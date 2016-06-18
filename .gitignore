@@ -1,0 +1,17 @@
+
+### Java ###
+*.class
+*.jar
+*.war
+*.ear
+
+### Eclipse ###
+.settings/
+.recommenders
+.classpath
+.project
+target/
+
+
+### Others ###
+design
