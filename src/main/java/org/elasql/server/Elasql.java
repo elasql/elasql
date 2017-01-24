@@ -28,7 +28,7 @@ import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashBasedPartitionMetaMgr;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.util.DDProperties;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 
 public class Elasql extends VanillaDb {
@@ -39,7 +39,18 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB.
 	 */
 	public enum ServiceType {
-		NAIVE, CALVIN
+		NAIVE, CALVIN;
+		
+		static ServiceType fromInteger(int index) {
+			switch (index) {
+			case 0:
+				return NAIVE;
+			case 1:
+				return CALVIN;
+			default:
+				throw new RuntimeException("Unsupport service type");
+			}
+		}
 	}
 
 	private static ServiceType serviceType;
@@ -69,10 +80,10 @@ public class Elasql extends VanillaDb {
 			logger.info("vanilladddb initializing...");
 
 		// read service type properties
-		int type = DDProperties.getLoader().getPropertyAsInteger(
+		int type = ElasqlProperties.getLoader().getPropertyAsInteger(
 				Elasql.class.getName() + ".SERVICE_TYPE",
 				ServiceType.NAIVE.ordinal());
-		serviceType = ServiceType.values()[type];
+		serviceType = ServiceType.fromInteger(type);
 		if (logger.isLoggable(Level.INFO))
 			logger.info("using " + serviceType + " type service");
 
@@ -130,7 +141,7 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static void initPartitionMetaMgr() {
-		Class<?> parMgrCls = DDProperties.getLoader().getPropertyAsClass(
+		Class<?> parMgrCls = ElasqlProperties.getLoader().getPropertyAsClass(
 				Elasql.class.getName() + ".PARTITION_META_MGR",
 				HashBasedPartitionMetaMgr.class, PartitionMetaMgr.class);
 

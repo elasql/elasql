@@ -15,7 +15,7 @@
  ******************************************************************************/
 package org.elasql.storage.log;
 
-import org.elasql.util.DDProperties;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.storage.log.LogMgr;
 
 /**
@@ -30,7 +30,7 @@ public class DdLogMgr extends LogMgr {
 	public static final String DD_LOG_FILE;
 
 	static {
-		DD_LOG_FILE = DDProperties.getLoader().getPropertyAsString(
+		DD_LOG_FILE = ElasqlProperties.getLoader().getPropertyAsString(
 				DdLogMgr.class.getName() + ".LOG_FILE", "vanilladddb.log");
 	}
 

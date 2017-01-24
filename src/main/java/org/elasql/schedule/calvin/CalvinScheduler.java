@@ -22,7 +22,7 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
 import org.elasql.server.task.calvin.CalvinStoredProcedureTask;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
-import org.elasql.util.DDProperties;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
@@ -33,7 +33,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 
 	static {
-		FACTORY_CLASS = DDProperties.getLoader().getPropertyAsClass(
+		FACTORY_CLASS = ElasqlProperties.getLoader().getPropertyAsClass(
 				CalvinScheduler.class.getName() + ".FACTORY_CLASS", null,
 				CalvinStoredProcedureFactory.class);
 		if (FACTORY_CLASS == null)

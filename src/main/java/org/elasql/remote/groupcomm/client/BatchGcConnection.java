@@ -24,7 +24,7 @@ import java.util.logging.Logger;
 
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
-import org.elasql.util.DDProperties;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.comm.client.ClientAppl;
 import org.vanilladb.comm.client.ClientNodeFailListener;
 import org.vanilladb.comm.client.ClientP2pMessageListener;
@@ -49,7 +49,7 @@ public class BatchGcConnection implements ClientP2pMessageListener,
 	private Map<Integer, Long> rteIdtoTxNumMap = new HashMap<Integer, Long>();
 
 	static {
-		BATCH_SIZE = DDProperties.getLoader().getPropertyAsInteger(
+		BATCH_SIZE = ElasqlProperties.getLoader().getPropertyAsInteger(
 				BatchGcConnection.class.getName() + ".BATCH_SIZE", 1);
 	}
 
@@ -72,7 +72,7 @@ public class BatchGcConnection implements ClientP2pMessageListener,
 	public void run() {
 		// periodically send batch of requests
 		if (logger.isLoggable(Level.INFO))
-			logger.info("start periodically send batched request...");
+			logger.info("start request-batching worker");
 
 		while (true) {
 			sendBatchRequestToDb();

@@ -16,25 +16,32 @@
 package org.elasql.storage.metadata;
 
 import org.elasql.sql.RecordKey;
-import org.elasql.util.DDProperties;
+import org.elasql.util.ElasqlProperties;
 
 public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
 
 	static {
-		NUM_PARTITIONS = DDProperties.getLoader().getPropertyAsInteger(
-				PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
+		NUM_PARTITIONS = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 	}
 
-	// TODO: usage
+	/**
+	 * Check if a record is fully replicated on each node.
+	 * 
+	 * @param key
+	 *            the key of the record
+	 * @return if the record is fully replicated
+	 */
 	public abstract boolean isFullyReplicated(RecordKey key);
 
 	/**
 	 * Decides the partition of each record.
 	 * 
 	 * @param key
-	 * @return the partition id
+	 *            the key of the record
+	 * @return the id of the partition where the record is
 	 */
 	public abstract int getPartition(RecordKey key);
 }

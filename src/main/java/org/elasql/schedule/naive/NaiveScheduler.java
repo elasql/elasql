@@ -23,7 +23,7 @@ import org.elasql.schedule.DdStoredProcedure;
 import org.elasql.schedule.Scheduler;
 import org.elasql.server.task.naive.NaiveStoredProcedureTask;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
-import org.elasql.util.DDProperties;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
@@ -34,7 +34,7 @@ public class NaiveScheduler extends Task implements Scheduler {
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 	
 	static {
-		FACTORY_CLASS = DDProperties.getLoader().getPropertyAsClass(
+		FACTORY_CLASS = ElasqlProperties.getLoader().getPropertyAsClass(
 				NaiveScheduler.class.getName() + ".FACTORY_CLASS", null,
 				NaiveStoredProcedureFactory.class);
 		if (FACTORY_CLASS == null)

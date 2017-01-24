@@ -269,8 +269,13 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
 		int localNodeId = Elasql.serverId();
-
-		readPerNode[nodeId]++;
+		
+		try {
+			readPerNode[nodeId]++;
+		} catch (Exception e) {
+			System.out.println(readKey);
+			throw e;
+		}
 
 		if (nodeId == localNodeId)
 			localReadKeys.add(readKey);

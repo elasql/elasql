@@ -13,22 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.storage.metadata;
+package org.elasql.util;
 
-import org.elasql.sql.RecordKey;
+import org.vanilladb.core.util.PropertiesLoader;
 
-public class HashBasedPartitionMetaMgr extends PartitionMetaMgr {
+public class ElasqlProperties extends PropertiesLoader {
+
+	private static ElasqlProperties loader;
+	
+	public static ElasqlProperties getLoader() {
+		// Singleton
+		if (loader == null)
+			loader = new ElasqlProperties();
+		return loader;
+	}
+	
+	protected ElasqlProperties() {
+		super();
+	}
 	
 	@Override
-	public boolean isFullyReplicated(RecordKey key) {
-		return false;
+	protected String getConfigFilePath() {
+		return System.getProperty("org.elasql.config.file");
 	}
 
-	@Override
-	public int getPartition(RecordKey key) {
-		/*
-		 * Hard code the partitioning rules.
-		 */
-		return key.hashCode() % NUM_PARTITIONS;
-	}
 }
