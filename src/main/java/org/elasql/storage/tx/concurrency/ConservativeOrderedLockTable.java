@@ -23,21 +23,20 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
 
 public class ConservativeOrderedLockTable {
 	enum LockType {
-		IS_LOCK, IX_LOCK, S_LOCK, SIX_LOCK, X_LOCK, WRITE_BACK_LOCK
+		IS_LOCK, IX_LOCK, S_LOCK, SIX_LOCK, X_LOCK
 	}
 
 	class Lockers {
 		List<Long> sLockers, ixLockers, isLockers;
 		// only one tx can hold xLock(sixLock) on single item
-		long sixLocker, xLocker, wbLocker;
+		long sixLocker, xLocker;
 		static final long NONE = -1; // for sixLocker, xLocker and wbLocker
 
-		Queue<Long> requestQueue, writeBackQueue;
+		Queue<Long> requestQueue;
 
 		Lockers() {
 			sLockers = new LinkedList<Long>();
@@ -46,9 +45,17 @@ public class ConservativeOrderedLockTable {
 			sixLocker = NONE;
 			xLocker = NONE;
 			requestQueue = new LinkedList<Long>();
-
-			wbLocker = NONE;
-			writeBackQueue = new LinkedList<Long>();
+		}
+		
+		@Override
+		public String toString() {
+			return "{S: " + sLockers +
+					", IX" + ixLockers +
+					", IS" + isLockers +
+					", SIX" + sixLocker +
+					", X" + xLocker +
+					", requests: " + requestQueue +
+					"}";
 		}
 	}
 
@@ -69,17 +76,6 @@ public class ConservativeOrderedLockTable {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
-	}
-
-	// TODO: Check if we needs this method
-	public void requestWriteBackLocks(RecordKey[] keys, long txNum) {
-		if (keys != null)
-			for (RecordKey wt : keys) {
-				synchronized (getAnchor(wt)) {
-					Lockers lockers = prepareLockers(wt);
-					lockers.writeBackQueue.add(txNum);
-				}
-			}
 	}
 
 	/**
@@ -169,6 +165,8 @@ public class ConservativeOrderedLockTable {
 	void xLock(Object obj, long txNum) {
 		synchronized (getAnchor(obj)) {
 			Lockers lockers = prepareLockers(obj);
+			
+//			System.out.println("Tx." + txNum + " requests " + obj);
 
 			// check if it have already had lock
 			if (hasXLock(lockers, txNum)) {
@@ -184,6 +182,7 @@ public class ConservativeOrderedLockTable {
 				Long head = lockers.requestQueue.peek();
 				while (!xLockable(lockers, txNum)
 						|| (head != null && head.longValue() != txNum)) {
+//					System.out.println("Tx." + txNum + " look the list of " + obj + ":\n" + lockers);
 					getAnchor(obj).wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
@@ -198,6 +197,8 @@ public class ConservativeOrderedLockTable {
 				throw new LockAbortException(
 						"Interrupted when waitting for lock");
 			}
+			
+//			System.out.println("Tx." + txNum + " got " + obj);
 		}
 	}
 
@@ -338,43 +339,6 @@ public class ConservativeOrderedLockTable {
 		}
 	}
 
-	// TODO: check this method
-	void wbLock(Object obj, long txNum) {
-		synchronized (getAnchor(obj)) {
-			Lockers lockers = prepareLockers(obj);
-
-			// check if it have already had lock
-			if (hasWbLock(lockers, txNum)) {
-				lockers.writeBackQueue.remove(txNum);
-				return;
-			}
-
-			try {
-				/*
-				 * If this transaction is not the first one requesting this
-				 * object or it cannot get lock on this object, it must wait.
-				 */
-				Long head = lockers.writeBackQueue.peek();
-				while (!wbLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
-					getAnchor(obj).wait();
-					lockers = prepareLockers(obj);
-					head = lockers.writeBackQueue.peek();
-				}
-
-				// get the write back lock
-				lockers.writeBackQueue.poll();
-				lockers.wbLocker = txNum;
-
-				// System.out.println("WB lock" + obj + "txnum: " + txNum);
-				getObjectSet(txNum).add(obj);
-			} catch (InterruptedException e) {
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
-			}
-		}
-	}
-
 	/**
 	 * Releases the specified type of lock on an item holding by a transaction.
 	 * If a lock is the last lock on that block, then the waiting transactions
@@ -401,15 +365,14 @@ public class ConservativeOrderedLockTable {
 			// Check if this transaction have any other lock on this object
 			if (!hasSLock(lks, txNum) && !hasXLock(lks, txNum)
 					&& !hasSixLock(lks, txNum) && !hasIsLock(lks, txNum)
-					&& !hasIxLock(lks, txNum) && !wbLocked(lks)) {
+					&& !hasIxLock(lks, txNum)) {
 				getObjectSet(txNum).remove(obj);
 
 				// Remove the locker, if there is no other transaction
 				// having it
 				if (!sLocked(lks) && !xLocked(lks) && !sixLocked(lks)
-						&& !isLocked(lks) && !ixLocked(lks) && !wbLocked(lks)
-						&& lks.requestQueue.isEmpty()
-						&& lks.writeBackQueue.isEmpty())
+						&& !isLocked(lks) && !ixLocked(lks)
+						&& lks.requestQueue.isEmpty())
 					lockerMap.remove(obj);
 			}
 		}
@@ -446,9 +409,6 @@ public class ConservativeOrderedLockTable {
 				if (hasIxLock(lks, txNum))
 					releaseLock(lks, txNum, LockType.IX_LOCK, anchor);
 
-				if (hasWbLock(lks, txNum))
-					releaseLock(lks, txNum, LockType.WRITE_BACK_LOCK, anchor);
-
 				// Remove the locker, if there is no other transaction
 				// having it
 				// if (lks == null) {
@@ -458,9 +418,8 @@ public class ConservativeOrderedLockTable {
 				// System.out.println("Release: " + obj + "txnum: " + txNum);
 				// }
 				if (!sLocked(lks) && !xLocked(lks) && !sixLocked(lks)
-						&& !isLocked(lks) && !ixLocked(lks) && !wbLocked(lks)
-						&& lks.requestQueue.isEmpty()
-						&& lks.writeBackQueue.isEmpty())
+						&& !isLocked(lks) && !ixLocked(lks)
+						&& lks.requestQueue.isEmpty())
 					lockerMap.remove(obj);
 			}
 		}
@@ -547,12 +506,6 @@ public class ConservativeOrderedLockTable {
 					anchor.notifyAll();
 			}
 			return;
-		case WRITE_BACK_LOCK:
-			if (lks.wbLocker == txNum) {
-				lks.wbLocker = -1;
-				anchor.notifyAll();
-			}
-			return;
 		default:
 			throw new IllegalArgumentException();
 		}
@@ -561,10 +514,6 @@ public class ConservativeOrderedLockTable {
 	/*
 	 * Verify if an item is locked.
 	 */
-
-	private boolean wbLocked(Lockers lks) {
-		return lks != null && lks.wbLocker != -1;
-	}
 
 	private boolean sLocked(Lockers lks) {
 		return lks != null && lks.sLockers.size() > 0;
@@ -596,10 +545,6 @@ public class ConservativeOrderedLockTable {
 
 	private boolean hasXLock(Lockers lks, long txNUm) {
 		return lks != null && lks.xLocker == txNUm;
-	}
-
-	private boolean hasWbLock(Lockers lks, long txNUm) {
-		return lks != null && lks.wbLocker == txNUm;
 	}
 
 	private boolean hasSixLock(Lockers lks, long txNum) {
@@ -642,10 +587,6 @@ public class ConservativeOrderedLockTable {
 	/*
 	 * Verify if an item is lockable to a tx.
 	 */
-
-	private boolean wbLockable(Lockers lks, long txNum) {
-		return (!wbLocked(lks) || hasWbLock(lks, txNum));
-	}
 
 	private boolean sLockable(Lockers lks, long txNum) {
 		return (!xLocked(lks) || hasXLock(lks, txNum))

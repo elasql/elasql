@@ -45,10 +45,12 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 
 	private ServerAppl serverAppl;
 	private int myId;
+	private boolean sequencerMode;
 	private BlockingQueue<TotalOrderMessage> tomQueue = new LinkedBlockingQueue<TotalOrderMessage>();
 
-	public ConnectionMgr(int id) {
+	public ConnectionMgr(int id, boolean seqMode) {
 		myId = id;
+		sequencerMode = seqMode;
 		serverAppl = new ServerAppl(id, this, this, this);
 		serverAppl.start();
 
@@ -61,26 +63,29 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 			e.printStackTrace();
 		}
 		serverAppl.startPFD();
-		VanillaDb.taskMgr().runTask(new Task() {
-
-			@Override
-			public void run() {
-				while (true) {
-					try {
-						TotalOrderMessage tom = tomQueue.take();
-						for (int i = 0; i < tom.getMessages().length; ++i) {
-							StoredProcedureCall spc = (StoredProcedureCall) tom
-									.getMessages()[i];
-							spc.setTxNum(tom.getTotalOrderIdStart() + i);
-							Elasql.scheduler().schedule(spc);
+		
+		if (!sequencerMode) {
+			VanillaDb.taskMgr().runTask(new Task() {
+	
+				@Override
+				public void run() {
+					while (true) {
+						try {
+							TotalOrderMessage tom = tomQueue.take();
+							for (int i = 0; i < tom.getMessages().length; ++i) {
+								StoredProcedureCall spc = (StoredProcedureCall) tom
+										.getMessages()[i];
+								spc.setTxNum(tom.getTotalOrderIdStart() + i);
+								Elasql.scheduler().schedule(spc);
+							}
+						} catch (InterruptedException e) {
+							e.printStackTrace();
 						}
-					} catch (InterruptedException e) {
-						e.printStackTrace();
 					}
+	
 				}
-
-			}
-		});
+			});
+		}
 	}
 
 	public void sendClientResponse(int clientId, int rteId, long txNum,
@@ -103,6 +108,9 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 
 	@Override
 	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
+		if (sequencerMode)
+			return;
+		
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
@@ -121,6 +129,9 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 
 	@Override
 	public void onRecvServerTotalOrderedMessage(TotalOrderMessage tom) {
+		if (sequencerMode)
+			return;
+		
 		try {
 			tomQueue.put(tom);
 		} catch (InterruptedException e) {

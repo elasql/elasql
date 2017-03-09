@@ -67,17 +67,21 @@ public class Elasql extends VanillaDb {
 
 	/**
 	 * Initializes the system. This method is called during system startup.
+	 * For sequencers, it can set {@code initVanillaDb} as {@code false}
+	 * to avoid initializing underlying databases.
 	 * 
 	 * @param dirName
 	 *            the name of the database directory
 	 * @param id
 	 *            the id of the server
+	 * @param isSequencer
+	 *            is this server a sequencer
 	 */
-	public static void init(String dirName, int id) {
+	public static void init(String dirName, int id, boolean isSequencer) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
-			logger.info("vanilladddb initializing...");
+			logger.info("ElaSQL initializing...");
 
 		// read service type properties
 		int type = ElasqlProperties.getLoader().getPropertyAsInteger(
@@ -86,7 +90,13 @@ public class Elasql extends VanillaDb {
 		serviceType = ServiceType.fromInteger(type);
 		if (logger.isLoggable(Level.INFO))
 			logger.info("using " + serviceType + " type service");
-
+		
+		if (isSequencer) {
+			logger.info("initializing using Sequencer mode");
+			initConnectionMgr(myNodeId, true);
+			return;
+		}
+		
 		// initialize core modules
 		VanillaDb.init(dirName, VanillaDb.BufferMgrType.DefaultBufferMgr);
 		
@@ -94,7 +104,7 @@ public class Elasql extends VanillaDb {
 		initCacheMgr();
 		initPartitionMetaMgr();
 		initScheduler();
-		initConnectionMgr(myNodeId);
+		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
 	}
 
@@ -154,8 +164,8 @@ public class Elasql extends VanillaDb {
 		}
 	}
 
-	public static void initConnectionMgr(int id) {
-		connMgr = new ConnectionMgr(id);
+	public static void initConnectionMgr(int id, boolean isSequencer) {
+		connMgr = new ConnectionMgr(id, isSequencer);
 	}
 
 	public static void initDdLogMgr() {

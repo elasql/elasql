@@ -88,7 +88,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 						sp);
 
 				// perform conservative locking
-				spt.lockConservatively();
+				spt.bookConservativeLocks();
 
 				// hand over to a thread to run the task
 				VanillaDb.taskMgr().runTask(spt);

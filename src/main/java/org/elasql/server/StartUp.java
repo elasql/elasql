@@ -24,9 +24,17 @@ public class StartUp {
 	public static void main(String args[]) throws Exception {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("initing...");
-
+		
+		// For initializing VanillaDb
+		boolean isSeq = false;
+		if (args.length > 2) {
+			int num = Integer.parseInt(args[2]);
+			if (num == 1)
+				isSeq = true; 
+		}
+		
 		// configure and initialize the database
-		Elasql.init(args[0], Integer.parseInt(args[1]));
+		Elasql.init(args[0], Integer.parseInt(args[1]), isSeq);
 
 		if (logger.isLoggable(Level.INFO))
 			logger.info("dd database server ready");

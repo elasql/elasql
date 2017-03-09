@@ -16,10 +16,8 @@
 package org.elasql.schedule.calvin;
 
 import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -46,6 +44,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected long txNum;
 	protected H paramHelper;
 	protected int localNodeId = Elasql.serverId();
+	protected CalvinCacheMgr cacheMgr;
 
 	// Participants
 	// Active Participants: Nodes that need to write records locally
@@ -59,24 +58,21 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private int masterNode;
 
 	// Record keys
-	private List<String> localReadTables = new ArrayList<String>();
-	private List<String> localWriteTables = new ArrayList<String>();
-	private List<RecordKey> localReadKeys = new ArrayList<RecordKey>();
-	private List<RecordKey> localWriteKeys = new ArrayList<RecordKey>();
-	private List<RecordKey> remoteReadKeys = new ArrayList<RecordKey>();
+	// XXX: Do we need table-level locks ?
+	private Set<RecordKey> localReadKeys = new HashSet<RecordKey>();
+	private Set<RecordKey> localWriteKeys = new HashSet<RecordKey>();
+	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
+	private Set<RecordKey> remoteReadKeys = new HashSet<RecordKey>();
 
 	// Records
 	private Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
 
-	private ConservativeOrderedCcMgr ccMgr;
-	private String[] readTablesForLock, writeTablesForLock;
-	private RecordKey[] readKeysForLock, writeKeysForLock;
-	
-	private CalvinCacheMgr cacheMgr = (CalvinCacheMgr) Elasql.cacheMgr();
-
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
+		
+		cacheMgr = (CalvinCacheMgr) Elasql.cacheMgr();
+		localNodeId = Elasql.serverId();
 
 		if (paramHelper == null)
 			throw new NullPointerException("paramHelper should not be null");
@@ -115,11 +111,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// create transaction
 		boolean isReadOnly = paramHelper.isReadOnly();
-		this.tx = Elasql.txMgr().newTransaction(
+		tx = Elasql.txMgr().newTransaction(
 				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
-		this.ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		this.tx.addLifecycleListener(new DdRecoveryMgr(tx
-				.getTransactionNumber()));
+		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 
 		// prepare keys
 		prepareKeys();
@@ -128,30 +122,18 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		masterNode = decideMaster();
 	}
 
-	public void requestConservativeLocks() {
-		readTablesForLock = localReadTables.toArray(new String[0]);
-		writeTablesForLock = localWriteTables.toArray(new String[0]);
-
-		readKeysForLock = localReadKeys.toArray(new RecordKey[0]);
-		writeKeysForLock = localWriteKeys.toArray(new RecordKey[0]);
-
-		ccMgr.prepareSp(readTablesForLock, writeTablesForLock);
-		ccMgr.prepareSp(readKeysForLock, writeKeysForLock);
+	public void bookConservativeLocks() {
+		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
+		
+		ccMgr.bookReadKeys(localReadKeys);
+		ccMgr.bookWriteKeys(localWriteKeys);
+		ccMgr.bookWriteKeys(localInsertKeys);
 	}
 
 	private void getConservativeLocks() {
-		ccMgr.executeSp(readTablesForLock, writeTablesForLock);
-		ccMgr.executeSp(readKeysForLock, writeKeysForLock);
-	}
-
-	@Override
-	public final RecordKey[] getReadSet() {
-		return localReadKeys.toArray(new RecordKey[0]);
-	}
-
-	@Override
-	public final RecordKey[] getWriteSet() {
-		return localWriteKeys.toArray(new RecordKey[0]);
+		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
+		
+		ccMgr.requestLocks();
 	}
 
 	@Override
@@ -192,8 +174,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	public boolean isParticipated() {
 		if (masterNode == localNodeId)
 			return true;
-		return localReadTables.size() != 0 || localWriteTables.size() != 0
-				|| localReadKeys.size() != 0 || localWriteKeys.size() != 0;
+		return localReadKeys.size() != 0 || localWriteKeys.size() != 0 ||
+				localInsertKeys.size() != 0;
 	}
 
 	@Override
@@ -268,14 +250,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected void addReadKey(RecordKey readKey) {
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
-		int localNodeId = Elasql.serverId();
 		
-		try {
-			readPerNode[nodeId]++;
-		} catch (Exception e) {
-			System.out.println(readKey);
-			throw e;
-		}
+		readPerNode[nodeId]++;
 
 		if (nodeId == localNodeId)
 			localReadKeys.add(readKey);
@@ -286,7 +262,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected void addWriteKey(RecordKey writeKey) {
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(writeKey);
-		int localNodeId = Elasql.serverId();
 
 		writePerNode[nodeId]++;
 
@@ -294,13 +269,20 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			localWriteKeys.add(writeKey);
 		activeParticipants.add(nodeId);
 	}
+	
+	protected void addInsertKey(RecordKey insertKey) {
+		// Check which node has the corresponding record
+		int nodeId = Elasql.partitionMetaMgr().getPartition(insertKey);
+
+		writePerNode[nodeId]++;
+
+		if (nodeId == localNodeId)
+			localInsertKeys.add(insertKey);
+		activeParticipants.add(nodeId);
+	}
 
 	protected Map<RecordKey, CachedRecord> getReadings() {
 		return readings;
-	}
-
-	protected List<RecordKey> getLocalWriteKeys() {
-		return localWriteKeys;
 	}
 	
 	protected void update(RecordKey key, CachedRecord rec) {
@@ -309,7 +291,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	}
 	
 	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
-		if (localWriteKeys.contains(key))
+		if (localInsertKeys.contains(key))
 			cacheMgr.insert(key, fldVals, tx);
 	}
 
@@ -369,6 +351,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private void removeCachedRecord() {
 		// write to local storage and remove cached records
 		for (RecordKey k : localWriteKeys) {
+			cacheMgr.flushToLocalStorage(k, txNum, tx);
+			cacheMgr.remove(k, txNum);
+		}
+		
+		for (RecordKey k : localInsertKeys) {
 			cacheMgr.flushToLocalStorage(k, txNum, tx);
 			cacheMgr.remove(k, txNum);
 		}

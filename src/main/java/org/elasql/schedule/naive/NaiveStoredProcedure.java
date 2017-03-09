@@ -43,7 +43,6 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	// Record keys
 	private List<RecordKey> readKeys = new ArrayList<RecordKey>();
 	private List<RecordKey> writeKeys = new ArrayList<RecordKey>();
-	private RecordKey[] readKeysForLock, writeKeysForLock;
 	
 	private NaiveCacheMgr cacheMgr = (NaiveCacheMgr) Elasql.cacheMgr();
 	
@@ -94,21 +93,8 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	public void requestConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx
 				.concurrencyMgr();
-
-		readKeysForLock = readKeys.toArray(new RecordKey[0]);
-		writeKeysForLock = writeKeys.toArray(new RecordKey[0]);
-
-		ccMgr.prepareSp(readKeysForLock, writeKeysForLock);
-	}
-
-	@Override
-	public final RecordKey[] getReadSet() {
-		return readKeysForLock;
-	}
-
-	@Override
-	public final RecordKey[] getWriteSet() {
-		return writeKeysForLock;
+		ccMgr.bookReadKeys(readKeys);
+		ccMgr.bookWriteKeys(writeKeys);
 	}
 
 	@Override
@@ -165,6 +151,6 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx
 				.concurrencyMgr();
-		ccMgr.executeSp(readKeysForLock, writeKeysForLock);
+		ccMgr.requestLocks();
 	}
 }

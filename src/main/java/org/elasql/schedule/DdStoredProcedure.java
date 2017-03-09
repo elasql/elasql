@@ -15,14 +15,9 @@
  ******************************************************************************/
 package org.elasql.schedule;
 
-import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 
 public interface DdStoredProcedure extends StoredProcedure {
-
-	RecordKey[] getReadSet();
-
-	RecordKey[] getWriteSet();
 
 	boolean isReadOnly();
 

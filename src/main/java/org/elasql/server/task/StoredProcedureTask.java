@@ -16,7 +16,6 @@
 package org.elasql.server.task;
 
 import org.elasql.schedule.DdStoredProcedure;
-import org.elasql.sql.RecordKey;
 import org.vanilladb.core.server.task.Task;
 
 public abstract class StoredProcedureTask extends Task {
@@ -34,14 +33,6 @@ public abstract class StoredProcedureTask extends Task {
 	}
 
 	public abstract void run();
-
-	public RecordKey[] getReadSet() {
-		return sp.getReadSet();
-	}
-
-	public RecordKey[] getWriteSet() {
-		return sp.getWriteSet();
-	}
 
 	public long getTxNum() {
 		return txNum;

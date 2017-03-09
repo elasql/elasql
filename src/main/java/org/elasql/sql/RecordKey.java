@@ -32,7 +32,6 @@ import org.vanilladb.core.sql.predicate.Expression;
 import org.vanilladb.core.sql.predicate.FieldNameExpression;
 import org.vanilladb.core.sql.predicate.Predicate;
 import org.vanilladb.core.sql.predicate.Term;
-import org.vanilladb.core.util.Timers;
 
 public class RecordKey implements Serializable {
 	/**
@@ -48,7 +47,6 @@ public class RecordKey implements Serializable {
 		this.tableName = tableName;
 		this.keyEntryMap = keyEntryMap;
 		genHashCode();
-		partition = Elasql.partitionMetaMgr().getPartition(this);
 	}
 
 	public RecordKey(String tableName, String[] flds, Constant[] vals) {
@@ -60,11 +58,13 @@ public class RecordKey implements Serializable {
 			map.put(flds[i], vals[i]);
 		this.keyEntryMap = map;
 		genHashCode();
-
-		partition = Elasql.partitionMetaMgr().getPartition(this);
 	}
 	
 	public int getPartition(){
+		// Lazy evaluation
+		if (partition == -1)
+			partition = Elasql.partitionMetaMgr().getPartition(this);
+		
 		return partition;
 	}
 	

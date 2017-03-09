@@ -15,6 +15,7 @@
  ******************************************************************************/
 package org.elasql.storage.tx.concurrency;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -26,90 +27,72 @@ import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
 
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	protected static ConservativeOrderedLockTable lockTbl = new ConservativeOrderedLockTable();
-
-	// TODO: We can record all objects locked by this transaction here
+	
+	private Set<Object> bookedObjs, readObjs, writeObjs;
 
 	public ConservativeOrderedCcMgr(long txNumber) {
 		txNum = txNumber;
+		bookedObjs = new HashSet<Object>();
+		readObjs = new HashSet<Object>();
+		writeObjs = new HashSet<Object>();
 	}
 
-	public void prepareSp(String[] readTables, String[] writeTables) {
-		if (readTables != null)
-			for (String rt : readTables)
-				lockTbl.requestLock(rt, txNum);
-
-		if (writeTables != null)
-			for (String wt : writeTables)
-				lockTbl.requestLock(wt, txNum);
-	}
-
-	public void executeSp(String[] readTables, String[] writeTables) {
-		if (writeTables != null)
-			for (String s : writeTables)
-				lockTbl.xLock(s, txNum);
-
-		if (readTables != null)
-			for (String s : readTables)
-				lockTbl.sLock(s, txNum);
-	}
-
-	public void prepareSp(RecordKey[] readKeys, RecordKey[] writeKeys) {
-		// If a transaction requests to take x lock on a object,
-		// it should not take s lock on the same object.
-		Set<RecordKey> writeSet = new HashSet<RecordKey>();
-		for (RecordKey wk : writeKeys)
-			writeSet.add(wk);
-		
-		if (readKeys != null)
-			for (RecordKey rt : readKeys)
-				if (!writeSet.contains(rt))
-					lockTbl.requestLock(rt, txNum);
-
-		if (writeKeys != null)
-			for (RecordKey wt : writeKeys)
-				lockTbl.requestLock(wt, txNum);
-	}
-
-	public void executeSp(RecordKey[] readKeys, RecordKey[] writeKeys) {
-		/*
-		 * TODO: should take intension lock on tables? If the structure of
-		 * record file may change, the ix lock on table level is needed.
-		 */
-		Set<RecordKey> writeSet = new HashSet<RecordKey>();
-		for (RecordKey wk : writeKeys)
-			writeSet.add(wk);
-		
-		if (readKeys != null)
-			for (RecordKey rt : readKeys) 
-				if (!writeSet.contains(rt))	{
-					// lockTbl.isLock(k.getTableName(), txNum);
-					lockTbl.sLock(rt, txNum);
-				}
-		
-		if (writeKeys != null)
-			for (RecordKey k : writeKeys) {
-				// lockTbl.ixLock(k.getTableName(), txNum);
-				lockTbl.xLock(k, txNum);
+	/**
+	 * Book the read lock of the specified object.
+	 * 
+	 * @param obj
+	 *            the object which the transaction wishes to lock on
+	 */
+	public void bookReadKeys(Collection<RecordKey> keys) {
+		if (keys != null) {
+			for (RecordKey key : keys) {
+				// The key needs to be booked only once. 
+				if (!bookedObjs.contains(key))
+					lockTbl.requestLock(key, txNum);
 			}
+			
+			bookedObjs.addAll(keys);
+			readObjs.addAll(keys);
+		}
 	}
-
-	public void finishSp(RecordKey[] readKeys, RecordKey[] writeKeys) {
-		if (writeKeys != null)
-			for (RecordKey k : writeKeys) {
-				// TODO: release table ixlock
-				lockTbl.release(k, txNum,
-						ConservativeOrderedLockTable.LockType.X_LOCK);
+	
+	/**
+	 * Book the write lock of the specified object.
+	 * 
+	 * @param obj
+	 *            the object which the transaction wishes to lock on
+	 */
+	public void bookWriteKeys(Collection<RecordKey> keys) {
+		if (keys != null) {
+			for (RecordKey key : keys) {
+				// The key needs to be booked only once. 
+				if (!bookedObjs.contains(key))
+					lockTbl.requestLock(key, txNum);
 			}
-
-		if (readKeys != null)
-			for (RecordKey k : readKeys) {
-				// TODO: release table islock
-				lockTbl.release(k, txNum,
-						ConservativeOrderedLockTable.LockType.S_LOCK);
-			}
+			
+			bookedObjs.addAll(keys);
+			writeObjs.addAll(keys);
+		}
+	}
+	
+	/**
+	 * Request (get the locks immediately) the locks which the transaction
+	 * has booked. If the locks can not be obtained in the time, it will
+	 * make the thread wait until it can obtain all locks it requests.
+	 */
+	public void requestLocks() {
+		for (Object obj : writeObjs)
+			lockTbl.xLock(obj, txNum);
+		
+		for (Object obj : readObjs)
+			if (!writeObjs.contains(obj))
+				lockTbl.sLock(obj, txNum);
 	}
 
 	public void onTxCommit(Transaction tx) {
+		// TODO: Since we have known what we have locked, we
+		// might be able to specify what we want to unlock here.
+		// It can save the shared data structure in the LockTable.
 		lockTbl.releaseAll(txNum);
 	}
 
@@ -119,23 +102,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 
 	public void onTxEndStatement(Transaction tx) {
 		// do nothing
-	}
-
-	public void prepareWriteBack(RecordKey... keys) {
-		lockTbl.requestWriteBackLocks(keys, txNum);
-	}
-
-	public void executeWriteBack(RecordKey... keys) {
-		if (keys != null)
-			for (RecordKey k : keys)
-				lockTbl.wbLock(k, txNum);
-	}
-
-	public void releaseWriteBackLock(RecordKey... keys) {
-		if (keys != null)
-			for (RecordKey k : keys)
-				lockTbl.release(k, txNum,
-						ConservativeOrderedLockTable.LockType.WRITE_BACK_LOCK);
 	}
 
 	@Override
@@ -231,8 +197,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void crabBackDirBlockForModification(BlockId blk) {
-		lockTbl.release(blk, txNum,
-				ConservativeOrderedLockTable.LockType.X_LOCK);
+		lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
 		writtenIndexBlks.remove(blk);
 	}
 
@@ -243,18 +208,15 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void crabBackDirBlockForRead(BlockId blk) {
-		lockTbl.release(blk, txNum,
-				ConservativeOrderedLockTable.LockType.S_LOCK);
+		lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
 		readIndexBlks.remove(blk);
 	}
 
 	public void releaseIndexLocks() {
 		for (BlockId blk : readIndexBlks)
-			lockTbl.release(blk, txNum,
-					ConservativeOrderedLockTable.LockType.S_LOCK);
+			lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
 		for (BlockId blk : writtenIndexBlks)
-			lockTbl.release(blk, txNum,
-					ConservativeOrderedLockTable.LockType.X_LOCK);
+			lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
 		readIndexBlks.clear();
 		writtenIndexBlks.clear();
 	}
@@ -264,8 +226,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	}
 
 	public void releaseRecordFileHeader(BlockId blk) {
-		lockTbl.release(blk, txNum,
-				ConservativeOrderedLockTable.LockType.X_LOCK);
+		lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
 	}
 
 	@Override

@@ -72,7 +72,7 @@ public class BatchGcConnection implements ClientP2pMessageListener,
 	public void run() {
 		// periodically send batch of requests
 		if (logger.isLoggable(Level.INFO))
-			logger.info("start request-batching worker");
+			logger.info("start batching-request worker");
 
 		while (true) {
 			sendBatchRequestToDb();

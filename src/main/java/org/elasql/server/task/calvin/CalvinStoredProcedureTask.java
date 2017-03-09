@@ -53,7 +53,7 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 		// Timers.reportTime();
 	}
 
-	public void lockConservatively() {
-		csp.requestConservativeLocks();
+	public void bookConservativeLocks() {
+		csp.bookConservativeLocks();
 	}
 }
