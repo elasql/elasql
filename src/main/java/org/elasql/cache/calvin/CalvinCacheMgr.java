@@ -15,98 +15,147 @@
  ******************************************************************************/
 package org.elasql.cache.calvin;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 
-import org.elasql.cache.CacheMgr;
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.VanillaCoreCrud;
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.storage.tx.TransactionLifecycleListener;
 
 /**
- * The class that deal with remote wait
- * 
+ * The class that deal with remote records for parent transaction.
  */
-
-// TODO remove unnecessary code
-public class CalvinCacheMgr implements CacheMgr {
-	// private static long MAX_TIME = 30000;
-	private BasicCacheMgr cacheMgr;
-
-	private final Object[] anchors = new Object[1009];
-
-	public CalvinCacheMgr() {
-		cacheMgr = new BasicCacheMgr();
-		for (int i = 0; i < anchors.length; ++i) {
-			anchors[i] = new Object();
+public class CalvinCacheMgr implements TransactionLifecycleListener {
+	
+	private static class KeyRecordPair {
+		RecordKey key;
+		CachedRecord record;
+		
+		KeyRecordPair(RecordKey key, CachedRecord record) {
+			this.key = key;
+			this.record = record;
 		}
 	}
+	
+	// For single thread
+	private CalvinRecordDispatcher dispatcher;
+	private Transaction tx;
+	
+	// Cached records
+	private Map<RecordKey, CachedRecord> cachedRecords;
+	
+	// For multi-threading
+	private BlockingQueue<KeyRecordPair> inbox;
 
-	private Object prepareAnchor(Object o) {
-		int hash = o.hashCode() % anchors.length;
-		if (hash < 0) {
-			hash += anchors.length;
-		}
-		return anchors[hash];
+	public CalvinCacheMgr(Transaction tx) {
+		this.tx = tx;
+		this.dispatcher = (CalvinRecordDispatcher) Elasql.remoteRecReceiver();
+		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
+		
+		// Register this CacheMgr
+		this.dispatcher.registerCacheMgr(tx.getTransactionNumber(), this);
 	}
 
-	public void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
-		// System.out.println("cache " + key + " src:" + rec.getSrcTxNum());
-		synchronized (prepareAnchor(key)) {
-			cacheMgr.cacheRecord(key, rec);
-			prepareAnchor(key).notifyAll();
-		}
+	@Override
+	public void onTxCommit(Transaction tx) {
+		dispatcher.unregisterCacheMgr(tx.getTransactionNumber());
+		flushLocalRecords();
 	}
 
-	public void flushToLocalStorage(RecordKey key, long srcTxNum, Transaction tx) {
-		cacheMgr.flushToLocalStorage(key, srcTxNum, tx);
+	@Override
+	public void onTxRollback(Transaction tx) {
+		dispatcher.unregisterCacheMgr(tx.getTransactionNumber());
 	}
 
-	public void remove(RecordKey key, long srcTxNum) {
-		cacheMgr.remove(key, srcTxNum);
+	@Override
+	public void onTxEndStatement(Transaction tx) {
+		// Do nothing
 	}
 
-	public CachedRecord read(RecordKey key, long srcTxNum, Transaction tx,
-			boolean srcIsLocal) {
-		CachedRecord rec;
-
-		if (!srcIsLocal) { // not received the remote record yet
-			try {
-				synchronized (prepareAnchor(key)) {
-					rec = cacheMgr.read(key, srcTxNum, tx, srcIsLocal);
-					while (rec == null) {
-						prepareAnchor(key).wait();
-						rec = cacheMgr.read(key, srcTxNum, tx, srcIsLocal);
-					}
-
-				}
-			} catch (InterruptedException e) {
-				throw new RuntimeException();
+	public CachedRecord read(RecordKey key) {
+		CachedRecord rec = cachedRecords.get(key);
+		
+		if (rec == null) {
+			// Check if it is in the local
+			if (key.getPartition() == Elasql.serverId()) {
+				rec = readFromLocal(key);
+			} else {
+				rec = readFromRemote(key);
 			}
-		} else {
-			rec = cacheMgr.read(key, srcTxNum, tx, srcIsLocal);
+		}
+		
+		return rec;
+	}
+
+	public void update(RecordKey key, CachedRecord rec) {
+		rec.setSrcTxNum(tx.getTransactionNumber());
+		cachedRecords.put(key, rec);
+	}
+
+	public void insert(RecordKey key, Map<String, Constant> fldVals) {
+		CachedRecord rec = new CachedRecord(fldVals);
+		rec.setSrcTxNum(tx.getTransactionNumber());
+		rec.setNewInserted(true);
+		cachedRecords.put(key, rec);
+	}
+
+	public void delete(RecordKey key) {
+		CachedRecord dummyRec = new CachedRecord();
+		dummyRec.setSrcTxNum(tx.getTransactionNumber());
+		dummyRec.delete();
+		cachedRecords.put(key, dummyRec);
+	}
+	
+	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
+		inbox.add(new KeyRecordPair(key, rec));
+	}
+	
+	private CachedRecord readFromLocal(RecordKey key) {
+		CachedRecord rec = VanillaCoreCrud.read(key, tx);
+
+		if (rec != null) {
+			rec.setSrcTxNum(tx.getTransactionNumber());
+			cachedRecords.put(key, rec);
+		}
+		
+		return rec;
+	}
+	
+	private CachedRecord readFromRemote(RecordKey key) {
+		CachedRecord rec = null;
+		
+		try {
+			KeyRecordPair pair = inbox.take();
+			while (!pair.key.equals(key)) {
+				cachedRecords.put(pair.key, pair.record);
+				pair = inbox.take();
+			}
+			rec = pair.record;
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 
 		return rec;
 	}
-
-	/*
-	 * TODO: Deprecated public void update(RecordKey key, Map<String, Constant>
-	 * fldVals, Transaction tx) { // need to update the whole flds of a record
-	 * cacheMgr.update(key, fldVals, tx); }
-	 */
-
-	public void update(RecordKey key, CachedRecord rec, Transaction tx) {
-		// need to update the whole flds of a record
-		cacheMgr.update(key, rec, tx);
-	}
-
-	public void insert(RecordKey key, Map<String, Constant> fldVals,
-			Transaction tx) {
-		cacheMgr.insert(key, fldVals, tx);
-	}
-
-	public void delete(RecordKey key, Transaction tx) {
-		cacheMgr.delete(key, tx);
+	
+	private void flushLocalRecords() {
+		for (Map.Entry<RecordKey, CachedRecord> entry : cachedRecords.entrySet()) {
+			RecordKey key = entry.getKey();
+			CachedRecord rec = entry.getValue();
+			
+			if (key.getPartition() == Elasql.serverId()) {
+				if (rec.isDeleted())
+					VanillaCoreCrud.delete(key, tx);
+				else if (rec.isNewInserted())
+					VanillaCoreCrud.insert(key, rec, tx);
+				else if (rec.isDirty())
+					VanillaCoreCrud.update(key, rec, tx);
+			}
+		}
 	}
 }

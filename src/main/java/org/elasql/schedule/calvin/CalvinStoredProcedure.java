@@ -70,9 +70,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
-		
-		cacheMgr = (CalvinCacheMgr) Elasql.cacheMgr();
-		localNodeId = Elasql.serverId();
+		this.localNodeId = Elasql.serverId();
 
 		if (paramHelper == null)
 			throw new NullPointerException("paramHelper should not be null");
@@ -114,6 +112,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		tx = Elasql.txMgr().newTransaction(
 				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
 		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
+		
+		// create a cache manager
+		cacheMgr = new CalvinCacheMgr(tx);
+		tx.addLifecycleListener(cacheMgr);
 
 		// prepare keys
 		prepareKeys();
@@ -242,9 +244,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// The master node must collect final results
 		if (isMasterNode())
 			masterCollectResults(readings);
-
-		// Remove the cached records in CacheMgr
-		removeCachedRecord();
 	}
 
 	protected void addReadKey(RecordKey readKey) {
@@ -287,12 +286,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	
 	protected void update(RecordKey key, CachedRecord rec) {
 		if (localWriteKeys.contains(key))
-			cacheMgr.update(key, rec, tx);
+			cacheMgr.update(key, rec);
 	}
 	
 	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
 		if (localInsertKeys.contains(key))
-			cacheMgr.insert(key, fldVals, tx);
+			cacheMgr.insert(key, fldVals);
 	}
 
 	private void performLocalRead() {
@@ -303,7 +302,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Read local records
 		for (RecordKey k : localReadKeys) {
 			if (!partMgr.isFullyReplicated(k) || activeParticipants.contains(localNodeId)) {
-				CachedRecord rec = cacheMgr.read(k, txNum, tx, true);
+				CachedRecord rec = cacheMgr.read(k);
 				readings.put(k, rec);
 				localReadings.put(k, rec);
 			}
@@ -339,31 +338,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// Read remote records
 		for (RecordKey k : remoteReadKeys) {
-			CachedRecord rec = cacheMgr.read(k, txNum, tx, false);
+			CachedRecord rec = cacheMgr.read(k);
 			readings.put(k, rec);
 			remoteReadings.put(k, rec);
 		}
 
 		// Notify the implementation of subclass
 		onRemoteReadCollected(remoteReadings);
-	}
-
-	private void removeCachedRecord() {
-		// write to local storage and remove cached records
-		for (RecordKey k : localWriteKeys) {
-			cacheMgr.flushToLocalStorage(k, txNum, tx);
-			cacheMgr.remove(k, txNum);
-		}
-		
-		for (RecordKey k : localInsertKeys) {
-			cacheMgr.flushToLocalStorage(k, txNum, tx);
-			cacheMgr.remove(k, txNum);
-		}
-
-		// remove cached read records
-		for (RecordKey k : localReadKeys)
-			cacheMgr.remove(k, txNum);
-		for (RecordKey k : remoteReadKeys)
-			cacheMgr.remove(k, txNum);
 	}
 }

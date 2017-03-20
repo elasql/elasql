@@ -21,7 +21,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -105,13 +104,11 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	protected abstract void executeSql();
 
 	private void waitForNotification() {
-		CalvinCacheMgr cm = (CalvinCacheMgr) Elasql.cacheMgr();
-
 		// Wait for notification from other nodes
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
 			if (nodeId != Elasql.serverId()) {
 				RecordKey notKey = getFinishNotificationKey(nodeId);
-				CachedRecord rec = cm.read(notKey, txNum, tx, false);
+				CachedRecord rec = cacheMgr.read(notKey);
 				Constant con = rec.getVal(NOTIFICATION_FILED_NAME);
 				int value = (int) con.asJavaVal();
 				if (value != 1)

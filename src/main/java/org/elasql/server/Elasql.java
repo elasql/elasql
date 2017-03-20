@@ -18,8 +18,8 @@ package org.elasql.server;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.cache.CacheMgr;
-import org.elasql.cache.calvin.CalvinCacheMgr;
+import org.elasql.cache.RemoteRecordReceiver;
+import org.elasql.cache.calvin.CalvinRecordDispatcher;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.schedule.Scheduler;
@@ -58,7 +58,7 @@ public class Elasql extends VanillaDb {
 	// DD modules
 	private static ConnectionMgr connMgr;
 	private static PartitionMetaMgr parMetaMgr;
-	private static CacheMgr cacheMgr;
+	private static RemoteRecordReceiver remoteRecReceiver;
 	private static Scheduler scheduler;
 	private static DdLogMgr ddLogMgr;
 
@@ -115,10 +115,10 @@ public class Elasql extends VanillaDb {
 	public static void initCacheMgr() {
 		switch (serviceType) {
 		case NAIVE:
-			cacheMgr = new NaiveCacheMgr();
+			remoteRecReceiver = new NaiveCacheMgr();
 			break;
 		case CALVIN:
-			cacheMgr = new CalvinCacheMgr();
+			remoteRecReceiver = new CalvinRecordDispatcher();
 			break;
 		default:
 			throw new UnsupportedOperationException();
@@ -177,8 +177,8 @@ public class Elasql extends VanillaDb {
 	// 	Module Getters
 	// ================
 	
-	public static CacheMgr cacheMgr() {
-		return cacheMgr;
+	public static RemoteRecordReceiver remoteRecReceiver() {
+		return remoteRecReceiver;
 	}
 
 	public static Scheduler scheduler() {

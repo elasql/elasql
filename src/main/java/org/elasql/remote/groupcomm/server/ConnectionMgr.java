@@ -20,13 +20,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
-import org.elasql.server.Elasql.ServiceType;
 import org.vanilladb.comm.messages.ChannelType;
 import org.vanilladb.comm.messages.P2pMessage;
 import org.vanilladb.comm.messages.TotalOrderMessage;
@@ -114,15 +112,8 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
-			for (Tuple t : ts.getTupleSet()) {
-				if (Elasql.serviceType() == ServiceType.CALVIN) {
-					CalvinCacheMgr cacheMgr = (CalvinCacheMgr) Elasql
-							.cacheMgr();
-					cacheMgr.cacheRemoteRecord(t.key, t.rec);
-				} else
-					throw new IllegalArgumentException(
-							"Service Type Not Found Exception");
-			}
+			for (Tuple t : ts.getTupleSet())
+				Elasql.remoteRecReceiver().cacheRemoteRecord(t.key, t.rec);
 		} else
 			throw new IllegalArgumentException();
 	}
