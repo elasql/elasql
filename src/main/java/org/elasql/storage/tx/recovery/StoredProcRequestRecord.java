@@ -85,7 +85,7 @@ public class StoredProcRequestRecord implements DdLogRecord {
 	@Override
 	public LogSeqNum writeToLog() {
 		List<Constant> rec = buildRecord();
-		return logMgr.append(rec.toArray(new Constant[rec.size()]));
+		return ddLogMgr.append(rec.toArray(new Constant[rec.size()]));
 	}
 
 	@Override
