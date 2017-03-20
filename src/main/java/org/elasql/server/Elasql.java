@@ -33,6 +33,8 @@ import org.vanilladb.core.server.VanillaDb;
 
 public class Elasql extends VanillaDb {
 	private static Logger logger = Logger.getLogger(VanillaDb.class.getName());
+	
+	public static final long START_TX_NUMBER = 0;
 
 	/**
 	 * The type of transactional execution engine supported by distributed

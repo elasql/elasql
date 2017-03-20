@@ -18,6 +18,7 @@ package org.elasql.cache.calvin;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
@@ -56,6 +57,7 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 		this.tx = tx;
 		this.dispatcher = (CalvinRecordDispatcher) Elasql.remoteRecReceiver();
 		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
+		this.inbox = new LinkedBlockingQueue<KeyRecordPair>();
 		
 		// Register this CacheMgr
 		this.dispatcher.registerCacheMgr(tx.getTransactionNumber(), this);
