@@ -46,8 +46,6 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 	// For single thread
 	private CalvinRecordDispatcher dispatcher;
 	private Transaction tx;
-	
-	// Cached records
 	private Map<RecordKey, CachedRecord> cachedRecords;
 	
 	// For multi-threading
@@ -66,7 +64,6 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 	@Override
 	public void onTxCommit(Transaction tx) {
 		dispatcher.unregisterCacheMgr(tx.getTransactionNumber());
-		flushLocalRecords();
 	}
 
 	@Override
@@ -78,19 +75,37 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 	public void onTxEndStatement(Transaction tx) {
 		// Do nothing
 	}
-
-	public CachedRecord read(RecordKey key) {
+	
+	public CachedRecord readFromLocal(RecordKey key) {
 		CachedRecord rec = cachedRecords.get(key);
+		if (rec != null)
+			return rec;
 		
-		if (rec == null) {
-			// Check if it is in the local
-			if (key.getPartition() == Elasql.serverId()) {
-				rec = readFromLocal(key);
-			} else {
-				rec = readFromRemote(key);
-			}
+		rec = VanillaCoreCrud.read(key, tx);
+		if (rec != null) {
+			rec.setSrcTxNum(tx.getTransactionNumber());
+			cachedRecords.put(key, rec);
 		}
 		
+		return rec;
+	}
+	
+	public CachedRecord readFromRemote(RecordKey key) {
+		CachedRecord rec = cachedRecords.get(key);
+		if (rec != null)
+			return rec;
+		
+		try {
+			KeyRecordPair pair = inbox.take();
+			while (!pair.key.equals(key)) {
+				cachedRecords.put(pair.key, pair.record);
+				pair = inbox.take();
+			}
+			rec = pair.record;
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
 		return rec;
 	}
 
@@ -113,39 +128,7 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 		cachedRecords.put(key, dummyRec);
 	}
 	
-	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
-		inbox.add(new KeyRecordPair(key, rec));
-	}
-	
-	private CachedRecord readFromLocal(RecordKey key) {
-		CachedRecord rec = VanillaCoreCrud.read(key, tx);
-
-		if (rec != null) {
-			rec.setSrcTxNum(tx.getTransactionNumber());
-			cachedRecords.put(key, rec);
-		}
-		
-		return rec;
-	}
-	
-	private CachedRecord readFromRemote(RecordKey key) {
-		CachedRecord rec = null;
-		
-		try {
-			KeyRecordPair pair = inbox.take();
-			while (!pair.key.equals(key)) {
-				cachedRecords.put(pair.key, pair.record);
-				pair = inbox.take();
-			}
-			rec = pair.record;
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-
-		return rec;
-	}
-	
-	private void flushLocalRecords() {
+	public void flush() {
 		for (Map.Entry<RecordKey, CachedRecord> entry : cachedRecords.entrySet()) {
 			RecordKey key = entry.getKey();
 			CachedRecord rec = entry.getValue();
@@ -159,5 +142,9 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 					VanillaCoreCrud.update(key, rec, tx);
 			}
 		}
+	}
+	
+	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
+		inbox.add(new KeyRecordPair(key, rec));
 	}
 }

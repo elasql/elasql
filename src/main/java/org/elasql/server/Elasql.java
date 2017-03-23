@@ -27,6 +27,7 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashBasedPartitionMetaMgr;
+import org.elasql.storage.metadata.NotificationPartMetaMgr;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
@@ -159,6 +160,9 @@ public class Elasql extends VanillaDb {
 
 		try {
 			parMetaMgr = (PartitionMetaMgr) parMgrCls.newInstance();
+			
+			// Add a warper partition-meta-mgr for handling notifications between servers
+			parMetaMgr = new NotificationPartMetaMgr(parMetaMgr);
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("error reading the class name for partition manager");

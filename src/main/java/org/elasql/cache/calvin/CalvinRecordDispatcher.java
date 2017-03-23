@@ -13,7 +13,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.server.task.Task;
 
-public class CalvinRecordDispatcher implements RemoteRecordReceiver {
+public class CalvinRecordDispatcher extends Task implements RemoteRecordReceiver {
 
 	private static enum EventType {
 		REGISTER, UNREGISTER, REMOTE_RECORD
@@ -61,11 +61,6 @@ public class CalvinRecordDispatcher implements RemoteRecordReceiver {
 		public EventType getEventType() {
 			return EventType.REMOTE_RECORD;
 		}
-		
-//		@Override
-//		public String toString() {
-//			return key + ", " + record;
-//		}
 	}
 
 	// For thread-to-thread communication
@@ -87,137 +82,90 @@ public class CalvinRecordDispatcher implements RemoteRecordReceiver {
 		committedTxs = new HashSet<Long>();
 
 		// Create a thread for dispatching
-		Elasql.taskMgr().runTask(new Task() {
+		Elasql.taskMgr().runTask(this);
+	}
+	
+	@Override
+	public void run() {
 
-			@Override
-			public void run() {
+		while (true) {
+			try {
+				// Retrieve an event
+				Event e = eventQueue.take();
 
-				while (true) {
-					try {
-						// Retrieve an event
-						Event e = eventQueue.take();
+				switch (e.getEventType()) {
+				case REGISTER:
+					RegisterRequest rq = (RegisterRequest) e;
 
-						switch (e.getEventType()) {
-						case REGISTER:
-							RegisterRequest rq = (RegisterRequest) e;
+					// Add the channel
+					channelMap.put(rq.txNum, rq.cacheMgr);
 
-							// Add the channel
-							channelMap.put(rq.txNum, rq.cacheMgr);
+					// Check if there is any cached record
+					Set<RemoteRecord> cachedRecs = cachedRecords.get(rq.txNum);
 
-							// Check if there is any cached record
-							Set<RemoteRecord> cachedRecs = cachedRecords.get(rq.txNum);
+					// Transfer the cached records
+					if (cachedRecs != null) {
+						for (RemoteRecord rec : cachedRecs)
+							rq.cacheMgr.receiveRemoteRecord(rec.key, rec.record);
+					}
 
-							// Transfer the cached records
-							if (cachedRecs != null) {
-								for (RemoteRecord rec : cachedRecs)
-									rq.cacheMgr.receiveRemoteRecord(rec.key, rec.record);
-							}
+					break;
+				case UNREGISTER:
+					UnregisterRequest ur = (UnregisterRequest) e;
 
-							break;
-						case UNREGISTER:
-							UnregisterRequest ur = (UnregisterRequest) e;
+					// Delete the channel
+					channelMap.remove(ur.txNum);
 
-							// Delete the channel
-							channelMap.remove(ur.txNum);
+					// If the tx number = (lower water mark + 1), update
+					// the lower water mark
+					if (ur.txNum == lowerWaterMark + 1) {
+						lowerWaterMark++;
+						cachedRecords.remove(lowerWaterMark);
 
-							// If the tx number = (lower water mark + 1), update
-							// the lower water mark
-							if (ur.txNum == lowerWaterMark + 1) {
-								lowerWaterMark++;
-								cachedRecords.remove(lowerWaterMark);
+						// Process all committed transactions
+						while (committedTxs.remove(lowerWaterMark + 1)) {
+							lowerWaterMark++;
+							cachedRecords.remove(lowerWaterMark);
+						}
+					} else {
+						// If it is not, add it to committed tx.
+						committedTxs.add(ur.txNum);
+					}
 
-								// Process all committed transactions
-								while (committedTxs.remove(lowerWaterMark + 1)) {
-									lowerWaterMark++;
-									cachedRecords.remove(lowerWaterMark);
-								}
-							} else {
-								// If it is not, add it to committed tx.
-								committedTxs.add(ur.txNum);
-							}
+					break;
+				case REMOTE_RECORD:
+					RemoteRecord rr = (RemoteRecord) e;
 
-							break;
-						case REMOTE_RECORD:
-							RemoteRecord rr = (RemoteRecord) e;
+					// If the tx number is lower than lower water mark,
+					// the record should be abandoned.
+					long txNum = rr.record.getSrcTxNum();
+					if (txNum <= lowerWaterMark)
+						continue;
 
-							// If the tx number is lower than lower water mark,
-							// the record should be abandoned.
-							long txNum = rr.record.getSrcTxNum();
-							if (txNum <= lowerWaterMark)
-								continue;
+					// Send the record to the corresponding channel
+					CalvinCacheMgr cacheMgr = channelMap.get(txNum);
 
-							// Send the record to the corresponding channel
-							CalvinCacheMgr cacheMgr = channelMap.get(txNum);
+					if (cacheMgr != null) {
+						cacheMgr.receiveRemoteRecord(rr.key, rr.record);
+					} else {
+						// If there is no such channel, cache it.
+						Set<RemoteRecord> cache = cachedRecords.get(txNum);
 
-							if (cacheMgr != null) {
-								cacheMgr.receiveRemoteRecord(rr.key, rr.record);
-							} else {
-								// If there is no such channel, cache it.
-								Set<RemoteRecord> cache = cachedRecords.get(txNum);
-
-								if (cache == null) {
-									cache = new HashSet<RemoteRecord>();
-									cachedRecords.put(txNum, cache);
-								}
-
-								cache.add(rr);
-							}
-
-							break;
+						if (cache == null) {
+							cache = new HashSet<RemoteRecord>();
+							cachedRecords.put(txNum, cache);
 						}
 
-					} catch (InterruptedException e) {
-						e.printStackTrace();
+						cache.add(rr);
 					}
+
+					break;
 				}
+
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 			}
-
-		});
-
-		// Debug
-//		new Thread() {
-//			@Override
-//			public void run() {
-//				long startTime = System.currentTimeMillis();
-//				long lastRecordTime = 0;
-//				long elapsedTime = System.currentTimeMillis() - startTime;
-//				long totalTime = 20000;
-//				long recordInterval = 1000; // in millisecond
-//
-//				while (elapsedTime < totalTime) {
-//					// Record tx counts
-//					if (elapsedTime - lastRecordTime >= recordInterval) {
-//						lastRecordTime = elapsedTime;
-//						System.out.println("EventQueue Size: " + eventQueue.size());
-//						System.out.println("ChannelMap Size: " + channelMap.size());
-//						System.out.println("CachedRecordMap Size: " + cachedRecords.size());
-//						System.out.println("LowerWaterMark: " + lowerWaterMark);
-//						System.out.println("CommittedSet Size: " + committedTxs.size());
-//					}
-//
-//					// Sleep for a short time (avoid busy waiting)
-//					try {
-//						Thread.sleep(100);
-//					} catch (InterruptedException e) {
-//						e.printStackTrace();
-//					}
-//
-//					// Update elapsed time
-//					elapsedTime = System.currentTimeMillis() - startTime;
-//				}
-//				
-//				int i = 0;
-//				for (Long txNum : cachedRecords.keySet()) {
-//					System.out.println("Tx: " + txNum);
-//					System.out.println(cachedRecords.get(txNum));
-//					
-//					i++;
-//					if (i > 5) {
-//						break;
-//					}
-//				}
-//			}
-//		}.start();
+		}
 	}
 
 	// ======================

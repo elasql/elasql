@@ -24,6 +24,7 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.NotificationPartMetaMgr;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
@@ -34,7 +35,9 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	private static Logger logger = Logger.getLogger(AllExecuteProcedure.class
 			.getName());
 
-	private static final String NOTIFICATION_FILED_NAME = "finish";
+	private static final String KEY_FINISH = "finish";
+	
+	private static final int MASTER_NODE = 0;
 
 	public AllExecuteProcedure(long txNum, H paramHelper) {
 		super(txNum, paramHelper);
@@ -56,8 +59,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	@Override
 	protected int decideMaster() {
-		// The first node be the master node
-		return 0;
+		return MASTER_NODE;
 	}
 
 	@Override
@@ -106,10 +108,13 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	private void waitForNotification() {
 		// Wait for notification from other nodes
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
-			if (nodeId != Elasql.serverId()) {
-				RecordKey notKey = getFinishNotificationKey(nodeId);
-				CachedRecord rec = cacheMgr.read(notKey);
-				Constant con = rec.getVal(NOTIFICATION_FILED_NAME);
+			if (nodeId != MASTER_NODE) {
+				if (logger.isLoggable(Level.FINE))
+					logger.fine("Waiting for the notification from node no." + nodeId);
+				
+				RecordKey notKey = NotificationPartMetaMgr.createRecordKey(nodeId, MASTER_NODE);
+				CachedRecord rec = cacheMgr.readFromRemote(notKey);
+				Constant con = rec.getVal(KEY_FINISH);
 				int value = (int) con.asJavaVal();
 				if (value != 1)
 					throw new RuntimeException(
@@ -122,8 +127,13 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	}
 
 	private void sendNotification() {
-		RecordKey notKey = getFinishNotificationKey(Elasql.serverId());
-		CachedRecord notVal = getFinishNotificationValue(txNum);
+		// Create a key value set
+		Map<String, Constant> fldVals = new HashMap<String, Constant>();
+		fldVals.put(KEY_FINISH, new IntegerConstant(1));
+		
+		RecordKey notKey = NotificationPartMetaMgr.createRecordKey(Elasql.serverId(), MASTER_NODE);
+		CachedRecord notVal = NotificationPartMetaMgr.createRecord(Elasql.serverId(), MASTER_NODE,
+				txNum, fldVals);
 
 		TupleSet ts = new TupleSet(-1);
 		// Use node id as source tx number
@@ -132,22 +142,5 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 		if (logger.isLoggable(Level.FINE))
 			logger.fine("The notification is sent to the master by tx." + txNum);
-	}
-
-	private RecordKey getFinishNotificationKey(int nodeId) {
-		Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
-		keyEntryMap.put(NOTIFICATION_FILED_NAME, new IntegerConstant(nodeId));
-		return new RecordKey("notification", keyEntryMap);
-	}
-
-	private CachedRecord getFinishNotificationValue(long txNum) {
-		// Create key value sets
-		Map<String, Constant> fldVals = new HashMap<String, Constant>();
-		fldVals.put(NOTIFICATION_FILED_NAME, new IntegerConstant(1));
-
-		// Create a record
-		CachedRecord rec = new CachedRecord(fldVals);
-		rec.setSrcTxNum(txNum);
-		return rec;
 	}
 }

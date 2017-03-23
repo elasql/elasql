@@ -146,6 +146,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 			// Execute transaction
 			executeTransactionLogic();
+			
+			// Flush the cached records
+			cacheMgr.flush();
 
 			// The transaction finishes normally
 			tx.commit();
@@ -302,7 +305,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Read local records
 		for (RecordKey k : localReadKeys) {
 			if (!partMgr.isFullyReplicated(k) || activeParticipants.contains(localNodeId)) {
-				CachedRecord rec = cacheMgr.read(k);
+				CachedRecord rec = cacheMgr.readFromLocal(k);
 				readings.put(k, rec);
 				localReadings.put(k, rec);
 			}
@@ -338,7 +341,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// Read remote records
 		for (RecordKey k : remoteReadKeys) {
-			CachedRecord rec = cacheMgr.read(k);
+			CachedRecord rec = cacheMgr.readFromRemote(k);
 			readings.put(k, rec);
 			remoteReadings.put(k, rec);
 		}
