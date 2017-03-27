@@ -44,7 +44,7 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 	}
 	
 	// For single thread
-	private CalvinRecordDispatcher dispatcher;
+	private CalvinRemotePostOffice postOffice;
 	private Transaction tx;
 	private Map<RecordKey, CachedRecord> cachedRecords;
 	
@@ -53,22 +53,22 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 
 	public CalvinCacheMgr(Transaction tx) {
 		this.tx = tx;
-		this.dispatcher = (CalvinRecordDispatcher) Elasql.remoteRecReceiver();
+		this.postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
 		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
 		this.inbox = new LinkedBlockingQueue<KeyRecordPair>();
 		
 		// Register this CacheMgr
-		this.dispatcher.registerCacheMgr(tx.getTransactionNumber(), this);
+		this.postOffice.registerCacheMgr(tx.getTransactionNumber(), this);
 	}
 
 	@Override
 	public void onTxCommit(Transaction tx) {
-		dispatcher.unregisterCacheMgr(tx.getTransactionNumber());
+		postOffice.unregisterCacheMgr(tx.getTransactionNumber());
 	}
 
 	@Override
 	public void onTxRollback(Transaction tx) {
-		dispatcher.unregisterCacheMgr(tx.getTransactionNumber());
+		postOffice.unregisterCacheMgr(tx.getTransactionNumber());
 	}
 
 	@Override

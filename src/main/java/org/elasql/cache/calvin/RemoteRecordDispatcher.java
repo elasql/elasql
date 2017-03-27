@@ -8,12 +8,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.server.task.Task;
 
-public class CalvinRecordDispatcher extends Task implements RemoteRecordReceiver {
+public class RemoteRecordDispatcher extends Task {
 
 	private static enum EventType {
 		REGISTER, UNREGISTER, REMOTE_RECORD
@@ -74,15 +73,12 @@ public class CalvinRecordDispatcher extends Task implements RemoteRecordReceiver
 	private Set<Long> committedTxs; // The committed transactions
 	// whose number larger than lowerWaterMark
 
-	public CalvinRecordDispatcher() {
+	RemoteRecordDispatcher() {
 		eventQueue = new LinkedBlockingQueue<Event>();
 		channelMap = new HashMap<Long, CalvinCacheMgr>();
 		cachedRecords = new HashMap<Long, Set<RemoteRecord>>();
 		lowerWaterMark = Elasql.START_TX_NUMBER - 1;
 		committedTxs = new HashSet<Long>();
-
-		// Create a thread for dispatching
-		Elasql.taskMgr().runTask(this);
 	}
 	
 	@Override
@@ -172,15 +168,15 @@ public class CalvinRecordDispatcher extends Task implements RemoteRecordReceiver
 	// APIs for Other Threads
 	// ======================
 
-	public void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
+	void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
 		eventQueue.add(new RemoteRecord(key, rec));
 	}
 
-	public void registerCacheMgr(long txNum, CalvinCacheMgr cacheMgr) {
+	void registerCacheMgr(long txNum, CalvinCacheMgr cacheMgr) {
 		eventQueue.add(new RegisterRequest(txNum, cacheMgr));
 	}
 
-	public void unregisterCacheMgr(long txNum) {
+	void unregisterCacheMgr(long txNum) {
 		eventQueue.add(new UnregisterRequest(txNum));
 	}
 }
