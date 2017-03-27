@@ -12,6 +12,8 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.server.task.Task;
 
+import static org.elasql.cache.calvin.CalvinRemotePostOffice.NUM_DISPATCHERS;
+
 public class RemoteRecordDispatcher extends Task {
 
 	private static enum EventType {
@@ -112,15 +114,15 @@ public class RemoteRecordDispatcher extends Task {
 					// Delete the channel
 					channelMap.remove(ur.txNum);
 
-					// If the tx number = (lower water mark + 1), update
+					// If the tx number = (lower water mark + NUM_DISPATCHERS), update
 					// the lower water mark
-					if (ur.txNum == lowerWaterMark + 1) {
-						lowerWaterMark++;
+					if (ur.txNum == lowerWaterMark + NUM_DISPATCHERS) {
+						lowerWaterMark += NUM_DISPATCHERS;
 						cachedRecords.remove(lowerWaterMark);
 
 						// Process all committed transactions
-						while (committedTxs.remove(lowerWaterMark + 1)) {
-							lowerWaterMark++;
+						while (committedTxs.remove(lowerWaterMark + NUM_DISPATCHERS)) {
+							lowerWaterMark += NUM_DISPATCHERS;
 							cachedRecords.remove(lowerWaterMark);
 						}
 					} else {

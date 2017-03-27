@@ -8,7 +8,7 @@ import org.elasql.sql.RecordKey;
 public class CalvinRemotePostOffice implements RemoteRecordReceiver {
 	
 	// TODO: add this to a properties file
-	private static final int NUM_DISPATCHERS = 4;
+	public static final int NUM_DISPATCHERS = 4;
 	
 	private RemoteRecordDispatcher[] dispatchers = new RemoteRecordDispatcher[NUM_DISPATCHERS];
 	
