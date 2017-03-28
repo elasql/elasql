@@ -71,15 +71,12 @@ public class CalvinCacheMgr {
 	 * be able to receive remote records after calling this. This will make the post office clean
 	 * the remote cache for this transaction.
 	 */
-	public void finishWithRemotes() {
-		if (inbox == null)
-			return;
-		
+	public void notifyTxCommitted() {
 		CalvinRemotePostOffice postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
 		inbox = null;
 		
-		// Register this CacheMgr
-		postOffice.unregisterCacheMgr(tx.getTransactionNumber());
+		// Notify the post office the transaction has committed
+		postOffice.notifyTxCommitted(tx.getTransactionNumber());
 	}
 	
 	public CachedRecord readFromLocal(RecordKey key) {

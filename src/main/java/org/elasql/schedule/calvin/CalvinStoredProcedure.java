@@ -163,7 +163,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			paramHelper.setCommitted(false);
 		} finally {
 			// Clean the cache
-			cacheMgr.finishWithRemotes();
+			cacheMgr.notifyTxCommitted();
 		}
 
 		return paramHelper.createResultSet();

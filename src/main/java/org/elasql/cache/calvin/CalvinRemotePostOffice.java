@@ -14,9 +14,14 @@ public class CalvinRemotePostOffice implements RemoteRecordReceiver {
 	
 	public CalvinRemotePostOffice() {
 		for (int i = 0; i < NUM_DISPATCHERS; i++) {
-			dispatchers[i] = new RemoteRecordDispatcher();
+			dispatchers[i] = new RemoteRecordDispatcher(i);
 			Elasql.taskMgr().runTask(dispatchers[i]);
 		}
+	}
+	
+	public void skipTransaction(long txNum) {
+		int id = (int) (txNum % NUM_DISPATCHERS);
+		dispatchers[id].ungisterTransaction(txNum);
 	}
 
 	public void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
@@ -29,8 +34,8 @@ public class CalvinRemotePostOffice implements RemoteRecordReceiver {
 		dispatchers[id].registerCacheMgr(txNum, cacheMgr);
 	}
 
-	void unregisterCacheMgr(long txNum) {
+	void notifyTxCommitted(long txNum) {
 		int id = (int) (txNum % NUM_DISPATCHERS);
-		dispatchers[id].unregisterCacheMgr(txNum);
+		dispatchers[id].ungisterTransaction(txNum);
 	}
 }
