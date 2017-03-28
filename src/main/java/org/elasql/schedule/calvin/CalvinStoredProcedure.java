@@ -115,10 +115,14 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		
 		// create a cache manager
 		cacheMgr = new CalvinCacheMgr(tx);
-		tx.addLifecycleListener(cacheMgr);
 
 		// prepare keys
 		prepareKeys();
+		
+		// if it knows there will be records coming from remote nodes, it needs to
+		// tell cache manager to prepare for them.
+		if (!remoteReadKeys.isEmpty())
+			cacheMgr.prepareForRemotes();
 
 		// decide which node the master is
 		masterNode = decideMaster();
@@ -157,6 +161,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			e.printStackTrace();
 			tx.rollback();
 			paramHelper.setCommitted(false);
+		} finally {
+			// Clean the cache
+			cacheMgr.finishWithRemotes();
 		}
 
 		return paramHelper.createResultSet();

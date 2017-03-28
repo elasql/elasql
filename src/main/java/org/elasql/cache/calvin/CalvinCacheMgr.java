@@ -26,12 +26,11 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
-import org.vanilladb.core.storage.tx.TransactionLifecycleListener;
 
 /**
  * The class that deal with remote records for parent transaction.
  */
-public class CalvinCacheMgr implements TransactionLifecycleListener {
+public class CalvinCacheMgr {
 	
 	private static class KeyRecordPair {
 		RecordKey key;
@@ -44,7 +43,6 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 	}
 	
 	// For single thread
-	private CalvinRemotePostOffice postOffice;
 	private Transaction tx;
 	private Map<RecordKey, CachedRecord> cachedRecords;
 	
@@ -53,27 +51,35 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 
 	public CalvinCacheMgr(Transaction tx) {
 		this.tx = tx;
-		this.postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
 		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
-		this.inbox = new LinkedBlockingQueue<KeyRecordPair>();
+	}
+	
+	/**
+	 * Prepare for receiving the records from remote nodes. This must be called before starting
+	 * receiving those records.
+	 */
+	public void prepareForRemotes() {
+		CalvinRemotePostOffice postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
+		inbox = new LinkedBlockingQueue<KeyRecordPair>();
 		
 		// Register this CacheMgr
-		this.postOffice.registerCacheMgr(tx.getTransactionNumber(), this);
+		postOffice.registerCacheMgr(tx.getTransactionNumber(), this);
 	}
-
-	@Override
-	public void onTxCommit(Transaction tx) {
+	
+	/**
+	 * Tell the post office that this transaction has done with the remote records. It will not
+	 * be able to receive remote records after calling this. This will make the post office clean
+	 * the remote cache for this transaction.
+	 */
+	public void finishWithRemotes() {
+		if (inbox == null)
+			return;
+		
+		CalvinRemotePostOffice postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
+		inbox = null;
+		
+		// Register this CacheMgr
 		postOffice.unregisterCacheMgr(tx.getTransactionNumber());
-	}
-
-	@Override
-	public void onTxRollback(Transaction tx) {
-		postOffice.unregisterCacheMgr(tx.getTransactionNumber());
-	}
-
-	@Override
-	public void onTxEndStatement(Transaction tx) {
-		// Do nothing
 	}
 	
 	public CachedRecord readFromLocal(RecordKey key) {
@@ -95,7 +101,12 @@ public class CalvinCacheMgr implements TransactionLifecycleListener {
 		if (rec != null)
 			return rec;
 		
+		if (inbox == null)
+			throw new RuntimeException("tx." + tx.getTransactionNumber() + " needs to"
+					+ " call prepareForRemotes() before receiving remote records.");
+		
 		try {
+			// Wait for remote records
 			KeyRecordPair pair = inbox.take();
 			while (!pair.key.equals(key)) {
 				cachedRecords.put(pair.key, pair.record);
