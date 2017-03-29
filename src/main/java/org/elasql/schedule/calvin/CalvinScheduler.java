@@ -18,10 +18,8 @@ package org.elasql.schedule.calvin;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.elasql.cache.calvin.CalvinRemotePostOffice;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
-import org.elasql.server.Elasql;
 import org.elasql.server.task.calvin.CalvinStoredProcedureTask;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
@@ -33,7 +31,6 @@ public class CalvinScheduler extends Task implements Scheduler {
 
 	private CalvinStoredProcedureFactory factory;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-	private CalvinRemotePostOffice postOffice;
 
 	static {
 		FACTORY_CLASS = ElasqlProperties.getLoader().getPropertyAsClass(
@@ -49,7 +46,6 @@ public class CalvinScheduler extends Task implements Scheduler {
 		} catch (InstantiationException | IllegalAccessException e) {
 			e.printStackTrace();
 		}
-		postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -83,7 +79,6 @@ public class CalvinScheduler extends Task implements Scheduler {
 				// if this node doesn't have to participate this transaction,
 				// skip it
 				if (!sp.isParticipated()) {
-					postOffice.skipTransaction(sp.txNum);
 					continue;
 				}
 

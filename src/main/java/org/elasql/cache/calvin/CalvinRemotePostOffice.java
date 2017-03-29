@@ -4,6 +4,7 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.vanilladb.core.storage.tx.Transaction;
 
 public class CalvinRemotePostOffice implements RemoteRecordReceiver {
 	
@@ -17,6 +18,18 @@ public class CalvinRemotePostOffice implements RemoteRecordReceiver {
 			dispatchers[i] = new RemoteRecordDispatcher(i);
 			Elasql.taskMgr().runTask(dispatchers[i]);
 		}
+	}
+	
+	public CalvinCacheMgr createCacheMgr(Transaction tx, boolean willHaveRemote) {
+		CalvinCacheMgr cacheMgr = new CalvinCacheMgr(this, tx);
+		
+		if (willHaveRemote) {
+			// Register this CacheMgr for remote records
+			cacheMgr.createInboxForRemotes();
+			registerCacheMgr(tx.getTransactionNumber(), cacheMgr);
+		}
+		
+		return cacheMgr;
 	}
 	
 	public void skipTransaction(long txNum) {

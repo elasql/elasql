@@ -49,7 +49,7 @@ public class CalvinCacheMgr {
 	// For multi-threading
 	private BlockingQueue<KeyRecordPair> inbox;
 
-	public CalvinCacheMgr(Transaction tx) {
+	CalvinCacheMgr(CalvinRemotePostOffice postOffice, Transaction tx) {
 		this.tx = tx;
 		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
 	}
@@ -58,12 +58,8 @@ public class CalvinCacheMgr {
 	 * Prepare for receiving the records from remote nodes. This must be called before starting
 	 * receiving those records.
 	 */
-	public void prepareForRemotes() {
-		CalvinRemotePostOffice postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
+	void createInboxForRemotes() {
 		inbox = new LinkedBlockingQueue<KeyRecordPair>();
-		
-		// Register this CacheMgr
-		postOffice.registerCacheMgr(tx.getTransactionNumber(), this);
 	}
 	
 	/**

@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
+import org.elasql.cache.calvin.CalvinRemotePostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.DdStoredProcedure;
 import org.elasql.server.Elasql;
@@ -112,20 +113,24 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		tx = Elasql.txMgr().newTransaction(
 				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
 		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
-		
-		// create a cache manager
-		cacheMgr = new CalvinCacheMgr(tx);
 
 		// prepare keys
 		prepareKeys();
-		
-		// if it knows there will be records coming from remote nodes, it needs to
-		// tell cache manager to prepare for them.
-		if (!remoteReadKeys.isEmpty())
-			cacheMgr.prepareForRemotes();
 
 		// decide which node the master is
 		masterNode = decideMaster();
+		
+		// for the cache layer
+		CalvinRemotePostOffice postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
+		if (isParticipated()) {
+			// create a cache manager
+			if (remoteReadKeys.isEmpty())
+				cacheMgr = postOffice.createCacheMgr(tx, false);
+			else
+				cacheMgr = postOffice.createCacheMgr(tx, true);
+		} else {
+			postOffice.skipTransaction(txNum);
+		}
 	}
 
 	public void bookConservativeLocks() {
