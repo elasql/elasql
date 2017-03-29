@@ -6,14 +6,14 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
-public class CalvinRemotePostOffice implements RemoteRecordReceiver {
+public class CalvinPostOffice implements RemoteRecordReceiver {
 	
 	// TODO: add this to a properties file
 	public static final int NUM_DISPATCHERS = 4;
 	
 	private RemoteRecordDispatcher[] dispatchers = new RemoteRecordDispatcher[NUM_DISPATCHERS];
 	
-	public CalvinRemotePostOffice() {
+	public CalvinPostOffice() {
 		for (int i = 0; i < NUM_DISPATCHERS; i++) {
 			dispatchers[i] = new RemoteRecordDispatcher(i);
 			Elasql.taskMgr().runTask(dispatchers[i]);

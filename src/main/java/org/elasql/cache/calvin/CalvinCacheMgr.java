@@ -49,7 +49,7 @@ public class CalvinCacheMgr {
 	// For multi-threading
 	private BlockingQueue<KeyRecordPair> inbox;
 
-	CalvinCacheMgr(CalvinRemotePostOffice postOffice, Transaction tx) {
+	CalvinCacheMgr(CalvinPostOffice postOffice, Transaction tx) {
 		this.tx = tx;
 		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
 	}
@@ -68,7 +68,7 @@ public class CalvinCacheMgr {
 	 * the remote cache for this transaction.
 	 */
 	public void notifyTxCommitted() {
-		CalvinRemotePostOffice postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
+		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		inbox = null;
 		
 		// Notify the post office the transaction has committed

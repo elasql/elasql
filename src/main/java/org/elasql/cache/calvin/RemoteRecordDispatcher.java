@@ -12,7 +12,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.server.task.Task;
 
-import static org.elasql.cache.calvin.CalvinRemotePostOffice.NUM_DISPATCHERS;
+import static org.elasql.cache.calvin.CalvinPostOffice.NUM_DISPATCHERS;
 
 public class RemoteRecordDispatcher extends Task {
 
@@ -81,7 +81,7 @@ public class RemoteRecordDispatcher extends Task {
 		eventQueue = new LinkedBlockingQueue<Event>();
 		channelMap = new HashMap<Long, CalvinCacheMgr>();
 		cachedRecords = new HashMap<Long, Set<RemoteRecord>>();
-		lowerWaterMark = Elasql.START_TX_NUMBER - CalvinRemotePostOffice.NUM_DISPATCHERS + id;
+		lowerWaterMark = Elasql.START_TX_NUMBER - CalvinPostOffice.NUM_DISPATCHERS + id;
 		committedTxs = new HashSet<Long>();
 		dispatcherId = id;
 		

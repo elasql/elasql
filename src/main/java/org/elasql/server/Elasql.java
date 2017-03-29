@@ -19,7 +19,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.RemoteRecordReceiver;
-import org.elasql.cache.calvin.CalvinRemotePostOffice;
+import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.schedule.Scheduler;
@@ -121,7 +121,7 @@ public class Elasql extends VanillaDb {
 			remoteRecReceiver = new NaiveCacheMgr();
 			break;
 		case CALVIN:
-			remoteRecReceiver = new CalvinRemotePostOffice();
+			remoteRecReceiver = new CalvinPostOffice();
 			break;
 		default:
 			throw new UnsupportedOperationException();

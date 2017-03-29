@@ -24,7 +24,7 @@ import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
-import org.elasql.cache.calvin.CalvinRemotePostOffice;
+import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.DdStoredProcedure;
 import org.elasql.server.Elasql;
@@ -121,7 +121,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		masterNode = decideMaster();
 		
 		// for the cache layer
-		CalvinRemotePostOffice postOffice = (CalvinRemotePostOffice) Elasql.remoteRecReceiver();
+		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		if (isParticipated()) {
 			// create a cache manager
 			if (remoteReadKeys.isEmpty())
