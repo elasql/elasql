@@ -59,24 +59,11 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	@Override
 	protected int decideMaster() {
-		// The first node be the master node
 		return MASTER_NODE;
 	}
 
 	@Override
-	protected void onLocalReadCollected(
-			Map<RecordKey, CachedRecord> localReadings) {
-		// Do nothing
-	}
-
-	@Override
-	protected void onRemoteReadCollected(
-			Map<RecordKey, CachedRecord> remoteReadings) {
-		// Do nothing
-	}
-
-	@Override
-	protected void writeRecords(Map<RecordKey, CachedRecord> readings) {
+	protected void executeSQL(Map<RecordKey, CachedRecord> readings) {
 		// Do nothing
 	}
 
@@ -114,7 +101,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 					logger.fine("Waiting for the notification from node no." + nodeId);
 				
 				RecordKey notKey = NotificationPartMetaMgr.createRecordKey(nodeId, MASTER_NODE);
-				CachedRecord rec = cacheMgr.read(notKey, txNum, tx, false);
+				CachedRecord rec = cacheMgr.readFromRemote(notKey);
 				Constant con = rec.getVal(KEY_FINISH);
 				int value = (int) con.asJavaVal();
 				if (value != 1)

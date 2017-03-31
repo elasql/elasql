@@ -44,7 +44,7 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	private List<RecordKey> readKeys = new ArrayList<RecordKey>();
 	private List<RecordKey> writeKeys = new ArrayList<RecordKey>();
 	
-	private NaiveCacheMgr cacheMgr = (NaiveCacheMgr) Elasql.cacheMgr();
+	private NaiveCacheMgr cacheMgr = (NaiveCacheMgr) Elasql.remoteRecReceiver();
 	
 	public NaiveStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;

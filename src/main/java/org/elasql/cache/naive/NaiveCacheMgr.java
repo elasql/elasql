@@ -15,28 +15,33 @@
  ******************************************************************************/
 package org.elasql.cache.naive;
 
-import org.elasql.cache.CacheMgr;
 import org.elasql.cache.CachedRecord;
-import org.elasql.cache.LocalRecordMgr;
+import org.elasql.cache.RemoteRecordReceiver;
+import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
-public class NaiveCacheMgr implements CacheMgr {
+public class NaiveCacheMgr implements RemoteRecordReceiver {
 
 	public CachedRecord read(RecordKey key, Transaction tx) {
-		return LocalRecordMgr.read(key, tx);
+		return VanillaCoreCrud.read(key, tx);
 	}
 
 	public void update(RecordKey key, CachedRecord rec, Transaction tx) {
-		LocalRecordMgr.update(key, rec, tx);
+		VanillaCoreCrud.update(key, rec, tx);
 	}
 
 	public void insert(RecordKey key, CachedRecord rec, Transaction tx) {
-		LocalRecordMgr.insert(key, rec, tx);
+		VanillaCoreCrud.insert(key, rec, tx);
 	}
 
 	public void delete(RecordKey key, Transaction tx) {
-		LocalRecordMgr.delete(key, tx);
+		VanillaCoreCrud.delete(key, tx);
+	}
+
+	@Override
+	public void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
+		// Do nothing
 	}
 }
 

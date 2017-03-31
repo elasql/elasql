@@ -15,98 +15,138 @@
  ******************************************************************************/
 package org.elasql.cache.calvin;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
-import org.elasql.cache.CacheMgr;
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.VanillaCoreCrud;
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
 
 /**
- * The class that deal with remote wait
- * 
+ * The class that deal with remote records for parent transaction.
  */
-
-// TODO remove unnecessary code
-public class CalvinCacheMgr implements CacheMgr {
-	// private static long MAX_TIME = 30000;
-	private BasicCacheMgr cacheMgr;
-
-	private final Object[] anchors = new Object[1009];
-
-	public CalvinCacheMgr() {
-		cacheMgr = new BasicCacheMgr();
-		for (int i = 0; i < anchors.length; ++i) {
-			anchors[i] = new Object();
+public class CalvinCacheMgr {
+	
+	private static class KeyRecordPair {
+		RecordKey key;
+		CachedRecord record;
+		
+		KeyRecordPair(RecordKey key, CachedRecord record) {
+			this.key = key;
+			this.record = record;
 		}
 	}
+	
+	// For single thread
+	private Transaction tx;
+	private Map<RecordKey, CachedRecord> cachedRecords;
+	
+	// For multi-threading
+	private BlockingQueue<KeyRecordPair> inbox;
 
-	private Object prepareAnchor(Object o) {
-		int hash = o.hashCode() % anchors.length;
-		if (hash < 0) {
-			hash += anchors.length;
+	CalvinCacheMgr(CalvinPostOffice postOffice, Transaction tx) {
+		this.tx = tx;
+		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
+	}
+	
+	/**
+	 * Prepare for receiving the records from remote nodes. This must be called before starting
+	 * receiving those records.
+	 */
+	void createInboxForRemotes() {
+		inbox = new LinkedBlockingQueue<KeyRecordPair>();
+	}
+	
+	/**
+	 * Tell the post office that this transaction has done with the remote records. It will not
+	 * be able to receive remote records after calling this. This will make the post office clean
+	 * the remote cache for this transaction.
+	 */
+	public void notifyTxCommitted() {
+		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
+		inbox = null;
+		
+		// Notify the post office the transaction has committed
+		postOffice.notifyTxCommitted(tx.getTransactionNumber());
+	}
+	
+	public CachedRecord readFromLocal(RecordKey key) {
+		CachedRecord rec = cachedRecords.get(key);
+		if (rec != null)
+			return rec;
+		
+		rec = VanillaCoreCrud.read(key, tx);
+		if (rec != null) {
+			rec.setSrcTxNum(tx.getTransactionNumber());
+			cachedRecords.put(key, rec);
 		}
-		return anchors[hash];
+		
+		return rec;
 	}
-
-	public void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
-		// System.out.println("cache " + key + " src:" + rec.getSrcTxNum());
-		synchronized (prepareAnchor(key)) {
-			cacheMgr.cacheRecord(key, rec);
-			prepareAnchor(key).notifyAll();
-		}
-	}
-
-	public void flushToLocalStorage(RecordKey key, long srcTxNum, Transaction tx) {
-		cacheMgr.flushToLocalStorage(key, srcTxNum, tx);
-	}
-
-	public void remove(RecordKey key, long srcTxNum) {
-		cacheMgr.remove(key, srcTxNum);
-	}
-
-	public CachedRecord read(RecordKey key, long srcTxNum, Transaction tx,
-			boolean srcIsLocal) {
-		CachedRecord rec;
-
-		if (!srcIsLocal) { // not received the remote record yet
-			try {
-				synchronized (prepareAnchor(key)) {
-					rec = cacheMgr.read(key, srcTxNum, tx, srcIsLocal);
-					while (rec == null) {
-						prepareAnchor(key).wait();
-						rec = cacheMgr.read(key, srcTxNum, tx, srcIsLocal);
-					}
-
-				}
-			} catch (InterruptedException e) {
-				throw new RuntimeException();
+	
+	public CachedRecord readFromRemote(RecordKey key) {
+		CachedRecord rec = cachedRecords.get(key);
+		if (rec != null)
+			return rec;
+		
+		if (inbox == null)
+			throw new RuntimeException("tx." + tx.getTransactionNumber() + " needs to"
+					+ " call prepareForRemotes() before receiving remote records.");
+		
+		try {
+			// Wait for remote records
+			KeyRecordPair pair = inbox.take();
+			while (!pair.key.equals(key)) {
+				cachedRecords.put(pair.key, pair.record);
+				pair = inbox.take();
 			}
-		} else {
-			rec = cacheMgr.read(key, srcTxNum, tx, srcIsLocal);
+			rec = pair.record;
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 
 		return rec;
 	}
 
-	/*
-	 * TODO: Deprecated public void update(RecordKey key, Map<String, Constant>
-	 * fldVals, Transaction tx) { // need to update the whole flds of a record
-	 * cacheMgr.update(key, fldVals, tx); }
-	 */
-
-	public void update(RecordKey key, CachedRecord rec, Transaction tx) {
-		// need to update the whole flds of a record
-		cacheMgr.update(key, rec, tx);
+	public void update(RecordKey key, CachedRecord rec) {
+		rec.setSrcTxNum(tx.getTransactionNumber());
+		cachedRecords.put(key, rec);
 	}
 
-	public void insert(RecordKey key, Map<String, Constant> fldVals,
-			Transaction tx) {
-		cacheMgr.insert(key, fldVals, tx);
+	public void insert(RecordKey key, Map<String, Constant> fldVals) {
+		CachedRecord rec = new CachedRecord(fldVals);
+		rec.setSrcTxNum(tx.getTransactionNumber());
+		rec.setNewInserted(true);
+		cachedRecords.put(key, rec);
 	}
 
-	public void delete(RecordKey key, Transaction tx) {
-		cacheMgr.delete(key, tx);
+	public void delete(RecordKey key) {
+		CachedRecord dummyRec = new CachedRecord();
+		dummyRec.setSrcTxNum(tx.getTransactionNumber());
+		dummyRec.delete();
+		cachedRecords.put(key, dummyRec);
+	}
+	
+	public void flush() {
+		for (Map.Entry<RecordKey, CachedRecord> entry : cachedRecords.entrySet()) {
+			RecordKey key = entry.getKey();
+			CachedRecord rec = entry.getValue();
+			
+			if (rec.isDeleted())
+				VanillaCoreCrud.delete(key, tx);
+			else if (rec.isNewInserted())
+				VanillaCoreCrud.insert(key, rec, tx);
+			else if (rec.isDirty())
+				VanillaCoreCrud.update(key, rec, tx);
+		}
+	}
+	
+	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
+		inbox.add(new KeyRecordPair(key, rec));
 	}
 }
