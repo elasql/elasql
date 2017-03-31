@@ -53,11 +53,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private Set<Integer> activeParticipants = new HashSet<Integer>();
 	// private Set<Integer> passiveParticipants = new HashSet<Integer>();
 
-	// Master node decision
-	private int[] readPerNode = new int[PartitionMetaMgr.NUM_PARTITIONS];
-	private int[] writePerNode = new int[PartitionMetaMgr.NUM_PARTITIONS];
-	private int masterNode;
-
 	// Record keys
 	// XXX: Do we need table-level locks ?
 	private Set<RecordKey> localReadKeys = new HashSet<RecordKey>();
@@ -85,10 +80,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 */
 	protected abstract void prepareKeys();
 
-	protected abstract void executeSQL(Map<RecordKey, CachedRecord> readings);
-
-	protected abstract void masterCollectResults(
-			Map<RecordKey, CachedRecord> readings);
+	protected abstract void executeSql(Map<RecordKey, CachedRecord> readings);
 
 	/**********************
 	 * implemented methods
@@ -98,7 +90,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
-		// create transaction
+		// create a transaction
 		boolean isReadOnly = paramHelper.isReadOnly();
 		tx = Elasql.txMgr().newTransaction(
 				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
@@ -106,9 +98,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// prepare keys
 		prepareKeys();
-
-		// decide which node the master is
-		masterNode = decideMaster();
 		
 		// for the cache layer
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
@@ -164,66 +153,18 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		return paramHelper.createResultSet();
 	}
 
-	/**
-	 * Returns true if this machine is the master node which is responsible for
-	 * sending response back to client.
-	 * 
-	 * @return
-	 */
-	public boolean isMasterNode() {
-		return masterNode == localNodeId;
-	}
-
-	public int getMasterNodeId() {
-		return masterNode;
-	}
-
 	public boolean isParticipated() {
-		if (masterNode == localNodeId)
-			return true;
 		return localReadKeys.size() != 0 || localWriteKeys.size() != 0 ||
 				localInsertKeys.size() != 0;
+	}
+	
+	public boolean willResponseToClients() {
+		return activeParticipants.contains(localNodeId);
 	}
 
 	@Override
 	public boolean isReadOnly() {
 		return paramHelper.isReadOnly();
-	}
-
-	/**
-	 * Choose a node be the master node. The master node must collect the
-	 * readings from other nodes and take responsibility for reporting to
-	 * clients. This method can be overridden if a developer wants to use
-	 * another election algorithm. The default algorithm chooses the node which
-	 * has the most writings or readings to be a master node. It has to be
-	 * noticed that the algorithm must be deterministic on all server nodes.
-	 * 
-	 * @return the master node id
-	 */
-	protected int decideMaster() {
-		int maxValue = -1;
-		int masterId = -1;
-
-		// Let the node with the most writings be the master
-		for (int nodeId = 0; nodeId < writePerNode.length; nodeId++) {
-			if (maxValue < writePerNode[nodeId]) {
-				maxValue = writePerNode[nodeId];
-				masterId = nodeId;
-			}
-		}
-
-		if (maxValue > 0)
-			return masterId;
-
-		// Let the node with the most readings be the master
-		for (int nodeId = 0; nodeId < readPerNode.length; nodeId++) {
-			if (maxValue < readPerNode[nodeId]) {
-				maxValue = readPerNode[nodeId];
-				masterId = nodeId;
-			}
-		}
-
-		return masterId;
 	}
 
 	/**
@@ -235,11 +176,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		Map<RecordKey, CachedRecord> readings = performLocalRead();
 
 		// Push local records to the needed remote nodes
-		if (!activeParticipants.isEmpty() || !isMasterNode())
+		if (!activeParticipants.isEmpty())
 			pushReadingsToRemotes(readings);
 		
 		// Passive participants stops here
-		if (!activeParticipants.contains(localNodeId) && !isMasterNode())
+		if (!activeParticipants.contains(localNodeId))
 			return;
 
 		// Read the remote records
@@ -247,18 +188,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// Write the local records
 		if (activeParticipants.contains(localNodeId))
-			executeSQL(readings);
-
-		// The master node must collect final results
-		if (isMasterNode())
-			masterCollectResults(readings);
+			executeSql(readings);
 	}
 
 	protected void addReadKey(RecordKey readKey) {
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
-		
-		readPerNode[nodeId]++;
 
 		if (nodeId == localNodeId)
 			localReadKeys.add(readKey);
@@ -270,8 +205,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(writeKey);
 
-		writePerNode[nodeId]++;
-
 		if (nodeId == localNodeId)
 			localWriteKeys.add(writeKey);
 		activeParticipants.add(nodeId);
@@ -280,8 +213,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected void addInsertKey(RecordKey insertKey) {
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(insertKey);
-
-		writePerNode[nodeId]++;
 
 		if (nodeId == localNodeId)
 			localInsertKeys.add(insertKey);
@@ -320,12 +251,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		return localReadings;
 	}
 
-	private void pushReadingsToRemotes(Map<RecordKey, CachedRecord> localReadings) {
+	private void pushReadingsToRemotes(Map<RecordKey, CachedRecord> readings) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		TupleSet ts = new TupleSet(-1);
-		if (!localReadings.isEmpty()) {
+		if (!readings.isEmpty()) {
 			// Construct pushing tuple set
-			for (Entry<RecordKey, CachedRecord> e : localReadings.entrySet()) {
+			for (Entry<RecordKey, CachedRecord> e : readings.entrySet()) {
 				if (!partMgr.isFullyReplicated(e.getKey()))
 					ts.addTuple(e.getKey(), txNum, txNum, e.getValue());
 			}
@@ -334,10 +265,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			for (Integer n : activeParticipants)
 				if (n != localNodeId)
 					Elasql.connectionMgr().pushTupleSet(n, ts);
-
-			// Push a set to the master node
-			if (!activeParticipants.contains(masterNode) && !isMasterNode())
-				Elasql.connectionMgr().pushTupleSet(masterNode, ts);
 		}
 	}
 
