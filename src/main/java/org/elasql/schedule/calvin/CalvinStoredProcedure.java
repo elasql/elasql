@@ -65,9 +65,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> remoteReadKeys = new HashSet<RecordKey>();
 
-	// Records
-	private Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
-
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
@@ -88,14 +85,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 */
 	protected abstract void prepareKeys();
 
-	protected abstract void onLocalReadCollected(
-			Map<RecordKey, CachedRecord> localReadings);
-
-	protected abstract void onRemoteReadCollected(
-			Map<RecordKey, CachedRecord> remoteReadings);
-
-	protected abstract void writeRecords(
-			Map<RecordKey, CachedRecord> remoteReadings);
+	protected abstract void executeSQL(Map<RecordKey, CachedRecord> readings);
 
 	protected abstract void masterCollectResults(
 			Map<RecordKey, CachedRecord> readings);
@@ -242,19 +232,22 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 */
 	protected void executeTransactionLogic() {
 		// Read the local records
-		performLocalRead();
+		Map<RecordKey, CachedRecord> readings = performLocalRead();
 
 		// Push local records to the needed remote nodes
 		if (!activeParticipants.isEmpty() || !isMasterNode())
-			pushReadingsToRemotes();
+			pushReadingsToRemotes(readings);
+		
+		// Passive participants stops here
+		if (!activeParticipants.contains(localNodeId) && !isMasterNode())
+			return;
 
 		// Read the remote records
-		if (activeParticipants.contains(localNodeId) || isMasterNode())
-			collectRemoteReadings();
+		collectRemoteReadings(readings);
 
 		// Write the local records
 		if (activeParticipants.contains(localNodeId))
-			writeRecords(readings);
+			executeSQL(readings);
 
 		// The master node must collect final results
 		if (isMasterNode())
@@ -294,10 +287,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			localInsertKeys.add(insertKey);
 		activeParticipants.add(nodeId);
 	}
-
-	protected Map<RecordKey, CachedRecord> getReadings() {
-		return readings;
-	}
 	
 	protected void update(RecordKey key, CachedRecord rec) {
 		if (localWriteKeys.contains(key))
@@ -308,8 +297,14 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		if (localInsertKeys.contains(key))
 			cacheMgr.insert(key, fldVals);
 	}
+	
+	protected void delete(RecordKey key) {
+		// XXX: Do we need a 'localDeleteKeys' for this ?
+		if (localWriteKeys.contains(key))
+			cacheMgr.delete(key);
+	}
 
-	private void performLocalRead() {
+	private Map<RecordKey, CachedRecord> performLocalRead() {
 		Map<RecordKey, CachedRecord> localReadings = new HashMap<RecordKey, CachedRecord>();
 		// Check which node has the corresponding record
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
@@ -318,21 +313,19 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		for (RecordKey k : localReadKeys) {
 			if (!partMgr.isFullyReplicated(k) || activeParticipants.contains(localNodeId)) {
 				CachedRecord rec = cacheMgr.readFromLocal(k);
-				readings.put(k, rec);
 				localReadings.put(k, rec);
 			}
 		}
-
-		// Notify the implementation of subclass
-		onLocalReadCollected(localReadings);
+		
+		return localReadings;
 	}
 
-	private void pushReadingsToRemotes() {
+	private void pushReadingsToRemotes(Map<RecordKey, CachedRecord> localReadings) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		TupleSet ts = new TupleSet(-1);
-		if (!readings.isEmpty()) {
+		if (!localReadings.isEmpty()) {
 			// Construct pushing tuple set
-			for (Entry<RecordKey, CachedRecord> e : readings.entrySet()) {
+			for (Entry<RecordKey, CachedRecord> e : localReadings.entrySet()) {
 				if (!partMgr.isFullyReplicated(e.getKey()))
 					ts.addTuple(e.getKey(), txNum, txNum, e.getValue());
 			}
@@ -348,17 +341,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 	}
 
-	private void collectRemoteReadings() {
-		Map<RecordKey, CachedRecord> remoteReadings = new HashMap<RecordKey, CachedRecord>();
-
+	private void collectRemoteReadings(Map<RecordKey, CachedRecord> readingCache) {
 		// Read remote records
 		for (RecordKey k : remoteReadKeys) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
-			readings.put(k, rec);
-			remoteReadings.put(k, rec);
+			readingCache.put(k, rec);
 		}
-
-		// Notify the implementation of subclass
-		onRemoteReadCollected(remoteReadings);
 	}
 }

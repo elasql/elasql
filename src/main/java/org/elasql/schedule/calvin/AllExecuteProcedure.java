@@ -63,19 +63,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	}
 
 	@Override
-	protected void onLocalReadCollected(
-			Map<RecordKey, CachedRecord> localReadings) {
-		// Do nothing
-	}
-
-	@Override
-	protected void onRemoteReadCollected(
-			Map<RecordKey, CachedRecord> remoteReadings) {
-		// Do nothing
-	}
-
-	@Override
-	protected void writeRecords(Map<RecordKey, CachedRecord> readings) {
+	protected void executeSQL(Map<RecordKey, CachedRecord> readings) {
 		// Do nothing
 	}
 

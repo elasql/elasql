@@ -137,14 +137,12 @@ public class CalvinCacheMgr {
 			RecordKey key = entry.getKey();
 			CachedRecord rec = entry.getValue();
 			
-			if (key.getPartition() == Elasql.serverId()) {
-				if (rec.isDeleted())
-					VanillaCoreCrud.delete(key, tx);
-				else if (rec.isNewInserted())
-					VanillaCoreCrud.insert(key, rec, tx);
-				else if (rec.isDirty())
-					VanillaCoreCrud.update(key, rec, tx);
-			}
+			if (rec.isDeleted())
+				VanillaCoreCrud.delete(key, tx);
+			else if (rec.isNewInserted())
+				VanillaCoreCrud.insert(key, rec, tx);
+			else if (rec.isDirty())
+				VanillaCoreCrud.update(key, rec, tx);
 		}
 	}
 	
