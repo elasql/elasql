@@ -51,7 +51,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	// Active Participants: Nodes that need to write records locally
 	// Passive Participants: Nodes that only need to read records and push
 	private Set<Integer> activeParticipants = new HashSet<Integer>();
-	// private Set<Integer> passiveParticipants = new HashSet<Integer>();
+//	private Set<Integer> passiveParticipants = new HashSet<Integer>();
+	
+	// For read-only transactions to choose one node as a active participant
+	private int mostReadsNode = 0;
+	private int[] readsPerNodes = new int[PartitionMetaMgr.NUM_PARTITIONS];
 
 	// Record keys
 	// XXX: Do we need table-level locks ?
@@ -98,6 +102,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// prepare keys
 		prepareKeys();
+		
+		// if there is no active participant (e.g. read-only transaction),
+		// choose the one with most readings as the only active participant.
+		if (activeParticipants.isEmpty())
+			activeParticipants.add(mostReadsNode);
 		
 		// for the cache layer
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
@@ -199,6 +208,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			localReadKeys.add(readKey);
 		else
 			remoteReadKeys.add(readKey);
+		
+		// Record who is the node with most readings
+		readsPerNodes[nodeId]++;
+		if (readsPerNodes[nodeId] > readsPerNodes[mostReadsNode])
+			mostReadsNode = nodeId;
 	}
 
 	protected void addWriteKey(RecordKey writeKey) {

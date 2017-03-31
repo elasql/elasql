@@ -18,9 +18,9 @@ class BatchSpcSender implements Runnable {
 
 	static {
 		BATCH_SIZE = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(GroupCommConnection.class.getName() + ".BATCH_SIZE", 1);
+				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".BATCH_SIZE", 1);
 		MAX_WAITING_TIME = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(GroupCommConnection.class.getName() + ".MAX_WAITING_TIME", 1000);
+				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".MAX_WAITING_TIME", 1000);
 	}
 
 	private AtomicInteger numOfQueuedSpcs = new AtomicInteger(0);

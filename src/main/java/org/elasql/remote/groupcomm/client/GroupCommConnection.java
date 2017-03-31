@@ -70,7 +70,10 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 		// Wait for the response
 		try {
 			ClientResponse cr = respQueue.take();
-			long lastTxNum = rteToLastTxNum.get(rteId);
+			Long lastTxNumObj = rteToLastTxNum.get(rteId);
+			long lastTxNum = -1;
+			if (lastTxNumObj != null)
+				lastTxNum = lastTxNumObj;
 
 			while (lastTxNum >= cr.getTxNum())
 				cr = respQueue.take();
