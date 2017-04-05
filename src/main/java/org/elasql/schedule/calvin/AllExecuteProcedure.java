@@ -15,17 +15,20 @@
  ******************************************************************************/
 package org.elasql.schedule.calvin;
 
+import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.NotificationPartMetaMgr;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
@@ -42,41 +45,41 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	public AllExecuteProcedure(long txNum, H paramHelper) {
 		super(txNum, paramHelper);
 	}
+	
+	public void prepare(Object... pars) {
+		// prepare parameters
+		paramHelper.prepareParameters(pars);
 
-	/**
-	 * Only return true in order to force all nodes to participate.
-	 * 
-	 * @return true
-	 */
+		// create a transaction
+		boolean isReadOnly = paramHelper.isReadOnly();
+		tx = Elasql.txMgr().newTransaction(
+				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
+		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
+
+		// prepare keys
+		prepareKeys();
+		
+		// for the cache layer
+		// NOTE: always creates a CacheMgr that can accept remote records
+		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
+		cacheMgr = postOffice.createCacheMgr(tx, true);
+	}
+	
 	public boolean isParticipated() {
+		// Only return true in order to force all nodes to participate.
 		return true;
 	}
-
-	@Override
-	protected void prepareKeys() {
-		// Do nothing
-	}
-
-	@Override
-	protected int decideMaster() {
-		return MASTER_NODE;
-	}
-
-	@Override
-	protected void executeSQL(Map<RecordKey, CachedRecord> readings) {
-		// Do nothing
-	}
-
-	@Override
-	protected void masterCollectResults(Map<RecordKey, CachedRecord> readings) {
-		// Do nothing
+	
+	public boolean willResponseToClients() {
+		// The master node is the only one that will response to the clients.
+		return localNodeId == MASTER_NODE;
 	}
 
 	protected void executeTransactionLogic() {
-		executeSql();
+		executeSql(null);
 
 		// Notification for finish
-		if (isMasterNode()) {
+		if (localNodeId == MASTER_NODE) {
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Waiting for other servers...");
 
@@ -90,8 +93,6 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 			sendNotification();
 		}
 	}
-
-	protected abstract void executeSql();
 
 	private void waitForNotification() {
 		// Wait for notification from other nodes

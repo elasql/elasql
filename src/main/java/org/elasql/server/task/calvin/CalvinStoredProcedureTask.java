@@ -44,12 +44,12 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 		// Timers.getTimer().stopExecution();
 		// }
 
-		if (csp.isMasterNode()) {
+		if (csp.willResponseToClients()) {
 			// System.out.println("Commit: " + (System.nanoTime() - startTime));
 			Elasql.connectionMgr().sendClientResponse(cid, rteId, txNum,
 					rs);
 		}
-
+		
 		// Timers.reportTime();
 	}
 
