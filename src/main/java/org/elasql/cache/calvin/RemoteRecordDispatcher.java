@@ -74,8 +74,6 @@ public class RemoteRecordDispatcher extends Task {
 	// transactions with smaller number have committed.
 	private Set<Long> committedTxs; // The committed transactions
 	// whose number larger than lowerWaterMark
-	
-	private int dispatcherId;
 
 	RemoteRecordDispatcher(int id) {
 		eventQueue = new LinkedBlockingQueue<Event>();
@@ -83,52 +81,6 @@ public class RemoteRecordDispatcher extends Task {
 		cachedRecords = new HashMap<Long, Set<RemoteRecord>>();
 		lowerWaterMark = Elasql.START_TX_NUMBER - CalvinPostOffice.NUM_DISPATCHERS + id;
 		committedTxs = new HashSet<Long>();
-		dispatcherId = id;
-		
-//		if (id == 3)
-//		new Thread() {
-//			@Override
-//			public void run() {
-//				long startTime = System.currentTimeMillis();
-//				long lastRecordTime = 0;
-//				long elapsedTime = System.currentTimeMillis() - startTime;
-//				long totalTime = 30000;
-//				long recordInterval = 1000; // in millisecond
-//
-//				while (elapsedTime < totalTime) {
-//					// Record tx counts
-//					if (elapsedTime - lastRecordTime >= recordInterval) {
-//						lastRecordTime = elapsedTime;
-//						System.out.println("D" + dispatcherId + "'s EventQueue Size: " + eventQueue.size());
-//						System.out.println("D" + dispatcherId + "'s ChannelMap Size: " + channelMap.size());
-//						System.out.println("D" + dispatcherId + "'s CachedRecordMap Size: " + cachedRecords.size());
-//						System.out.println("D" + dispatcherId + "'s LowerWaterMark: " + lowerWaterMark);
-//						System.out.println("D" + dispatcherId + "'s CommittedSet Size: " + committedTxs.size());
-//					}
-//
-//					// Sleep for a short time (avoid busy waiting)
-//					try {
-//						Thread.sleep(100);
-//					} catch (InterruptedException e) {
-//						e.printStackTrace();
-//					}
-//
-//					// Update elapsed time
-//					elapsedTime = System.currentTimeMillis() - startTime;
-//				}
-
-//				int i = 0;
-//				for (Long txNum : cachedRecords.keySet()) {
-//					System.out.println("Tx: " + txNum);
-//					System.out.println(cachedRecords.get(txNum));
-//
-//					i++;
-//					if (i > 5) {
-//						break;
-//					}
-//				}
-//			}
-//		}.start();
 	}
 	
 	@Override

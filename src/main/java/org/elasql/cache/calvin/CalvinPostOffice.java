@@ -4,12 +4,17 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class CalvinPostOffice implements RemoteRecordReceiver {
 	
-	// TODO: add this to a properties file
-	public static final int NUM_DISPATCHERS = 4;
+	public static final int NUM_DISPATCHERS;
+	
+	static {
+		NUM_DISPATCHERS = ElasqlProperties.getLoader().getPropertyAsInteger(
+				CalvinPostOffice.class.getName() + ".NUM_DISPATCHERS", 1);
+	}
 	
 	private RemoteRecordDispatcher[] dispatchers = new RemoteRecordDispatcher[NUM_DISPATCHERS];
 	
