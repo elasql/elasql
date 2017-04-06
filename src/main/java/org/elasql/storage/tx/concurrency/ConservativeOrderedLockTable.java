@@ -15,27 +15,28 @@
  ******************************************************************************/
 package org.elasql.storage.tx.concurrency;
 
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
 
 public class ConservativeOrderedLockTable {
+
+	private static final int NUM_ANCHOR = 1009;
+	
 	enum LockType {
 		IS_LOCK, IX_LOCK, S_LOCK, SIX_LOCK, X_LOCK
 	}
 
-	class Lockers {
+	private class Lockers {
+		static final long NONE = -1; // for sixLocker, xLocker and wbLocker
+		
 		List<Long> sLockers, ixLockers, isLockers;
 		// only one tx can hold xLock(sixLock) on single item
 		long sixLocker, xLocker;
-		static final long NONE = -1; // for sixLocker, xLocker and wbLocker
-
 		Queue<Long> requestQueue;
 
 		Lockers() {
@@ -50,23 +51,19 @@ public class ConservativeOrderedLockTable {
 		@Override
 		public String toString() {
 			return "{S: " + sLockers +
-					", IX" + ixLockers +
-					", IS" + isLockers +
-					", SIX" + sixLocker +
-					", X" + xLocker +
+					", IX: " + ixLockers +
+					", IS: " + isLockers +
+					", SIX: " + sixLocker +
+					", X: " + xLocker +
 					", requests: " + requestQueue +
 					"}";
 		}
 	}
 
 	private Map<Object, Lockers> lockerMap = new ConcurrentHashMap<Object, Lockers>();
-	private Map<Long, Set<Object>> txLockMap = new ConcurrentHashMap<Long, Set<Object>>();
 
-	// Anchors
-	private static final int NUM_ANCHOR = 1009;
-	private final Object anchors[] = new Object[NUM_ANCHOR]; // To distribute
-																// synchronized
-																// area
+	// Lock-stripping
+	private final Object anchors[] = new Object[NUM_ANCHOR];
 
 	/**
 	 * Create and initialize a conservative ordered lock table.
@@ -107,10 +104,12 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void sLock(Object obj, long txNum) {
-		synchronized (getAnchor(obj)) {
+		Object anchor = getAnchor(obj);
+		
+		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
-			// check if it have already had lock
+			// check if it have already held the lock
 			if (hasSLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
 				return;
@@ -125,7 +124,11 @@ public class ConservativeOrderedLockTable {
 				while (!sLockable(lockers, txNum)
 						|| (head != null && head.longValue() != txNum)) {
 
-					getAnchor(obj).wait();
+					anchor.wait();
+					
+					// Since a transaction may delete the lockers of an object
+					// after releasing them, it should call prepareLockers()
+					// here, instead of using lockers it obtains earlier.
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
@@ -134,14 +137,10 @@ public class ConservativeOrderedLockTable {
 				lockers.requestQueue.poll();
 				lockers.sLockers.add(txNum);
 				// System.out.println("S: " + obj + ", txn: " + txNum);
-				getObjectSet(txNum).add(obj);
 
-				/*
-				 * Because we can let multiple transaction get s lock on the
-				 * same object, it shall wake up transaction which waiting on
-				 * this object and let them try to get s lock.
-				 */
-				getAnchor(obj).notifyAll();
+				// Wake up other waiting transactions (on this object) to let them
+				// fight for the lockers on this object.
+				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				throw new LockAbortException(
@@ -163,27 +162,23 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void xLock(Object obj, long txNum) {
-		synchronized (getAnchor(obj)) {
+		// See the comments in sLock(..) for the explanation of the algorithm 
+		Object anchor = getAnchor(obj);
+		
+		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
-			
-//			System.out.println("Tx." + txNum + " requests " + obj);
 
-			// check if it have already had lock
 			if (hasXLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
 				return;
 			}
 
 			try {
-				/*
-				 * If this transaction is not the first one requesting this
-				 * object or it cannot get lock on this object, it must wait.
-				 */
 				Long head = lockers.requestQueue.peek();
 				while (!xLockable(lockers, txNum)
 						|| (head != null && head.longValue() != txNum)) {
 //					System.out.println("Tx." + txNum + " look the list of " + obj + ":\n" + lockers);
-					getAnchor(obj).wait();
+					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
@@ -192,7 +187,9 @@ public class ConservativeOrderedLockTable {
 				lockers.requestQueue.poll();
 				lockers.xLocker = txNum;
 				// System.out.println("X: " + obj + ", txn: " + txNum);
-				getObjectSet(txNum).add(obj);
+				
+				// An X lock blocks all other lockers, so it don't need to
+				// wake up anyone.
 			} catch (InterruptedException e) {
 				throw new LockAbortException(
 						"Interrupted when waitting for lock");
@@ -215,22 +212,22 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void sixLock(Object obj, long txNum) {
-		synchronized (getAnchor(obj)) {
+		// See the comments in sLock(..) for the explanation of the algorithm 
+		Object anchor = getAnchor(obj);
+		
+		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
-			// check if it have already had lock TODO: Add remove request
-			if (hasSixLock(lockers, txNum))
+			if (hasSixLock(lockers, txNum)) {
+				lockers.requestQueue.remove(txNum);
 				return;
+			}
 
 			try {
-				/*
-				 * If this transaction is not the first one requesting this
-				 * object or it cannot get lock on this object, it must wait.
-				 */
 				Long head = lockers.requestQueue.peek();
 				while (!sixLockable(lockers, txNum)
 						|| (head != null && head.longValue() != txNum)) {
-					getAnchor(obj).wait();
+					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
@@ -238,8 +235,8 @@ public class ConservativeOrderedLockTable {
 				// get the six lock
 				lockers.requestQueue.poll();
 				lockers.sixLocker = txNum;
-				getObjectSet(txNum).add(obj);
-				getAnchor(obj).notifyAll();
+				
+				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				throw new LockAbortException(
 						"Interrupted when waitting for lock");
@@ -253,30 +250,28 @@ public class ConservativeOrderedLockTable {
 	 * list until the lock is released. If the thread remains on the wait list
 	 * for a certain amount of time, then an exception is thrown.
 	 * 
-	 * TODO: check this method
-	 * 
 	 * @param obj
 	 *            an object to be locked
 	 * @param txNum
 	 *            a transaction number
 	 */
 	void isLock(Object obj, long txNum) {
-		synchronized (getAnchor(obj)) {
+		// See the comments in sLock(..) for the explanation of the algorithm 
+		Object anchor = getAnchor(obj);
+		
+		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
-			// check if it have already had lock TODO: Add remove request
-			if (hasIsLock(lockers, txNum))
+			if (hasIsLock(lockers, txNum)) {
+				lockers.requestQueue.remove(txNum);
 				return;
+			}
 
 			try {
-				/*
-				 * If this transaction is not the first one requesting this
-				 * object or it cannot get lock on this object, it must wait.
-				 */
 				Long head = lockers.requestQueue.peek();
 				while (!isLockable(lockers, txNum)
 						|| (head != null && head.longValue() != txNum)) {
-					getAnchor(obj).wait();
+					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
@@ -284,8 +279,8 @@ public class ConservativeOrderedLockTable {
 				// get the is lock
 				lockers.requestQueue.poll();
 				lockers.isLockers.add(txNum);
-				getObjectSet(txNum).add(obj);
-				getAnchor(obj).notifyAll();
+				
+				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				throw new LockAbortException(
 						"Interrupted when waitting for lock");
@@ -299,30 +294,28 @@ public class ConservativeOrderedLockTable {
 	 * list until the lock is released. If the thread remains on the wait list
 	 * for a certain amount of time, then an exception is thrown.
 	 * 
-	 * TODO: check this method
-	 * 
 	 * @param obj
 	 *            an object to be locked
 	 * @param txNum
 	 *            a transaction number
 	 */
 	void ixLock(Object obj, long txNum) {
-		synchronized (getAnchor(obj)) {
+		// See the comments in sLock(..) for the explanation of the algorithm 
+		Object anchor = getAnchor(obj);
+		
+		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
-			// check if it have already had lock TODO: Add remove request
-			if (hasIxLock(lockers, txNum))
+			if (hasIxLock(lockers, txNum)) {
+				lockers.requestQueue.remove(txNum);
 				return;
+			}
 
 			try {
-				/*
-				 * If this transaction is not the first one requesting this
-				 * object or it cannot get lock on this object, it must wait.
-				 */
 				Long head = lockers.requestQueue.peek();
 				while (!ixLockable(lockers, txNum)
 						|| (head != null && head.longValue() != txNum)) {
-					getAnchor(obj).wait();
+					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
@@ -330,8 +323,8 @@ public class ConservativeOrderedLockTable {
 				// get the ix lock
 				lockers.requestQueue.poll();
 				lockers.ixLockers.add(txNum);
-				getObjectSet(txNum).add(obj);
-				getAnchor(obj).notifyAll();
+				
+				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				throw new LockAbortException(
 						"Interrupted when waitting for lock");
@@ -344,11 +337,6 @@ public class ConservativeOrderedLockTable {
 	 * If a lock is the last lock on that block, then the waiting transactions
 	 * are notified.
 	 * 
-	 * TODO: Check if the lockers related to the transaction are all released.
-	 * If it is true, it must remove that transaction from txLockMap. (We don't
-	 * have to do this for now because all transaction will call releaseAll
-	 * during committing.)
-	 * 
 	 * @param obj
 	 *            a locked object
 	 * @param txNum
@@ -360,81 +348,26 @@ public class ConservativeOrderedLockTable {
 		Object anchor = getAnchor(obj);
 		synchronized (anchor) {
 			Lockers lks = lockerMap.get(obj);
+			
+			if (lks == null)
+				return;
+			
 			releaseLock(lks, txNum, lockType, anchor);
 
-			// Check if this transaction have any other lock on this object
-			if (!hasSLock(lks, txNum) && !hasXLock(lks, txNum)
-					&& !hasSixLock(lks, txNum) && !hasIsLock(lks, txNum)
-					&& !hasIxLock(lks, txNum)) {
-				getObjectSet(txNum).remove(obj);
-
-				// Remove the locker, if there is no other transaction
-				// having it
-				if (!sLocked(lks) && !xLocked(lks) && !sixLocked(lks)
-						&& !isLocked(lks) && !ixLocked(lks)
-						&& lks.requestQueue.isEmpty())
-					lockerMap.remove(obj);
-			}
+			// Remove the locker, if there is no other transaction
+			// holding it
+			if (!sLocked(lks) && !xLocked(lks) && !sixLocked(lks)
+					&& !isLocked(lks) && !ixLocked(lks)
+					&& lks.requestQueue.isEmpty())
+				lockerMap.remove(obj);
+			
+			// There might be someone waiting for the lock
+			anchor.notifyAll();
 		}
 	}
 
 	/**
-	 * Releases all locks held by a transaction. If a lock is the last lock on
-	 * that block, then the waiting transactions are notified.
-	 * 
-	 * @param txNum
-	 *            a transaction number
-	 */
-	void releaseAll(long txNum) {
-
-		Set<Object> objectsToRelease = getObjectSet(txNum);
-		for (Object obj : objectsToRelease) {
-
-			Object anchor = getAnchor(obj);
-			synchronized (anchor) {
-				Lockers lks = lockerMap.get(obj);
-
-				if (hasSLock(lks, txNum))
-					releaseLock(lks, txNum, LockType.S_LOCK, anchor);
-
-				if (hasXLock(lks, txNum))
-					releaseLock(lks, txNum, LockType.X_LOCK, anchor);
-
-				if (hasSixLock(lks, txNum))
-					releaseLock(lks, txNum, LockType.SIX_LOCK, anchor);
-
-				if (hasIsLock(lks, txNum))
-					releaseLock(lks, txNum, LockType.IS_LOCK, anchor);
-
-				if (hasIxLock(lks, txNum))
-					releaseLock(lks, txNum, LockType.IX_LOCK, anchor);
-
-				// Remove the locker, if there is no other transaction
-				// having it
-				// if (lks == null) {
-				// System.out.println("!!! Release: " + obj + "txnum: "
-				// + txNum);
-				// } else {
-				// System.out.println("Release: " + obj + "txnum: " + txNum);
-				// }
-				if (!sLocked(lks) && !xLocked(lks) && !sixLocked(lks)
-						&& !isLocked(lks) && !ixLocked(lks)
-						&& lks.requestQueue.isEmpty())
-					lockerMap.remove(obj);
-			}
-		}
-		// Remove the locked object set of the corresponding transaction
-		txLockMap.remove(txNum);
-		/*
-		 * TODO: Sometimes there are some object which will be requested but
-		 * that requesting transaction do not actually get the lock. We may have
-		 * to check if it happened.
-		 */
-
-	}
-
-	/**
-	 * To decide which anchor object obj should use.
+	 * Gets the anchor for the specified object.
 	 * 
 	 * @param obj
 	 *            the target object
@@ -455,20 +388,8 @@ public class ConservativeOrderedLockTable {
 		return lockers;
 	}
 
-	private Set<Object> getObjectSet(long txNum) {
-		Set<Object> objectSet = txLockMap.get(txNum);
-		if (objectSet == null) {
-			objectSet = new HashSet<Object>();
-			txLockMap.put(txNum, objectSet);
-		}
-		return objectSet;
-	}
-
 	private void releaseLock(Lockers lks, long txNum, LockType lockType,
 			Object anchor) {
-		if (lks == null)
-			return;
-
 		switch (lockType) {
 		case X_LOCK:
 			if (lks.xLocker == txNum) {
