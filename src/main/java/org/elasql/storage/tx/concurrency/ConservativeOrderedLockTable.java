@@ -136,7 +136,6 @@ public class ConservativeOrderedLockTable {
 				// get the s lock
 				lockers.requestQueue.poll();
 				lockers.sLockers.add(txNum);
-				// System.out.println("S: " + obj + ", txn: " + txNum);
 
 				// Wake up other waiting transactions (on this object) to let them
 				// fight for the lockers on this object.
@@ -177,7 +176,6 @@ public class ConservativeOrderedLockTable {
 				Long head = lockers.requestQueue.peek();
 				while (!xLockable(lockers, txNum)
 						|| (head != null && head.longValue() != txNum)) {
-//					System.out.println("Tx." + txNum + " look the list of " + obj + ":\n" + lockers);
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
@@ -186,7 +184,6 @@ public class ConservativeOrderedLockTable {
 				// get the x lock
 				lockers.requestQueue.poll();
 				lockers.xLocker = txNum;
-				// System.out.println("X: " + obj + ", txn: " + txNum);
 				
 				// An X lock blocks all other lockers, so it don't need to
 				// wake up anyone.
@@ -194,8 +191,6 @@ public class ConservativeOrderedLockTable {
 				throw new LockAbortException(
 						"Interrupted when waitting for lock");
 			}
-			
-//			System.out.println("Tx." + txNum + " got " + obj);
 		}
 	}
 

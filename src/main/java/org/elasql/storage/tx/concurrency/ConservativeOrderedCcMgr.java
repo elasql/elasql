@@ -29,7 +29,12 @@ import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	protected static ConservativeOrderedLockTable lockTbl = new ConservativeOrderedLockTable();
 	
+	// For normal operations - using conservative locking 
 	private Set<Object> bookedObjs, readObjs, writeObjs;
+	
+	// For Indexes - using crabbing locking
+	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
+	private Set<BlockId> writtenIndexBlks = new HashSet<BlockId>();
 
 	public ConservativeOrderedCcMgr(long txNumber) {
 		txNum = txNumber;
@@ -142,8 +147,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/*
 	 * Methods for B-Tree index locking
 	 */
-	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
-	private Set<BlockId> writtenIndexBlks = new HashSet<BlockId>();
 
 	/**
 	 * Sets lock on the leaf block for update.
