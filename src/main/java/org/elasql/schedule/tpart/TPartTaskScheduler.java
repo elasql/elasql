@@ -6,12 +6,12 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.server.task.tpart.TPartStoredProcedureTask;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class TPartTaskScheduler extends Task {
-	private static Logger logger = Logger.getLogger(TPartTaskScheduler.class
-			.getName());
+	private static Logger logger = Logger.getLogger(TPartTaskScheduler.class.getName());
 	private BlockingQueue<Iterator<TPartStoredProcedureTask>> plansQueue;
 
 	public TPartTaskScheduler() {
@@ -23,7 +23,7 @@ public class TPartTaskScheduler extends Task {
 	 * 
 	 * @param task
 	 */
-	
+
 	// Test if this class is needed
 	public void addTask(Iterator<TPartStoredProcedureTask> plans) {
 		try {

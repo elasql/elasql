@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.elasql.cache.tpart.NewTPartCacheMgr;
 import org.elasql.schedule.tpart.Edge;
 import org.elasql.schedule.tpart.Node;
 import org.elasql.schedule.tpart.TGraph;
@@ -18,7 +19,7 @@ public class CacheOptimizedSinker extends Sinker {
 	private static int sinkProcessId = 0;
 	private int myId = Elasql.serverId();
 
-	private NewTPartCacheMgr cm = (NewTPartCacheMgr) Elasql.cacheMgr();
+	private NewTPartCacheMgr cm = (NewTPartCacheMgr) Elasql.remoteRecReceiver();
 
 	public CacheOptimizedSinker() {
 		// the tx numbers of sink flush task are unused negative value

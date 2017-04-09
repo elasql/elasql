@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-
 
 public class TGraph {
 	private List<Node> nodes = new LinkedList<Node>();
@@ -23,7 +23,7 @@ public class TGraph {
 			node.setPartId(i);
 			sinkNodes[i] = node;
 		}
-		parMeta = VanillaDdDb.partitionMetaMgr();
+		parMeta = Elasql.partitionMetaMgr();
 	}
 
 	/**
@@ -63,10 +63,9 @@ public class TGraph {
 		for (Entry<RecordKey, Node> resPosPair : resPos.entrySet()) {
 			RecordKey res = resPosPair.getKey();
 			Node node = resPosPair.getValue();
-			
+
 			if (node.getTask() != null)
-				node.addWriteBackEdges(new Edge(sinkNodes[parMeta
-						.getPartition(res)], res));
+				node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getPartition(res)], res));
 		}
 		resPos.clear();
 	}

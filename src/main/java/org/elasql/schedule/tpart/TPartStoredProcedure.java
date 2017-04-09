@@ -1,6 +1,7 @@
 package org.elasql.schedule.tpart;
 
 import org.elasql.schedule.DdStoredProcedure;
+import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.sql.RecordKey;
 
 public interface TPartStoredProcedure extends DdStoredProcedure {

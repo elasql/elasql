@@ -10,10 +10,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.cache.tpart.WriteBackRecMgr.WriteBackTuple;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
-
 
 public class WriteBackRecMgr {
 	private static final long UNCACHE_DELAY = 500;
@@ -24,8 +24,7 @@ public class WriteBackRecMgr {
 	private Map<RecordKey, List<WriteBackTuple>> writeBackRecMap = new ConcurrentHashMap<RecordKey, List<WriteBackTuple>>();
 
 	// the thread pool for uncahced task
-	private ScheduledExecutorService scheduledExecutorService = Executors
-			.newScheduledThreadPool(5);
+	private ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(5);
 
 	private final Object[] anchors = new Object[100000];
 
@@ -102,13 +101,11 @@ public class WriteBackRecMgr {
 		return null;
 	}
 
-	public void writeBackRecord(RecordKey key, int sinkProcessId,
-			CachedRecord rec, Transaction tx) {
+	public void writeBackRecord(RecordKey key, int sinkProcessId, CachedRecord rec, Transaction tx) {
 
 		synchronized (prepareAnchor(key)) {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
-			ListIterator<WriteBackTuple> tuplesItr = tuples.listIterator(tuples
-					.size());
+			ListIterator<WriteBackTuple> tuplesItr = tuples.listIterator(tuples.size());
 			while (tuplesItr.hasPrevious()) {
 				WriteBackTuple wbt = tuplesItr.previous();
 				// if wbt is in previous sink, make sure the write back is done
@@ -169,17 +166,16 @@ public class WriteBackRecMgr {
 
 			// System.out.println("tuples size: " + tuples.size());
 
-			if (tuples.size() == 0)
-				writeBackRecMap.remove(key);
+			writeBackRecMap.remove(key);
 		}
 	}
 
 	private void flush(RecordKey key, CachedRecord rec, Transaction tx) {
 		if (rec.isDeleted())
-			LocalRecordMgr.delete(key, tx);
+			VanillaCoreCrud.delete(key, tx);
 		else if (rec.isNewInserted())
-			LocalRecordMgr.insert(key, rec, tx);
+			VanillaCoreCrud.insert(key, rec, tx);
 		else if (rec.isDirty())
-			LocalRecordMgr.update(key, rec, tx);
+			VanillaCoreCrud.update(key, rec, tx);
 	}
 }

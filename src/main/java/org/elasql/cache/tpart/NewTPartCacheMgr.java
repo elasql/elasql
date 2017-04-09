@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
+import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
@@ -205,7 +206,7 @@ public class NewTPartCacheMgr implements RemoteRecordReceiver {
 		CachedRecord rec = writeBackMgr.getCachedRecord(key, mySinkProcessId);
 		// if there is no write back cache, read from local storage
 		if (rec == null)
-			rec = LocalRecordMgr.read(key, tx);
+			rec = VanillaCoreCrud.read(key, tx);
 
 		// System.out.println("Read from sink done: <" + key + ","
 		// + mySinkProcessId + "," + tx.getTransactionNumber());

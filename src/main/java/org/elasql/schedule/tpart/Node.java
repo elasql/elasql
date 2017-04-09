@@ -3,8 +3,9 @@ package org.elasql.schedule.tpart;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.vanilladb.dd.cache.tpart.NewTPartCacheMgr;
-import org.vanilladb.dd.server.task.tpart.TPartStoredProcedureTask;
+import org.elasql.cache.tpart.NewTPartCacheMgr;
+import org.elasql.server.task.tpart.TPartStoredProcedureTask;
+
 
 public class Node {
 	private List<Edge> readEdges;
