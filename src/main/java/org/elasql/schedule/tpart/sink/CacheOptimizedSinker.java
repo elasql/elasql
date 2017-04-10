@@ -5,7 +5,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.elasql.cache.tpart.NewTPartCacheMgr;
+import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.schedule.tpart.Edge;
 import org.elasql.schedule.tpart.Node;
 import org.elasql.schedule.tpart.TGraph;
@@ -19,7 +19,7 @@ public class CacheOptimizedSinker extends Sinker {
 	private static int sinkProcessId = 0;
 	private int myId = Elasql.serverId();
 
-	private NewTPartCacheMgr cm = (NewTPartCacheMgr) Elasql.remoteRecReceiver();
+	private TPartCacheMgr cm = (TPartCacheMgr) Elasql.remoteRecReceiver();
 
 	public CacheOptimizedSinker() {
 		// the tx numbers of sink flush task are unused negative value
@@ -120,7 +120,7 @@ public class CacheOptimizedSinker extends Sinker {
 					// if is not local task and the source of the edge is sink
 					// node add the push tag to sinkPushTask
 					plan.addSinkPushingInfo(e.getResourceKey(), node.getPartId(),
-							NewTPartCacheMgr.getPartitionTxnId(myId), node.getTxNum());
+							TPartCacheMgr.getPartitionTxnId(myId), node.getTxNum());
 				}
 			}
 
@@ -158,10 +158,10 @@ public class CacheOptimizedSinker extends Sinker {
 						} else {
 							// push the data if write back to remote
 							plan.addPushingInfo(k, targetServerId, txNum,
-									NewTPartCacheMgr.getPartitionTxnId(targetServerId));
+									TPartCacheMgr.getPartitionTxnId(targetServerId));
 
 						}
-						plan.addWritingInfo(e.getResourceKey(), NewTPartCacheMgr.getPartitionTxnId(targetServerId));
+						plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.getPartitionTxnId(targetServerId));
 					} else {
 						if (targetServerId == myId) {
 							// remoteFlags.add(new CachedEntryKey(k, txNum, node

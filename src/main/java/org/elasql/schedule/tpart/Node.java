@@ -3,7 +3,7 @@ package org.elasql.schedule.tpart;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.elasql.cache.tpart.NewTPartCacheMgr;
+import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.server.task.tpart.TPartStoredProcedureTask;
 
 
@@ -87,7 +87,7 @@ public class Node {
 
 	public long getTxNum() {
 		if (isSinkNode())
-			return NewTPartCacheMgr.getPartitionTxnId(getPartId());
+			return TPartCacheMgr.getPartitionTxnId(getPartId());
 		else
 			return task.getTxNum();
 	}

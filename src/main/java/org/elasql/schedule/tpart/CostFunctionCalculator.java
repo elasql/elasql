@@ -2,6 +2,7 @@ package org.elasql.schedule.tpart;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.util.ElasqlProperties;
 
 public class CostFunctionCalculator {
 	private static final double BETA;
@@ -10,12 +11,10 @@ public class CostFunctionCalculator {
 	public int crossEdgeCount;
 	public static int ttt;
 	static {
-		String prop = System.getProperty(CostFunctionCalculator.class.getName()
-				+ ".BETA");
-		if (prop != null && !prop.isEmpty())
-			BETA = Double.parseDouble(prop.trim());
-		else
-			BETA = 1;
+
+		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(TPartPartitioner.class.getName() + ".NUM_PARTITIONS",
+				1);
+
 	}
 
 	public CostFunctionCalculator() {
@@ -73,22 +72,22 @@ public class CostFunctionCalculator {
 	public double calAddNodeCost(Node newNode, TGraph graph) {
 		// calculate cross partition edge cost
 		double edgeCost = 0;
-		for(int part = 0; part < TPartPartitioner.NUM_PARTITIONS; part++){
-			if(part != newNode.getPartId())
+		for (int part = 0; part < TPartPartitioner.NUM_PARTITIONS; part++) {
+			if (part != newNode.getPartId())
 				edgeCost += newNode.getPartRecordCntArray()[part];
 		}
-		
+
 		// calculate partition load cost
-		double averageLoad = (totalLoads + newNode.getWeight())/TPartPartitioner.NUM_PARTITIONS;
+		double averageLoad = (totalLoads + newNode.getWeight()) / TPartPartitioner.NUM_PARTITIONS;
 		double loadCost = 0;
-		
-		for(int part = 0; part < TPartPartitioner.NUM_PARTITIONS; part++){
+
+		for (int part = 0; part < TPartPartitioner.NUM_PARTITIONS; part++) {
 			if (part == newNode.getPartId())
 				loadCost += Math.abs(partLoads[part] + newNode.getWeight() - averageLoad);
 			else
-				loadCost += Math.abs(partLoads[part]  - averageLoad);
+				loadCost += Math.abs(partLoads[part] - averageLoad);
 		}
-		
+
 		return truncate(loadCost * (1 - BETA) + edgeCost * BETA, 4);
 	}
 
@@ -102,20 +101,20 @@ public class CostFunctionCalculator {
 		updateCost(removeNode, graph, true);
 		return cost;
 	}
-	
+
 	/**
 	 * Calculate the number of record for each partition as an array
 	 */
-	public int[] calPartitionRecordCount(Node node, TGraph graph){
+	public int[] calPartitionRecordCount(Node node, TGraph graph) {
 		int[] recordsPerPart = new int[TPartPartitioner.NUM_PARTITIONS];
-		
+
 		for (RecordKey res : node.getTask().getReadSet()) {
 			if (Elasql.partitionMetaMgr().isFullyReplicated(res))
 				continue;
-			
+
 			recordsPerPart[graph.getResourcePosition(res).getPartId()]++;
 		}
-		
+
 		return recordsPerPart;
 	}
 
