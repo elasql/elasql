@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.server.task.naive;
+package org.elasql.procedure.naive;
 
-import org.elasql.schedule.DdStoredProcedure;
-import org.elasql.schedule.naive.NaiveStoredProcedure;
+import org.elasql.procedure.DdStoredProcedure;
+import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.server.Elasql;
-import org.elasql.server.task.StoredProcedureTask;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class NaiveStoredProcedureTask extends StoredProcedureTask {
