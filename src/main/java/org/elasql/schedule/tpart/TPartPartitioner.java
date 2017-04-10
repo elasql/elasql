@@ -9,11 +9,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.procedure.tpart.TPartStoredProcedure;
+import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.server.Elasql;
-import org.elasql.server.task.tpart.TPartStoredProcedureTask;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;

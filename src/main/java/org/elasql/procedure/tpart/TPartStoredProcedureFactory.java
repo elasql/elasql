@@ -1,6 +1,6 @@
-package org.elasql.schedule.tpart;
+package org.elasql.procedure.tpart;
 
-import org.elasql.schedule.DdStoredProcedureFactory;
+import org.elasql.procedure.DdStoredProcedureFactory;
 
 public interface TPartStoredProcedureFactory extends DdStoredProcedureFactory{
 	

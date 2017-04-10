@@ -6,7 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.server.task.tpart.TPartStoredProcedureTask;
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 

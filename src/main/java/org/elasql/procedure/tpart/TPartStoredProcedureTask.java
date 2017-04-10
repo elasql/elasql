@@ -1,9 +1,8 @@
-package org.elasql.server.task.tpart;
+package org.elasql.procedure.tpart;
 
-import org.elasql.schedule.tpart.TPartStoredProcedure;
+import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
-import org.elasql.server.task.StoredProcedureTask;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 

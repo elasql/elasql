@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
-import org.elasql.server.task.tpart.TPartStoredProcedureTask;
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 
 
 public class Node {

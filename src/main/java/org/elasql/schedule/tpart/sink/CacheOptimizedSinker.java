@@ -6,12 +6,12 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.Edge;
 import org.elasql.schedule.tpart.Node;
 import org.elasql.schedule.tpart.TGraph;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.server.Elasql;
-import org.elasql.server.task.tpart.TPartStoredProcedureTask;
 import org.elasql.sql.RecordKey;
 
 public class CacheOptimizedSinker extends Sinker {

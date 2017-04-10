@@ -13,28 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.server.task;
+package org.elasql.procedure;
 
-import org.elasql.schedule.DdStoredProcedure;
-import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 
-public abstract class StoredProcedureTask extends Task {
-	protected DdStoredProcedure sp;
-	protected int cid;
-	protected int rteId;
-	protected long txNum;
+public interface DdStoredProcedure extends StoredProcedure {
 
-	public StoredProcedureTask(int cid, int rteId, long txNum,
-			DdStoredProcedure sp) {
-		this.txNum = txNum;
-		this.cid = cid;
-		this.rteId = rteId;
-		this.sp = sp;
-	}
+	boolean isReadOnly();
 
-	public abstract void run();
-
-	public long getTxNum() {
-		return txNum;
-	}
 }

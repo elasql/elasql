@@ -2,8 +2,8 @@ package org.elasql.schedule.tpart.sink;
 
 import java.util.Iterator;
 
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.TGraph;
-import org.elasql.server.task.tpart.TPartStoredProcedureTask;
 
 public abstract class Sinker {
 
