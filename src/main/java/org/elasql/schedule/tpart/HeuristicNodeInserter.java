@@ -1,5 +1,7 @@
 package org.elasql.schedule.tpart;
 
+import org.elasql.storage.metadata.PartitionMetaMgr;
+
 public class HeuristicNodeInserter implements NodeInserter {
 
 	public HeuristicNodeInserter() {
@@ -16,7 +18,7 @@ public class HeuristicNodeInserter implements NodeInserter {
 		// them in the node
 		node.setPartRecordCntArray(TPartPartitioner.costFuncCal.calPartitionRecordCount(node, graph));
 		
-		for (int p = 0; p < TPartPartitioner.NUM_PARTITIONS; p++) {
+		for (int p = 0; p < PartitionMetaMgr.NUM_PARTITIONS; p++) {
 			node.setPartId(p);
 			double cost = TPartPartitioner.costFuncCal.calAddNodeCost(node,
 					graph);

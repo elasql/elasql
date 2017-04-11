@@ -2,18 +2,19 @@ package org.elasql.schedule.tpart;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
 public class CostFunctionCalculator {
 	private static final double BETA;
-	private double[] partLoads = new double[TPartPartitioner.NUM_PARTITIONS];
+	private double[] partLoads = new double[PartitionMetaMgr.NUM_PARTITIONS];
 	private double totalLoads = 0; // used to speed up the sum of partLoads
 	public int crossEdgeCount;
 	public static int ttt;
 	static {
 
-		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(TPartPartitioner.class.getName() + ".NUM_PARTITIONS",
-				1);
+		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(TPartPartitioner.class.getName() + ".BETA",
+				1.0);
 
 	}
 
@@ -72,16 +73,16 @@ public class CostFunctionCalculator {
 	public double calAddNodeCost(Node newNode, TGraph graph) {
 		// calculate cross partition edge cost
 		double edgeCost = 0;
-		for (int part = 0; part < TPartPartitioner.NUM_PARTITIONS; part++) {
+		for (int part = 0; part < PartitionMetaMgr.NUM_PARTITIONS; part++) {
 			if (part != newNode.getPartId())
 				edgeCost += newNode.getPartRecordCntArray()[part];
 		}
 
 		// calculate partition load cost
-		double averageLoad = (totalLoads + newNode.getWeight()) / TPartPartitioner.NUM_PARTITIONS;
+		double averageLoad = (totalLoads + newNode.getWeight()) / PartitionMetaMgr.NUM_PARTITIONS;
 		double loadCost = 0;
 
-		for (int part = 0; part < TPartPartitioner.NUM_PARTITIONS; part++) {
+		for (int part = 0; part < PartitionMetaMgr.NUM_PARTITIONS; part++) {
 			if (part == newNode.getPartId())
 				loadCost += Math.abs(partLoads[part] + newNode.getWeight() - averageLoad);
 			else
@@ -106,7 +107,7 @@ public class CostFunctionCalculator {
 	 * Calculate the number of record for each partition as an array
 	 */
 	public int[] calPartitionRecordCount(Node node, TGraph graph) {
-		int[] recordsPerPart = new int[TPartPartitioner.NUM_PARTITIONS];
+		int[] recordsPerPart = new int[PartitionMetaMgr.NUM_PARTITIONS];
 
 		for (RecordKey res : node.getTask().getReadSet()) {
 			if (Elasql.partitionMetaMgr().isFullyReplicated(res))

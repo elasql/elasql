@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class RemoteCacheMgr {
 
@@ -116,7 +117,7 @@ public class RemoteCacheMgr {
 
 		PositionInfo(long srcTxNum) {
 			this.srcTxNum = srcTxNum;
-			partitionIds = new boolean[TPartPartitioner.NUM_PARTITIONS];
+			partitionIds = new boolean[PartitionMetaMgr.NUM_PARTITIONS];
 			for (int i = 0; i < partitionIds.length; i++)
 				partitionIds[i] = false;
 		}

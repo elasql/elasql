@@ -17,7 +17,7 @@ public class TGraph {
 	private PartitionMetaMgr parMeta;
 
 	public TGraph() {
-		sinkNodes = new Node[TPartPartitioner.NUM_PARTITIONS];
+		sinkNodes = new Node[PartitionMetaMgr.NUM_PARTITIONS];
 		for (int i = 0; i < sinkNodes.length; i++) {
 			Node node = new Node(null);
 			node.setPartId(i);

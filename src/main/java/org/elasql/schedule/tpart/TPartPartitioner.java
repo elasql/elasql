@@ -24,7 +24,6 @@ import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class TPartPartitioner extends Task implements Scheduler {
-	public static final int NUM_PARTITIONS;
 
 	public static CostFunctionCalculator costFuncCal;
 
@@ -48,14 +47,11 @@ public class TPartPartitioner extends Task implements Scheduler {
 		if (FACTORY_CLASS == null)
 			throw new RuntimeException("Factory property is empty");
 
-		NUM_PARTITIONS = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(TPartPartitioner.class.getName() + ".NUM_PARTITIONS", 1);
-
 		HAS_REORDERING = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(TPartPartitioner.class.getName() + ".HAS_REORDERING", 0);
 
 		COST_FUNC_CLASS = ElasqlProperties.getLoader().getPropertyAsClass(
-				TPartPartitioner.class.getName() + ".COST_FUNC_CLS", null, CostFunctionCalculator.class);
+				TPartPartitioner.class.getName() + ".COST_FUNC_CLASS", null, CostFunctionCalculator.class);
 		if (COST_FUNC_CLASS == null)
 			throw new RuntimeException("Cost Fun property is empty");
 
