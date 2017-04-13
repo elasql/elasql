@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.schedule.calvin;
+package org.elasql.procedure.calvin;
 
-import org.elasql.schedule.DdStoredProcedureFactory;
+import org.elasql.procedure.DdStoredProcedureFactory;
 
 public interface CalvinStoredProcedureFactory extends DdStoredProcedureFactory {
 	

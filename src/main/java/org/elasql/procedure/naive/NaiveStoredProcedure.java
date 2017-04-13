@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.schedule.naive;
+package org.elasql.procedure.naive;
 
 import java.sql.Connection;
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ import java.util.Map;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.naive.NaiveCacheMgr;
-import org.elasql.schedule.DdStoredProcedure;
+import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;

@@ -18,9 +18,11 @@ package org.elasql.schedule.calvin;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.elasql.procedure.calvin.CalvinStoredProcedure;
+import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
+import org.elasql.procedure.calvin.CalvinStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
-import org.elasql.server.task.calvin.CalvinStoredProcedureTask;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
