@@ -44,7 +44,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected Transaction tx;
 	protected long txNum;
 	protected H paramHelper;
-	protected int localNodeId = Elasql.serverId();
+	protected int localNodeId;
 	protected CalvinCacheMgr cacheMgr;
 
 	// Participants
@@ -140,16 +140,17 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		try {
 			// Get conservative locks it has asked before
 			getConservativeLocks();
-
+			
 			// Execute transaction
 			executeTransactionLogic();
 			
 			// Flush the cached records
 			cacheMgr.flush();
-
+			
 			// The transaction finishes normally
 			tx.commit();
-
+			paramHelper.setCommitted(true);
+			
 		} catch (Exception e) {
 			e.printStackTrace();
 			tx.rollback();

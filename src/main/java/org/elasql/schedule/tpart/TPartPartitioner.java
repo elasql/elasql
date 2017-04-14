@@ -10,6 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.procedure.tpart.TPartStoredProcedure;
+import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -126,9 +127,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 
 				// schedules the utility procedures directly without T-Part
 				// module
-				if (task.getProcedureType() == TPartStoredProcedure.POPULATE
-						|| task.getProcedureType() == TPartStoredProcedure.PRE_LOAD
-						|| task.getProcedureType() == TPartStoredProcedure.PROFILE) {
+				if (task.getProcedureType() == ProcedureType.UTILITY) {
 					lastSunkTxNum = task.getTxNum();
 					List<TPartStoredProcedureTask> list = new ArrayList<TPartStoredProcedureTask>();
 					list.add(task);
@@ -140,7 +139,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 					continue;
 				}
 
-				if (task.getProcedureType() == TPartStoredProcedure.KEY_ACCESS) {
+				if (task.getProcedureType() == ProcedureType.NORMAL) {
 
 					boolean isCrossPartitionTx = false;
 					int lastPart = -1;
@@ -199,9 +198,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getRteId(), call.getTxNum(), null);
 		} else {
-			TPartStoredProcedure sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
+			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
-			sp.requestConservativeLocks();
 
 			if (!sp.isReadOnly())
 				DdRecoveryMgr.logRequest(call);

@@ -5,6 +5,6 @@ import org.elasql.procedure.DdStoredProcedureFactory;
 public interface TPartStoredProcedureFactory extends DdStoredProcedureFactory{
 	
 	@Override
-	TPartStoredProcedure getStoredProcedure(int pid, long txNum);
+	TPartStoredProcedure<?> getStoredProcedure(int pid, long txNum);
 
 }
