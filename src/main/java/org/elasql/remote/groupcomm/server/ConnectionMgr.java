@@ -25,6 +25,7 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
+import org.elasql.server.Elasql.ServiceType;
 import org.vanilladb.comm.messages.ChannelType;
 import org.vanilladb.comm.messages.P2pMessage;
 import org.vanilladb.comm.messages.TotalOrderMessage;
@@ -36,10 +37,9 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
-public class ConnectionMgr implements ServerTotalOrderedMessageListener,
-		ServerP2pMessageListener, ServerNodeFailListener {
-	private static Logger logger = Logger.getLogger(ConnectionMgr.class
-			.getName());
+public class ConnectionMgr
+		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener {
+	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
 
 	private ServerAppl serverAppl;
 	private int myId;
@@ -61,18 +61,17 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 			e.printStackTrace();
 		}
 		serverAppl.startPFD();
-		
+
 		if (!sequencerMode) {
 			VanillaDb.taskMgr().runTask(new Task() {
-	
+
 				@Override
 				public void run() {
 					while (true) {
 						try {
 							TotalOrderMessage tom = tomQueue.take();
 							for (int i = 0; i < tom.getMessages().length; ++i) {
-								StoredProcedureCall spc = (StoredProcedureCall) tom
-										.getMessages()[i];
+								StoredProcedureCall spc = (StoredProcedureCall) tom.getMessages()[i];
 								spc.setTxNum(tom.getTotalOrderIdStart() + i);
 								Elasql.scheduler().schedule(spc);
 							}
@@ -80,17 +79,16 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 							e.printStackTrace();
 						}
 					}
-	
+
 				}
 			});
 		}
 	}
 
-	public void sendClientResponse(int clientId, int rteId, long txNum,
-			SpResultSet rs) {
+	public void sendClientResponse(int clientId, int rteId, long txNum, SpResultSet rs) {
 		// call the communication module to send the response back to client
-		P2pMessage p2pmsg = new P2pMessage(new ClientResponse(clientId, rteId,
-				txNum, rs), clientId, ChannelType.CLIENT);
+		P2pMessage p2pmsg = new P2pMessage(new ClientResponse(clientId, rteId, txNum, rs), clientId,
+				ChannelType.CLIENT);
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
 
@@ -108,12 +106,13 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
 		if (sequencerMode)
 			return;
-		
+
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
-			for (Tuple t : ts.getTupleSet())
-				Elasql.remoteRecReceiver().cacheRemoteRecord(t.key, t.rec);
+			for (Tuple t : ts.getTupleSet()) {
+				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
+			}
 		} else
 			throw new IllegalArgumentException();
 	}
@@ -122,7 +121,7 @@ public class ConnectionMgr implements ServerTotalOrderedMessageListener,
 	public void onRecvServerTotalOrderedMessage(TotalOrderMessage tom) {
 		if (sequencerMode)
 			return;
-		
+
 		try {
 			tomQueue.put(tom);
 		} catch (InterruptedException e) {

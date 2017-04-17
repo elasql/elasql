@@ -9,11 +9,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.VanillaCoreCrud;
+import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
-
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 	private Map<CachedEntryKey, CachedRecord> cachedRecordMap = new ConcurrentHashMap<CachedEntryKey, CachedRecord>();
@@ -22,7 +22,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	// Map<txn_id,List<record_key>>
 	// private Map<Long, ArrayList<RecordKey>> writeBackFlags = new
 	// HashMap<Long, ArrayList<RecordKey>>();
-
+	private static final long MAX_TIME = 10000;
+	private static final long EPSILON = 50;
 	private int[] latencies = new int[200];
 	private Object[] syncObjs = new Object[200];
 
@@ -70,7 +71,10 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		synchronized (prepareAnchor(k)) {
 			// wait if the remote record has not delivered
 			try {
-				while (!cachedRecordMap.containsKey(k)) {
+
+				while (!cachedRecordMap.containsKey(k)
+
+				) {
 					// System.out.println("Read <" + key + "," + src + "," +
 					// dest
 					// + ">");
@@ -81,6 +85,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 					// System.out.println("Read OK <" + key + "," + src + ","
 					// + dest + ">");
 				}
+
 			} catch (InterruptedException e) {
 				throw new RuntimeException();
 			}
@@ -239,8 +244,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 
 	@Override
-	public void cacheRemoteRecord(org.elasql.sql.RecordKey key, org.elasql.cache.CachedRecord rec) {
-		// TODO Auto-generated method stub
+	public void cacheRemoteRecord(Tuple t) {
+		cacheRemoteRecord(t.key, t.srcTxNum, t.destTxNum, t.rec);
 
 	}
 

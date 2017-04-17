@@ -57,10 +57,14 @@ public class WriteBackRecMgr {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
 			if (tuples == null) {
 				tuples = new LinkedList<WriteBackTuple>();
+				//System.out.println("Key " + key + "first pust at" + System.currentTimeMillis());
 				writeBackRecMap.put(key, tuples);
+			} else {
+				//System.out.println("Key " + key + "put " + tuples.size() + "times at" + System.currentTimeMillis()+ "by " + Thread.currentThread().getId());
 			}
 
 			// insert the new tuple into the head of the list
+
 			tuples.add(0, new WriteBackTuple(sinkProcessId));
 		}
 	}
@@ -105,6 +109,8 @@ public class WriteBackRecMgr {
 
 		synchronized (prepareAnchor(key)) {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
+			if (tuples == null)
+				System.out.println("Null key in wbr " + key + "At " + System.currentTimeMillis()+ "by " + Thread.currentThread().getId());
 			ListIterator<WriteBackTuple> tuplesItr = tuples.listIterator(tuples.size());
 			while (tuplesItr.hasPrevious()) {
 				WriteBackTuple wbt = tuplesItr.previous();
@@ -155,6 +161,7 @@ public class WriteBackRecMgr {
 	public void uncache(RecordKey key, int sinkProcessId) {
 		synchronized (prepareAnchor(key)) {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
+
 			Iterator<WriteBackTuple> iter = tuples.iterator();
 			while (iter.hasNext()) {
 				WriteBackTuple wbt = iter.next();
@@ -165,8 +172,9 @@ public class WriteBackRecMgr {
 			}
 
 			// System.out.println("tuples size: " + tuples.size());
-
-			writeBackRecMap.remove(key);
+			//System.out.println("Remove key at" + key + "at " + System.currentTimeMillis() + "by " + Thread.currentThread().getId());
+			if(tuples.isEmpty())
+				writeBackRecMap.remove(key);
 		}
 	}
 

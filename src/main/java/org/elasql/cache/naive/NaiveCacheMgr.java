@@ -18,6 +18,7 @@ package org.elasql.cache.naive;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.VanillaCoreCrud;
+import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -40,8 +41,8 @@ public class NaiveCacheMgr implements RemoteRecordReceiver {
 	}
 
 	@Override
-	public void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
-		// Do nothing
+	public void cacheRemoteRecord(Tuple t) {
+		// TODO Auto-generated method stub
+
 	}
 }
-
