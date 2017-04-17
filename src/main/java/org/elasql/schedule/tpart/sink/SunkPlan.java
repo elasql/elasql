@@ -9,7 +9,6 @@ import java.util.Set;
 
 import org.elasql.sql.RecordKey;
 
-
 public class SunkPlan {
 	private int sinkProcessId;
 	private boolean isLocalTask;
@@ -111,12 +110,6 @@ public class SunkPlan {
 		keys.add(key);
 	}
 
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append(readingInfoMap).append(pushingInfoMap);
-		return sb.toString();
-	}
-
 	public long getReadSrcTxNum(RecordKey key) {
 		return readingInfoMap.get(key);
 	}
@@ -139,5 +132,48 @@ public class SunkPlan {
 
 	public boolean hasSinkPush() {
 		return sinkPushingInfoMap.size() > 0;
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		
+		sb.append("Sink Process Id: ");
+		sb.append(sinkProcessId);
+		sb.append("\n");
+		
+		sb.append("Is Local: ");
+		sb.append(isLocalTask);
+		sb.append("\n");
+		
+		sb.append("Reading Info: ");
+		sb.append(readingInfoMap);
+		sb.append("\n");
+		
+		sb.append("Pushing Info: ");
+		sb.append(pushingInfoMap);
+		sb.append("\n");
+		
+		sb.append("Local Writing Back Info: ");
+		sb.append(localWriteBackInfo);
+		sb.append("\n");
+		
+		sb.append("Remote Writing Back Info: ");
+		sb.append(remoteWriteBackInfo);
+		sb.append("\n");
+		
+		sb.append("Write Dest: ");
+		sb.append(writeDestMap);
+		sb.append("\n");
+		
+		sb.append("Sink Pushing Info: ");
+		sb.append(sinkPushingInfoMap);
+		sb.append("\n");
+		
+		sb.append("Sink Reading Info: ");
+		sb.append(sinkReadingSet);
+		sb.append("\n");
+		
+		return sb.toString();
 	}
 }
