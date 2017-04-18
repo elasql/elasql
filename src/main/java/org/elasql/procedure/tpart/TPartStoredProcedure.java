@@ -1,17 +1,15 @@
 package org.elasql.procedure.tpart;
 
 import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.cache.tpart.CachedEntryKey;
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.cache.tpart.TPartTxLocalCache;
 import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.tpart.sink.PushInfo;
@@ -39,10 +37,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	// Private resource
 	private Set<RecordKey> readKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> writeKeys = new HashSet<RecordKey>();
-	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
 	private SunkPlan plan;
-
-	private TPartCacheMgr cm = (TPartCacheMgr) Elasql.remoteRecReceiver();
+	private TPartTxLocalCache cache;
 
 	public TPartStoredProcedure(long txNum, H paramHelper) {
 		if (paramHelper == null)
@@ -71,6 +67,9 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// prepare keys
 		prepareKeys();
+		
+		// create a local cache
+		cache = new TPartTxLocalCache(tx);
 	}
 
 	@Override
@@ -131,35 +130,34 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	}
 
 	protected void update(RecordKey key, CachedRecord rec) {
-		Long[] destTxNums = plan.getWritingDestOfRecord(key);
-		cm.update(key, rec.getFldValMap(), tx, destTxNums);
+		cache.update(key, rec);
 	}
 
 	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
-		Long[] destTxNums = plan.getWritingDestOfRecord(key);
-		cm.insert(key, fldVals, tx, destTxNums);
+		cache.insert(key, fldVals);
 	}
 
 	protected void delete(RecordKey key) {
-		Long[] destTxNums = plan.getWritingDestOfRecord(key);
-		cm.delete(key, tx, destTxNums);
+		cache.delete(key);
 	}
 
 	private void executeTransactionLogic() {
 		int sinkId = plan.sinkProcessId();
 
 		if (plan.isLocalTask()) {
+			Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
+			
 			// Read the records from the local sink
 			for (RecordKey k : plan.getSinkReadingInfo()) {
-				cm.createCacheRecordFromSink(k, plan.sinkProcessId(), tx, txNum);
+				readings.put(k, cache.readFromSink(k, sinkId));
 			}
 
 			// Read all needed records
-			Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
 			for (RecordKey k : readKeys) {
-				long srcTxNum = plan.getReadSrcTxNum(k);
-				readings.put(k, cm.read(k, srcTxNum, txNum));
-				cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
+				if (!readings.containsKey(k)) {
+					long srcTxNum = plan.getReadSrcTxNum(k);
+					readings.put(k, cache.read(k, srcTxNum));
+				}
 			}
 
 			// Execute the SQLs defined by users
@@ -175,8 +173,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					// Construct a tuple set
 					TupleSet rs = new TupleSet(sinkId);
 					for (PushInfo pushInfo : entry.getValue()) {
-						CachedRecord rec = cm.read(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum());
-						cachedEntrySet.add(new CachedEntryKey(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum()));
+						CachedRecord rec = readings.get(pushInfo.getRecord());
 						rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
 					}
 
@@ -189,8 +186,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 				int targetServerId = entry.getKey();
 				TupleSet rs = new TupleSet(sinkId);
 				for (PushInfo pushInfo : entry.getValue()) {
-					long sinkTxnNum = TPartCacheMgr.getPartitionTxnId(Elasql.serverId());
-					CachedRecord rec = cm.readFromSink(pushInfo.getRecord(), sinkId, tx);
+					long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
+					CachedRecord rec = cache.readFromSink(pushInfo.getRecord(), sinkId);
 					// TODO deal with null value record
 					rec.setSrcTxNum(sinkTxnNum);
 					rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
@@ -199,20 +196,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			}
 		}
 
-		// Local write back
-		if (plan.hasLocalWriteBack()) {
-			for (RecordKey wk : plan.getLocalWriteBackInfo()) {
-				cm.writeBack(wk, txNum, sinkId, tx);
-			}
-		}
-
-		// Remove the cached data
-		removeCachedRecords();
-	}
-
-	private void removeCachedRecords() {
-		for (CachedEntryKey key : cachedEntrySet) {
-			cm.uncache(key.getRecordKey(), key.getSource(), key.getDestination());
-		}
+		// Flush the cached data
+		// including the writes to the next transaction and local write backs
+		cache.flush(plan);
 	}
 }

@@ -101,7 +101,7 @@ public class CacheOptimizedSinker extends Sinker {
 				} else if (isLocalResource && e.getTarget().isSinkNode()) {
 					// if is not local task and the source of the edge is sink
 					// node add the push tag to sinkPushTask
-					plan.addSinkPushingInfo(e.getResourceKey(), node.getPartId(), TPartCacheMgr.getPartitionTxnId(myId),
+					plan.addSinkPushingInfo(e.getResourceKey(), node.getPartId(), TPartCacheMgr.toSinkId(myId),
 							node.getTxNum());
 				}
 			}
@@ -135,10 +135,10 @@ public class CacheOptimizedSinker extends Sinker {
 						} else {
 							// push the data if write back to remote
 							plan.addPushingInfo(k, targetServerId, txNum,
-									TPartCacheMgr.getPartitionTxnId(targetServerId));
+									TPartCacheMgr.toSinkId(targetServerId));
 
 						}
-						plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.getPartitionTxnId(targetServerId));
+						plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.toSinkId(targetServerId));
 					} else {
 						if (targetServerId == myId) {
 

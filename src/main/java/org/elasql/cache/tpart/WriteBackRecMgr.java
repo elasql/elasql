@@ -6,27 +6,25 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
-import org.elasql.cache.tpart.WriteBackRecMgr.WriteBackTuple;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
+/**
+ * This represents the local sink on this machine. All data accesses to the local storage should pass
+ * through this interface. It also caches the records written by the transactions of a T-Graph; then,
+ * pass the records to the ones need them in the next T-Graph.
+ */
 public class WriteBackRecMgr {
-	private static final long UNCACHE_DELAY = 500;
 	/*
 	 * The write back tuples should be inserted followed the sink process id in
 	 * decs. order.
 	 */
 	private Map<RecordKey, List<WriteBackTuple>> writeBackRecMap = new ConcurrentHashMap<RecordKey, List<WriteBackTuple>>();
 
-	// the thread pool for uncahced task
-	private ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(5);
-
-	private final Object[] anchors = new Object[100000];
+	private final Object[] anchors = new Object[1009];
 
 	public WriteBackRecMgr() {
 		for (int i = 0; i < anchors.length; ++i) {
@@ -55,18 +53,23 @@ public class WriteBackRecMgr {
 	public void setWriteBackInfo(RecordKey key, int sinkProcessId) {
 		synchronized (prepareAnchor(key)) {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
-			if (tuples == null) {
-				tuples = new LinkedList<WriteBackTuple>();
-				//System.out.println("Key " + key + "first pust at" + System.currentTimeMillis());
-				writeBackRecMap.put(key, tuples);
-			} else {
-				//System.out.println("Key " + key + "put " + tuples.size() + "times at" + System.currentTimeMillis()+ "by " + Thread.currentThread().getId());
-			}
+			tuples = new LinkedList<WriteBackTuple>();
+			writeBackRecMap.put(key, tuples);
 
 			// insert the new tuple into the head of the list
-
 			tuples.add(0, new WriteBackTuple(sinkProcessId));
 		}
+	}
+	
+	public CachedRecord read(RecordKey key, int mySinkProcessId, Transaction tx) {
+		// read from write back cache first
+		CachedRecord rec = getCachedRecord(key, mySinkProcessId);
+		
+		// if there is no write back cache, read from local storage
+		if (rec == null)
+			rec = VanillaCoreCrud.read(key, tx);
+		
+		return rec;
 	}
 
 	/**
@@ -90,8 +93,6 @@ public class WriteBackRecMgr {
 				if (wbt.sinkProcessId < mySinkProcessId) {
 					while (!wbt.hasValue) {
 						try {
-							// System.out.println("wait obj: " + key
-							// + ", sink id: " + mySinkProcessId);
 							prepareAnchor(key).wait();
 						} catch (InterruptedException e) {
 							e.printStackTrace();
@@ -131,31 +132,15 @@ public class WriteBackRecMgr {
 					break;
 				}
 			}
-			// System.out
-			// .println("ok obj: " + key + ", sink id: " + sinkProcessId);
 			prepareAnchor(key).notifyAll();
 		}
 
 		// flush to local
+		// XXX: (Possible optimization) We can do this in the background
 		flush(key, rec, tx);
 
 		uncache(key, sinkProcessId);
 		// XXX: cache the touched record longer?
-	}
-
-	class UncacheTask implements Runnable {
-		RecordKey key;
-		int sinkProcessId;
-
-		UncacheTask(RecordKey key, int sinkProcessId) {
-			this.key = key;
-			this.sinkProcessId = sinkProcessId;
-		}
-
-		@Override
-		public void run() {
-			uncache(key, sinkProcessId);
-		}
 	}
 
 	public void uncache(RecordKey key, int sinkProcessId) {
@@ -171,8 +156,6 @@ public class WriteBackRecMgr {
 				}
 			}
 
-			// System.out.println("tuples size: " + tuples.size());
-			//System.out.println("Remove key at" + key + "at " + System.currentTimeMillis() + "by " + Thread.currentThread().getId());
 			if(tuples.isEmpty())
 				writeBackRecMap.remove(key);
 		}
