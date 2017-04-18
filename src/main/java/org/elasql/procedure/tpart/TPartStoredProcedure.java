@@ -67,7 +67,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// prepare keys
 		prepareKeys();
-		
+
 		// create a local cache
 		cache = new TPartTxLocalCache(tx);
 	}
@@ -146,7 +146,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		if (plan.isLocalTask()) {
 			Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
-			
+
 			// Read the records from the local sink
 			for (RecordKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k, sinkId));

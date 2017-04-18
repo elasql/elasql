@@ -58,16 +58,17 @@ public class TPartTxLocalCache {
 		if (rec != null)
 			return rec;
 
-//		if (src != txNum) {
-			rec = cacheMgr.takeFromTx(key, src, txNum);
-			recordCache.put(key, rec);
-//		}
+		// if (src != txNum) {
+		rec = cacheMgr.takeFromTx(key, src, txNum);
+		recordCache.put(key, rec);
+		// }
 		return rec;
 	}
 
 	public void update(RecordKey key, CachedRecord rec) {
 		rec.setSrcTxNum(txNum);
 		recordCache.put(key, rec);
+		
 	}
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
@@ -75,13 +76,24 @@ public class TPartTxLocalCache {
 		rec.setSrcTxNum(txNum);
 		rec.setNewInserted(true);
 		recordCache.put(key, rec);
+		
 	}
 
 	public void delete(RecordKey key) {
 		CachedRecord dummyRec = new CachedRecord();
-		dummyRec.setSrcTxNum(tx.getTransactionNumber());
+		dummyRec.setSrcTxNum(txNum);
 		dummyRec.delete();
 		recordCache.put(key, dummyRec);
+		
+	}
+
+	public void senTothers(RecordKey key, CachedRecord rec, SunkPlan plan) {
+		Long[] dests = plan.getWritingDestOfRecord(key);
+		if (dests != null) {
+			for (long dest : dests)
+				cacheMgr.passToTheNextTx(key, rec, txNum, dest);
+
+		}
 	}
 
 	public void flush(SunkPlan plan) {

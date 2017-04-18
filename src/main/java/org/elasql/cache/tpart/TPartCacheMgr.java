@@ -10,7 +10,20 @@ import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
-	
+
+	private static final long MAX_TIME = 10000;
+	private static final long EPSILON = 50;
+
+	@SuppressWarnings("serial")
+	public class WaitTooLongException extends RuntimeException {
+		public WaitTooLongException() {
+		}
+
+		public WaitTooLongException(String message) {
+			super(message);
+		}
+	}
+
 	/**
 	 * Looks up the sink id for the specified partition.
 	 * 
@@ -23,17 +36,17 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 
 	private static WriteBackRecMgr writeBackMgr = new WriteBackRecMgr();
-	
+
 	private Map<CachedEntryKey, CachedRecord> exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>();
-	
+
 	private final Object anchors[] = new Object[1009];
-	
+
 	public TPartCacheMgr() {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
 	}
-	
+
 	private Object prepareAnchor(Object o) {
 		int hash = o.hashCode() % anchors.length;
 		if (hash < 0) {
@@ -51,19 +64,31 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		synchronized (prepareAnchor(k)) {
 			try {
 				CachedRecord rec = null;
-				
+				long timestamp = System.currentTimeMillis();
 				// wait if the record has not delivered
-				while ((rec = exchange.remove(key)) == null) {
-					prepareAnchor(k).wait();
+				while (!exchange.containsKey(k) && !waitingTooLong(timestamp)) {
+					prepareAnchor(k).wait(MAX_TIME);
+				}
+			
+				if (!exchange.containsKey(k) ){
+					System.out.println("Wait long key " + key + " sent form " + src + " to " + dest);
+				}
+				while (!exchange.containsKey(k) ) {
+					prepareAnchor(k).wait(MAX_TIME);
 				}
 				
-				return rec;
+				
+				return exchange.remove(k);
 			} catch (InterruptedException e) {
 				throw new RuntimeException();
 			}
 		}
 	}
-	
+
+	private boolean waitingTooLong(long starttime) {
+		return System.currentTimeMillis() - starttime + EPSILON > MAX_TIME;
+	}
+
 	public void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest) {
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 		synchronized (prepareAnchor(k)) {
@@ -74,9 +99,10 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	@Override
 	public void cacheRemoteRecord(Tuple t) {
+		System.out.println("Get remote " + t + " At " + System.currentTimeMillis());
 		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum);
 	}
-	
+
 	public void writeBack(RecordKey key, int sinkProcessId, CachedRecord rec, Transaction tx) {
 		writeBackMgr.writeBackRecord(key, sinkProcessId, rec, tx);
 	}
