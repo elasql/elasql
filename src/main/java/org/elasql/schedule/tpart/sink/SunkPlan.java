@@ -35,7 +35,7 @@ public class SunkPlan {
 	}
 
 	public void addReadingInfo(RecordKey key, long srcTxNum) {
-		// not need to specify dest, that is the owner tx num
+		// not need to specify dest, that is the owner tx num 
 
 		if (readingInfoMap == null)
 			readingInfoMap = new HashMap<RecordKey, Long>();

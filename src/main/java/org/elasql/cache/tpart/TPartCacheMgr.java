@@ -53,7 +53,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 				CachedRecord rec = null;
 				
 				// wait if the record has not delivered
-				while (rec == exchange.remove(key)) {
+				while ((rec = exchange.remove(key)) == null) {
 					prepareAnchor(k).wait();
 				}
 				

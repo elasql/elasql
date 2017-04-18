@@ -10,11 +10,11 @@ public class CostFunctionCalculator {
 	private double[] partLoads = new double[PartitionMetaMgr.NUM_PARTITIONS];
 	private double totalLoads = 0; // used to speed up the sum of partLoads
 	public int crossEdgeCount;
-	public static int ttt;
+
 	static {
 
-		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(TPartPartitioner.class.getName() + ".BETA", 1.0);
-
+		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(CostFunctionCalculator.class.getName() + ".BETA", 1.0);
+		System.out.println("Beta :" + BETA);
 	}
 
 	public CostFunctionCalculator() {
@@ -22,7 +22,7 @@ public class CostFunctionCalculator {
 	}
 
 	public void reset() {
-		ttt += crossEdgeCount;
+
 		for (int i = 0; i < partLoads.length; i++)
 			partLoads[i] = 0;
 		crossEdgeCount = 0;

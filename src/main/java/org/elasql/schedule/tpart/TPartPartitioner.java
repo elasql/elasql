@@ -64,6 +64,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 
 		NUM_TASK_PER_SINK = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(TPartPartitioner.class.getName() + ".NUM_TASK_PER_SINK", 10);
+		System.out.println("NUM_TASK_PER_SINK : "+NUM_TASK_PER_SINK);
 
 	}
 

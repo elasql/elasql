@@ -42,7 +42,8 @@ public class TPartTxLocalCache {
 
 	/**
 	 * Reads a CachedRecord from the cache. If the specified record does not
-	 * exist, reads from the specified transaction through {@code TPartCacheMgr}.
+	 * exist, reads from the specified transaction through {@code TPartCacheMgr}
+	 * .
 	 * 
 	 * @param key
 	 *            the key of the record
@@ -53,15 +54,14 @@ public class TPartTxLocalCache {
 	 */
 	public CachedRecord read(RecordKey key, long src) {
 		CachedRecord rec = recordCache.get(key);
-		recordCache.put(key, rec);
-		
+
 		if (rec != null)
 			return rec;
-		
-		if (src != txNum) {
+
+//		if (src != txNum) {
 			rec = cacheMgr.takeFromTx(key, src, txNum);
 			recordCache.put(key, rec);
-		}
+//		}
 		return rec;
 	}
 
@@ -83,7 +83,7 @@ public class TPartTxLocalCache {
 		dummyRec.delete();
 		recordCache.put(key, dummyRec);
 	}
-	
+
 	public void flush(SunkPlan plan) {
 		// Pass to the transactions
 		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
@@ -95,10 +95,15 @@ public class TPartTxLocalCache {
 				}
 			}
 		}
-		
+
 		// Flush to the local storage (write back)
 		for (RecordKey key : plan.getLocalWriteBackInfo()) {
-			cacheMgr.writeBack(key, plan.sinkProcessId(), recordCache.get(key), tx);
+			CachedRecord rec = recordCache.get(key);
+			// TODO : Add doc
+			if (rec == null)
+				rec = cacheMgr.takeFromTx(key, txNum, txNum);
+			cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
+
 		}
 	}
 }

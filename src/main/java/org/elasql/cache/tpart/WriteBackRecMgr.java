@@ -13,9 +13,10 @@ import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
 /**
- * This represents the local sink on this machine. All data accesses to the local storage should pass
- * through this interface. It also caches the records written by the transactions of a T-Graph; then,
- * pass the records to the ones need them in the next T-Graph.
+ * This represents the local sink on this machine. All data accesses to the
+ * local storage should pass through this interface. It also caches the records
+ * written by the transactions of a T-Graph; then, pass the records to the ones
+ * need them in the next T-Graph.
  */
 public class WriteBackRecMgr {
 	/*
@@ -53,22 +54,24 @@ public class WriteBackRecMgr {
 	public void setWriteBackInfo(RecordKey key, int sinkProcessId) {
 		synchronized (prepareAnchor(key)) {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
-			tuples = new LinkedList<WriteBackTuple>();
-			writeBackRecMap.put(key, tuples);
 
+			if (tuples == null) {
+				tuples = new LinkedList<WriteBackTuple>();
+				writeBackRecMap.put(key, tuples);
+			}
 			// insert the new tuple into the head of the list
 			tuples.add(0, new WriteBackTuple(sinkProcessId));
 		}
 	}
-	
+
 	public CachedRecord read(RecordKey key, int mySinkProcessId, Transaction tx) {
 		// read from write back cache first
 		CachedRecord rec = getCachedRecord(key, mySinkProcessId);
-		
+
 		// if there is no write back cache, read from local storage
 		if (rec == null)
 			rec = VanillaCoreCrud.read(key, tx);
-		
+
 		return rec;
 	}
 
@@ -111,7 +114,8 @@ public class WriteBackRecMgr {
 		synchronized (prepareAnchor(key)) {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
 			if (tuples == null)
-				System.out.println("Null key in wbr " + key + "At " + System.currentTimeMillis()+ "by " + Thread.currentThread().getId());
+				System.out.println("Null key in wbr " + key + "At " + System.currentTimeMillis() + "by "
+						+ Thread.currentThread().getId());
 			ListIterator<WriteBackTuple> tuplesItr = tuples.listIterator(tuples.size());
 			while (tuplesItr.hasPrevious()) {
 				WriteBackTuple wbt = tuplesItr.previous();
@@ -156,7 +160,7 @@ public class WriteBackRecMgr {
 				}
 			}
 
-			if(tuples.isEmpty())
+			if (tuples.isEmpty())
 				writeBackRecMap.remove(key);
 		}
 	}
