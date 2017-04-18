@@ -25,7 +25,6 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
-import org.elasql.server.Elasql.ServiceType;
 import org.vanilladb.comm.messages.ChannelType;
 import org.vanilladb.comm.messages.P2pMessage;
 import org.vanilladb.comm.messages.TotalOrderMessage;

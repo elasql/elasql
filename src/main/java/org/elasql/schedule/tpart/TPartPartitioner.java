@@ -92,25 +92,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 		for (StoredProcedureCall call : calls)
 			spcQueue.add(call);
 
-		/*
-		 * Deprecated for (int i = 0; i < calls.length; i++) {
-		 * StoredProcedureCall call = calls[i]; // log request
-		 * 
-		 * TPartStoredProcedureTask spt; if (call.isNoOpStoredProcCall()) { spt
-		 * = new TPartStoredProcedureTask(call.getClientId(), call.getRteId(),
-		 * call.getTxNum(), null); } else { TPartStoredProcedure sp =
-		 * factory.getStoredProcedure( call.getPid(), call.getTxNum());
-		 * sp.prepare(call.getPars()); sp.requestConservativeLocks(); spt = new
-		 * TPartStoredProcedureTask(call.getClientId(), call.getRteId(),
-		 * call.getTxNum(), sp);
-		 * 
-		 * if (!sp.isReadOnly()) DdRecoveryMgr.logRequest(call); } try {
-		 * taskQueue.put(spt); } catch (InterruptedException ex) { if
-		 * (logger.isLoggable(Level.SEVERE))
-		 * logger.severe("fail to insert task to queue"); }
-		 * 
-		 * }
-		 */
 	}
 
 	public void run() {
@@ -122,9 +103,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 				StoredProcedureCall call = spcQueue.take();
 				TPartStoredProcedureTask task = createStoredProcedureTask(call);
 
-				// Deprecated
-				// TPartStoredProcedureTask task = taskQueue.take();
-
 				// schedules the utility procedures directly without T-Part
 				// module
 				if (task.getProcedureType() == ProcedureType.UTILITY) {
@@ -132,8 +110,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 					List<TPartStoredProcedureTask> list = new ArrayList<TPartStoredProcedureTask>();
 					list.add(task);
 
-					// Deprecated
-					// VanillaDdDb.tpartTaskScheduler().addTask(list.iterator());
 					dispatchToTaskMgr(list.iterator());
 
 					continue;
@@ -177,8 +153,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 					if (graph.getNodes().size() != 0) {
 						Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 
-						// Deprecated
-						// VanillaDdDb.tpartTaskScheduler().addTask(plansTter);
 						dispatchToTaskMgr(plansTter);
 					}
 

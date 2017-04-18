@@ -13,8 +13,7 @@ public class CostFunctionCalculator {
 	public static int ttt;
 	static {
 
-		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(TPartPartitioner.class.getName() + ".BETA",
-				1.0);
+		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(TPartPartitioner.class.getName() + ".BETA", 1.0);
 
 	}
 
@@ -135,15 +134,6 @@ public class CostFunctionCalculator {
 		return truncate(loadBalance * (1 - BETA) + crossEdgeCount * BETA, 4);
 	}
 
-	/*
-	 * public void printCost() { double totalLoad = 0; for (Double d :
-	 * partLoads) { totalLoad += d; } double loadBalance = 0; for (Double d :
-	 * partLoads) loadBalance += Math.abs(d - totalLoad / partLoads.length);
-	 * System.out.println("BETA: " + BETA); System.out.println("Edge: " +
-	 * crossEdgeCount); double score = truncate(loadBalance * (1 - BETA) +
-	 * crossEdgeCount BETA, 4); System.out.println("Score: " + score); }
-	 */
-
 	private double truncate(double number, int precision) {
 		double prec = Math.pow(10, precision);
 		int integerPart = (int) number;
@@ -158,49 +148,4 @@ public class CostFunctionCalculator {
 		return partLoads;
 	}
 
-	// public double getEdgeCost(TGraph graph) {
-	// double edgeCost = 0;
-	//
-	// for (Edge edge : graph.getEdges()) {
-	// if (edge.getSource().getPartId() == edge.getDestination()
-	// .getPartId())
-	// continue;
-	// // if is sink node, skip this round
-	// int sourceIdx = graph.getNodes().indexOf(edge.getSource());
-	// int destIdx = graph.getNodes().indexOf(edge.getDestination());
-	// if (sourceIdx == -1 || destIdx == -1)
-	// continue;
-	// edgeCost += destIdx - sourceIdx;
-	// }
-	//
-	// return edgeCost;
-	// }
-	//
-	// public int getEdgeCut(TGraph graph) {
-	// int edgeCut = 0;
-	// for (Edge edge : graph.getEdges()) {
-	// if (edge.getSource().getPartId() == edge.getDestination()
-	// .getPartId())
-	// continue;
-	// // if is sink node, skip this round
-	// int sourceIdx = graph.getNodes().indexOf(edge.getSource());
-	// int destIdx = graph.getNodes().indexOf(edge.getDestination());
-	// if (sourceIdx == -1 || destIdx == -1)
-	// continue;
-	//
-	// edgeCut++;
-	// }
-	//
-	// return edgeCut;
-	// }
-	//
-	// private double calEdgeWeight(Edge e, TGraph graph) {
-	// int sourceId = graph.getNodes().indexOf(e.getSource());
-	// int destId = graph.getNodes().indexOf(e.getDestination());
-	// return sigmoidFunc(-2.5, 3, destId - sourceId);
-	// }
-
-	private static double sigmoidFunc(double a, double b, double x) {
-		return 1 / (1 + Math.exp(-1 * (a * (x - b))));
-	}
 }
