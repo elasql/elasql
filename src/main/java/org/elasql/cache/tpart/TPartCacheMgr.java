@@ -66,18 +66,20 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 				CachedRecord rec = null;
 				long timestamp = System.currentTimeMillis();
 				// wait if the record has not delivered
-				while (!exchange.containsKey(k) && !waitingTooLong(timestamp)) {
-					prepareAnchor(k).wait(MAX_TIME);
+				while (!exchange.containsKey(k)) {
+					prepareAnchor(k).wait();
 				}
-			
-				if (!exchange.containsKey(k) ){
-					System.out.println("Wait long key " + key + " sent form " + src + " to " + dest);
-				}
-				while (!exchange.containsKey(k) ) {
-					prepareAnchor(k).wait(MAX_TIME);
-				}
-				
-				
+				/*
+				 * while (!exchange.containsKey(k) &&
+				 * !waitingTooLong(timestamp)) {
+				 * prepareAnchor(k).wait(MAX_TIME); }
+				 * 
+				 * if (!exchange.containsKey(k) ){
+				 * System.out.println("Wait long key " + key + " sent form " +
+				 * src + " to " + dest); } while (!exchange.containsKey(k) ) {
+				 * prepareAnchor(k).wait(MAX_TIME); }
+				 */
+
 				return exchange.remove(k);
 			} catch (InterruptedException e) {
 				throw new RuntimeException();
@@ -99,7 +101,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	@Override
 	public void cacheRemoteRecord(Tuple t) {
-		System.out.println("Get remote " + t + " At " + System.currentTimeMillis());
+		// System.out.println("Get remote " + t + " At " +
+		// System.currentTimeMillis());
 		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum);
 	}
 
