@@ -16,11 +16,13 @@ public class TPartTxLocalCache {
 	private long txNum;
 	private TPartCacheMgr cacheMgr;
 	private Map<RecordKey, CachedRecord> recordCache = new HashMap<RecordKey, CachedRecord>();
+	private long localStorageId; 
 
 	public TPartTxLocalCache(Transaction tx) {
 		this.tx = tx;
 		this.txNum = tx.getTransactionNumber();
 		this.cacheMgr = (TPartCacheMgr) Elasql.remoteRecReceiver();
+		this.localStorageId = TPartCacheMgr.toSinkId(Elasql.serverId());
 	}
 
 	/**
@@ -111,9 +113,12 @@ public class TPartTxLocalCache {
 		// Flush to the local storage (write back)
 		for (RecordKey key : plan.getLocalWriteBackInfo()) {
 			CachedRecord rec = recordCache.get(key);
-			// TODO : Add doc
+			
+			// If there is no such record in the local cache,
+			// it might be pushed from the same transaction on the other machine.
 			if (rec == null)
-				rec = cacheMgr.takeFromTx(key, txNum, txNum);
+				rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
+			
 			cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
 
 		}
