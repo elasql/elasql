@@ -87,9 +87,12 @@ public class TPartTxLocalCache {
 	public void flush(SunkPlan plan) {
 		// Pass to the transactions
 		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
-			for (long dest : plan.getWritingDestOfRecord(entry.getKey())) {
-				CachedRecord clonedRec = new CachedRecord(entry.getValue());
-				cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
+			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
+			if (dests != null) {
+				for (long dest : dests) {
+					CachedRecord clonedRec = new CachedRecord(entry.getValue());
+					cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
+				}
 			}
 		}
 		
