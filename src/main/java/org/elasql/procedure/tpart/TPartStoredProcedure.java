@@ -130,15 +130,18 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	}
 
 	protected void update(RecordKey key, CachedRecord rec) {
-		cache.update(key, rec);
+		Long[] destTxNums = plan.getWritingDestOfRecord(key);
+		cache.update(key, rec, destTxNums);
 	}
 
 	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
-		cache.insert(key, fldVals);
+		Long[] destTxNums = plan.getWritingDestOfRecord(key);
+		cache.insert(key, fldVals, destTxNums);
 	}
 
 	protected void delete(RecordKey key) {
-		cache.delete(key);
+		Long[] destTxNums = plan.getWritingDestOfRecord(key);
+		cache.delete(key, destTxNums);
 	}
 
 	private void executeTransactionLogic() {

@@ -67,26 +67,29 @@ public class TPartTxLocalCache {
 		return rec;
 	}
 
-	public void update(RecordKey key, CachedRecord rec) {
+	public void update(RecordKey key, CachedRecord rec, Long... dests) {
 		rec.setSrcTxNum(txNum);
 		recordCache.put(key, rec);
-		
+		for (Long dest : dests)
+			cacheMgr.passToTheNextTx(key, rec, txNum, dest);
 	}
 
-	public void insert(RecordKey key, Map<String, Constant> fldVals) {
+	public void insert(RecordKey key, Map<String, Constant> fldVals, Long... dests) {
 		CachedRecord rec = new CachedRecord(fldVals);
 		rec.setSrcTxNum(txNum);
 		rec.setNewInserted(true);
 		recordCache.put(key, rec);
-		
+		for (Long dest : dests)
+			cacheMgr.passToTheNextTx(key, rec, txNum, dest);
 	}
 
-	public void delete(RecordKey key) {
+	public void delete(RecordKey key, Long... dests) {
 		CachedRecord dummyRec = new CachedRecord();
 		dummyRec.setSrcTxNum(txNum);
 		dummyRec.delete();
 		recordCache.put(key, dummyRec);
-		
+		for (Long dest : dests)
+			cacheMgr.passToTheNextTx(key, dummyRec, txNum, dest);
 	}
 
 	public void senTothers(RecordKey key, CachedRecord rec, SunkPlan plan) {
@@ -100,15 +103,15 @@ public class TPartTxLocalCache {
 
 	public void flush(SunkPlan plan) {
 		// Pass to the transactions
-		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
-			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
-			if (dests != null) {
-				for (long dest : dests) {
-					CachedRecord clonedRec = new CachedRecord(entry.getValue());
-					cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
-				}
-			}
-		}
+//		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
+//			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
+//			if (dests != null) {
+//				for (long dest : dests) {
+//					CachedRecord clonedRec = new CachedRecord(entry.getValue());
+//					cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
+//				}
+//			}
+//		}
 
 		// Flush to the local storage (write back)
 		for (RecordKey key : plan.getLocalWriteBackInfo()) {
