@@ -7,6 +7,7 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
+import org.elasql.util.PeriodicalJob;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
@@ -45,6 +46,15 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
+		
+		new PeriodicalJob(1000, 120000, new Runnable() {
+
+			@Override
+			public void run() {
+				System.out.println("The size of exchange: " + exchange.size());
+			}
+			
+		}).start();
 	}
 
 	private Object prepareAnchor(Object o) {
