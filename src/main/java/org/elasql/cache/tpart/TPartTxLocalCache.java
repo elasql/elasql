@@ -124,8 +124,11 @@ public class TPartTxLocalCache {
 			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
 			if (dests != null) {
 				for (long dest : dests) {
-					CachedRecord clonedRec = new CachedRecord(entry.getValue());
-					cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
+					// The destination might be the local storage
+					if (dest >= 0) {
+						CachedRecord clonedRec = new CachedRecord(entry.getValue());
+						cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
+					}
 				}
 			}
 		}
