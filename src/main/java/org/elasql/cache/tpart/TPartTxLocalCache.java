@@ -9,7 +9,6 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
-import org.vanilladb.core.util.Timers;
 
 public class TPartTxLocalCache {
 
@@ -39,12 +38,9 @@ public class TPartTxLocalCache {
 	public CachedRecord readFromSink(RecordKey key, int mySinkId) {
 
 		CachedRecord rec = null;
-		Timers.getTimer().startComponentTimer("readFromSink");
 		rec = cacheMgr.readFromSink(key, mySinkId, tx);
 		rec.setSrcTxNum(txNum);
 		recordCache.put(key, rec);
-
-		Timers.getTimer().stopComponentTimer("readFromSink");
 
 		return rec;
 	}
@@ -62,69 +58,41 @@ public class TPartTxLocalCache {
 	 * @return the specified record
 	 */
 	public CachedRecord read(RecordKey key, long src) {
-		CachedRecord rec = null;
-		try {
-			Timers.getTimer().startComponentTimer("read");
-			rec = recordCache.get(key);
-			if (rec != null)
-				return rec;
-
-			// if (src != txNum) {
-			rec = cacheMgr.takeFromTx(key, src, txNum);
-			recordCache.put(key, rec);
-		} finally {
-			Timers.getTimer().stopComponentTimer("read");
-		}
-		// }
+		CachedRecord rec = recordCache.get(key);
+		if (rec != null)
+			return rec;
+		
+		rec = cacheMgr.takeFromTx(key, src, txNum);
+		recordCache.put(key, rec);
 		return rec;
 	}
 
 	public void update(RecordKey key, CachedRecord rec) {
-		Timers.getTimer().startComponentTimer("update");
 		rec.setSrcTxNum(txNum);
 		recordCache.put(key, rec);
-		Timers.getTimer().stopComponentTimer("update");
-
 	}
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
-		Timers.getTimer().startComponentTimer("insert");
 		CachedRecord rec = new CachedRecord(fldVals);
 		rec.setSrcTxNum(txNum);
 		rec.setNewInserted(true);
 		recordCache.put(key, rec);
-		Timers.getTimer().stopComponentTimer("insert");
 	}
 
 	public void delete(RecordKey key) {
-		Timers.getTimer().startComponentTimer("delete");
 		CachedRecord dummyRec = new CachedRecord();
 		dummyRec.setSrcTxNum(txNum);
 		dummyRec.delete();
 		recordCache.put(key, dummyRec);
-		Timers.getTimer().stopComponentTimer("delete");
-
-	}
-
-	public void senTothers(RecordKey key, CachedRecord rec, SunkPlan plan) {
-		Timers.getTimer().startComponentTimer("senTothers");
-		Long[] dests = plan.getWritingDestOfRecord(key);
-		if (dests != null) {
-			for (long dest : dests)
-				cacheMgr.passToTheNextTx(key, rec, txNum, dest);
-
-		}
-		Timers.getTimer().stopComponentTimer("senTothers");
 	}
 
 	public void flush(SunkPlan plan) {
-		Timers.getTimer().startComponentTimer("flush");
 		// Pass to the transactions
 		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
 			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
 			if (dests != null) {
 				for (long dest : dests) {
-					// The destination might be the local storage
+					// The destination might be the local storage (txNum < 0)
 					if (dest >= 0) {
 						CachedRecord clonedRec = new CachedRecord(entry.getValue());
 						cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
@@ -146,6 +114,5 @@ public class TPartTxLocalCache {
 			cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
 
 		}
-		Timers.getTimer().stopComponentTimer("flush");
 	}
 }

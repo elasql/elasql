@@ -12,19 +12,6 @@ import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 
-	private static final long MAX_TIME = 10000;
-	private static final long EPSILON = 50;
-
-	@SuppressWarnings("serial")
-	public class WaitTooLongException extends RuntimeException {
-		public WaitTooLongException() {
-		}
-
-		public WaitTooLongException(String message) {
-			super(message);
-		}
-	}
-
 	/**
 	 * Looks up the sink id for the specified partition.
 	 * 
@@ -47,7 +34,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			anchors[i] = new Object();
 		}
 		
-		new PeriodicalJob(1000, 120000, new Runnable() {
+		new PeriodicalJob(1000, 140000, new Runnable() {
 
 			@Override
 			public void run() {
@@ -73,32 +60,15 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 		synchronized (prepareAnchor(k)) {
 			try {
-				CachedRecord rec = null;
-				long timestamp = System.currentTimeMillis();
 				// wait if the record has not delivered
 				while (!exchange.containsKey(k)) {
 					prepareAnchor(k).wait();
 				}
-				/*
-				 * while (!exchange.containsKey(k) &&
-				 * !waitingTooLong(timestamp)) {
-				 * prepareAnchor(k).wait(MAX_TIME); }
-				 * 
-				 * if (!exchange.containsKey(k) ){
-				 * System.out.println("Wait long key " + key + " sent form " +
-				 * src + " to " + dest); } while (!exchange.containsKey(k) ) {
-				 * prepareAnchor(k).wait(MAX_TIME); }
-				 */
-
 				return exchange.remove(k);
 			} catch (InterruptedException e) {
 				throw new RuntimeException();
 			}
 		}
-	}
-
-	private boolean waitingTooLong(long starttime) {
-		return System.currentTimeMillis() - starttime + EPSILON > MAX_TIME;
 	}
 
 	public void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest) {
@@ -111,8 +81,6 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	@Override
 	public void cacheRemoteRecord(Tuple t) {
-		// System.out.println("Get remote " + t + " At " +
-		// System.currentTimeMillis());
 		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum);
 	}
 
