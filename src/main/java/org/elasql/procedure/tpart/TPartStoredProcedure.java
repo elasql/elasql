@@ -1,13 +1,16 @@
 package org.elasql.procedure.tpart;
 
 import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.tpart.CachedEntryKey;
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.cache.tpart.TPartTxLocalCache;
 import org.elasql.procedure.DdStoredProcedure;
@@ -39,6 +42,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private Set<RecordKey> writeKeys = new HashSet<RecordKey>();
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
+	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
 
 	public TPartStoredProcedure(long txNum, H paramHelper) {
 		if (paramHelper == null)
@@ -157,6 +161,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 				if (!readings.containsKey(k)) {
 					long srcTxNum = plan.getReadSrcTxNum(k);
 					readings.put(k, cache.read(k, srcTxNum));
+					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
 				}
 			}
 
@@ -174,6 +179,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					TupleSet rs = new TupleSet(sinkId);
 					for (PushInfo pushInfo : entry.getValue()) {
 						CachedRecord rec = readings.get(pushInfo.getRecord());
+						cachedEntrySet.add(new CachedEntryKey(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum()));
 						rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
 					}
 
@@ -198,6 +204,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
-		cache.flush(plan);
+		cache.flush(plan,  cachedEntrySet);
 	}
 }

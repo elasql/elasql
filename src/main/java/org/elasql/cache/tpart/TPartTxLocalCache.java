@@ -1,6 +1,7 @@
 package org.elasql.cache.tpart;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.elasql.cache.CachedRecord;
@@ -61,7 +62,7 @@ public class TPartTxLocalCache {
 		CachedRecord rec = recordCache.get(key);
 		if (rec != null)
 			return rec;
-		
+
 		rec = cacheMgr.takeFromTx(key, src, txNum);
 		recordCache.put(key, rec);
 		return rec;
@@ -86,7 +87,7 @@ public class TPartTxLocalCache {
 		recordCache.put(key, dummyRec);
 	}
 
-	public void flush(SunkPlan plan) {
+	public void flush(SunkPlan plan, List<CachedEntryKey> cachedEntrySet) {
 		// Pass to the transactions
 		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
 			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
@@ -95,24 +96,59 @@ public class TPartTxLocalCache {
 					// The destination might be the local storage (txNum < 0)
 					if (dest >= 0) {
 						CachedRecord clonedRec = new CachedRecord(entry.getValue());
-						cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest);
+						cacheMgr.passToTheNextTx(entry.getKey(), clonedRec, txNum, dest, false);
 					}
 				}
 			}
 		}
 
-		// Flush to the local storage (write back)
-		for (RecordKey key : plan.getLocalWriteBackInfo()) {
-			CachedRecord rec = recordCache.get(key);
+		if (plan.hasLocalWriteBack())
+			System.out.println("At " + System.currentTimeMillis() + " TX " + txNum + "\n" + plan);
+		// // Flush to the local storage (write back)
+		// for (RecordKey key : plan.getLocalWriteBackInfo()) {
+		//
+		//
+		// CachedRecord rec = recordCache.get(key);
+		//
+		// // If there is no such record in the local cache,
+		// // it might be pushed from the same transaction on the other
+		// // machine.
+		// if (rec == null)
+		// rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
+		//
+		// cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
+		//
+		// CachedEntryKey k = new CachedEntryKey(key, txNum, localStorageId);
+		// cacheMgr.release(k);
+		//
+		// }
+		if (plan.isLocalTask()) {
+			// Flush to the local storage (write back)
+			for (RecordKey key : plan.getLocalWriteBackInfo()) {
 
-			// If there is no such record in the local cache,
-			// it might be pushed from the same transaction on the other
-			// machine.
-			if (rec == null)
-				rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
+				CachedRecord rec = recordCache.get(key);
 
-			cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
+				// If there is no such record in the local cache,
+				// it might be pushed from the same transaction on the other
+				// machine.
+				if (rec == null)
+					System.out.println("Something wring!!");
+
+				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
+
+			}
+		} else {
+			// Flush to the local storage (write back)
+			for (RecordKey key : plan.getLocalWriteBackInfo()) {
+
+				CachedRecord rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
+
+				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
+
+
+			}
 
 		}
+
 	}
 }

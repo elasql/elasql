@@ -36,4 +36,9 @@ public class PushInfo {
 	public void setRecord(RecordKey record) {
 		this.record = record;
 	}
+
+	public String toString() {
+		return "{" + record + ":" + serverId + ":" + destTxNum + "}";
+
+	}
 }

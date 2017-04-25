@@ -6,11 +6,27 @@ public class CachedEntryKey {
 	private final RecordKey recKey;
 	private final long source;
 	private final long dest;
+	private long insertTime;
+	private boolean isRemote = false;
 
 	public CachedEntryKey(RecordKey key, long src, long dest) {
 		recKey = key;
 		source = src;
 		this.dest = dest;
+	}
+
+	public void setTime() {
+		insertTime = System.currentTimeMillis();
+	}
+
+	public long getTime() {
+		return insertTime;
+	}
+	public void setRemote(boolean isr){
+		isRemote = isr;
+	}
+	public boolean getRemote(){
+		return isRemote;
 	}
 
 	public RecordKey getRecordKey() {
@@ -34,8 +50,7 @@ public class CachedEntryKey {
 		if (obj.getClass() != CachedEntryKey.class)
 			return false;
 		CachedEntryKey key = (CachedEntryKey) obj;
-		return key.recKey.equals(recKey) && key.source == this.source
-				&& key.dest == this.dest;
+		return key.recKey.equals(recKey) && key.source == this.source && key.dest == this.dest;
 	}
 
 	@Override
@@ -49,7 +64,6 @@ public class CachedEntryKey {
 
 	@Override
 	public String toString() {
-		return "[" + recKey.toString() + ", src:" + source + ", dest:" + dest
-				+ "]";
+		return "[" + recKey.toString() + ", src:" + source + ", dest:" + dest + "]";
 	}
 }

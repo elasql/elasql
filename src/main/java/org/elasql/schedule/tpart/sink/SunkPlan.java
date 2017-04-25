@@ -3,6 +3,7 @@ package org.elasql.schedule.tpart.sink;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,7 +36,7 @@ public class SunkPlan {
 	}
 
 	public void addReadingInfo(RecordKey key, long srcTxNum) {
-		// not need to specify dest, that is the owner tx num 
+		// not need to specify dest, that is the owner tx num
 
 		if (readingInfoMap == null)
 			readingInfoMap = new HashMap<RecordKey, Long>();
@@ -161,15 +162,46 @@ public class SunkPlan {
 		sb.append("\n");
 
 		sb.append("Write Dest: ");
-		sb.append(writeDestMap);
+		Iterator iterator = null;
+		if (writeDestMap != null) {
+			iterator = writeDestMap.keySet().iterator();
+
+			while (iterator.hasNext()) {
+				RecordKey key = (RecordKey) iterator.next();
+				Set<Long> value = writeDestMap.get(key);
+				sb.append(key + " : [");
+				for(Long p : value)
+					sb.append(p+",");
+				sb.append("]");
+			}
+		}
+
 		sb.append("\n");
 
 		sb.append("Sink Pushing Info: ");
-		sb.append(sinkPushingInfoMap);
+		if (sinkPushingInfoMap != null) {
+			iterator = sinkPushingInfoMap.keySet().iterator();
+			while (iterator.hasNext()) {
+				Integer key = (Integer) iterator.next();
+				Set<PushInfo> value = sinkPushingInfoMap.get(key);
+				sb.append(key + " : [");
+				for(PushInfo p : value)
+					sb.append(p+",");
+				sb.append("]");
+				
+			}
+		}
 		sb.append("\n");
 
 		sb.append("Sink Reading Info: ");
-		sb.append(sinkReadingSet);
+		if (sinkReadingSet != null) {
+			iterator = sinkReadingSet.iterator();
+			while (iterator.hasNext()) {
+				sb.append(iterator.next() + ",");
+
+			}
+		}
+
 		sb.append("\n");
 
 		return sb.toString();

@@ -1,5 +1,9 @@
 package org.elasql.cache.tpart;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -7,6 +11,7 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
+import org.elasql.util.PeriodicalJob;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
@@ -28,19 +33,42 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	private final Object anchors[] = new Object[1009];
 
-	public TPartCacheMgr() {
+	public TPartCacheMgr() throws IOException {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
-		
-//		new PeriodicalJob(1000, 140000, new Runnable() {
-//
-//			@Override
-//			public void run() {
-//				System.out.println("The size of exchange: " + exchange.size());
-//			}
-//			
-//		}).start();
+
+		File dir = new File(".");
+		File outputFile = new File(dir, "left_over.txt");
+		FileWriter wrFile = new FileWriter(outputFile);
+		final BufferedWriter bwrFile = new BufferedWriter(wrFile);
+
+		new PeriodicalJob(5000, 100000, new Runnable() {
+
+			@Override
+			public void run() {
+				System.out.println("The size of exchange: " + exchange.size());
+				long nowTime = System.currentTimeMillis();
+				try {
+					bwrFile.write("++++++++++++++++++++++++++++++++++++++++at"+nowTime+"\n");
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				for (CachedEntryKey k : exchange.keySet()) {
+					if (nowTime - k.getTime() > 10000) {
+						try {
+							bwrFile.write(String.valueOf(k.getRemote()) + k + "\n");
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+				}
+
+			}
+
+		}).start();
 	}
 
 	private Object prepareAnchor(Object o) {
@@ -70,17 +98,31 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		}
 	}
 
-	public void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest) {
+	public void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
+		k.setTime();
+		k.setRemote(isRemote);
 		synchronized (prepareAnchor(k)) {
 			exchange.put(k, rec);
 			prepareAnchor(k).notifyAll();
 		}
 	}
 
+	public void release(CachedEntryKey k) {
+
+		synchronized (prepareAnchor(k)) {
+
+			CachedRecord rec = exchange.remove(k);
+			if (rec != null)
+				System.out.println("writeback done: " + k.getRecordKey() + ", src:" + k.getSource() + ", target:"
+						+ k.getDestination());
+
+		}
+	}
+
 	@Override
 	public void cacheRemoteRecord(Tuple t) {
-		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum);
+		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, true);
 	}
 
 	public void writeBack(RecordKey key, int sinkProcessId, CachedRecord rec, Transaction tx) {
@@ -90,4 +132,5 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	public void setWriteBackInfo(RecordKey key, int sinkProcessId) {
 		writeBackMgr.setWriteBackInfo(key, sinkProcessId);
 	}
+
 }
