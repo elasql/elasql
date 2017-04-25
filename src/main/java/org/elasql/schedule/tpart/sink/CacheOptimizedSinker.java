@@ -114,8 +114,8 @@ public class CacheOptimizedSinker extends Sinker {
 					int targetServerId = e.getTarget().getPartId();
 					if (targetServerId != myId)
 						plan.addPushingInfo(e.getResourceKey(), targetServerId, txNum, e.getTarget().getTxNum());
-
-					plan.addWritingInfo(e.getResourceKey(), e.getTarget().getTxNum());
+					else
+						plan.addWritingInfo(e.getResourceKey(), e.getTarget().getTxNum());
 				}
 			}
 

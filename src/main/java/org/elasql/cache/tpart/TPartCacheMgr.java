@@ -38,37 +38,37 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			anchors[i] = new Object();
 		}
 
-		File dir = new File(".");
+		/*File dir = new File(".");
 		File outputFile = new File(dir, "left_over.txt");
 		FileWriter wrFile = new FileWriter(outputFile);
 		final BufferedWriter bwrFile = new BufferedWriter(wrFile);
-
-		new PeriodicalJob(5000, 100000, new Runnable() {
-
-			@Override
-			public void run() {
-				System.out.println("The size of exchange: " + exchange.size());
-				long nowTime = System.currentTimeMillis();
-				try {
-					bwrFile.write("++++++++++++++++++++++++++++++++++++++++at"+nowTime+"\n");
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				for (CachedEntryKey k : exchange.keySet()) {
-					if (nowTime - k.getTime() > 10000) {
-						try {
-							bwrFile.write(String.valueOf(k.getRemote()) + k + "\n");
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
-				}
-
-			}
-
-		}).start();
+*/
+//		new PeriodicalJob(3000, 500000, new Runnable() {
+//
+//			@Override
+//			public void run() {
+//				System.out.println("The size of exchange: " + exchange.size());
+//				/*long nowTime = System.currentTimeMillis();
+//				try {
+//					bwrFile.write("++++++++++++++++++++++++++++++++++++++++at"+nowTime+"\n");
+//				} catch (IOException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				}
+//				for (CachedEntryKey k : exchange.keySet()) {
+//					if (nowTime - k.getTime() > 10000) {
+//						try {
+//							bwrFile.write(String.valueOf(k.getRemote()) + k + "\n");
+//						} catch (IOException e) {
+//							// TODO Auto-generated catch block
+//							e.printStackTrace();
+//						}
+//					}
+//				}*/
+//
+//			}
+//
+//		}).start();
 	}
 
 	private Object prepareAnchor(Object o) {

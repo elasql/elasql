@@ -102,8 +102,8 @@ public class TPartTxLocalCache {
 			}
 		}
 
-		if (plan.hasLocalWriteBack())
-			System.out.println("At " + System.currentTimeMillis() + " TX " + txNum + "\n" + plan);
+		//if (txNum < 10000 && txNum% 4 ==0)
+		//	System.out.println("At " + System.currentTimeMillis() + " TX " + txNum + "\n" + plan);
 		// // Flush to the local storage (write back)
 		// for (RecordKey key : plan.getLocalWriteBackInfo()) {
 		//
