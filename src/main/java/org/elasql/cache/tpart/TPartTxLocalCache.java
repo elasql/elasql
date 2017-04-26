@@ -102,26 +102,6 @@ public class TPartTxLocalCache {
 			}
 		}
 
-		//if (txNum < 10000 && txNum% 4 ==0)
-		//	System.out.println("At " + System.currentTimeMillis() + " TX " + txNum + "\n" + plan);
-		// // Flush to the local storage (write back)
-		// for (RecordKey key : plan.getLocalWriteBackInfo()) {
-		//
-		//
-		// CachedRecord rec = recordCache.get(key);
-		//
-		// // If there is no such record in the local cache,
-		// // it might be pushed from the same transaction on the other
-		// // machine.
-		// if (rec == null)
-		// rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
-		//
-		// cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
-		//
-		// CachedEntryKey k = new CachedEntryKey(key, txNum, localStorageId);
-		// cacheMgr.release(k);
-		//
-		// }
 		if (plan.isLocalTask()) {
 			// Flush to the local storage (write back)
 			for (RecordKey key : plan.getLocalWriteBackInfo()) {
@@ -131,20 +111,18 @@ public class TPartTxLocalCache {
 				// If there is no such record in the local cache,
 				// it might be pushed from the same transaction on the other
 				// machine.
-				if (rec == null)
-					System.out.println("Something wring!!");
 
 				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
 
 			}
 		} else {
+
 			// Flush to the local storage (write back)
 			for (RecordKey key : plan.getLocalWriteBackInfo()) {
 
 				CachedRecord rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
 
 				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
-
 
 			}
 

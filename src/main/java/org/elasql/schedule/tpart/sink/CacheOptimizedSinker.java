@@ -112,6 +112,10 @@ public class CacheOptimizedSinker extends Sinker {
 				for (Edge e : node.getWriteEdges()) {
 
 					int targetServerId = e.getTarget().getPartId();
+					// Since Local Cache will take care of push rec in the
+					// reading phase
+					// there is no need to add WriteingInfo
+					// See TPartStoredProcedure pushing
 					if (targetServerId != myId)
 						plan.addPushingInfo(e.getResourceKey(), targetServerId, txNum, e.getTarget().getTxNum());
 					else
@@ -134,8 +138,7 @@ public class CacheOptimizedSinker extends Sinker {
 							writeBackFlags.add(k);
 						} else {
 							// push the data if write back to remote
-							plan.addPushingInfo(k, targetServerId, txNum,
-									TPartCacheMgr.toSinkId(targetServerId));
+							plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
 
 						}
 						plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.toSinkId(targetServerId));
