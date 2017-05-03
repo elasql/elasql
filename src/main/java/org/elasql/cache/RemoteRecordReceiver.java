@@ -1,9 +1,9 @@
 package org.elasql.cache;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.remote.groupcomm.Tuple;
 
 public interface RemoteRecordReceiver {
-
-	void cacheRemoteRecord(RecordKey key, CachedRecord rec);
+	
+	void cacheRemoteRecord(Tuple t);
 	
 }

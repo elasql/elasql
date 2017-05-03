@@ -12,6 +12,7 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class TGraph {
 	private List<Node> nodes = new LinkedList<Node>();
+	/// XXX A Map indicate where are the records' position
 	private Map<RecordKey, Node> resPos = new HashMap<RecordKey, Node>();
 	private Node[] sinkNodes;
 	private PartitionMetaMgr parMeta;
@@ -37,22 +38,27 @@ public class TGraph {
 
 		nodes.add(node);
 
-		if (node.getTask().getReadSet() != null)
+		if (node.getTask().getReadSet() != null) {
 			// create a read edge to the latest txn that writes that resource
 			for (RecordKey res : node.getTask().getReadSet()) {
+
 				Node targetNode;
+
 				if (parMeta.isFullyReplicated(res))
 					targetNode = sinkNodes[node.getPartId()];
 				else
 					targetNode = getResourcePosition(res);
+
 				node.addReadEdges(new Edge(targetNode, res));
 				targetNode.addWriteEdges(new Edge(node, res));
 			}
-
-		if (node.getTask().getWriteSet() != null)
+		}
+		
+		if (node.getTask().getWriteSet() != null) {
 			// update the resource position
 			for (RecordKey res : node.getTask().getWriteSet())
 				resPos.put(res, node);
+		}
 	}
 
 	/**
@@ -76,12 +82,6 @@ public class TGraph {
 	}
 
 	public void removeSunkNodes() {
-		// Iterator<Node> iter = nodes.iterator();
-		// while (iter.hasNext()) {
-		// Node n = iter.next();
-		// if (n.hasSunk())
-		// iter.remove();
-		// }
 		nodes.clear();
 	}
 

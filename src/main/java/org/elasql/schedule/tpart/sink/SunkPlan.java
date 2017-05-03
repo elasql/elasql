@@ -3,12 +3,12 @@ package org.elasql.schedule.tpart.sink;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.elasql.sql.RecordKey;
-
 
 public class SunkPlan {
 	private int sinkProcessId;
@@ -37,14 +37,13 @@ public class SunkPlan {
 
 	public void addReadingInfo(RecordKey key, long srcTxNum) {
 		// not need to specify dest, that is the owner tx num
-		// System.out.println("add read info : " + key + "," + srcTxNum);
+
 		if (readingInfoMap == null)
 			readingInfoMap = new HashMap<RecordKey, Long>();
 		readingInfoMap.put(key, srcTxNum);
 	}
 
-	public void addPushingInfo(RecordKey key, int targetNodeId, long srcTxNum,
-			long destTxNum) {
+	public void addPushingInfo(RecordKey key, int targetNodeId, long srcTxNum, long destTxNum) {
 		if (pushingInfoMap == null)
 			pushingInfoMap = new HashMap<Integer, Set<PushInfo>>();
 		Set<PushInfo> pushInfos = pushingInfoMap.get(targetNodeId);
@@ -61,8 +60,7 @@ public class SunkPlan {
 		writeDestMap.get(key).add(destTxNum);
 	}
 
-	public void addSinkPushingInfo(RecordKey key, int destNodeId,
-			long srcTxNum, long destTxNum) {
+	public void addSinkPushingInfo(RecordKey key, int destNodeId, long srcTxNum, long destTxNum) {
 		Set<PushInfo> pushInfos = sinkPushingInfoMap.get(destNodeId);
 		if (pushInfos == null) {
 			pushInfos = new HashSet<PushInfo>();
@@ -111,12 +109,6 @@ public class SunkPlan {
 		keys.add(key);
 	}
 
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append(readingInfoMap).append(pushingInfoMap);
-		return sb.toString();
-	}
-
 	public long getReadSrcTxNum(RecordKey key) {
 		return readingInfoMap.get(key);
 	}
@@ -139,5 +131,79 @@ public class SunkPlan {
 
 	public boolean hasSinkPush() {
 		return sinkPushingInfoMap.size() > 0;
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+
+		sb.append("Sink Process Id: ");
+		sb.append(sinkProcessId);
+		sb.append("\n");
+
+		sb.append("Is Local: ");
+		sb.append(isLocalTask);
+		sb.append("\n");
+
+		sb.append("Reading Info: ");
+		sb.append(readingInfoMap);
+		sb.append("\n");
+
+		sb.append("Pushing Info: ");
+		sb.append(pushingInfoMap);
+		sb.append("\n");
+
+		sb.append("Local Writing Back Info: ");
+		sb.append(localWriteBackInfo);
+		sb.append("\n");
+
+		sb.append("Remote Writing Back Info: ");
+		sb.append(remoteWriteBackInfo);
+		sb.append("\n");
+
+		sb.append("Write Dest: ");
+		Iterator<?> iterator = null;
+		if (writeDestMap != null) {
+			iterator = writeDestMap.keySet().iterator();
+
+			while (iterator.hasNext()) {
+				RecordKey key = (RecordKey) iterator.next();
+				Set<Long> value = writeDestMap.get(key);
+				sb.append(key + " : [");
+				for(Long p : value)
+					sb.append(p+",");
+				sb.append("]");
+			}
+		}
+
+		sb.append("\n");
+
+		sb.append("Sink Pushing Info: ");
+		if (sinkPushingInfoMap != null) {
+			iterator = sinkPushingInfoMap.keySet().iterator();
+			while (iterator.hasNext()) {
+				Integer key = (Integer) iterator.next();
+				Set<PushInfo> value = sinkPushingInfoMap.get(key);
+				sb.append(key + " : [");
+				for(PushInfo p : value)
+					sb.append(p+",");
+				sb.append("]");
+				
+			}
+		}
+		sb.append("\n");
+
+		sb.append("Sink Reading Info: ");
+		if (sinkReadingSet != null) {
+			iterator = sinkReadingSet.iterator();
+			while (iterator.hasNext()) {
+				sb.append(iterator.next() + ",");
+
+			}
+		}
+
+		sb.append("\n");
+
+		return sb.toString();
 	}
 }

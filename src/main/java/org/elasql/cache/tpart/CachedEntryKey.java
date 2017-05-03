@@ -34,8 +34,7 @@ public class CachedEntryKey {
 		if (obj.getClass() != CachedEntryKey.class)
 			return false;
 		CachedEntryKey key = (CachedEntryKey) obj;
-		return key.recKey.equals(recKey) && key.source == this.source
-				&& key.dest == this.dest;
+		return key.recKey.equals(recKey) && key.source == this.source && key.dest == this.dest;
 	}
 
 	@Override
@@ -49,7 +48,6 @@ public class CachedEntryKey {
 
 	@Override
 	public String toString() {
-		return "[" + recKey.toString() + ", src:" + source + ", dest:" + dest
-				+ "]";
+		return "[" + recKey.toString() + ", src:" + source + ", dest:" + dest + "]";
 	}
 }

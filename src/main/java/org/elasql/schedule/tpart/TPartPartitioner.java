@@ -10,6 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.procedure.tpart.TPartStoredProcedure;
+import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -63,7 +64,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 
 		NUM_TASK_PER_SINK = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(TPartPartitioner.class.getName() + ".NUM_TASK_PER_SINK", 10);
-
 	}
 
 	private BlockingQueue<StoredProcedureCall> spcQueue;
@@ -90,26 +90,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 	public void schedule(StoredProcedureCall... calls) {
 		for (StoredProcedureCall call : calls)
 			spcQueue.add(call);
-
-		/*
-		 * Deprecated for (int i = 0; i < calls.length; i++) {
-		 * StoredProcedureCall call = calls[i]; // log request
-		 * 
-		 * TPartStoredProcedureTask spt; if (call.isNoOpStoredProcCall()) { spt
-		 * = new TPartStoredProcedureTask(call.getClientId(), call.getRteId(),
-		 * call.getTxNum(), null); } else { TPartStoredProcedure sp =
-		 * factory.getStoredProcedure( call.getPid(), call.getTxNum());
-		 * sp.prepare(call.getPars()); sp.requestConservativeLocks(); spt = new
-		 * TPartStoredProcedureTask(call.getClientId(), call.getRteId(),
-		 * call.getTxNum(), sp);
-		 * 
-		 * if (!sp.isReadOnly()) DdRecoveryMgr.logRequest(call); } try {
-		 * taskQueue.put(spt); } catch (InterruptedException ex) { if
-		 * (logger.isLoggable(Level.SEVERE))
-		 * logger.severe("fail to insert task to queue"); }
-		 * 
-		 * }
-		 */
 	}
 
 	public void run() {
@@ -121,26 +101,19 @@ public class TPartPartitioner extends Task implements Scheduler {
 				StoredProcedureCall call = spcQueue.take();
 				TPartStoredProcedureTask task = createStoredProcedureTask(call);
 
-				// Deprecated
-				// TPartStoredProcedureTask task = taskQueue.take();
-
 				// schedules the utility procedures directly without T-Part
 				// module
-				if (task.getProcedureType() == TPartStoredProcedure.POPULATE
-						|| task.getProcedureType() == TPartStoredProcedure.PRE_LOAD
-						|| task.getProcedureType() == TPartStoredProcedure.PROFILE) {
+				if (task.getProcedureType() == ProcedureType.UTILITY) {
 					lastSunkTxNum = task.getTxNum();
 					List<TPartStoredProcedureTask> list = new ArrayList<TPartStoredProcedureTask>();
 					list.add(task);
 
-					// Deprecated
-					// VanillaDdDb.tpartTaskScheduler().addTask(list.iterator());
 					dispatchToTaskMgr(list.iterator());
 
 					continue;
 				}
 
-				if (task.getProcedureType() == TPartStoredProcedure.KEY_ACCESS) {
+				if (task.getProcedureType() == ProcedureType.NORMAL) {
 
 					boolean isCrossPartitionTx = false;
 					int lastPart = -1;
@@ -178,8 +151,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 					if (graph.getNodes().size() != 0) {
 						Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 
-						// Deprecated
-						// VanillaDdDb.tpartTaskScheduler().addTask(plansTter);
 						dispatchToTaskMgr(plansTter);
 					}
 
@@ -199,9 +170,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getRteId(), call.getTxNum(), null);
 		} else {
-			TPartStoredProcedure sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
+			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
-			sp.requestConservativeLocks();
 
 			if (!sp.isReadOnly())
 				DdRecoveryMgr.logRequest(call);

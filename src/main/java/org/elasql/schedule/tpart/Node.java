@@ -87,7 +87,7 @@ public class Node {
 
 	public long getTxNum() {
 		if (isSinkNode())
-			return TPartCacheMgr.getPartitionTxnId(getPartId());
+			return TPartCacheMgr.toSinkId(getPartId());
 		else
 			return task.getTxNum();
 	}

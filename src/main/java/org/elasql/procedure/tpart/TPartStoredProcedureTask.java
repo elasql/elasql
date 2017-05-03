@@ -1,6 +1,9 @@
 package org.elasql.procedure.tpart;
 
+import java.util.Set;
+
 import org.elasql.procedure.StoredProcedureTask;
+import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -8,58 +11,56 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class TPartStoredProcedureTask extends StoredProcedureTask {
 
-	private TPartStoredProcedure sp;
+	private TPartStoredProcedure<?> tsp;
 	private int cid, rteId, parId;
 	private long txNum;
-	private static long startTime = System.nanoTime();
-	private long taskStartTime = System.nanoTime();
 
-	public TPartStoredProcedureTask(int cid, int rteId, long txNum, TPartStoredProcedure sp) {
+	public TPartStoredProcedureTask(int cid, int rteId, long txNum, TPartStoredProcedure<?> sp) {
 		super(cid, rteId, txNum, sp);
 		this.cid = cid;
 		this.rteId = rteId;
 		this.txNum = txNum;
-		this.sp = sp;
+		this.tsp = sp;
 	}
 
 	@Override
 	public void run() {
-		// Timers.createTimer(txNum);
+//		Timers.createTimer(txNum);
 		SpResultSet rs = null;
-		// Timers.getTimer().startExecution();
+//		Timers.getTimer().startExecution();
 
 		// try {
 		// long start = System.nanoTime();
-		rs = sp.execute();
+		rs = tsp.execute();
 		// long time = System.nanoTime() - start;
 		// System.out.println(time / 1000);
 		// } finally {
-		// Timers.getTimer().stopExecution();
+//		Timers.getTimer().stopExecution();
 		// }
 
-		if (sp.isMaster()) {
+		if (tsp.isMaster()) {
 			Elasql.connectionMgr().sendClientResponse(cid, rteId, txNum, rs);
 			// System.out.println("Commit: " + (System.nanoTime() - startTime));
 		}
 		// System.out.println("task time:" + (System.nanoTime() -
 		// taskStartTime));
-		// Timers.reportTime();
+//		Timers.addToStatstics();
 	}
 
 	public long getTxNum() {
 		return txNum;
 	}
 
-	public RecordKey[] getReadSet() {
-		return sp.getReadSet();
+	public Set<RecordKey> getReadSet() {
+		return tsp.getReadSet();
 	}
 
-	public RecordKey[] getWriteSet() {
-		return sp.getWriteSet();
+	public Set<RecordKey> getWriteSet() {
+		return tsp.getWriteSet();
 	}
 
 	public double getWeight() {
-		return sp.getWeight();
+		return tsp.getWeight();
 	}
 
 	public int getPartitionId() {
@@ -71,16 +72,16 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 	}
 
 	public void setSunkPlan(SunkPlan plan) {
-		sp.setSunkPlan(plan);
+		tsp.setSunkPlan(plan);
 	}
 
-	public int getProcedureType() {
-		if (sp == null)
-			return TPartStoredProcedure.NOP;
-		return sp.getProcedureType();
+	public ProcedureType getProcedureType() {
+		if (tsp == null)
+			return ProcedureType.NOP;
+		return tsp.getProcedureType();
 	}
 
 	public boolean isReadOnly() {
-		return sp.isReadOnly();
+		return tsp.isReadOnly();
 	}
 }
