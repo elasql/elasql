@@ -36,4 +36,20 @@ public class Tuple implements Serializable {
 		this.srcTxNum = srcTxNum;
 		this.destTxNum = destTxNum;
 	}
+
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+
+		sb.append("[Tuple: ");
+		sb.append(key);
+		sb.append(" sent form tx.");
+		sb.append(srcTxNum);
+		sb.append(" to tx.");
+		sb.append(destTxNum);
+		sb.append("]");
+
+		return sb.toString();
+	}
+
 }

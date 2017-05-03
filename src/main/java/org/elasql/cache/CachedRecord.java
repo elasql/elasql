@@ -46,6 +46,19 @@ public class CachedRecord implements Record, Serializable {
 	public CachedRecord(Map<String, Constant> fldVals) {
 		fldValueMap = fldVals;
 	}
+	
+	/**
+	 * Constructs a new CachedRecord with the same key-value pairs
+	 * and the same meta-data as the given CachedRecord.
+	 */
+	public CachedRecord(CachedRecord rec) {
+		fldValueMap = new HashMap<String, Constant>(rec.fldValueMap);
+		dirtyFlds = new HashSet<String>(rec.dirtyFlds);
+		isDirty = rec.isDirty;
+		isDeleted = rec.isDeleted;
+		isNewInserted = rec.isNewInserted;
+		srcTxNum = rec.srcTxNum;
+	}
 
 	public Constant getVal(String fldName) {
 		return isDeleted ? null : fldValueMap.get(fldName);

@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.server.task.calvin;
+package org.elasql.procedure.calvin;
 
-import org.elasql.schedule.DdStoredProcedure;
-import org.elasql.schedule.calvin.CalvinStoredProcedure;
+import org.elasql.procedure.DdStoredProcedure;
+import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.server.Elasql;
-import org.elasql.server.task.StoredProcedureTask;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class CalvinStoredProcedureTask extends StoredProcedureTask {
@@ -44,12 +43,12 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 		// Timers.getTimer().stopExecution();
 		// }
 
-		if (csp.isMasterNode()) {
+		if (csp.willResponseToClients()) {
 			// System.out.println("Commit: " + (System.nanoTime() - startTime));
 			Elasql.connectionMgr().sendClientResponse(cid, rteId, txNum,
 					rs);
 		}
-
+		
 		// Timers.reportTime();
 	}
 

@@ -18,15 +18,21 @@ package org.elasql.server;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.cache.CacheMgr;
-import org.elasql.cache.calvin.CalvinCacheMgr;
+import org.elasql.cache.RemoteRecordReceiver;
+import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
+import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
+import org.elasql.schedule.tpart.HeuristicNodeInserter;
+import org.elasql.schedule.tpart.TGraph;
+import org.elasql.schedule.tpart.TPartPartitioner;
+import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashBasedPartitionMetaMgr;
+import org.elasql.storage.metadata.NotificationPartMetaMgr;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
@@ -34,19 +40,23 @@ import org.vanilladb.core.server.VanillaDb;
 public class Elasql extends VanillaDb {
 	private static Logger logger = Logger.getLogger(VanillaDb.class.getName());
 
+	public static final long START_TX_NUMBER = 0;
+
 	/**
 	 * The type of transactional execution engine supported by distributed
 	 * deterministic VanillaDB.
 	 */
 	public enum ServiceType {
-		NAIVE, CALVIN;
-		
+		NAIVE, CALVIN, TPART;
+
 		static ServiceType fromInteger(int index) {
 			switch (index) {
 			case 0:
 				return NAIVE;
 			case 1:
 				return CALVIN;
+			case 2:
+				return TPART;
 			default:
 				throw new RuntimeException("Unsupport service type");
 			}
@@ -58,7 +68,7 @@ public class Elasql extends VanillaDb {
 	// DD modules
 	private static ConnectionMgr connMgr;
 	private static PartitionMetaMgr parMetaMgr;
-	private static CacheMgr cacheMgr;
+	private static RemoteRecordReceiver remoteRecReceiver;
 	private static Scheduler scheduler;
 	private static DdLogMgr ddLogMgr;
 
@@ -66,9 +76,9 @@ public class Elasql extends VanillaDb {
 	private static int myNodeId;
 
 	/**
-	 * Initializes the system. This method is called during system startup.
-	 * For sequencers, it can set {@code initVanillaDb} as {@code false}
-	 * to avoid initializing underlying databases.
+	 * Initializes the system. This method is called during system startup. For
+	 * sequencers, it can set {@code initVanillaDb} as {@code false} to avoid
+	 * initializing underlying databases.
 	 * 
 	 * @param dirName
 	 *            the name of the database directory
@@ -84,22 +94,21 @@ public class Elasql extends VanillaDb {
 			logger.info("ElaSQL initializing...");
 
 		// read service type properties
-		int type = ElasqlProperties.getLoader().getPropertyAsInteger(
-				Elasql.class.getName() + ".SERVICE_TYPE",
+		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",
 				ServiceType.NAIVE.ordinal());
 		serviceType = ServiceType.fromInteger(type);
 		if (logger.isLoggable(Level.INFO))
 			logger.info("using " + serviceType + " type service");
-		
+
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
 			initConnectionMgr(myNodeId, true);
 			return;
 		}
-		
+
 		// initialize core modules
 		VanillaDb.init(dirName, VanillaDb.BufferMgrType.DefaultBufferMgr);
-		
+
 		// initialize DD modules
 		initCacheMgr();
 		initPartitionMetaMgr();
@@ -115,11 +124,15 @@ public class Elasql extends VanillaDb {
 	public static void initCacheMgr() {
 		switch (serviceType) {
 		case NAIVE:
-			cacheMgr = new NaiveCacheMgr();
+			remoteRecReceiver = new NaiveCacheMgr();
 			break;
 		case CALVIN:
-			cacheMgr = new CalvinCacheMgr();
+			remoteRecReceiver = new CalvinPostOffice();
 			break;
+		case TPART:
+			remoteRecReceiver = new TPartCacheMgr();
+			break;
+
 		default:
 			throw new UnsupportedOperationException();
 		}
@@ -133,11 +146,14 @@ public class Elasql extends VanillaDb {
 		case CALVIN:
 			scheduler = initCalvinScheduler();
 			break;
+		case TPART:
+			scheduler = initTPartScheduler();
+			break;
 		default:
 			throw new UnsupportedOperationException();
 		}
 	}
-	
+
 	public static Scheduler initNaiveScheduler() {
 		NaiveScheduler scheduler = new NaiveScheduler();
 		taskMgr().runTask(scheduler);
@@ -150,13 +166,24 @@ public class Elasql extends VanillaDb {
 		return scheduler;
 	}
 
+	public static Scheduler initTPartScheduler() {
+		TPartPartitioner scheduler = new TPartPartitioner(new HeuristicNodeInserter(), new CacheOptimizedSinker(),
+				new TGraph());
+		taskMgr().runTask(scheduler);
+		return scheduler;
+	}
+
 	public static void initPartitionMetaMgr() {
 		Class<?> parMgrCls = ElasqlProperties.getLoader().getPropertyAsClass(
-				Elasql.class.getName() + ".PARTITION_META_MGR",
-				HashBasedPartitionMetaMgr.class, PartitionMetaMgr.class);
+				Elasql.class.getName() + ".PARTITION_META_MGR", HashBasedPartitionMetaMgr.class,
+				PartitionMetaMgr.class);
 
 		try {
 			parMetaMgr = (PartitionMetaMgr) parMgrCls.newInstance();
+
+			// Add a warper partition-meta-mgr for handling notifications
+			// between servers
+			parMetaMgr = new NotificationPartMetaMgr(parMetaMgr);
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("error reading the class name for partition manager");
@@ -172,13 +199,12 @@ public class Elasql extends VanillaDb {
 		ddLogMgr = new DdLogMgr();
 	}
 
-	
 	// ================
-	// 	Module Getters
+	// Module Getters
 	// ================
-	
-	public static CacheMgr cacheMgr() {
-		return cacheMgr;
+
+	public static RemoteRecordReceiver remoteRecReceiver() {
+		return remoteRecReceiver;
 	}
 
 	public static Scheduler scheduler() {
@@ -197,9 +223,8 @@ public class Elasql extends VanillaDb {
 		return ddLogMgr;
 	}
 
-	
 	// ===============
-	// 	Other Getters
+	// Other Getters
 	// ===============
 
 	public static int serverId() {

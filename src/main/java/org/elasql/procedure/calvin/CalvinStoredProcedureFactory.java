@@ -13,8 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.cache;
+package org.elasql.procedure.calvin;
 
-public interface CacheMgr {
+import org.elasql.procedure.DdStoredProcedureFactory;
 
+public interface CalvinStoredProcedureFactory extends DdStoredProcedureFactory {
+	
+	@Override
+	CalvinStoredProcedure<?> getStoredProcedure(int pid, long txNum);
+	
 }

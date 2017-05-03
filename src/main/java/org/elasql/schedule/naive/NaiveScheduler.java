@@ -18,10 +18,11 @@ package org.elasql.schedule.naive;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.elasql.procedure.DdStoredProcedure;
+import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
+import org.elasql.procedure.naive.NaiveStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
-import org.elasql.schedule.DdStoredProcedure;
 import org.elasql.schedule.Scheduler;
-import org.elasql.server.task.naive.NaiveStoredProcedureTask;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;

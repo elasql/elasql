@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.schedule.calvin;
+package org.elasql.procedure;
 
-import org.elasql.schedule.DdStoredProcedureFactory;
 
-public interface CalvinStoredProcedureFactory extends DdStoredProcedureFactory {
-	
-	@Override
-	CalvinStoredProcedure<?> getStoredProcedure(int pid, long txNum);
-	
+public interface DdStoredProcedureFactory {
+
+	DdStoredProcedure getStoredProcedure(int pid, long txNum);
+
 }
