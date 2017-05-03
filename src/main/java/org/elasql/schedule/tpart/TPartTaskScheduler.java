@@ -35,7 +35,6 @@ public class TPartTaskScheduler extends Task {
 	}
 
 	public void schedule(TPartStoredProcedureTask spt) {
-
 		// create worker thread to serve the request
 		VanillaDb.taskMgr().runTask(spt);
 	}
@@ -44,10 +43,8 @@ public class TPartTaskScheduler extends Task {
 		while (true) {
 			try {
 				Iterator<TPartStoredProcedureTask> plans = plansQueue.take();
-
 				while (plans.hasNext()) {
 					TPartStoredProcedureTask p = plans.next();
-
 					schedule(p);
 				}
 			} catch (InterruptedException ex) {

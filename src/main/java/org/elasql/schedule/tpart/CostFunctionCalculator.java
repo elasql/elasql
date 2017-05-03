@@ -12,9 +12,7 @@ public class CostFunctionCalculator {
 	public int crossEdgeCount;
 
 	static {
-
 		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(CostFunctionCalculator.class.getName() + ".BETA", 1.0);
-		System.out.println("Beta :" + BETA);
 	}
 
 	public CostFunctionCalculator() {
@@ -22,7 +20,6 @@ public class CostFunctionCalculator {
 	}
 
 	public void reset() {
-
 		for (int i = 0; i < partLoads.length; i++)
 			partLoads[i] = 0;
 		crossEdgeCount = 0;
@@ -147,5 +144,4 @@ public class CostFunctionCalculator {
 	public double[] getPartLoads() {
 		return partLoads;
 	}
-
 }

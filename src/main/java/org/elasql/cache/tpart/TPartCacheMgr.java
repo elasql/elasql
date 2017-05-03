@@ -1,6 +1,5 @@
 package org.elasql.cache.tpart;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,11 +28,10 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	private final Object anchors[] = new Object[1009];
 
-	public TPartCacheMgr() throws IOException {
+	public TPartCacheMgr() {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
-
 	}
 
 	private Object prepareAnchor(Object o) {
@@ -65,23 +63,9 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	public void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
-		k.setTime();
-		k.setRemote(isRemote);
 		synchronized (prepareAnchor(k)) {
 			exchange.put(k, rec);
 			prepareAnchor(k).notifyAll();
-		}
-	}
-
-	public void release(CachedEntryKey k) {
-
-		synchronized (prepareAnchor(k)) {
-
-			CachedRecord rec = exchange.remove(k);
-			if (rec != null)
-				System.out.println("writeback done: " + k.getRecordKey() + ", src:" + k.getSource() + ", target:"
-						+ k.getDestination());
-
 		}
 	}
 
@@ -97,5 +81,4 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	public void setWriteBackInfo(RecordKey key, int sinkProcessId) {
 		writeBackMgr.setWriteBackInfo(key, sinkProcessId);
 	}
-
 }

@@ -39,6 +39,5 @@ public class PushInfo {
 
 	public String toString() {
 		return "{" + record + ":" + serverId + ":" + destTxNum + "}";
-
 	}
 }

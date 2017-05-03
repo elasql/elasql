@@ -109,9 +109,8 @@ public class ConnectionMgr
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
-			for (Tuple t : ts.getTupleSet()) {
+			for (Tuple t : ts.getTupleSet())
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
-			}
 		} else
 			throw new IllegalArgumentException();
 	}

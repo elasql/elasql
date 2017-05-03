@@ -162,7 +162,7 @@ public class SunkPlan {
 		sb.append("\n");
 
 		sb.append("Write Dest: ");
-		Iterator iterator = null;
+		Iterator<?> iterator = null;
 		if (writeDestMap != null) {
 			iterator = writeDestMap.keySet().iterator();
 

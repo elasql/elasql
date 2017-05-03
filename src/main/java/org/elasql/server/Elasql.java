@@ -15,7 +15,6 @@
  ******************************************************************************/
 package org.elasql.server;
 
-import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -131,12 +130,7 @@ public class Elasql extends VanillaDb {
 			remoteRecReceiver = new CalvinPostOffice();
 			break;
 		case TPART:
-			try {
-				remoteRecReceiver = new TPartCacheMgr();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			remoteRecReceiver = new TPartCacheMgr();
 			break;
 
 		default:

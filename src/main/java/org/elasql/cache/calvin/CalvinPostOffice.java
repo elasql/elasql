@@ -1,10 +1,8 @@
 package org.elasql.cache.calvin;
 
-import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -42,10 +40,11 @@ public class CalvinPostOffice implements RemoteRecordReceiver {
 		int id = (int) (txNum % NUM_DISPATCHERS);
 		dispatchers[id].ungisterTransaction(txNum);
 	}
-
-	public void cacheRemoteRecord(RecordKey key, CachedRecord rec) {
-		int id = (int) (rec.getSrcTxNum() % NUM_DISPATCHERS);
-		dispatchers[id].cacheRemoteRecord(key, rec);
+	
+	@Override
+	public void cacheRemoteRecord(Tuple t) {
+		int id = (int) (t.rec.getSrcTxNum() % NUM_DISPATCHERS);
+		dispatchers[id].cacheRemoteRecord(t.key, t.rec);
 	}
 
 	void registerCacheMgr(long txNum, CalvinCacheMgr cacheMgr) {
@@ -56,11 +55,5 @@ public class CalvinPostOffice implements RemoteRecordReceiver {
 	void notifyTxCommitted(long txNum) {
 		int id = (int) (txNum % NUM_DISPATCHERS);
 		dispatchers[id].ungisterTransaction(txNum);
-	}
-
-	@Override
-	public void cacheRemoteRecord(Tuple t) {
-		cacheRemoteRecord(t.key, t.rec);
-
 	}
 }

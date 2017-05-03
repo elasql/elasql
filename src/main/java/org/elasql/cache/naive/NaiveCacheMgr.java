@@ -42,7 +42,6 @@ public class NaiveCacheMgr implements RemoteRecordReceiver {
 
 	@Override
 	public void cacheRemoteRecord(Tuple t) {
-		// TODO Auto-generated method stub
-
+		// Do nothing
 	}
 }

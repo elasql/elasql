@@ -113,9 +113,6 @@ public class WriteBackRecMgr {
 
 		synchronized (prepareAnchor(key)) {
 			List<WriteBackTuple> tuples = writeBackRecMap.get(key);
-			if (tuples == null)
-				System.out.println("Null key in wbr " + key + "At " + System.currentTimeMillis() + "by "
-						+ Thread.currentThread().getId());
 			ListIterator<WriteBackTuple> tuplesItr = tuples.listIterator(tuples.size());
 			while (tuplesItr.hasPrevious()) {
 				WriteBackTuple wbt = tuplesItr.previous();

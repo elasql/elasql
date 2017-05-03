@@ -6,27 +6,11 @@ public class CachedEntryKey {
 	private final RecordKey recKey;
 	private final long source;
 	private final long dest;
-	private long insertTime;
-	private boolean isRemote = false;
 
 	public CachedEntryKey(RecordKey key, long src, long dest) {
 		recKey = key;
 		source = src;
 		this.dest = dest;
-	}
-
-	public void setTime() {
-		insertTime = System.currentTimeMillis();
-	}
-
-	public long getTime() {
-		return insertTime;
-	}
-	public void setRemote(boolean isr){
-		isRemote = isr;
-	}
-	public boolean getRemote(){
-		return isRemote;
 	}
 
 	public RecordKey getRecordKey() {

@@ -53,6 +53,7 @@ public class TGraph {
 				targetNode.addWriteEdges(new Edge(node, res));
 			}
 		}
+		
 		if (node.getTask().getWriteSet() != null) {
 			// update the resource position
 			for (RecordKey res : node.getTask().getWriteSet())
@@ -81,7 +82,6 @@ public class TGraph {
 	}
 
 	public void removeSunkNodes() {
-
 		nodes.clear();
 	}
 

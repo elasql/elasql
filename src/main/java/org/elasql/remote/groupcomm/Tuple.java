@@ -41,15 +41,13 @@ public class Tuple implements Serializable {
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 
-		sb.append("key: ");
+		sb.append("[Tuple: ");
 		sb.append(key);
-		sb.append(" sent form ");
-
+		sb.append(" sent form tx.");
 		sb.append(srcTxNum);
-		sb.append(" to ");
-
+		sb.append(" to tx.");
 		sb.append(destTxNum);
-
+		sb.append("]");
 
 		return sb.toString();
 	}
