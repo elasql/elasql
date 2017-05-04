@@ -27,6 +27,7 @@ import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.HeuristicNodeInserter;
+import org.elasql.schedule.tpart.SupaTGraph;
 import org.elasql.schedule.tpart.TGraph;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;

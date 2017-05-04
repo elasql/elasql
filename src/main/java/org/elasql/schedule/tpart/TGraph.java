@@ -13,9 +13,9 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 public class TGraph {
 	private List<Node> nodes = new LinkedList<Node>();
 	/// XXX A Map indicate where are the records' position
-	private Map<RecordKey, Node> resPos = new HashMap<RecordKey, Node>();
-	private Node[] sinkNodes;
-	private PartitionMetaMgr parMeta;
+	protected Map<RecordKey, Node> resPos = new HashMap<RecordKey, Node>();
+	protected Node[] sinkNodes;
+	protected PartitionMetaMgr parMeta;
 
 	public TGraph() {
 		sinkNodes = new Node[PartitionMetaMgr.NUM_PARTITIONS];

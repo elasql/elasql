@@ -15,16 +15,28 @@
  ******************************************************************************/
 package org.elasql.storage.metadata;
 
+import java.util.HashMap;
+
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
+import org.elasql.util.PeriodicalJob;
 
 public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
+	
+	private static HashMap<RecordKey,Integer> locationTable;
 
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
+		locationTable = new HashMap<RecordKey,Integer>();
+		new PeriodicalJob(3000, 500000, new Runnable() {
+			@Override
+			 public void run(){
+				System.out.println("loc_tbl : "+locationTable.size());
+			}
+		}).start();
 	}
 
 	/**
@@ -43,5 +55,20 @@ public abstract class PartitionMetaMgr {
 	 *            the key of the record
 	 * @return the id of the partition where the record is
 	 */
-	public abstract int getPartition(RecordKey key);
+	public int getPartition(RecordKey key){
+		Integer loc = locationTable.get(key);
+		if(loc == null)
+			return getLocation(key);
+		else
+			return loc;
+	}
+	public Integer setPartition(RecordKey key , int loc){
+		return locationTable.put(key, new Integer(loc));
+	}
+	
+	protected abstract int getLocation(RecordKey key);
+	
+	
+		
+	
 }

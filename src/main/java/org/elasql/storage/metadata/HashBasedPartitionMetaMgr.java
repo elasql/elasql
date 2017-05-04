@@ -25,7 +25,7 @@ public class HashBasedPartitionMetaMgr extends PartitionMetaMgr {
 	}
 
 	@Override
-	public int getPartition(RecordKey key) {
+	public int getLocation(RecordKey key) {
 		/*
 		 * Hard code the partitioning rules.
 		 */
