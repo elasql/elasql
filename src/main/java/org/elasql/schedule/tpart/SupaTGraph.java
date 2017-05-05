@@ -17,7 +17,8 @@ public class SupaTGraph extends TGraph{
 		for (Entry<RecordKey, Node> resPosPair : resPos.entrySet()) {
 			RecordKey res = resPosPair.getKey();
 			Node node = resPosPair.getValue();
-
+			
+			// null means it is sink node
 			if (node.getTask() != null){
 				node.addWriteBackEdges(new Edge(sinkNodes[node.getPartId()], res));
 				parMeta.setPartition(res, node.getPartId());

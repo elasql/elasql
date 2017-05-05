@@ -169,7 +169,7 @@ public class Elasql extends VanillaDb {
 
 	public static Scheduler initTPartScheduler() {
 		TPartPartitioner scheduler = new TPartPartitioner(new HeuristicNodeInserter(), new CacheOptimizedSinker(),
-				new TGraph());
+				new SupaTGraph());
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
