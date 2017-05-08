@@ -151,6 +151,17 @@ public class CacheOptimizedSinker extends Sinker {
 						parMeta.setPartition(k, targetServerId);
 					}
 					
+					if (targetServerId == myId) {
+						// tell the task to write back local
+						plan.addLocalWriteBackInfo(k);
+						writeBackFlags.add(k);
+					} else {
+						// push the data if write back to remote
+						plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
+
+					}
+					
+					/*
 					if (taskIsLocal) {
 						if (targetServerId == myId) {
 							// tell the task to write back local
@@ -169,7 +180,7 @@ public class CacheOptimizedSinker extends Sinker {
 							writeBackFlags.add(k);
 							plan.addLocalWriteBackInfo(k);
 						}
-					}
+					}*/
 				}
 			}
 
