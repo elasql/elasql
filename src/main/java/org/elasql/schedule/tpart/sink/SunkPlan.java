@@ -22,6 +22,10 @@ public class SunkPlan {
 
 	private List<RecordKey> localWriteBackInfo = new ArrayList<RecordKey>();
 
+	// Migration flags
+	private Set<RecordKey> migraInsertSet = new HashSet<RecordKey>();
+	private Set<RecordKey> migraDeleteSet = new HashSet<RecordKey>();
+
 	private Map<Integer, List<RecordKey>> remoteWriteBackInfo;
 
 	private Map<RecordKey, Set<Long>> writeDestMap = new HashMap<RecordKey, Set<Long>>();
@@ -133,6 +137,22 @@ public class SunkPlan {
 		return sinkPushingInfoMap.size() > 0;
 	}
 
+	public void addMigraInsertInfo(RecordKey key) {
+		migraInsertSet.add(key);
+	}
+
+	public void addMigraDeleteInfo(RecordKey key) {
+		migraDeleteSet.add(key);
+	}
+
+	public Set<RecordKey> getMigraInsertInfo() {
+		return migraInsertSet;
+	}
+
+	public Set<RecordKey> getMigraDeleteInfo() {
+		return migraDeleteSet;
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
@@ -170,8 +190,8 @@ public class SunkPlan {
 				RecordKey key = (RecordKey) iterator.next();
 				Set<Long> value = writeDestMap.get(key);
 				sb.append(key + " : [");
-				for(Long p : value)
-					sb.append(p+",");
+				for (Long p : value)
+					sb.append(p + ",");
 				sb.append("]");
 			}
 		}
@@ -185,10 +205,10 @@ public class SunkPlan {
 				Integer key = (Integer) iterator.next();
 				Set<PushInfo> value = sinkPushingInfoMap.get(key);
 				sb.append(key + " : [");
-				for(PushInfo p : value)
-					sb.append(p+",");
+				for (PushInfo p : value)
+					sb.append(p + ",");
 				sb.append("]");
-				
+
 			}
 		}
 		sb.append("\n");

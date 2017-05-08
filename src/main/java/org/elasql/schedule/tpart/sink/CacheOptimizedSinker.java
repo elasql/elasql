@@ -13,15 +13,19 @@ import org.elasql.schedule.tpart.TGraph;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class CacheOptimizedSinker extends Sinker {
 	// private static long sinkPushTxNum;
 	private static int sinkProcessId = 0;
 	private int myId = Elasql.serverId();
+	
+	protected PartitionMetaMgr parMeta;
 
 	private TPartCacheMgr cm = (TPartCacheMgr) Elasql.remoteRecReceiver();
 
 	public CacheOptimizedSinker() {
+		parMeta = Elasql.partitionMetaMgr();
 		// the tx numbers of sink flush task are unused negative value
 		// sinkPushTxNum = -(TPartPartitioner.NUM_PARTITIONS) - 1;
 	}
@@ -126,11 +130,27 @@ public class CacheOptimizedSinker extends Sinker {
 			// write back
 			// System.out.println("Write back edges: ");
 			if (node.getWriteBackEdges().size() > 0 && !replicated) {
+				int sourceServerId;
+				
 				for (Edge e : node.getWriteBackEdges()) {
 
 					int targetServerId = e.getTarget().getPartId();
 					RecordKey k = e.getResourceKey();
-
+					sourceServerId = parMeta.getPartition(k);
+					
+					if(sourceServerId != targetServerId){
+						
+						//destination perform insert
+						if(targetServerId == myId)
+							plan.addMigraInsertInfo(k);
+						
+						//source perform delete
+						if(sourceServerId == myId)
+							plan.addMigraDeleteInfo(k);
+						
+						parMeta.setPartition(k, targetServerId);
+					}
+					
 					if (taskIsLocal) {
 						if (targetServerId == myId) {
 							// tell the task to write back local
@@ -141,6 +161,7 @@ public class CacheOptimizedSinker extends Sinker {
 							plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
 
 						}
+						// XXX : pass rec to local tx , check this , writeinfo only pass to local tx which txm > 0 ,hence this might be a dead code 
 						plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.toSinkId(targetServerId));
 					} else {
 						if (targetServerId == myId) {
@@ -172,9 +193,11 @@ public class CacheOptimizedSinker extends Sinker {
 		// }
 
 		// set write back flags
-		for (RecordKey key : writeBackFlags) {
+		for (RecordKey key : writeBackFlags) 
 			cm.setWriteBackInfo(key, sinkProcessId);
-		}
+		
+		
+		
 
 		return localTasks;
 	}

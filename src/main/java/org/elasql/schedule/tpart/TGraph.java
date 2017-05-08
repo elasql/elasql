@@ -1,9 +1,11 @@
 package org.elasql.schedule.tpart;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 
 import org.elasql.server.Elasql;
@@ -53,7 +55,7 @@ public class TGraph {
 				targetNode.addWriteEdges(new Edge(node, res));
 			}
 		}
-		
+
 		if (node.getTask().getWriteSet() != null) {
 			// update the resource position
 			for (RecordKey res : node.getTask().getWriteSet())

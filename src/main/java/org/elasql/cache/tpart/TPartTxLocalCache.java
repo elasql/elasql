@@ -112,6 +112,10 @@ public class TPartTxLocalCache {
 				// it might be pushed from the same transaction on the other
 				// machine.
 
+				// Migrated data need to insert
+				if (plan.getMigraInsertInfo().contains(key))
+					rec.setNewInserted(true);
+
 				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
 
 			}
@@ -121,12 +125,17 @@ public class TPartTxLocalCache {
 			for (RecordKey key : plan.getLocalWriteBackInfo()) {
 
 				CachedRecord rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
-
+				// Migrated data need to insert
+				if (plan.getMigraInsertInfo().contains(key))
+					rec.setNewInserted(true);
 				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
 
 			}
 
 		}
+		// Clean up migrted rec
+		for (RecordKey key : plan.getMigraDeleteInfo())
+			delete(key);
 
 	}
 }
