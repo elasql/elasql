@@ -8,6 +8,7 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timers;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 
@@ -47,6 +48,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 
 	public CachedRecord takeFromTx(RecordKey key, long src, long dest) {
+		
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 		synchronized (prepareAnchor(k)) {
 			try {
@@ -59,6 +61,9 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 				throw new RuntimeException();
 			}
 		}
+		
+	
+		
 	}
 
 	public void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {

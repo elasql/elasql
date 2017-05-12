@@ -41,7 +41,6 @@ public class RecordKey implements Serializable {
 	private String tableName;
 	private transient Map<String, Constant> keyEntryMap;
 	private int hashCode;
-	private int partition = -1;
 
 	public RecordKey(String tableName, Map<String, Constant> keyEntryMap) {
 		this.tableName = tableName;
@@ -59,16 +58,8 @@ public class RecordKey implements Serializable {
 		this.keyEntryMap = map;
 		genHashCode();
 	}
-	
-	public int getPartition(){
-		// Lazy evaluation
-		if (partition == -1)
-			partition = Elasql.partitionMetaMgr().getPartition(this);
-		
-		return partition;
-	}
-	
-	private void genHashCode(){
+
+	private void genHashCode() {
 		hashCode = 17;
 		hashCode = 31 * hashCode + tableName.hashCode();
 		hashCode = 31 * hashCode + keyEntryMap.hashCode();
@@ -110,8 +101,7 @@ public class RecordKey implements Serializable {
 		if (obj.getClass() != RecordKey.class)
 			return false;
 		RecordKey k = (RecordKey) obj;
-		return k.tableName.equals(this.tableName)
-				&& k.keyEntryMap.equals(this.keyEntryMap);
+		return k.tableName.equals(this.tableName) && k.keyEntryMap.equals(this.keyEntryMap);
 	}
 
 	@Override
@@ -139,8 +129,7 @@ public class RecordKey implements Serializable {
 		}
 	}
 
-	private void readObject(ObjectInputStream in) throws IOException,
-			ClassNotFoundException {
+	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 		in.defaultReadObject();
 		keyEntryMap = new HashMap<String, Constant>();
 		int numFlds = in.readInt();
@@ -151,8 +140,7 @@ public class RecordKey implements Serializable {
 			int sqlType = in.readInt();
 			byte[] bytes = new byte[in.readInt()];
 			in.read(bytes);
-			Constant val = Constant.newInstance(Type.newInstance(sqlType),
-					bytes);
+			Constant val = Constant.newInstance(Type.newInstance(sqlType), bytes);
 			keyEntryMap.put(fld, val);
 		}
 	}

@@ -10,6 +10,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timers;
 
 public class TPartTxLocalCache {
 
@@ -59,12 +60,14 @@ public class TPartTxLocalCache {
 	 * @return the specified record
 	 */
 	public CachedRecord read(RecordKey key, long src) {
+		
 		CachedRecord rec = recordCache.get(key);
 		if (rec != null)
 			return rec;
 
 		rec = cacheMgr.takeFromTx(key, src, txNum);
 		recordCache.put(key, rec);
+		
 		return rec;
 	}
 
@@ -101,7 +104,8 @@ public class TPartTxLocalCache {
 				}
 			}
 		}
-
+		Timers.getTimer().startComponentTimer("Writeback");
+		 
 		if (plan.isLocalTask()) {
 			// Flush to the local storage (write back)
 			for (RecordKey key : plan.getLocalWriteBackInfo()) {
@@ -133,9 +137,13 @@ public class TPartTxLocalCache {
 			}
 
 		}
+		
+		 
 		// Clean up migrted rec
 		for (RecordKey key : plan.getMigraDeleteInfo())
 			delete(key);
+		
+		Timers.getTimer().stopComponentTimer("Writeback");
 
 	}
 }

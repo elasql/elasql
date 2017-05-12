@@ -24,6 +24,7 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timers;
 
 public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper> implements DdStoredProcedure {
 
@@ -150,7 +151,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		if (plan.isLocalTask()) {
 			Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
-
+			Timers.getTimer().startComponentTimer("read");
 			// Read the records from the local sink
 			for (RecordKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k, sinkId));
@@ -164,7 +165,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
 				}
 			}
-
+			Timers.getTimer().stopComponentTimer("read");
 			// Execute the SQLs defined by users
 			executeSql(readings);
 
