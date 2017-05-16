@@ -57,13 +57,12 @@ public abstract class PartitionMetaMgr {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 		locationTable = new HashMap<RecordKey, Tuple<Integer>>();
-		new PeriodicalJob(3000, 500000, new Runnable() {
-			@Override
-			public void run() {
-				System.out.println("loc_tbl : " + locationTable.size());
-			}
-		}).start();
-
+		/*
+		 * new PeriodicalJob(3000, 500000, new Runnable() {
+		 * 
+		 * @Override public void run() { System.out.println("loc_tbl : " +
+		 * locationTable.size()); } }).start();
+		 */
 		Thread thread = new Thread(new Runnable() {
 			public void run() {
 				try {
@@ -78,45 +77,45 @@ public abstract class PartitionMetaMgr {
 					RecordKey key;
 					int[] c = new int[PartitionMetaMgr.NUM_PARTITIONS];
 					int[] f = new int[PartitionMetaMgr.NUM_PARTITIONS];
-					int p;
-					for (int i = 1; i <= 100000 * 4; i++) {
+					int[] l;
+					int p, iid;
+					for (int j = 0; j < PartitionMetaMgr.NUM_PARTITIONS; j++) {
+						l = new int[PartitionMetaMgr.NUM_PARTITIONS];
+						System.out.print(String.format("Items : %7d ~ %7d -> ", j * 100000, (j + 1) * 100000));
+						for (int i = 1; i <= 100000; i++) {
+							iid = 100000 * j + i;
+							keyEntryMap.put("i_id", new IntegerConstant(iid));
+							key = new RecordKey("item", keyEntryMap);
+							Tuple t = tmp.get(key);
 
-						keyEntryMap.put("i_id", new IntegerConstant(i));
-						key = new RecordKey("item", keyEntryMap);
-						Tuple t = tmp.get(key);
-
-						if (t != null)
-							p = (int) t.loc;
-						else
-							p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
-
-						if (i / 100000 == p)
-							c[p]++;
-						else
-							f[p]++;
+							if (t != null)
+								p = (int) t.loc;
+							else
+								p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
+							l[p]++;
+						}
+						for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
+							System.out.print(String.format("P %d : %6d ", i, l[i]));
+						System.out.println("");
 					}
-
-					for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
-						System.out.println("Partition " + i + " , Correct " + c[i] + " , False " + f[i]);
 
 					System.out.println("Before");
-					c = new int[PartitionMetaMgr.NUM_PARTITIONS];
-					f = new int[PartitionMetaMgr.NUM_PARTITIONS];
-					for (int i = 1; i <= 100000 * 4; i++) {
+					for (int j = 0; j < PartitionMetaMgr.NUM_PARTITIONS; j++) {
+						l = new int[PartitionMetaMgr.NUM_PARTITIONS];
+						System.out.print(String.format("Items : %5d ~ %5d -> ", j * 100000, (j + 1) * 100000));
+						for (int i = 1; i <= 100000; i++) {
+							iid = 100000 * j + i;
+							keyEntryMap.put("i_id", new IntegerConstant(iid));
+							key = new RecordKey("item", keyEntryMap);
+							Tuple t = tmp.get(key);
 
-						keyEntryMap.put("i_id", new IntegerConstant(i));
-						key = new RecordKey("item", keyEntryMap);
-						Tuple t = tmp.get(key);
-
-						p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
-
-						if (i / 100000 == p)
-							c[p]++;
-						else
-							f[p]++;
+							p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
+							l[p]++;
+						}
+						for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
+							System.out.print(String.format("P %d : %6d ", i, l[i]));
+						System.out.println("");
 					}
-					for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
-						System.out.println("Partition " + i + " , Correct " + c[i] + " , False " + f[i]);
 
 					for (Entry<RecordKey, Tuple<Integer>> e : tmp.entrySet())
 						bwrFile.write(e.getKey() + " loc: " + e.getValue().loc + " time: " + e.getValue().times + "\n");
