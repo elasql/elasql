@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -32,7 +33,7 @@ import org.vanilladb.core.sql.IntegerConstant;
 public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
-
+/*
 	private class Tuple<X> {
 		public X loc;
 		public int times;
@@ -50,13 +51,16 @@ public abstract class PartitionMetaMgr {
 			this.loc = loc;
 		}
 	}
-
-	private static HashMap<RecordKey, Tuple<Integer>> locationTable;
+*/
+	private static HashMap<RecordKey, LinkedList<Integer>> locationTable;
 
 	static {
+
+		
+		
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
-		locationTable = new HashMap<RecordKey, Tuple<Integer>>();
+		locationTable = new HashMap<RecordKey, LinkedList<Integer>>();
 		/*
 		 * new PeriodicalJob(3000, 500000, new Runnable() {
 		 * 
@@ -66,17 +70,15 @@ public abstract class PartitionMetaMgr {
 		Thread thread = new Thread(new Runnable() {
 			public void run() {
 				try {
-					Thread.sleep(310000);
+					Thread.sleep(850000);
 					File dir = new File(".");
 					File outputFile = new File(dir, "loc_tbl.txt");
 					FileWriter wrFile = new FileWriter(outputFile);
 					BufferedWriter bwrFile = new BufferedWriter(wrFile);
-					HashMap<RecordKey, Tuple<Integer>> tmp = (HashMap<RecordKey, Tuple<Integer>>) locationTable.clone();
+					HashMap<RecordKey, LinkedList<Integer>> tmp = (HashMap<RecordKey, LinkedList<Integer>>) locationTable.clone();
 
 					Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
 					RecordKey key;
-					int[] c = new int[PartitionMetaMgr.NUM_PARTITIONS];
-					int[] f = new int[PartitionMetaMgr.NUM_PARTITIONS];
 					int[] l;
 					int p, iid;
 					for (int j = 0; j < PartitionMetaMgr.NUM_PARTITIONS; j++) {
@@ -86,10 +88,10 @@ public abstract class PartitionMetaMgr {
 							iid = 100000 * j + i;
 							keyEntryMap.put("i_id", new IntegerConstant(iid));
 							key = new RecordKey("item", keyEntryMap);
-							Tuple t = tmp.get(key);
+							LinkedList<Integer> t = tmp.get(key);
 
 							if (t != null)
-								p = (int) t.loc;
+								p = t.getFirst();
 							else
 								p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
 							l[p]++;
@@ -102,12 +104,12 @@ public abstract class PartitionMetaMgr {
 					System.out.println("Before");
 					for (int j = 0; j < PartitionMetaMgr.NUM_PARTITIONS; j++) {
 						l = new int[PartitionMetaMgr.NUM_PARTITIONS];
-						System.out.print(String.format("Items : %5d ~ %5d -> ", j * 100000, (j + 1) * 100000));
+						System.out.print(String.format("Items : %7d ~ %7d -> ", j * 100000, (j + 1) * 100000));
 						for (int i = 1; i <= 100000; i++) {
 							iid = 100000 * j + i;
 							keyEntryMap.put("i_id", new IntegerConstant(iid));
 							key = new RecordKey("item", keyEntryMap);
-							Tuple t = tmp.get(key);
+						
 
 							p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
 							l[p]++;
@@ -117,8 +119,8 @@ public abstract class PartitionMetaMgr {
 						System.out.println("");
 					}
 
-					for (Entry<RecordKey, Tuple<Integer>> e : tmp.entrySet())
-						bwrFile.write(e.getKey() + " loc: " + e.getValue().loc + " time: " + e.getValue().times + "\n");
+					for (Entry<RecordKey, LinkedList<Integer>> e : tmp.entrySet())
+						bwrFile.write(e.getKey() + " loc: " + e.getValue() + "\n");
 					bwrFile.close();
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
@@ -149,24 +151,24 @@ public abstract class PartitionMetaMgr {
 	 * @return the id of the partition where the record is
 	 */
 	public int getPartition(RecordKey key) {
-		Tuple<Integer> old = locationTable.get(key);
+		LinkedList<Integer> old = locationTable.get(key);
 		if (old == null)
 			return getLocation(key);
 		else
-			return old.loc;
+			return old.getFirst();
 	}
 
 	public void setPartition(RecordKey key, int loc) {
 
-		Tuple<Integer> old = locationTable.get(key);
-		if (old == null)
-			locationTable.put(key, new Tuple<Integer>(loc));
-		else {
-			old.encrease();
-			old.setLot(loc);
-
+		LinkedList<Integer> old = locationTable.get(key);
+		if (old == null){
+			LinkedList<Integer> l = new LinkedList<Integer>();
+			l.addFirst(loc);
+			locationTable.put(key, l);
 		}
-
+		else 
+			old.set(0, loc);
+		
 	}
 
 	protected abstract int getLocation(RecordKey key);
