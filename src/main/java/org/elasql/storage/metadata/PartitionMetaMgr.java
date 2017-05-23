@@ -24,11 +24,14 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 import org.elasql.util.PeriodicalJob;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
+
+
 
 public abstract class PartitionMetaMgr {
 
@@ -70,7 +73,7 @@ public abstract class PartitionMetaMgr {
 		Thread thread = new Thread(new Runnable() {
 			public void run() {
 				try {
-					Thread.sleep(850000);
+					Thread.sleep(670000);
 					File dir = new File(".");
 					File outputFile = new File(dir, "loc_tbl.txt");
 					FileWriter wrFile = new FileWriter(outputFile);
@@ -93,7 +96,7 @@ public abstract class PartitionMetaMgr {
 							if (t != null)
 								p = t.getFirst();
 							else
-								p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
+								p = getRangeLoc(key);
 							l[p]++;
 						}
 						for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
@@ -159,7 +162,7 @@ public abstract class PartitionMetaMgr {
 	}
 
 	public void setPartition(RecordKey key, int loc) {
-
+		
 		LinkedList<Integer> old = locationTable.get(key);
 		if (old == null){
 			LinkedList<Integer> l = new LinkedList<Integer>();
@@ -172,5 +175,19 @@ public abstract class PartitionMetaMgr {
 	}
 
 	protected abstract int getLocation(RecordKey key);
+	
+	private static int getRangeLoc(RecordKey key){
+		Constant iidCon = key.getKeyVal("i_id");
+		if (iidCon != null) {
+			int iid = (int) iidCon.asJavaVal();
+			return (iid - 1) / 100000;
+		} else {
+			// Fully replicated
+			return Elasql.serverId();
+		}
+	}
+	private static int getHashLoc(RecordKey key){
+		return key.hashCode() % NUM_PARTITIONS;
+	}
 
 }
