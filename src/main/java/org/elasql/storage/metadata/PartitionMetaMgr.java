@@ -65,7 +65,7 @@ public abstract class PartitionMetaMgr {
 
 		
 		LOGDIR = new File(".");
-		LOGFILE =  new File(LOGDIR, "loc_tbl.txt");
+		LOGFILE =  new File(LOGDIR, "loc_log.txt");
 		try {
 			WRLOGFILE = new FileWriter(LOGFILE);
 			BWRLOGFILE = new BufferedWriter(WRLOGFILE);
