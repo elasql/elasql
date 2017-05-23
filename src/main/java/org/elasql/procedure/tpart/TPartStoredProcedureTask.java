@@ -26,9 +26,9 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 	@Override
 	public void run() {
-		Timers.createTimer(txNum);
+		//Timers.createTimer(txNum);
 		SpResultSet rs = null;
-		Timers.getTimer().startExecution();
+		//Timers.getTimer().startExecution();
 
 		// try {
 		// long start = System.nanoTime();
@@ -36,7 +36,7 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 		// long time = System.nanoTime() - start;
 		// System.out.println(time / 1000);
 		// } finally {
-		Timers.getTimer().stopExecution();
+		//Timers.getTimer().stopExecution();
 		// }
 
 		if (tsp.isMaster()) {
@@ -45,7 +45,7 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 		}
 		// System.out.println("task time:" + (System.nanoTime() -
 		// taskStartTime));
-		Timers.addToStatstics();
+		//Timers.addToStatstics();
 	}
 
 	public long getTxNum() {

@@ -104,7 +104,7 @@ public class TPartTxLocalCache {
 				}
 			}
 		}
-		Timers.getTimer().startComponentTimer("Writeback");
+		//Timers.getTimer().startComponentTimer("Writeback");
 		 
 		if (plan.isLocalTask()) {
 			// Flush to the local storage (write back)
@@ -143,7 +143,7 @@ public class TPartTxLocalCache {
 		for (RecordKey key : plan.getMigraDeleteInfo())
 			delete(key);
 		
-		Timers.getTimer().stopComponentTimer("Writeback");
+		//Timers.getTimer().stopComponentTimer("Writeback");
 
 	}
 }

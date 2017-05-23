@@ -36,6 +36,10 @@ import org.vanilladb.core.sql.IntegerConstant;
 public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
+	public final static File LOGDIR;
+	public final static File LOGFILE;
+	public  static FileWriter WRLOGFILE;
+	public  static BufferedWriter BWRLOGFILE;
 /*
 	private class Tuple<X> {
 		public X loc;
@@ -59,6 +63,16 @@ public abstract class PartitionMetaMgr {
 
 	static {
 
+		
+		LOGDIR = new File(".");
+		LOGFILE =  new File(LOGDIR, "loc_tbl.txt");
+		try {
+			WRLOGFILE = new FileWriter(LOGFILE);
+			BWRLOGFILE = new BufferedWriter(WRLOGFILE);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 		
 		
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
@@ -162,6 +176,14 @@ public abstract class PartitionMetaMgr {
 	}
 
 	public void setPartition(RecordKey key, int loc) {
+		
+		try {
+			BWRLOGFILE.write(key+":"+loc);
+			BWRLOGFILE.newLine();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 		LinkedList<Integer> old = locationTable.get(key);
 		if (old == null){
