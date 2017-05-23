@@ -31,41 +31,29 @@ import org.elasql.util.PeriodicalJob;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
-
-
 public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
 	public final static File LOGDIR;
 	public final static File LOGFILE;
-	public  static FileWriter WRLOGFILE;
-	public  static BufferedWriter BWRLOGFILE;
-/*
-	private class Tuple<X> {
-		public X loc;
-		public int times;
-
-		public Tuple(X loc) {
-			this.loc = loc;
-			this.times = 0;
-		}
-
-		public void encrease() {
-			this.times++;
-		}
-
-		public void setLot(X loc) {
-			this.loc = loc;
-		}
-	}
-*/
+	public static FileWriter WRLOGFILE;
+	public static BufferedWriter BWRLOGFILE;
+	private static final long BENCH_START_TIME;
+	/*
+	 * private class Tuple<X> { public X loc; public int times;
+	 * 
+	 * public Tuple(X loc) { this.loc = loc; this.times = 0; }
+	 * 
+	 * public void encrease() { this.times++; }
+	 * 
+	 * public void setLot(X loc) { this.loc = loc; } }
+	 */
 	private static HashMap<RecordKey, LinkedList<Integer>> locationTable;
 
 	static {
 
-		
 		LOGDIR = new File(".");
-		LOGFILE =  new File(LOGDIR, "loc_log.txt");
+		LOGFILE = new File(LOGDIR, "loc_log.txt");
 		try {
 			WRLOGFILE = new FileWriter(LOGFILE);
 			BWRLOGFILE = new BufferedWriter(WRLOGFILE);
@@ -73,8 +61,8 @@ public abstract class PartitionMetaMgr {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		
-		
+
+		BENCH_START_TIME = System.currentTimeMillis();
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 		locationTable = new HashMap<RecordKey, LinkedList<Integer>>();
@@ -92,7 +80,8 @@ public abstract class PartitionMetaMgr {
 					File outputFile = new File(dir, "loc_tbl.txt");
 					FileWriter wrFile = new FileWriter(outputFile);
 					BufferedWriter bwrFile = new BufferedWriter(wrFile);
-					HashMap<RecordKey, LinkedList<Integer>> tmp = (HashMap<RecordKey, LinkedList<Integer>>) locationTable.clone();
+					HashMap<RecordKey, LinkedList<Integer>> tmp = (HashMap<RecordKey, LinkedList<Integer>>) locationTable
+							.clone();
 
 					Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
 					RecordKey key;
@@ -126,7 +115,6 @@ public abstract class PartitionMetaMgr {
 							iid = 100000 * j + i;
 							keyEntryMap.put("i_id", new IntegerConstant(iid));
 							key = new RecordKey("item", keyEntryMap);
-						
 
 							p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
 							l[p]++;
@@ -176,29 +164,28 @@ public abstract class PartitionMetaMgr {
 	}
 
 	public void setPartition(RecordKey key, int loc) {
-		
+
 		try {
-			BWRLOGFILE.write(key+":"+loc);
+			BWRLOGFILE.write((System.currentTimeMillis() - BENCH_START_TIME) + "," + key.getKeyVal("i_id") + "," + loc);
 			BWRLOGFILE.newLine();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+
 		LinkedList<Integer> old = locationTable.get(key);
-		if (old == null){
+		if (old == null) {
 			LinkedList<Integer> l = new LinkedList<Integer>();
 			l.addFirst(loc);
 			locationTable.put(key, l);
-		}
-		else 
+		} else
 			old.set(0, loc);
-		
+
 	}
 
 	protected abstract int getLocation(RecordKey key);
-	
-	private static int getRangeLoc(RecordKey key){
+
+	private static int getRangeLoc(RecordKey key) {
 		Constant iidCon = key.getKeyVal("i_id");
 		if (iidCon != null) {
 			int iid = (int) iidCon.asJavaVal();
@@ -208,7 +195,8 @@ public abstract class PartitionMetaMgr {
 			return Elasql.serverId();
 		}
 	}
-	private static int getHashLoc(RecordKey key){
+
+	private static int getHashLoc(RecordKey key) {
 		return key.hashCode() % NUM_PARTITIONS;
 	}
 
