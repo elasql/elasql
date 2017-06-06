@@ -10,7 +10,6 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
-import org.vanilladb.core.util.Timers;
 
 public class TPartTxLocalCache {
 

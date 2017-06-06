@@ -44,7 +44,7 @@ public class DdRecoveryMgr extends RecoveryMgr {
 				while (true) {
 					try {
 						StoredProcedureCall spc = spcLogQueue.take();
-						new StoredProcRequestRecord(spc.getTxNum(), spc.getClientId(), spc.getRteId(), spc.getPid(),
+						new StoredProcRequestRecord(spc.getTxNum(), spc.getClientId(), spc.getConnectionId(), spc.getPid(),
 								spc.getPars()).writeToLog();
 						// synchronized (spcLoggerSyncObj) {
 						try {

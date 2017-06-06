@@ -24,30 +24,16 @@ import org.elasql.procedure.naive.NaiveStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
-import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class NaiveScheduler extends Task implements Scheduler {
-	private static final Class<?> FACTORY_CLASS;
-
+	
 	private NaiveStoredProcedureFactory factory;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-	
-	static {
-		FACTORY_CLASS = ElasqlProperties.getLoader().getPropertyAsClass(
-				NaiveScheduler.class.getName() + ".FACTORY_CLASS", null,
-				NaiveStoredProcedureFactory.class);
-		if (FACTORY_CLASS == null)
-			throw new RuntimeException("Factory property is empty");
-	}
 
-	public NaiveScheduler() {
-		try {
-			factory = (NaiveStoredProcedureFactory) FACTORY_CLASS.newInstance();
-		} catch (InstantiationException | IllegalAccessException e) {
-			e.printStackTrace();
-		}
+	public NaiveScheduler(NaiveStoredProcedureFactory factory) {
+		this.factory = factory;
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -80,7 +66,7 @@ public class NaiveScheduler extends Task implements Scheduler {
 
 				// create a new task for multi-thread
 				NaiveStoredProcedureTask spt = new NaiveStoredProcedureTask(
-						call.getClientId(), call.getRteId(), call.getTxNum(),
+						call.getClientId(), call.getConnectionId(), call.getTxNum(),
 						sp);
 
 				// perform conservative locking

@@ -8,18 +8,17 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.util.Timers;
 
 public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 	private TPartStoredProcedure<?> tsp;
-	private int cid, rteId, parId;
+	private int clientId, connectionId, parId;
 	private long txNum;
 
-	public TPartStoredProcedureTask(int cid, int rteId, long txNum, TPartStoredProcedure<?> sp) {
-		super(cid, rteId, txNum, sp);
-		this.cid = cid;
-		this.rteId = rteId;
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
+		super(cid, connId, txNum, sp);
+		this.clientId = cid;
+		this.connectionId = connId;
 		this.txNum = txNum;
 		this.tsp = sp;
 	}
@@ -40,7 +39,7 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 		// }
 
 		if (tsp.isMaster()) {
-			Elasql.connectionMgr().sendClientResponse(cid, rteId, txNum, rs);
+			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 			// System.out.println("Commit: " + (System.nanoTime() - startTime));
 		}
 		// System.out.println("task time:" + (System.nanoTime() -

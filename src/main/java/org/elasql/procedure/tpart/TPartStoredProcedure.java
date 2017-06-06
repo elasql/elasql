@@ -24,7 +24,6 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
-import org.vanilladb.core.util.Timers;
 
 public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper> implements DdStoredProcedure {
 

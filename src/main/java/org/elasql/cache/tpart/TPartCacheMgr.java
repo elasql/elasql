@@ -8,7 +8,6 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.storage.tx.Transaction;
-import org.vanilladb.core.util.Timers;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 

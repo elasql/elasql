@@ -30,7 +30,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 
 	private static Logger logger = Logger.getLogger(TPartPartitioner.class.getName());
 
-	private static final Class<?> FACTORY_CLASS, COST_FUNC_CLASS;
+	private static final Class<?> COST_FUNC_CLASS;
 
 	private static final int NUM_TASK_PER_SINK;
 
@@ -43,11 +43,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private PartitionMetaMgr parMetaMgr = Elasql.partitionMetaMgr();
 
 	static {
-		FACTORY_CLASS = ElasqlProperties.getLoader().getPropertyAsClass(
-				TPartPartitioner.class.getName() + ".FACTORY_CLASS", null, TPartStoredProcedureFactory.class);
-		if (FACTORY_CLASS == null)
-			throw new RuntimeException("Factory property is empty");
-
 		HAS_REORDERING = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(TPartPartitioner.class.getName() + ".HAS_REORDERING", 0);
 
@@ -71,20 +66,13 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private Sinker sinker;
 	private TGraph graph;
 
-	public TPartPartitioner(NodeInserter inserter, Sinker sinker, TGraph graph) {
+	public TPartPartitioner(TPartStoredProcedureFactory factory, 
+			NodeInserter inserter, Sinker sinker, TGraph graph) {
+		this.factory = factory;
 		this.inserter = inserter;
 		this.sinker = sinker;
 		this.graph = graph;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-
-		try {
-
-			factory = (TPartStoredProcedureFactory) FACTORY_CLASS.newInstance();
-
-		} catch (InstantiationException | IllegalAccessException e) {
-			e.printStackTrace();
-		}
-
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -168,7 +156,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 
 	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call) {
 		if (call.isNoOpStoredProcCall()) {
-			return new TPartStoredProcedureTask(call.getClientId(), call.getRteId(), call.getTxNum(), null);
+			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), null);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -176,7 +164,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 			if (!sp.isReadOnly())
 				DdRecoveryMgr.logRequest(call);
 
-			return new TPartStoredProcedureTask(call.getClientId(), call.getRteId(), call.getTxNum(), sp);
+			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), sp);
 		}
 	}
 

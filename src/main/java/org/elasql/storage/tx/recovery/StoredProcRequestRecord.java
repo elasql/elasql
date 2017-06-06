@@ -33,7 +33,7 @@ import org.vanilladb.core.storage.tx.recovery.LogRecord;
 
 public class StoredProcRequestRecord implements DdLogRecord {
 	private long txNum;
-	private int cid, rteId, pid;
+	private int clientId, connectionId, procedureId;
 	private Object[] pars;
 	private LogSeqNum lsn;
 	
@@ -48,12 +48,12 @@ public class StoredProcRequestRecord implements DdLogRecord {
 	 * @param pid
 	 * @param pars
 	 */
-	public StoredProcRequestRecord(long txNum, int cid, int rteId, int pid,
+	public StoredProcRequestRecord(long txNum, int cid, int connId, int pid,
 			Object... pars) {
 		this.txNum = txNum;
-		this.cid = cid;
-		this.rteId = rteId;
-		this.pid = pid;
+		this.clientId = cid;
+		this.connectionId = connId;
+		this.procedureId = pid;
 		this.pars = pars;
 	}
 
@@ -65,9 +65,9 @@ public class StoredProcRequestRecord implements DdLogRecord {
 	 */
 	public StoredProcRequestRecord(BasicLogRecord rec) {
 		this.txNum = (Long) rec.nextVal(BIGINT).asJavaVal();
-		this.cid = (Integer) rec.nextVal(INTEGER).asJavaVal();
-		this.rteId = (Integer) rec.nextVal(INTEGER).asJavaVal();
-		this.pid = (Integer) rec.nextVal(INTEGER).asJavaVal();
+		this.clientId = (Integer) rec.nextVal(INTEGER).asJavaVal();
+		this.connectionId = (Integer) rec.nextVal(INTEGER).asJavaVal();
+		this.procedureId = (Integer) rec.nextVal(INTEGER).asJavaVal();
 
 		// FIXME
 		// See writeToLog()
@@ -110,7 +110,7 @@ public class StoredProcRequestRecord implements DdLogRecord {
 
 	@Override
 	public String toString() {
-		return "<SP_REQUEST " + txNum + " " + pid + " " + cid + 
+		return "<SP_REQUEST " + txNum + " " + procedureId + " " + clientId + 
 				" " + Arrays.toString(pars) + " >";
 	}
 
@@ -119,9 +119,9 @@ public class StoredProcRequestRecord implements DdLogRecord {
 		List<Constant> rec = new LinkedList<Constant>();
 		rec.add(new IntegerConstant(op()));
 		rec.add(new BigIntConstant(txNum));
-		rec.add(new IntegerConstant(cid));
-		rec.add(new IntegerConstant(rteId));
-		rec.add(new IntegerConstant(pid));
+		rec.add(new IntegerConstant(clientId));
+		rec.add(new IntegerConstant(connectionId));
+		rec.add(new IntegerConstant(procedureId));
 		rec.add(new VarcharConstant(Arrays.toString(pars)));
 		return rec;
 	}

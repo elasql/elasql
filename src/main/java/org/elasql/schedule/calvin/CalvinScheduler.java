@@ -24,30 +24,16 @@ import org.elasql.procedure.calvin.CalvinStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
-import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class CalvinScheduler extends Task implements Scheduler {
-	private static final Class<?> FACTORY_CLASS;
-
+	
 	private CalvinStoredProcedureFactory factory;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 
-	static {
-		FACTORY_CLASS = ElasqlProperties.getLoader().getPropertyAsClass(
-				CalvinScheduler.class.getName() + ".FACTORY_CLASS", null,
-				CalvinStoredProcedureFactory.class);
-		if (FACTORY_CLASS == null)
-			throw new RuntimeException("Factory property is empty");
-	}
-
-	public CalvinScheduler() {
-		try {
-			factory = (CalvinStoredProcedureFactory) FACTORY_CLASS.newInstance();
-		} catch (InstantiationException | IllegalAccessException e) {
-			e.printStackTrace();
-		}
+	public CalvinScheduler(CalvinStoredProcedureFactory factory) {
+		this.factory = factory;
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -86,7 +72,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 
 				// create a new task for multi-thread
 				CalvinStoredProcedureTask spt = new CalvinStoredProcedureTask(
-						call.getClientId(), call.getRteId(), call.getTxNum(),
+						call.getClientId(), call.getConnectionId(), call.getTxNum(),
 						sp);
 
 				// perform conservative locking
