@@ -24,16 +24,16 @@ public class NaiveStoredProcedureTask extends StoredProcedureTask {
 	
 	private NaiveStoredProcedure<?> nsp;
 	
-	public NaiveStoredProcedureTask(int cid, int rteId, long txNum,
+	public NaiveStoredProcedureTask(int cid, int connId, long txNum,
 			DdStoredProcedure sp) {
-		super(cid, rteId, txNum, sp);
+		super(cid, connId, txNum, sp);
 		
 		nsp = (NaiveStoredProcedure<?>) sp;
 	}
 
 	public void run() {
 		SpResultSet rs = sp.execute();
-		Elasql.connectionMgr().sendClientResponse(cid, rteId, txNum, rs);
+		Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 	}
 	
 	public void lockConservatively() {

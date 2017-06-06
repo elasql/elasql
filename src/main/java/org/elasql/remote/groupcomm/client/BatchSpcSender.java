@@ -45,8 +45,8 @@ class BatchSpcSender implements Runnable {
 			sendBatchRequestToDb();
 	}
 
-	public void callStoredProc(int rteId, int pid, Object... pars) {
-		StoredProcedureCall spc = new StoredProcedureCall(nodeId, rteId, pid, pars);
+	public void callStoredProc(int connId, int pid, Object... pars) {
+		StoredProcedureCall spc = new StoredProcedureCall(nodeId, connId, pid, pars);
 		spcQueue.add(spc);
 		int size = numOfQueuedSpcs.incrementAndGet();
 		

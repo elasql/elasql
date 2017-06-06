@@ -13,32 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package org.elasql.server;
+package org.elasql.procedure;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
+public class DdSampleSpFactory implements DdStoredProcedureFactory {
 
-import org.elasql.procedure.DdSampleSpFactory;
-
-public class StartUp {
-	private static Logger logger = Logger.getLogger(StartUp.class.getName());
-
-	public static void main(String args[]) throws Exception {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("initing...");
-		
-		// For initializing VanillaDb
-		boolean isSeq = false;
-		if (args.length > 2) {
-			int num = Integer.parseInt(args[2]);
-			if (num == 1)
-				isSeq = true; 
-		}
-		
-		// configure and initialize the database
-		Elasql.init(args[0], Integer.parseInt(args[1]), isSeq, new DdSampleSpFactory());
-
-		if (logger.isLoggable(Level.INFO))
-			logger.info("dd database server ready");
+	@Override
+	public DdStoredProcedure getStoredProcedure(int pid, long txNum) {
+		throw new UnsupportedOperationException();
 	}
+
 }

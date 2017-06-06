@@ -57,20 +57,20 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 		new Thread(null, batchSender, "Batch-Spc-Sender").start();
 	}
 
-	public SpResultSet callStoredProc(int rteId, int pid, Object... pars) {
+	public SpResultSet callStoredProc(int connId, int pid, Object... pars) {
 		// Check if there is a queue for it
-		BlockingQueue<ClientResponse> respQueue = rteToRespQueue.get(rteId);
+		BlockingQueue<ClientResponse> respQueue = rteToRespQueue.get(connId);
 		if (respQueue == null) {
 			respQueue = new LinkedBlockingQueue<ClientResponse>();
-			rteToRespQueue.put(rteId, respQueue);
+			rteToRespQueue.put(connId, respQueue);
 		}
 
-		batchSender.callStoredProc(rteId, pid, pars);
+		batchSender.callStoredProc(connId, pid, pars);
 
 		// Wait for the response
 		try {
 			ClientResponse cr = respQueue.take();
-			Long lastTxNumObj = rteToLastTxNum.get(rteId);
+			Long lastTxNumObj = rteToLastTxNum.get(connId);
 			long lastTxNum = -1;
 			if (lastTxNumObj != null)
 				lastTxNum = lastTxNumObj;
@@ -79,7 +79,7 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 				cr = respQueue.take();
 
 			// Record the tx number of the response
-			rteToLastTxNum.put(rteId, cr.getTxNum());
+			rteToLastTxNum.put(connId, cr.getTxNum());
 			
 			return (SpResultSet) cr.getResultSet();
 		} catch (InterruptedException e) {
