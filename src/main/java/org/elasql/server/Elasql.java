@@ -255,8 +255,4 @@ public class Elasql extends VanillaDb {
 	public static int serverId() {
 		return myNodeId;
 	}
-
-	public static ServiceType serviceType() {
-		return SERVICE_TYPE;
-	}
 }
