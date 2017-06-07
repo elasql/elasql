@@ -66,8 +66,15 @@ public class Elasql extends VanillaDb {
 			}
 		}
 	}
-
-	private static ServiceType serviceType;
+	
+	public static final ServiceType SERVICE_TYPE;
+	
+	static {
+		// read service type properties
+		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",
+				ServiceType.NAIVE.ordinal());
+		SERVICE_TYPE = ServiceType.fromInteger(type);
+	}
 
 	// DD modules
 	private static ConnectionMgr connMgr;
@@ -115,12 +122,8 @@ public class Elasql extends VanillaDb {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("ElaSQL initializing...");
 
-		// read service type properties
-		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",
-				ServiceType.NAIVE.ordinal());
-		serviceType = ServiceType.fromInteger(type);
 		if (logger.isLoggable(Level.INFO))
-			logger.info("using " + serviceType + " type service");
+			logger.info("using " + SERVICE_TYPE + " type service");
 
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
@@ -144,7 +147,7 @@ public class Elasql extends VanillaDb {
 	// ================
 
 	public static void initCacheMgr() {
-		switch (serviceType) {
+		switch (SERVICE_TYPE) {
 		case NAIVE:
 			remoteRecReceiver = new NaiveCacheMgr();
 			break;
@@ -161,7 +164,7 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static void initScheduler(DdStoredProcedureFactory factory) {
-		switch (serviceType) {
+		switch (SERVICE_TYPE) {
 		case NAIVE:
 			if (!NaiveStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a NaiveStoredProcedureFactory");
@@ -252,9 +255,5 @@ public class Elasql extends VanillaDb {
 
 	public static int serverId() {
 		return myNodeId;
-	}
-
-	public static ServiceType serviceType() {
-		return serviceType;
 	}
 }
