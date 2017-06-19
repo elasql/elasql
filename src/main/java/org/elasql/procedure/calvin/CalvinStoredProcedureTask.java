@@ -19,37 +19,43 @@ import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.Timer;
 
 public class CalvinStoredProcedureTask extends StoredProcedureTask {
+	
+	static {
+		// For Debugging
+//		TimerStatistics.startReporting();
+	}
 
 	private CalvinStoredProcedure<?> csp;
-	//private static long startTime = System.nanoTime();
 
-	public CalvinStoredProcedureTask(int cid, int rteId, long txNum,
-			DdStoredProcedure sp) {
-		super(cid, rteId, txNum, sp);
+	public CalvinStoredProcedureTask(int cid, int connId, long txNum, DdStoredProcedure sp) {
+		super(cid, connId, txNum, sp);
 
 		csp = (CalvinStoredProcedure<?>) sp;
 	}
 
 	public void run() {
-		// Timers.createTimer(txNum);
+		Timer timer = Timer.getLocalTimer();
 		SpResultSet rs = null;
-		// Timers.getTimer().startExecution();
+		
+		timer.reset();
+		timer.startExecution();
 
-		// try {
-		rs = sp.execute();
-		// } finally {
-		// Timers.getTimer().stopExecution();
-		// }
+		try {
+			rs = sp.execute();
+		} finally {
+			timer.stopExecution();
+		}
 
 		if (csp.willResponseToClients()) {
-			// System.out.println("Commit: " + (System.nanoTime() - startTime));
-			Elasql.connectionMgr().sendClientResponse(cid, rteId, txNum,
-					rs);
+			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 		}
 		
-		// Timers.reportTime();
+		// For Debugging
+//		System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
+//		timer.addToGlobalStatistics();
 	}
 
 	public void bookConservativeLocks() {

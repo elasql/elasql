@@ -32,7 +32,7 @@ public class StoredProcedureCall implements Serializable {
 
 	private long txNum = -1;
 
-	private int clientId, pid = PID_NO_OPERATION, rteId = -1;
+	private int clientId, pid = PID_NO_OPERATION, connectionId = -1;
 
 	public static StoredProcedureCall getNoOpStoredProcCall(int clienId) {
 		return new StoredProcedureCall(clienId);
@@ -48,9 +48,9 @@ public class StoredProcedureCall implements Serializable {
 		this.objs = objs;
 	}
 
-	public StoredProcedureCall(int clienId, int rteid, int pid, Object... objs) {
-		this.clientId = clienId;
-		this.rteId = rteid;
+	public StoredProcedureCall(int clientId, int connId, int pid, Object... objs) {
+		this.clientId = clientId;
+		this.connectionId = connId;
 		this.pid = pid;
 		this.objs = objs;
 	}
@@ -71,16 +71,12 @@ public class StoredProcedureCall implements Serializable {
 		return clientId;
 	}
 
-	public int getRteId() {
-		return rteId;
+	public int getConnectionId() {
+		return connectionId;
 	}
 
 	public int getPid() {
 		return pid;
-	}
-
-	public void setClientId(int clientId) {
-		this.clientId = clientId;
 	}
 
 	public boolean isNoOpStoredProcCall() {

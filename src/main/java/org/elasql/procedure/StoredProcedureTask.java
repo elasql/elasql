@@ -19,15 +19,15 @@ import org.vanilladb.core.server.task.Task;
 
 public abstract class StoredProcedureTask extends Task {
 	protected DdStoredProcedure sp;
-	protected int cid;
-	protected int rteId;
+	protected int clientId;
+	protected int connectionId;
 	protected long txNum;
 
-	public StoredProcedureTask(int cid, int rteId, long txNum,
+	public StoredProcedureTask(int cid, int connId, long txNum,
 			DdStoredProcedure sp) {
 		this.txNum = txNum;
-		this.cid = cid;
-		this.rteId = rteId;
+		this.clientId = cid;
+		this.connectionId = connId;
 		this.sp = sp;
 	}
 

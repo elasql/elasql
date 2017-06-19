@@ -22,6 +22,10 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.procedure.DdStoredProcedureFactory;
+import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
+import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
+import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.calvin.CalvinScheduler;
@@ -62,8 +66,15 @@ public class Elasql extends VanillaDb {
 			}
 		}
 	}
-
-	private static ServiceType serviceType;
+	
+	public static final ServiceType SERVICE_TYPE;
+	
+	static {
+		// read service type properties
+		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",
+				ServiceType.NAIVE.ordinal());
+		SERVICE_TYPE = ServiceType.fromInteger(type);
+	}
 
 	// DD modules
 	private static ConnectionMgr connMgr;
@@ -74,7 +85,7 @@ public class Elasql extends VanillaDb {
 
 	// connection information
 	private static int myNodeId;
-
+	
 	/**
 	 * Initializes the system. This method is called during system startup. For
 	 * sequencers, it can set {@code initVanillaDb} as {@code false} to avoid
@@ -87,18 +98,32 @@ public class Elasql extends VanillaDb {
 	 * @param isSequencer
 	 *            is this server a sequencer
 	 */
-	public static void init(String dirName, int id, boolean isSequencer) {
+	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory) {
+		PartitionMetaMgr partMetaMgr = null;
+		Class<?> parMgrCls = ElasqlProperties.getLoader().getPropertyAsClass(
+				Elasql.class.getName() + ".DEFAULT_PARTITION_META_MGR", HashBasedPartitionMetaMgr.class,
+				PartitionMetaMgr.class);
+
+		try {
+			partMetaMgr = (PartitionMetaMgr) parMgrCls.newInstance();
+		} catch (Exception e) {
+			if (logger.isLoggable(Level.WARNING))
+				logger.warning("error reading the class name for partition manager");
+			throw new RuntimeException();
+		}
+		
+		init(dirName, id, isSequencer, factory, partMetaMgr);
+	}
+	
+	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
+			PartitionMetaMgr partitionMetaMgr) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
 			logger.info("ElaSQL initializing...");
 
-		// read service type properties
-		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",
-				ServiceType.NAIVE.ordinal());
-		serviceType = ServiceType.fromInteger(type);
 		if (logger.isLoggable(Level.INFO))
-			logger.info("using " + serviceType + " type service");
+			logger.info("using " + SERVICE_TYPE + " type service");
 
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
@@ -107,12 +132,12 @@ public class Elasql extends VanillaDb {
 		}
 
 		// initialize core modules
-		VanillaDb.init(dirName, VanillaDb.BufferMgrType.DefaultBufferMgr);
+		VanillaDb.init(dirName);
 
 		// initialize DD modules
 		initCacheMgr();
-		initPartitionMetaMgr();
-		initScheduler();
+		initPartitionMetaMgr(partitionMetaMgr);
+		initScheduler(factory);
 		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
 	}
@@ -122,7 +147,7 @@ public class Elasql extends VanillaDb {
 	// ================
 
 	public static void initCacheMgr() {
-		switch (serviceType) {
+		switch (SERVICE_TYPE) {
 		case NAIVE:
 			remoteRecReceiver = new NaiveCacheMgr();
 			break;
@@ -138,52 +163,52 @@ public class Elasql extends VanillaDb {
 		}
 	}
 
-	public static void initScheduler() {
-		switch (serviceType) {
+	public static void initScheduler(DdStoredProcedureFactory factory) {
+		switch (SERVICE_TYPE) {
 		case NAIVE:
-			scheduler = initNaiveScheduler();
+			if (!NaiveStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
+				throw new IllegalArgumentException("The given factory is not a NaiveStoredProcedureFactory");
+			scheduler = initNaiveScheduler((NaiveStoredProcedureFactory) factory);
 			break;
 		case CALVIN:
-			scheduler = initCalvinScheduler();
+			if (!CalvinStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
+				throw new IllegalArgumentException("The given factory is not a CalvinStoredProcedureFactory");
+			scheduler = initCalvinScheduler((CalvinStoredProcedureFactory) factory);
 			break;
 		case TPART:
-			scheduler = initTPartScheduler();
+			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			scheduler = initTPartScheduler((TPartStoredProcedureFactory) factory);
 			break;
 		default:
 			throw new UnsupportedOperationException();
 		}
 	}
 
-	public static Scheduler initNaiveScheduler() {
-		NaiveScheduler scheduler = new NaiveScheduler();
+	public static Scheduler initNaiveScheduler(NaiveStoredProcedureFactory factory) {
+		NaiveScheduler scheduler = new NaiveScheduler(factory);
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
 
-	public static Scheduler initCalvinScheduler() {
-		CalvinScheduler scheduler = new CalvinScheduler();
+	public static Scheduler initCalvinScheduler(CalvinStoredProcedureFactory factory) {
+		CalvinScheduler scheduler = new CalvinScheduler(factory);
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
 
-	public static Scheduler initTPartScheduler() {
-		TPartPartitioner scheduler = new TPartPartitioner(new HeuristicNodeInserter(), new CacheOptimizedSinker(),
-				new TGraph());
+	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
+		TPartPartitioner scheduler = new TPartPartitioner(factory, new HeuristicNodeInserter(),
+				new CacheOptimizedSinker(), new TGraph());
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
-
-	public static void initPartitionMetaMgr() {
-		Class<?> parMgrCls = ElasqlProperties.getLoader().getPropertyAsClass(
-				Elasql.class.getName() + ".PARTITION_META_MGR", HashBasedPartitionMetaMgr.class,
-				PartitionMetaMgr.class);
-
+	
+	public static void initPartitionMetaMgr(PartitionMetaMgr partitionMetaMgr) {
 		try {
-			parMetaMgr = (PartitionMetaMgr) parMgrCls.newInstance();
-
 			// Add a warper partition-meta-mgr for handling notifications
 			// between servers
-			parMetaMgr = new NotificationPartMetaMgr(parMetaMgr);
+			parMetaMgr = new NotificationPartMetaMgr(partitionMetaMgr);
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("error reading the class name for partition manager");
@@ -229,9 +254,5 @@ public class Elasql extends VanillaDb {
 
 	public static int serverId() {
 		return myNodeId;
-	}
-
-	public static ServiceType serviceType() {
-		return serviceType;
 	}
 }
