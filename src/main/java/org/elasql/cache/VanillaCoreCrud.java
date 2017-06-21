@@ -16,9 +16,13 @@
 package org.elasql.cache;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -28,11 +32,14 @@ import org.vanilladb.core.query.algebra.SelectScan;
 import org.vanilladb.core.query.algebra.TablePlan;
 import org.vanilladb.core.query.algebra.UpdateScan;
 import org.vanilladb.core.query.algebra.index.IndexSelectPlan;
+import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.ConstantRange;
 import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.storage.index.Index;
+import org.vanilladb.core.storage.metadata.TableInfo;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
+import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -72,7 +79,141 @@ public class VanillaCoreCrud {
 
 		return rec;
 	}
+	public static Map<RecordKey, CachedRecord> batchRead(Set<RecordKey> keys, Transaction tx) {
+		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
 
+		// Check if all record keys are in the same table
+		RecordKey representative = null;
+		String tblName = null;
+		for (RecordKey key : keys) {
+			if (representative == null) {
+				representative = key;
+				tblName = representative.getTableName();
+			} else if (!tblName.equals(key.getTableName()))
+				throw new RuntimeException("request keys are not in the same table");
+		}
+
+		// Open an index
+		Map<String, IndexInfo> indexes = Elasql.catalogMgr().getIndexInfo(tblName, tx);
+		Index index = null;
+		String indexedField = null;
+
+		// We only need one index
+		for (String fldName : representative.getKeyFldSet()) {
+			if (indexes.containsKey(fldName)) {
+				indexedField = fldName;
+				index = indexes.get(fldName).open(tx);
+				break;
+			}
+		}
+
+		// Search record ids for record keys
+		// Map<RecordId, Set<RecordKey>> ridToSearchKey = new HashMap<RecordId,
+		// Set<RecordKey>>();
+		Set<RecordId> searchRidSet = new HashSet<RecordId>(50000);
+		LinkedList<RecordId> searchRids = new LinkedList<RecordId>();
+		RecordId rid = null;
+
+		for (RecordKey key : keys) {
+			index.beforeFirst(ConstantRange.newInstance(key.getKeyVal(indexedField)));
+
+			while (index.next()) {
+				rid = index.getDataRecordId();
+				searchRidSet.add(rid);
+			}
+		}
+		searchRids.addAll(searchRidSet);
+		index.close();
+
+		// Sort the record ids
+		Collections.sort(searchRids);
+
+		// Open a record file
+		TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		Schema sch = ti.schema();
+		RecordFile recordFile = ti.open(tx, false);
+		CachedRecord record = null;
+
+		for (RecordId id : searchRids) {
+
+			// Skip the record that has been found
+			// if (recordMap.containsKey(searchKey))
+			// continue;
+
+			// Move to the record
+			recordFile.moveToRecordId(id);
+			Map<String, Constant> tmpFldVals = new HashMap<String, Constant>();
+			for (String fld : representative.getKeyFldSet()) {
+				tmpFldVals.put(fld, recordFile.getVal(fld));
+			}
+			RecordKey targetKey = new RecordKey(representative.getTableName(), tmpFldVals);
+			if (keys.contains(targetKey) && !recordMap.containsKey(targetKey)) {
+
+				// Construct a CachedRecord
+				Map<String, Constant> fldVals = new HashMap<String, Constant>();
+				for (String fld : sch.fields()) {
+					if (targetKey.getKeyFldSet().contains(fld)) {
+						fldVals.put(fld, targetKey.getKeyVal(fld));
+					} else {
+						fldVals.put(fld, recordFile.getVal(fld));
+					}
+				}
+				record = new CachedRecord(fldVals);
+				record.setSrcTxNum(tx.getTransactionNumber());
+
+				// Put the record to the map
+				recordMap.put(targetKey, record);
+
+			}
+		}
+		recordFile.close();
+
+		// TODO: Debug
+		// if (representative.getTableName().equals("customer") ||
+		// representative.getTableName().equals("history"))
+		//
+		// {
+		// for (RecordKey key : keys) {
+		//
+		// if (!recordMap.containsKey(key)) {
+		// LinkedList<RecordId> rids = new LinkedList<RecordId>();
+		//
+		// // Check index
+		// index.beforeFirst(ConstantRange.newInstance(key.getKeyVal(indexedField)));
+		//
+		// while (index.next()) {
+		// rid = index.getDataRecordId();
+		// System.out.println("Rid: " + rid);
+		// rids.add(rid);
+		// }
+		//
+		// if (rids.isEmpty())
+		// throw new RuntimeException("Cannot find " + key + " in the index");
+		//
+		// // Check each record
+		// for (RecordId id : rids) {
+		// recordFile.moveToRecordId(id);
+		//
+		// Map<String, Constant> fldVals = new HashMap<String, Constant>();
+		// for (String fld : sch.fields())
+		// fldVals.put(fld, recordFile.getVal(fld));
+		// System.out.println(fldVals);
+		//
+		// for (String fld : key.getKeyFldSet())
+		// if (!key.getKeyVal(fld).equals(recordFile.getVal(fld)))
+		// System.out.println("The values of field '" + fld + "' are not the
+		// same" + "(Ex: "
+		// + key.getKeyVal(fld) + ", act: " + recordFile.getVal(fld) + ")");
+		// }
+		//
+		// throw new RuntimeException("Cannot find: " + key);
+		// }
+		// }
+		// }
+		// index.close();
+		// recordFile.close();
+		return recordMap;
+	}
 	public static void update(RecordKey key, CachedRecord rec, Transaction tx) {
 		TablePlan tp = new TablePlan(key.getTableName(), tx);
 		Map<String, IndexInfo> indexInfoMap = Elasql.catalogMgr()

@@ -69,9 +69,12 @@ public class RecordKey implements Serializable {
 	}
 	
 	private void genHashCode(){
-		hashCode = 17;
-		hashCode = 31 * hashCode + tableName.hashCode();
-		hashCode = 31 * hashCode + keyEntryMap.hashCode();
+		int x = tableName.hashCode();
+		int y = keyEntryMap.hashCode();
+		hashCode = (x+y)*(x+y+1)/2+y;
+//		hashCode = 17;
+//		hashCode = 31 * hashCode + tableName.hashCode();
+//		hashCode = 31 * hashCode + keyEntryMap.hashCode();
 	}
 
 	public String getTableName() {

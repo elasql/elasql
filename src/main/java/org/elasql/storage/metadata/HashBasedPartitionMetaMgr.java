@@ -31,4 +31,10 @@ public class HashBasedPartitionMetaMgr extends PartitionMetaMgr {
 		 */
 		return key.hashCode() % NUM_PARTITIONS;
 	}
+
+	@Override
+	public int getLocation(RecordKey key) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

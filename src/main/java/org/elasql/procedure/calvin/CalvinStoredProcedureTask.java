@@ -27,7 +27,7 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 		// For Debugging
 //		TimerStatistics.startReporting();
 	}
-
+	public static long txStartTime = 0;
 	private CalvinStoredProcedure<?> csp;
 
 	public CalvinStoredProcedureTask(int cid, int connId, long txNum, DdStoredProcedure sp) {
@@ -37,6 +37,10 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 	}
 
 	public void run() {
+		
+		if (txStartTime == 0)
+			txStartTime = System.currentTimeMillis();
+		
 		Timer timer = Timer.getLocalTimer();
 		SpResultSet rs = null;
 		

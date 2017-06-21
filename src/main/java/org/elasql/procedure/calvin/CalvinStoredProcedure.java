@@ -28,17 +28,30 @@ import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.MigrationManager;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.IntegerConstant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
 
-public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper>
-		implements DdStoredProcedure {
+public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper> implements DdStoredProcedure {
+
+	// For simulating pull request
+	private static final RecordKey PULL_REQUEST_KEY;
+	private static final String DUMMY_FIELD1 = "dummy_field1";
+	private static final String DUMMY_FIELD2 = "dummy_field2";
+
+	static {
+		// Create a pull key
+		Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
+		keyEntryMap.put(DUMMY_FIELD1, new IntegerConstant(0));
+		PULL_REQUEST_KEY = new RecordKey("notification", keyEntryMap);
+	}
 
 	// Protected resource
 	protected Transaction tx;
@@ -52,7 +65,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	// Passive Participants: Nodes that only need to read records and push
 	private Set<Integer> activeParticipants = new HashSet<Integer>();
 	private boolean isActiveParticipant, isPassiveParticipant;
-	
+
 	// For read-only transactions to choose one node as a active participant
 	private int mostReadsNode = 0;
 	private int[] readsPerNodes = new int[PartitionMetaMgr.NUM_PARTITIONS];
@@ -65,6 +78,18 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private Set<RecordKey> localWriteKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> remoteReadKeys = new HashSet<RecordKey>();
+
+	// Migration
+	private MigrationManager migraMgr = Elasql.migrationMgr();
+	private boolean isSourceNode = (localNodeId == migraMgr.getSourcePartition());
+	private boolean isDestNode = (localNodeId == migraMgr.getDestPartition());
+	private Set<RecordKey> pullKeys = new HashSet<RecordKey>();
+	private Set<RecordKey> readKeysInMigration = new HashSet<RecordKey>();
+	private Set<RecordKey> writeKeysInMigration = new HashSet<RecordKey>();
+	private Set<RecordKey> keysForBGPush = new HashSet<RecordKey>();
+	protected boolean isExecutingInSrc = true;
+	private boolean isInMigrating = false, isAnalyzing = false;
+	private boolean activePulling = false;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
@@ -93,29 +118,81 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 **********************/
 
 	public void prepare(Object... pars) {
+		// check if this transaction is in a migration period
+		isInMigrating = migraMgr.isMigrating();
+		isAnalyzing = migraMgr.isAnalyzing();
+
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
 		// create a transaction
 		boolean isReadOnly = paramHelper.isReadOnly();
-		tx = Elasql.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
+		tx = Elasql.txMgr().newTransaction(Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
 		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 
 		// prepare keys
 		prepareKeys();
-		
+
 		// if there is no active participant (e.g. read-only transaction),
 		// choose the one with most readings as the only active participant.
 		if (activeParticipants.isEmpty())
 			activeParticipants.add(mostReadsNode);
-		
+
 		// Decide the role
 		if (activeParticipants.contains(localNodeId))
 			isActiveParticipant = true;
 		else if (!localReadKeys.isEmpty())
 			isPassiveParticipant = true;
-		
+
+		if (isInMigrating) {
+
+			// The one executing the tx needs to take care the data in the
+			// migration range:
+			if ((isExecutingInSrc && isSourceNode) || (!isExecutingInSrc && isDestNode)) {
+				localReadKeys.addAll(readKeysInMigration);
+				localWriteKeys.addAll(writeKeysInMigration);
+			}
+			if (!isExecutingInSrc) {
+				if (isSourceNode)
+					remoteReadKeys.addAll(readKeysInMigration);
+				if (isDestNode)
+					localWriteKeys.addAll(pullKeys);
+			}
+
+			// Other nodes should treat the source or the dest node as an active
+			// participant ?
+			if (!writeKeysInMigration.isEmpty()) {
+				if (isExecutingInSrc) {
+					activeParticipants.add(migraMgr.getSourcePartition());
+				} else {
+					activeParticipants.add(migraMgr.getDestPartition());
+				}
+			}
+
+			// Check if we need to pull data
+			if (!isExecutingInSrc && !pullKeys.isEmpty()) {
+				migraMgr.setRecordMigrated(pullKeys);
+				activePulling = true;
+			}
+
+			// Add the inserted keys to the candidates for BG pushes
+			if (isExecutingInSrc && isSourceNode) {
+				for (RecordKey key : keysForBGPush)
+					migraMgr.addNewInsertKey(key);
+			}
+
+			// if (isBgPush)
+			// bgCount.addAndGet(pullKeys.size());
+			// else
+			// fgCount.addAndGet(pullKeys.size());
+		} else if (isAnalyzing) {
+			// Add the inserted keys to the candidates for BG pushes
+			if (isSourceNode) {
+				for (RecordKey key : keysForBGPush)
+					migraMgr.addNewInsertKey(key);
+			}
+		}
+
 		// for the cache layer
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		if (isParticipated()) {
@@ -131,7 +208,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	public void bookConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		
+
 		ccMgr.bookReadKeys(localReadKeys);
 		ccMgr.bookWriteKeys(localWriteKeys);
 		ccMgr.bookWriteKeys(localInsertKeys);
@@ -139,7 +216,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		
+
 		ccMgr.requestLocks();
 	}
 
@@ -148,17 +225,20 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		try {
 			// Get conservative locks it has asked before
 			getConservativeLocks();
-			
+
 			// Execute transaction
 			executeTransactionLogic();
-			
+
 			// Flush the cached records
 			cacheMgr.flush();
-			
+
 			// The transaction finishes normally
 			tx.commit();
 			paramHelper.setCommitted(true);
-			
+
+			// Something might be done after committing
+			afterCommit();
+
 		} catch (Exception e) {
 			e.printStackTrace();
 			tx.rollback();
@@ -174,7 +254,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	public boolean isParticipated() {
 		return isActiveParticipant || isPassiveParticipant;
 	}
-	
+
 	public boolean willResponseToClients() {
 		return isActiveParticipant;
 	}
@@ -194,7 +274,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// Push local records to the needed remote nodes
 		pushReadingsToRemotes(readings);
-		
+
 		// Passive participants stops here
 		if (isPassiveParticipant)
 			return;
@@ -212,14 +292,14 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			fullyRepKeys.add(readKey);
 			return;
 		}
-		
+
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
 		if (nodeId == localNodeId)
 			localReadKeys.add(readKey);
 		else
 			remoteReadKeys.add(readKey);
-		
+
 		// Record who is the node with most readings
 		readsPerNodes[nodeId]++;
 		if (readsPerNodes[nodeId] > readsPerNodes[mostReadsNode])
@@ -233,7 +313,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			localWriteKeys.add(writeKey);
 		activeParticipants.add(nodeId);
 	}
-	
+
 	protected void addInsertKey(RecordKey insertKey) {
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(insertKey);
@@ -241,32 +321,56 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			localInsertKeys.add(insertKey);
 		activeParticipants.add(nodeId);
 	}
-	
+
 	protected void update(RecordKey key, CachedRecord rec) {
 		if (localWriteKeys.contains(key))
 			cacheMgr.update(key, rec);
 	}
-	
+
 	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
 		if (localInsertKeys.contains(key))
 			cacheMgr.insert(key, fldVals);
 	}
-	
+
 	protected void delete(RecordKey key) {
 		// XXX: Do we need a 'localDeleteKeys' for this ?
 		if (localWriteKeys.contains(key))
 			cacheMgr.delete(key);
 	}
 
+	protected void afterCommit() {
+		// do nothing
+	}
+
+	protected void waitForPullRequest() {
+		CachedRecord rec = cacheMgr.readFromRemote(PULL_REQUEST_KEY);
+		// CachedRecord rec = cacheMgr.read(PULL_REQUEST_KEY, txNum, tx, false);
+		int value = (int) rec.getVal(DUMMY_FIELD1).asJavaVal();
+		if (value != 0)
+			throw new RuntimeException("something wrong for the pull request of tx." + txNum);
+	}
+
+	protected void sendAPullRequest(int nodeId) {
+		Map<String, Constant> fldVals = new HashMap<String, Constant>();
+		fldVals.put(DUMMY_FIELD1, new IntegerConstant(0));
+		fldVals.put(DUMMY_FIELD2, new IntegerConstant(0));
+		CachedRecord rec = new CachedRecord(fldVals);
+		rec.setSrcTxNum(txNum);
+
+		TupleSet ts = new TupleSet(-1);
+		ts.addTuple(PULL_REQUEST_KEY, txNum, txNum, rec);
+		Elasql.connectionMgr().pushTupleSet(nodeId, ts);
+	}
+
 	private Map<RecordKey, CachedRecord> performLocalRead() {
 		Map<RecordKey, CachedRecord> localReadings = new HashMap<RecordKey, CachedRecord>();
-		
+
 		// Read local records (for both active or passive participants)
 		for (RecordKey k : localReadKeys) {
 			CachedRecord rec = cacheMgr.readFromLocal(k);
 			localReadings.put(k, rec);
 		}
-		
+
 		// Read the fully replicated records (for only active participants)
 		if (isActiveParticipant) {
 			for (RecordKey k : fullyRepKeys) {
@@ -274,7 +378,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				localReadings.put(k, rec);
 			}
 		}
-		
+
 		return localReadings;
 	}
 
@@ -283,7 +387,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// return immediately.
 		if (activeParticipants.size() < 2 && isActiveParticipant)
 			return;
-		
+
 		TupleSet ts = new TupleSet(-1);
 		if (!readings.isEmpty()) {
 			// Construct pushing tuple set

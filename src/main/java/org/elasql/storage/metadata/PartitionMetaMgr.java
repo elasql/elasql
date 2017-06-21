@@ -43,5 +43,8 @@ public abstract class PartitionMetaMgr {
 	 *            the key of the record
 	 * @return the id of the partition where the record is
 	 */
-	public abstract int getPartition(RecordKey key);
+	public int getPartition(RecordKey key){
+		return getLocation(key);
+	}
+	public abstract int getLocation(RecordKey key);
 }

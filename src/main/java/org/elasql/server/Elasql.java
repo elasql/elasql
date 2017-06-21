@@ -34,6 +34,7 @@ import org.elasql.schedule.tpart.HeuristicNodeInserter;
 import org.elasql.schedule.tpart.TGraph;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
+import org.elasql.server.migration.MigrationManager;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashBasedPartitionMetaMgr;
 import org.elasql.storage.metadata.NotificationPartMetaMgr;
@@ -82,6 +83,7 @@ public class Elasql extends VanillaDb {
 	private static RemoteRecordReceiver remoteRecReceiver;
 	private static Scheduler scheduler;
 	private static DdLogMgr ddLogMgr;
+	private static MigrationManager migrateMgr;
 
 	// connection information
 	private static int myNodeId;
@@ -133,10 +135,11 @@ public class Elasql extends VanillaDb {
 
 		// initialize core modules
 		VanillaDb.init(dirName);
-
+		initMigration();
 		// initialize DD modules
 		initCacheMgr();
 		initPartitionMetaMgr(partitionMetaMgr);
+		
 		initScheduler(factory);
 		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
@@ -215,6 +218,22 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 	}
+	
+	public static void initMigration(){
+		String prop = System.getProperty(Elasql.class.getName()
+				+ ".MIGRATION_MGR");
+		String migrationCls = prop == null ? MigrationManager.class
+				.getName() : prop.trim();
+
+		try {
+			migrateMgr = (MigrationManager) Class.forName(migrationCls)
+					.newInstance();
+		} catch (Exception e) {
+			if (logger.isLoggable(Level.WARNING))
+				logger.warning("error reading the class name for migration manager: " + migrationCls);
+			throw new RuntimeException();
+		}
+	}
 
 	public static void initConnectionMgr(int id, boolean isSequencer) {
 		connMgr = new ConnectionMgr(id, isSequencer);
@@ -246,6 +265,10 @@ public class Elasql extends VanillaDb {
 
 	public static DdLogMgr DdLogMgr() {
 		return ddLogMgr;
+	}
+	
+	public static MigrationManager migrationMgr(){
+		return migrateMgr;
 	}
 
 	// ===============

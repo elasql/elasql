@@ -56,4 +56,10 @@ public class NotificationPartMetaMgr extends PartitionMetaMgr {
 		return underliedPartMetaMgr.getPartition(key);
 	}
 
+	@Override
+	public int getLocation(RecordKey key) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
 }

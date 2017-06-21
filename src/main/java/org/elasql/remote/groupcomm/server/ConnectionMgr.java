@@ -25,6 +25,8 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.MigrationManager;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.comm.messages.ChannelType;
 import org.vanilladb.comm.messages.P2pMessage;
 import org.vanilladb.comm.messages.TotalOrderMessage;
@@ -39,6 +41,8 @@ import org.vanilladb.core.server.task.Task;
 public class ConnectionMgr
 		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
+
+	public static final int SEQ_NODE_ID = PartitionMetaMgr.NUM_PARTITIONS;
 
 	private ServerAppl serverAppl;
 	private int myId;
@@ -90,6 +94,10 @@ public class ConnectionMgr
 				ChannelType.CLIENT);
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
+	
+	public void sendBroadcastRequest(Object[] objs) {
+		serverAppl.sendBroadcastRequest(objs);
+	}
 
 	public void callStoredProc(int pid, Object... pars) {
 		StoredProcedureCall[] spcs = { new StoredProcedureCall(myId, pid, pars) };
@@ -102,13 +110,28 @@ public class ConnectionMgr
 	}
 
 	@Override
-	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
-		if (sequencerMode)
-			return;
+	public void onRecvServerP2pMessage(final P2pMessage p2pmsg) {
 
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
+
+			switch (ts.sinkId()) {
+			case MigrationManager.SINK_ID_START_MIGRATION:
+				Elasql.migrationMgr().onReceiveStartMigrationReq(ts.getMetadata());
+				break;
+			case MigrationManager.SINK_ID_ANALYSIS:
+				Elasql.migrationMgr().onReceiveAnalysisReq(ts.getMetadata());
+				break;
+			case MigrationManager.SINK_ID_ASYNC_PUSHING:
+				Elasql.migrationMgr().onReceiveAsyncMigrateReq(ts.getMetadata());
+				break;
+			case MigrationManager.SINK_ID_STOP_MIGRATION:
+				Elasql.migrationMgr().onReceiveStopMigrateReq(ts.getMetadata());
+				break;
+			}
+			if (sequencerMode)
+				return;
 			for (Tuple t : ts.getTupleSet())
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
 		} else
