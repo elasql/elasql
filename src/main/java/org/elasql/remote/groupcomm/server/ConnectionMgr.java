@@ -85,6 +85,24 @@ public class ConnectionMgr
 
 				}
 			});
+		}else{
+			//Add Start Analysis to TOM
+			VanillaDb.taskMgr().runTask(new Task() {
+
+				@Override
+				public void run() {
+					try {
+						Thread.sleep(60*1000);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					Elasql.migrationMgr().onReceiveAnalysisReq(null);
+
+				}
+			});
+			
+			
 		}
 	}
 
@@ -132,8 +150,11 @@ public class ConnectionMgr
 			}
 			if (sequencerMode)
 				return;
-			for (Tuple t : ts.getTupleSet())
+			for (Tuple t : ts.getTupleSet()){
+				System.out.println(t + "rec : " + t.rec);
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
+				
+				}
 		} else
 			throw new IllegalArgumentException();
 	}

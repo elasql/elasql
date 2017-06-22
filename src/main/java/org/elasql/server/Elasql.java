@@ -129,7 +129,11 @@ public class Elasql extends VanillaDb {
 
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
+			
+			VanillaDb.init(dirName);
 			initConnectionMgr(myNodeId, true);
+			initMigration();
+			// initialize core modules
 			return;
 		}
 
@@ -222,8 +226,7 @@ public class Elasql extends VanillaDb {
 	public static void initMigration(){
 		String prop = System.getProperty(Elasql.class.getName()
 				+ ".MIGRATION_MGR");
-		String migrationCls = prop == null ? MigrationManager.class
-				.getName() : prop.trim();
+		String migrationCls = "org.elasql.bench.migration.MicroMigrationManager";
 
 		try {
 			migrateMgr = (MigrationManager) Class.forName(migrationCls)
