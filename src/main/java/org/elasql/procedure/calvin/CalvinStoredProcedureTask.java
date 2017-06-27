@@ -22,10 +22,10 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.util.Timer;
 
 public class CalvinStoredProcedureTask extends StoredProcedureTask {
-	
+
 	static {
 		// For Debugging
-//		TimerStatistics.startReporting();
+		// TimerStatistics.startReporting();
 	}
 	public static long txStartTime = 0;
 	private CalvinStoredProcedure<?> csp;
@@ -37,13 +37,13 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 	}
 
 	public void run() {
-		
+
 		if (txStartTime == 0)
 			txStartTime = System.currentTimeMillis();
-		
+
 		Timer timer = Timer.getLocalTimer();
 		SpResultSet rs = null;
-		
+
 		timer.reset();
 		timer.startExecution();
 
@@ -56,10 +56,10 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 		if (csp.willResponseToClients()) {
 			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 		}
-		
+
 		// For Debugging
-//		System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
-//		timer.addToGlobalStatistics();
+		// System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
+		// timer.addToGlobalStatistics();
 	}
 
 	public void bookConservativeLocks() {

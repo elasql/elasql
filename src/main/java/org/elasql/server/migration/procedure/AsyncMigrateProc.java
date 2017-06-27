@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.cache.calvin.CalvinCacheMgr;
+import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
@@ -24,7 +25,6 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 	private static Constant FALSE = new IntegerConstant(0);
 	private static Constant TRUE = new IntegerConstant(1);
 	protected boolean forceReadWriteTx = false;
-	private CalvinCacheMgr cacheMgr = (CalvinCacheMgr) Elasql.remoteRecReceiver();
 
 	public AsyncMigrateProc(long txNum) {
 		super(txNum, new AsyncMigrateParamHelper());
@@ -42,6 +42,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 	@Override
 	protected void executeTransactionLogic() {
+		System.out.println("I'm "+Elasql.serverId() + "I receive Asunc Migration");
 		if (Elasql.serverId() == Elasql.migrationMgr().getSourcePartition())
 			executeSourceLogic();
 		else if (Elasql.serverId() == Elasql.migrationMgr().getDestPartition())
@@ -58,17 +59,25 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 			Elasql.connectionMgr().pushTupleSet(Elasql.migrationMgr().getSourcePartition(), ts);
 		}
 	}
+	
+	@Override
+	public boolean willResponseToClients(){
+		return false;
+	}
 
 	private void executeSourceLogic() {
+		
+		
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Asnyc pushing tx. " + txNum + " starts in the source node");
 
 		// For Squall: Pulling-based migration
 		// Wait for a pull request
 		waitForPullRequest();
+		System.out.println("Get pull request!");
 
 		// Construct pushing tuple set
-		TupleSet ts = new TupleSet(-1);
+		TupleSet ts = new TupleSet(-2);
 
 		// Construct key sets
 		Map<String, Set<RecordKey>> keysPerTables = new HashMap<String, Set<RecordKey>>();
@@ -116,7 +125,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 		// For Squall: Pulling-based migration
 		// Send a pull request
 		sendAPullRequest(Elasql.migrationMgr().getSourcePartition());
-
+		
 		// Receive the data from the source node and save them
 		for (RecordKey key : paramHelper.getPushingKeys()) {
 

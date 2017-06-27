@@ -1,5 +1,7 @@
 package org.elasql.cache.calvin;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -82,7 +84,7 @@ public class RemoteRecordDispatcher extends Task {
 		lowerWaterMark = Elasql.START_TX_NUMBER - CalvinPostOffice.NUM_DISPATCHERS + id;
 		committedTxs = new HashSet<Long>();
 	}
-	
+
 	@Override
 	public void run() {
 
@@ -103,8 +105,18 @@ public class RemoteRecordDispatcher extends Task {
 
 					// Transfer the cached records
 					if (cachedRecs != null) {
-						for (RemoteRecord rec : cachedRecs)
+						if (rq.cacheMgr.inbox == null) {
+							String str = System.currentTimeMillis()+"";
+							str = str + " from tx : " + rq.txNum;
+							str = str + "\n RRRecord  : ";
+							for (Integer rec : recordKeyToSortArray(cachedRecs))
+								str = str + " , " + rec;
+							System.out.println(str);
+						}
+						for (RemoteRecord rec : cachedRecs) {
+
 							rq.cacheMgr.receiveRemoteRecord(rec.key, rec.record);
+						}
 					}
 
 					break;
@@ -113,8 +125,9 @@ public class RemoteRecordDispatcher extends Task {
 
 					// Delete the channel
 					channelMap.remove(ur.txNum);
-				
-					// If the tx number = (lower water mark + NUM_DISPATCHERS), update
+
+					// If the tx number = (lower water mark + NUM_DISPATCHERS),
+					// update
 					// the lower water mark
 					if (ur.txNum == lowerWaterMark + NUM_DISPATCHERS) {
 						lowerWaterMark += NUM_DISPATCHERS;
@@ -144,6 +157,9 @@ public class RemoteRecordDispatcher extends Task {
 					CalvinCacheMgr cacheMgr = channelMap.get(txNum);
 
 					if (cacheMgr != null) {
+						if (cacheMgr.inbox == null)
+							System.out.println("Time : " + System.currentTimeMillis() + " Key " + rr.key + " from tx : "
+									+ rr.record.getSrcTxNum());
 						cacheMgr.receiveRemoteRecord(rr.key, rr.record);
 					} else {
 						// If there is no such channel, cache it.
@@ -180,5 +196,13 @@ public class RemoteRecordDispatcher extends Task {
 
 	void ungisterTransaction(long txNum) {
 		eventQueue.add(new UnregisterRequest(txNum));
+	}
+
+	private ArrayList<Integer> recordKeyToSortArray(Set<RemoteRecord> s) {
+		ArrayList<Integer> l = new ArrayList<Integer>();
+		for (RemoteRecord k : s)
+			l.add((int) k.key.getKeyVal("i_id").asJavaVal());
+		Collections.sort(l);
+		return l;
 	}
 }

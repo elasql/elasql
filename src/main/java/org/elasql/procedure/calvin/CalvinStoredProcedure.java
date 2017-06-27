@@ -16,6 +16,8 @@
 package org.elasql.procedure.calvin;
 
 import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -81,8 +83,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	// Migration
 	private MigrationManager migraMgr = Elasql.migrationMgr();
-	private boolean isSourceNode = (localNodeId == migraMgr.getSourcePartition());
-	private boolean isDestNode = (localNodeId == migraMgr.getDestPartition());
+	private boolean isSourceNode;
+	private boolean isDestNode;
 	private Set<RecordKey> pullKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> readKeysInMigration = new HashSet<RecordKey>();
 	private Set<RecordKey> writeKeysInMigration = new HashSet<RecordKey>();
@@ -95,7 +97,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
 		this.localNodeId = Elasql.serverId();
-
+		// Becareful with this
+		this.isSourceNode = (localNodeId == migraMgr.getSourcePartition());
+		this.isDestNode = (localNodeId == migraMgr.getDestPartition());
 		if (paramHelper == null)
 			throw new NullPointerException("paramHelper should not be null");
 	}
@@ -133,17 +137,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// prepare keys
 		prepareKeys();
 
-		// if there is no active participant (e.g. read-only transaction),
-		// choose the one with most readings as the only active participant.
-		if (activeParticipants.isEmpty())
-			activeParticipants.add(mostReadsNode);
-
-		// Decide the role
-		if (activeParticipants.contains(localNodeId))
-			isActiveParticipant = true;
-		else if (!localReadKeys.isEmpty())
-			isPassiveParticipant = true;
-
 		if (isInMigrating) {
 
 			// The one executing the tx needs to take care the data in the
@@ -152,6 +145,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				localReadKeys.addAll(readKeysInMigration);
 				localWriteKeys.addAll(writeKeysInMigration);
 			}
+
+			// not execute at source
 			if (!isExecutingInSrc) {
 				if (isSourceNode)
 					remoteReadKeys.addAll(readKeysInMigration);
@@ -193,17 +188,82 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			}
 		}
 
+		// if there is no active participant (e.g. read-only transaction),
+		// choose the one with most readings as the only active participant.
+		if (activeParticipants.isEmpty())
+			activeParticipants.add(mostReadsNode);
+
+		// Decide the role
+		if (activeParticipants.contains(localNodeId))
+			isActiveParticipant = true;
+		else if (!localReadKeys.isEmpty())
+			isPassiveParticipant = true;
+
 		// for the cache layer
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		if (isParticipated()) {
-			// create a cache manager
-			if (remoteReadKeys.isEmpty())
-				cacheMgr = postOffice.createCacheMgr(tx, false);
-			else
-				cacheMgr = postOffice.createCacheMgr(tx, true);
-		} else {
-			postOffice.skipTransaction(txNum);
+		cacheMgr = postOffice.createCacheMgr(tx, true);
+		/*
+		 * if (isParticipated()) { cacheMgr = postOffice.createCacheMgr(tx,
+		 * true); // create a cache manager /* if (remoteReadKeys.isEmpty()&&
+		 * !(paramHelper instanceof AsyncMigrateParamHelper)) cacheMgr =
+		 * postOffice.createCacheMgr(tx, false ); else cacheMgr =
+		 * postOffice.createCacheMgr(tx, true);
+		 */
+		/*
+		 * } else { postOffice.skipTransaction(txNum);
+		 */
+
+		if (this.isSourceNode) {
+			String str = "******\nisInMigrating : " + isInMigrating;
+			str = str + "\n Txnum : " + txNum;
+			str = str + "\n isExecutingInSrc : " + isExecutingInSrc;
+			Class<?> enclosingClass = getClass().getEnclosingClass();
+			if (enclosingClass != null) {
+				str = str + "\n Classname : " + enclosingClass.getName();
+
+			} else {
+				str = str + "\n Classname : " + getClass().getName();
+
+			}
+			str = str + "\n readKeysInMigration : ";
+			for (Integer k : recordKeyToSortArray(readKeysInMigration))
+				str = str + " , " + k;
+			str = str + "\n writeKeysInMigration : ";
+			for (Integer k : recordKeyToSortArray(writeKeysInMigration))
+				str = str + " , " + k;
+			str = str + "\n Local Read : ";
+			for (Integer k : recordKeyToSortArray(localReadKeys))
+				str = str + " , " + k;
+			str = str + "\n Local Write : ";
+			for (Integer k : recordKeyToSortArray(localWriteKeys))
+				str = str + " , " + k;
+			str = str + "\n Remote Read : ";
+			for (Integer k : recordKeyToSortArray(remoteReadKeys))
+				str = str + " , " + k;
+			str = str + "\n activeParticipants : " + activeParticipants;
+			str = str + "\n activePulling : " + activePulling;
+			str = str + "\n pullKeys : " + pullKeys.size();
+			str = str + "\n ******";
+
+			System.out.println(str);
+
 		}
+		if (!this.isSourceNode) {
+			String str = "********" + System.currentTimeMillis() + "\n Txnum : " + txNum;
+			str = str + "\n Local Read : ";
+			for (Integer k : recordKeyToSortArray(localReadKeys))
+				str = str + " , " + k;
+			str = str + "\n Local Write : ";
+			for (Integer k : recordKeyToSortArray(localWriteKeys))
+				str = str + " , " + k;
+			str = str + "\n Remote Read : ";
+			for (Integer k : recordKeyToSortArray(remoteReadKeys))
+				str = str + " , " + k;
+			str = str + "\n activeParticipants : " + activeParticipants;
+			str = str + "\n********";
+			System.out.println(str);
+		}
+
 	}
 
 	public void bookConservativeLocks() {
@@ -240,11 +300,16 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			afterCommit();
 
 		} catch (Exception e) {
+			System.out.println("Abort cause Exception!");
+
 			e.printStackTrace();
 			tx.rollback();
+
 			paramHelper.setCommitted(false);
 		} finally {
 			// Clean the cache
+			if (this.isDestNode)
+				System.out.println(System.currentTimeMillis() + " Tx : " + this.txNum + " Commited");
 			cacheMgr.notifyTxCommitted();
 		}
 
@@ -269,8 +334,40 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 * this method follows the steps described by Calvin paper.
 	 */
 	protected void executeTransactionLogic() {
+
+		// The destination may not involve
+		if (isInMigrating && isExecutingInSrc && isDestNode){
+			System.out.println("Destna");
+			return;
+		}
+
 		// Read the local records
-		Map<RecordKey, CachedRecord> readings = performLocalRead();
+		Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
+
+		// For pulling
+		if (activePulling) {
+			if (isSourceNode)
+				pushMigrationData();
+			else if (isDestNode)
+				pullMigrationData(readings);
+		}
+
+		// Read the local records
+		performLocalRead(readings);
+
+		/*
+		 * String str = "******\nisInMigrating : " + isInMigrating; str = str +
+		 * "\n NodeID : " + localNodeId; str = str + "\n SourceID : "
+		 * +migraMgr.getSourcePartition(); str = str + "\n ClientID : "
+		 * +migraMgr.getDestPartition(); str = str + "\n isExecutingInSrc : " +
+		 * isExecutingInSrc; str = str + "\n isSourceNode : " + isSourceNode;
+		 * str = str + "\n isDestNode : " + isDestNode; str = str +
+		 * "\n activePulling : " + activePulling; str = str + "\n pullKeys : " +
+		 * pullKeys.size(); str = str +"\n ******";
+		 * 
+		 * 
+		 * System.out.println(str);
+		 */
 
 		// Push local records to the needed remote nodes
 		pushReadingsToRemotes(readings);
@@ -282,24 +379,48 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Read the remote records
 		collectRemoteReadings(readings);
 
+		if (!this.isSourceNode) {
+			String str = "********\n Txnum : " + txNum;
+			str = str + "\n Final Readings : ";
+			for (Integer k : recordKeyToSortArray(readings.keySet()))
+				str = str + " , " + k;
+			str = str + "\n********";
+			System.out.println(str);
+		}
+
 		// Write the local records
 		executeSql(readings);
 	}
 
 	protected void addReadKey(RecordKey readKey) {
+
 		// Check if it is a fully replicated key
 		if (Elasql.partitionMetaMgr().isFullyReplicated(readKey)) {
 			fullyRepKeys.add(readKey);
 			return;
 		}
-
-		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
-		if (nodeId == localNodeId)
-			localReadKeys.add(readKey);
-		else
-			remoteReadKeys.add(readKey);
+		// Check which node has the corresponding record
+		// Normal
+		if (!isInMigrating || !migraMgr.keyIsInMigrationRange(readKey)) {
 
+			if (nodeId == localNodeId)
+				localReadKeys.add(readKey);
+			else
+				remoteReadKeys.add(readKey);
+		} else { // Migrating
+
+			// Check the migration status
+			if (!migraMgr.isRecordMigrated(readKey)) {
+				pullKeys.add(readKey);
+			} else
+				isExecutingInSrc = false;
+
+			readKeysInMigration.add(readKey);
+			// Other nodes
+			if (!isSourceNode && !isDestNode)
+				remoteReadKeys.add(readKey);
+		}
 		// Record who is the node with most readings
 		readsPerNodes[nodeId]++;
 		if (readsPerNodes[nodeId] > readsPerNodes[mostReadsNode])
@@ -309,17 +430,38 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected void addWriteKey(RecordKey writeKey) {
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(writeKey);
-		if (nodeId == localNodeId)
-			localWriteKeys.add(writeKey);
-		activeParticipants.add(nodeId);
+		// Normal
+		if (!isInMigrating || !migraMgr.keyIsInMigrationRange(writeKey)) {
+			if (nodeId == localNodeId)
+				localWriteKeys.add(writeKey);
+			activeParticipants.add(nodeId);
+		} else { // Migrating
+			// Check the migration status
+			if (!migraMgr.isRecordMigrated(writeKey)) {
+				pullKeys.add(writeKey);
+			} else {
+				isExecutingInSrc = false;
+			}
+
+			writeKeysInMigration.add(writeKey);
+		}
 	}
 
 	protected void addInsertKey(RecordKey insertKey) {
 		// Check which node has the corresponding record
 		int nodeId = Elasql.partitionMetaMgr().getPartition(insertKey);
-		if (nodeId == localNodeId)
-			localInsertKeys.add(insertKey);
-		activeParticipants.add(nodeId);
+
+		if ((isAnalyzing || isInMigrating) && migraMgr.keyIsInMigrationRange(insertKey)) {
+			keysForBGPush.add(insertKey);
+		}
+		// Normal
+		if (!isInMigrating || !migraMgr.keyIsInMigrationRange(insertKey)) {
+			if (nodeId == localNodeId)
+				localInsertKeys.add(insertKey);
+			activeParticipants.add(nodeId);
+		} else {// Migrating
+			writeKeysInMigration.add(insertKey);
+		}
 	}
 
 	protected void update(RecordKey key, CachedRecord rec) {
@@ -339,7 +481,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	}
 
 	protected void afterCommit() {
-		// do nothing
+
 	}
 
 	protected void waitForPullRequest() {
@@ -357,13 +499,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		CachedRecord rec = new CachedRecord(fldVals);
 		rec.setSrcTxNum(txNum);
 
-		TupleSet ts = new TupleSet(-1);
+		TupleSet ts = new TupleSet(-4);
 		ts.addTuple(PULL_REQUEST_KEY, txNum, txNum, rec);
 		Elasql.connectionMgr().pushTupleSet(nodeId, ts);
 	}
 
-	private Map<RecordKey, CachedRecord> performLocalRead() {
-		Map<RecordKey, CachedRecord> localReadings = new HashMap<RecordKey, CachedRecord>();
+	private void performLocalRead(Map<RecordKey, CachedRecord> localReadings) {
 
 		// Read local records (for both active or passive participants)
 		for (RecordKey k : localReadKeys) {
@@ -379,16 +520,16 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			}
 		}
 
-		return localReadings;
 	}
 
 	private void pushReadingsToRemotes(Map<RecordKey, CachedRecord> readings) {
 		// If there is only one active participant, and you are that one,
 		// return immediately.
+
 		if (activeParticipants.size() < 2 && isActiveParticipant)
 			return;
 
-		TupleSet ts = new TupleSet(-1);
+		TupleSet ts = new TupleSet(-3);
 		if (!readings.isEmpty()) {
 			// Construct pushing tuple set
 			for (Entry<RecordKey, CachedRecord> e : readings.entrySet()) {
@@ -410,4 +551,49 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			readingCache.put(k, rec);
 		}
 	}
+
+	// Only for the source node
+	private void pushMigrationData() {
+
+		System.out.println("Push data at Source");
+		// Wait for pull request
+		waitForPullRequest();
+
+		// Perform reading for pulling data
+		TupleSet ts = new TupleSet(-1);
+		for (RecordKey k : pullKeys) {
+			CachedRecord rec = cacheMgr.readFromLocal(k);
+			if (rec == null)
+				throw new RuntimeException(
+						"Tx. " + txNum + " cannot find the record for " + k + " in the local storage.");
+			ts.addTuple(k, txNum, txNum, rec);
+		}
+
+		// Push migration data set
+		Elasql.connectionMgr().pushTupleSet(migraMgr.getDestPartition(), ts);
+	}
+
+	// Only for the destination node
+	private void pullMigrationData(Map<RecordKey, CachedRecord> readings) {
+		System.out.println("Pull data at Destination");
+		// Send pull request
+		sendAPullRequest(migraMgr.getSourcePartition());
+
+		// Receiving migration data set
+		for (RecordKey k : pullKeys) {
+			CachedRecord rec = cacheMgr.readFromRemote(k);
+			// destination should do insert rather than write
+			cacheMgr.setInsert(k);
+			readings.put(k, rec);
+		}
+	}
+
+	private ArrayList<Integer> recordKeyToSortArray(Set<RecordKey> s) {
+		ArrayList<Integer> l = new ArrayList<Integer>();
+		for (RecordKey k : s)
+			l.add((int) k.getKeyVal("i_id").asJavaVal());
+		Collections.sort(l);
+		return l;
+	}
+
 }

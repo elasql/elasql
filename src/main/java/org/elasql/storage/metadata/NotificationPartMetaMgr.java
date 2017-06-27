@@ -58,8 +58,10 @@ public class NotificationPartMetaMgr extends PartitionMetaMgr {
 
 	@Override
 	public int getLocation(RecordKey key) {
-		// TODO Auto-generated method stub
-		return 0;
+		if (key.getTableName().equals(TABLE_NAME))
+			return -1; // Not belongs to anyone, preventing for inserting to local
+		
+		return underliedPartMetaMgr.getPartition(key);
 	}
 
 }

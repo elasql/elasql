@@ -32,6 +32,11 @@ public class MigrationAnalysisProc extends CalvinStoredProcedure<StoredProcedure
 	}
 	
 	@Override
+	public boolean willResponseToClients(){
+		return false;
+	}
+	
+	@Override
 	protected void executeTransactionLogic() {
 		
 		// Only Migration SourceNode perform Analysis process

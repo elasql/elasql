@@ -47,7 +47,7 @@ public class CalvinCacheMgr {
 	private Map<RecordKey, CachedRecord> cachedRecords;
 	
 	// For multi-threading
-	private BlockingQueue<KeyRecordPair> inbox;
+	public BlockingQueue<KeyRecordPair> inbox;
 
 	CalvinCacheMgr(CalvinPostOffice postOffice, Transaction tx) {
 		this.tx = tx;
@@ -69,10 +69,11 @@ public class CalvinCacheMgr {
 	 */
 	public void notifyTxCommitted() {
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		inbox = null;
+		// inbox is null
 		
 		// Notify the post office the transaction has committed
 		postOffice.notifyTxCommitted(tx.getTransactionNumber());
+		inbox = null;
 	}
 	
 	public CachedRecord readFromLocal(RecordKey key) {
@@ -147,6 +148,15 @@ public class CalvinCacheMgr {
 	}
 	
 	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
+		if(inbox==null)
+			System.out.println("receiveRemoteRecord : Inbox is null");
+		if(rec==null)
+			System.out.println("receiveRemoteRecord : Rec is null");
+		if(rec==null)
+			System.out.println("receiveRemoteRecord : key is null");
 		inbox.add(new KeyRecordPair(key, rec));
+	}
+	public void setInsert(RecordKey key){
+		cachedRecords.get(key).setNewInserted(true);
 	}
 }

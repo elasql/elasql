@@ -60,14 +60,6 @@ public class RecordKey implements Serializable {
 		genHashCode();
 	}
 	
-	public int getPartition(){
-		// Lazy evaluation
-		if (partition == -1)
-			partition = Elasql.partitionMetaMgr().getPartition(this);
-		
-		return partition;
-	}
-	
 	private void genHashCode(){
 		int x = tableName.hashCode();
 		int y = keyEntryMap.hashCode();

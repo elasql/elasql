@@ -87,12 +87,12 @@ public abstract class MigrationManager {
 	// That is, NUM_PARTITIONS is read before the properties loaded.
 
 	public int getSourcePartition() {
-		return 1;
+		return 0;
 		// return NUM_PARTITIONS - 2;
 	}
 
 	public int getDestPartition() {
-		return 2;
+		return 1;
 		// return NUM_PARTITIONS - 1;
 	}
 
@@ -182,7 +182,7 @@ public abstract class MigrationManager {
 			logger.info("Migration starts at " + (System.currentTimeMillis() - startTime) / 1000);
 		
 		// Start background pushes immediately
-		startBackgroundPush();
+		//startBackgroundPush();
 	}
 
 	public void stopMigration() {
@@ -403,6 +403,7 @@ public abstract class MigrationManager {
 				@Override
 				public void run() {
 					TupleSet ts = new TupleSet(MigrationManager.SINK_ID_ASYNC_PUSHING);
+					
 					Elasql.connectionMgr().pushTupleSet(Elasql.migrationMgr().getSourcePartition(), ts);
 	
 					if (logger.isLoggable(Level.INFO))

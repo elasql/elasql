@@ -124,7 +124,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		CachedRecord notVal = NotificationPartMetaMgr.createRecord(Elasql.serverId(), MASTER_NODE,
 				txNum, fldVals);
 
-		TupleSet ts = new TupleSet(-1);
+		TupleSet ts = new TupleSet(-5);
 		// Use node id as source tx number
 		ts.addTuple(notKey, txNum, txNum, notVal);
 		Elasql.connectionMgr().pushTupleSet(0, ts);

@@ -20,6 +20,11 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 		// Do nothing
 
 	}
+	
+	@Override
+	public boolean willResponseToClients(){
+		return false;
+	}
 
 	@Override
 	protected void executeSql(Map<RecordKey, CachedRecord> readings) {

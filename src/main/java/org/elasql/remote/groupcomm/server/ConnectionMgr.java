@@ -39,7 +39,7 @@ import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class ConnectionMgr
-		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener {
+		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener{
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
 
 	public static final int SEQ_NODE_ID = PartitionMetaMgr.NUM_PARTITIONS;
@@ -85,14 +85,14 @@ public class ConnectionMgr
 
 				}
 			});
-		}else{
-			//Add Start Analysis to TOM
+		} else {
+			// Add Start Analysis to TOM
 			VanillaDb.taskMgr().runTask(new Task() {
 
 				@Override
 				public void run() {
 					try {
-						Thread.sleep(60*1000);
+						Thread.sleep( 30 * 1000);
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -101,8 +101,7 @@ public class ConnectionMgr
 
 				}
 			});
-			
-			
+
 		}
 	}
 
@@ -112,9 +111,9 @@ public class ConnectionMgr
 				ChannelType.CLIENT);
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
-	
-	public void sendBroadcastRequest(Object[] objs) {
-		serverAppl.sendBroadcastRequest(objs);
+
+	public void sendBroadcastRequest(Object[] objs, boolean isAppiaTh) {
+		serverAppl.sendBroadcastRequest(objs, isAppiaTh);
 	}
 
 	public void callStoredProc(int pid, Object... pars) {
@@ -135,11 +134,11 @@ public class ConnectionMgr
 			TupleSet ts = (TupleSet) msg;
 
 			switch (ts.sinkId()) {
-			case MigrationManager.SINK_ID_START_MIGRATION:
-				Elasql.migrationMgr().onReceiveStartMigrationReq(ts.getMetadata());
-				break;
 			case MigrationManager.SINK_ID_ANALYSIS:
 				Elasql.migrationMgr().onReceiveAnalysisReq(ts.getMetadata());
+				break;
+			case MigrationManager.SINK_ID_START_MIGRATION:
+				Elasql.migrationMgr().onReceiveStartMigrationReq(ts.getMetadata());
 				break;
 			case MigrationManager.SINK_ID_ASYNC_PUSHING:
 				Elasql.migrationMgr().onReceiveAsyncMigrateReq(ts.getMetadata());
@@ -150,11 +149,14 @@ public class ConnectionMgr
 			}
 			if (sequencerMode)
 				return;
-			for (Tuple t : ts.getTupleSet()){
-				System.out.println(t + "rec : " + t.rec);
-				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
-				
+			for (Tuple t : ts.getTupleSet()) {
+				if(t.rec == null){
+					System.out.println("Receiver : "+p2pmsg.getReceiver()+" SinkID :"+ts.sinkId() + " Size :"+ts.getTupleSet().size());
+					System.out.println(t);
 				}
+				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
+
+			}
 		} else
 			throw new IllegalArgumentException();
 	}
@@ -174,5 +176,10 @@ public class ConnectionMgr
 	@Override
 	public void onNodeFail(int id, ChannelType ct) {
 		// do nothing
+	}
+	
+	@Override
+	public String mkClientResponse(Object o){
+		return ((ClientResponse) o).toString();
 	}
 }

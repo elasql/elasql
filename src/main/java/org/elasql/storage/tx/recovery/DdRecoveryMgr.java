@@ -65,7 +65,7 @@ public class DdRecoveryMgr extends RecoveryMgr {
 
 	public static void logRequest(StoredProcedureCall spc) {
 		// TODO Commented for experiment
-		spcLogQueue.add(spc);
+		//spcLogQueue.add(spc);
 	}
 
 	public DdRecoveryMgr(long txNum) {

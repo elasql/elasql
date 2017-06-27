@@ -66,4 +66,8 @@ public class ClientResponse implements Serializable {
 	public void setRteId(int rteId) {
 		this.rteId = rteId;
 	}
+
+	public String toString() {
+		return "Client Response Send From Client " + this.clientId + "rte :" + this.rteId + " TX : " + this.txNum;
+	}
 }
