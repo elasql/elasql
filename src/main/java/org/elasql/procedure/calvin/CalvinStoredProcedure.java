@@ -93,6 +93,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private boolean isInMigrating = false, isAnalyzing = false;
 	private boolean activePulling = false;
 
+	private boolean isMigrationTx = false;
+
+	private boolean islog = true;
+
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
@@ -189,9 +193,15 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 
 		// if there is no active participant (e.g. read-only transaction),
-		// choose the one with most readings as the only active participant.
+		// choose the one with most readings as the only active participant
+		
 		if (activeParticipants.isEmpty())
 			activeParticipants.add(mostReadsNode);
+
+		// Check is there is key in migration range to decide whether
+		// participate in migration
+
+		isMigrationTx = !pullKeys.isEmpty();
 
 		// Decide the role
 		if (activeParticipants.contains(localNodeId))
@@ -213,7 +223,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		 * } else { postOffice.skipTransaction(txNum);
 		 */
 
-		if (this.isSourceNode) {
+		if (this.isSourceNode && islog) {
 			String str = "******\nisInMigrating : " + isInMigrating;
 			str = str + "\n Txnum : " + txNum;
 			str = str + "\n isExecutingInSrc : " + isExecutingInSrc;
@@ -241,6 +251,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			for (Integer k : recordKeyToSortArray(remoteReadKeys))
 				str = str + " , " + k;
 			str = str + "\n activeParticipants : " + activeParticipants;
+			str = str + "\n ReadNodes : " ;
+			for (int k : readsPerNodes)
+				str = str + " , " + k;
 			str = str + "\n activePulling : " + activePulling;
 			str = str + "\n pullKeys : " + pullKeys.size();
 			str = str + "\n ******";
@@ -248,7 +261,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			System.out.println(str);
 
 		}
-		if (!this.isSourceNode) {
+		if (!this.isSourceNode && islog) {
 			String str = "********" + System.currentTimeMillis() + "\n Txnum : " + txNum;
 			str = str + "\n Local Read : ";
 			for (Integer k : recordKeyToSortArray(localReadKeys))
@@ -308,7 +321,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			paramHelper.setCommitted(false);
 		} finally {
 			// Clean the cache
-			if (this.isDestNode)
+			if (this.isDestNode &&islog)
 				System.out.println(System.currentTimeMillis() + " Tx : " + this.txNum + " Commited");
 			cacheMgr.notifyTxCommitted();
 		}
@@ -335,12 +348,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 */
 	protected void executeTransactionLogic() {
 
-		// The destination may not involve
-		if (isInMigrating && isExecutingInSrc && isDestNode){
-			System.out.println("Destna");
-			return;
-		}
-
 		// Read the local records
 		Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
 
@@ -351,6 +358,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			else if (isDestNode)
 				pullMigrationData(readings);
 		}
+
+		if (isInMigrating && !isExecutingInSrc && isSourceNode)
+			return;
 
 		// Read the local records
 		performLocalRead(readings);
@@ -379,7 +389,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Read the remote records
 		collectRemoteReadings(readings);
 
-		if (!this.isSourceNode) {
+		if (!this.isSourceNode&&islog) {
 			String str = "********\n Txnum : " + txNum;
 			str = str + "\n Final Readings : ";
 			for (Integer k : recordKeyToSortArray(readings.keySet()))
