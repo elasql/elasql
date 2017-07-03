@@ -26,7 +26,6 @@ import java.util.Set;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
@@ -114,7 +113,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private boolean someKeyMigrated = false;
 
 	private boolean islog = true;
-	private Map<RecordKey, CachedRecord>  readings;
+	private Map<RecordKey, CachedRecord> readings;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
@@ -151,11 +150,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
-
-		// create a transaction
-		boolean isReadOnly = paramHelper.isReadOnly();
-		tx = Elasql.txMgr().newTransaction(Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
-		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 
 		// prepare keys
 		prepareKeys();
@@ -196,10 +190,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				localReadKeys.addAll(readKeysInMigration);
 				// Add migrated Write to local write (Source will/already
 				// migrate to it)
-				localWriteKeys.addAll(writeKeysInMigration);
+				localWriteKeys.addAll(pullKeys);
 				// Remove migrated ReadKeys from Remote (Source will/already
 				// migrate to it)
 				remoteReadKeys.removeAll(readKeysInMigration);
+				// Dest should have the pullKeys Write lock to prevent other early access
+				//localWriteKeys.addAll(pullKeys);
 			}
 
 			// ActiveParticipants would be Dest and Src(if have write on it)
@@ -238,10 +234,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			}
 
 			// Only Dest can respond client
-			
-			
-			// Take care for AsyncPush 
-			if(isAsyncMigrateProc)
+
+			// Take care for AsyncPush
+			if (isAsyncMigrateProc)
 				activeParticipants.add(migraMgr.getSourcePartition());
 			// Old code for insert
 			//
@@ -267,9 +262,20 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		else if (!localReadKeys.isEmpty())
 			isPassiveParticipant = true;
 
+		// create a transaction
+
+		boolean isReadOnly = paramHelper.isReadOnly();
+
+		if (isMigrationTx)
+			isReadOnly = false;
+
+		tx = Elasql.txMgr().newTransaction(Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
+		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
+
 		// for the cache layer
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		cacheMgr = postOffice.createCacheMgr(tx, true);
+
 		/*
 		 * if (isParticipated()) { cacheMgr = postOffice.createCacheMgr(tx,
 		 * true); // create a cache manager /* if (remoteReadKeys.isEmpty()&&
@@ -309,6 +315,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			for (Integer k : recordKeyToSortArray(remoteReadKeys))
 				str = str + " , " + k;
 			str = str + "\n activeParticipants : " + activeParticipants;
+			str = str + "\n isParticipated : " + isParticipated();
 			str = str + "\n ReadNodes : ";
 			for (int k : readsPerNodes)
 				str = str + " , " + k;
@@ -317,7 +324,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				str = str + " , " + k;
 			str = str + "\n activePulling : " + activePulling;
 			str = str + "\n ******";
-
 			System.out.println(str);
 
 		}
@@ -355,7 +361,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		try {
 			// Get conservative locks it has asked before
 			getConservativeLocks();
-
+			System.out.println("Tx : "+txNum+" End of get lock!");
 			// Execute transaction
 			executeTransactionLogic();
 
@@ -368,6 +374,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 			// Something might be done after committing
 			afterCommit();
+			
+			
 
 		} catch (Exception e) {
 			StringWriter errors = new StringWriter();
@@ -378,15 +386,15 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				str = str + " , " + k;
 			str = str + "\n Error check : \n";
 			for (Entry<RecordKey, CachedRecord> pair : readings.entrySet()) {
-			    if(pair.getValue() == null)
-			    	str = str +"key" + pair.getKey() + "is null!\n";
-			    else if(pair.getValue().getVal("i_name")==null)
-			    	str = str +"key" + pair.getKey() + "no map!\n";
-			    	
-			}
-			System.out.println(str+errors.toString());
+				if (pair.getValue() == null)
+					str = str + "key" + pair.getKey() + "is null!\n";
+				else if (pair.getValue().getVal("i_name") == null)
+					str = str + "key" + pair.getKey() + "no map!\n";
 
-			//e.printStackTrace();
+			}
+			System.out.println(str + errors.toString());
+
+			// e.printStackTrace();
 			tx.rollback();
 
 			paramHelper.setCommitted(false);
@@ -443,7 +451,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected void executeTransactionLogic() {
 
 		// Read the local records
-		//Map<RecordKey, CachedRecord> 
+		// Map<RecordKey, CachedRecord>
 		readings = new HashMap<RecordKey, CachedRecord>();
 
 		// For pulling
@@ -454,6 +462,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				pullMigrationData(readings);
 		}
 
+		
+		
 		// if (isInMigrating && !isExecutingInSrc && isSourceNode)
 		// return;
 
@@ -470,15 +480,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Read the remote records
 		collectRemoteReadings(readings);
 		/*
-		if (!this.isSourceNode && islog) {
-			String str = "********\n Txnum : " + txNum;
-			str = str + "\n Final Readings : ";
-			for (Integer k : recordKeyToSortArray(readings.keySet()))
-				str = str + " , " + k;
-			str = str + "\n********";
-			System.out.println(str);
-		}
-*/
+		 * if (!this.isSourceNode && islog) { String str = "********\n Txnum : "
+		 * + txNum; str = str + "\n Final Readings : "; for (Integer k :
+		 * recordKeyToSortArray(readings.keySet())) str = str + " , " + k; str =
+		 * str + "\n********"; System.out.println(str); }
+		 */
 		// Write the local records
 		executeSql(readings);
 	}
@@ -570,7 +576,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				SourceWriteKeys.add(writeKey);
 
 			if (migraMgr.keyIsInMigrationRange(writeKey)) {
-				// Record Read keys in migration range
+				// Record Write keys in migration range
 				writeKeysInMigration.add(writeKey);
 				// Check if record have migraed
 				if (!migraMgr.isRecordMigrated(writeKey))
@@ -689,7 +695,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	// Only for the source node
 	private void pushMigrationData() {
 
-		System.out.println("Push data at Source");
+		//System.out.println("Push data at Source");
 		// Wait for pull request
 		waitForPullRequest();
 
@@ -709,7 +715,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	// Only for the destination node
 	private void pullMigrationData(Map<RecordKey, CachedRecord> readings) {
-		System.out.println("Pull data at Destination");
+		//System.out.println("Pull data at Destination");
 		// Send pull request
 		sendAPullRequest(migraMgr.getSourcePartition());
 
