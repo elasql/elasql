@@ -35,13 +35,15 @@ public abstract class MigrationManager {
 	private AtomicBoolean isMigrating = new AtomicBoolean(false);
 	private AtomicBoolean isMigrated = new AtomicBoolean(false);
 
-	// For recording the migrated status in the other node and the destination node
+	// For recording the migrated status in the other node and the destination
+	// node
 	private Set<RecordKey> migratedKeys = new HashSet<RecordKey>(1000000);
-	// These two sets are created for the source node identifying the migrated records
+	// These two sets are created for the source node identifying the migrated
+	// records
 	// and the parameters of background pushes.
 	private Map<RecordKey, Boolean> newInsertedData = new HashMap<RecordKey, Boolean>(1000000);
 	private Map<RecordKey, Boolean> analyzedData;
-	
+
 	private AtomicBoolean analysisStarted = new AtomicBoolean(false);
 	private AtomicBoolean analysisCompleted = new AtomicBoolean(false);
 
@@ -53,19 +55,23 @@ public abstract class MigrationManager {
 	private boolean roundrobin = true;
 	private boolean useCount = true;
 	private boolean backPushStarted = false;
-	
 	private boolean isSourceNode;
-	
+	private boolean isMoniterNode;
+
+	private int SourceNode, DestNode;
+
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
 
 	public MigrationManager(long printStatusPeriod) {
+		this.SourceNode = 0;
+		this.DestNode = 1;
 		this.printStatusPeriod = printStatusPeriod;
 		isSourceNode = (Elasql.serverId() == getSourcePartition());
 	}
 
 	public abstract boolean keyIsInMigrationRange(RecordKey key);
-	
+
 	public abstract void onReceiveStartMigrationReq(Object[] metadata);
 
 	public abstract void onReceiveAnalysisReq(Object[] metadata);
@@ -75,7 +81,7 @@ public abstract class MigrationManager {
 	public abstract void onReceiveStopMigrateReq(Object[] metadata);
 
 	public abstract void prepareAnalysis();
-	
+
 	public abstract int recordSize(String tableName);
 
 	public abstract Map<RecordKey, Boolean> generateDataSetForMigration();
@@ -87,13 +93,17 @@ public abstract class MigrationManager {
 	// That is, NUM_PARTITIONS is read before the properties loaded.
 
 	public int getSourcePartition() {
-		return 0;
+		return SourceNode;
 		// return NUM_PARTITIONS - 2;
 	}
 
 	public int getDestPartition() {
-		return 1;
+		return DestNode;
 		// return NUM_PARTITIONS - 1;
+	}
+
+	public int getMonitorNode() {
+		return 2;
 	}
 
 	// Executed on the source node
@@ -101,7 +111,7 @@ public abstract class MigrationManager {
 		// Only the source node can call this method
 		if (!isSourceNode)
 			throw new RuntimeException("Something wrong");
-		
+
 		// Set all keys in the data set as pushing candidates
 		// asyncPushingCandidates = new HashSet<RecordKey>(newDataSet.keySet());
 
@@ -134,18 +144,18 @@ public abstract class MigrationManager {
 			migratedKeys.addAll(keys);
 		}
 	}
-	
+
 	// NOTE: This can only be called by the scheduler
 	public boolean isRecordMigrated(RecordKey key) {
 		if (isSourceNode) {
 			Boolean status = newInsertedData.get(key);
 			if (status != null)
 				return status;
-			
+
 			status = analyzedData.get(key);
 			if (status != null)
 				return status;
-			
+
 			// If there is no candidate in the map, it means that the record
 			// must not be inserted before the migration starts. Therefore,
 			// the record must have been foreground pushed.
@@ -153,22 +163,22 @@ public abstract class MigrationManager {
 		} else
 			return migratedKeys.contains(key);
 	}
-	
-	// NOTE: only for the normal transactions on the source node 
+
+	// NOTE: only for the normal transactions on the source node
 	public void addNewInsertKey(RecordKey key) {
 		newInsertedData.put(key, Boolean.FALSE);
 		addBgPushKey(key);
 	}
-	
+
 	// Note that there may be duplicate keys
 	private synchronized void addBgPushKey(RecordKey key) {
 		Set<RecordKey> set = bgPushCandidates.get(key.getTableName());
 		if (set == null)
 			set = new HashSet<RecordKey>();
-			bgPushCandidates.put(key.getTableName(), set);
+		bgPushCandidates.put(key.getTableName(), set);
 		set.add(key);
 	}
-	
+
 	public void startAnalysis() {
 		analysisStarted.set(true);
 		analysisCompleted.set(false);
@@ -180,7 +190,7 @@ public abstract class MigrationManager {
 		isMigrated.set(false);
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Migration starts at " + (System.currentTimeMillis() - startTime) / 1000);
-		
+
 		// Start background pushes immediately
 		startBackgroundPush();
 	}
@@ -197,7 +207,7 @@ public abstract class MigrationManager {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Migration completes at " + (System.currentTimeMillis() - startTime) / 1000);
 	}
-	
+
 	public boolean isAnalyzing() {
 		return analysisStarted.get() && !analysisCompleted.get();
 	}
@@ -215,7 +225,7 @@ public abstract class MigrationManager {
 		Set<RecordKey> pushingKeys = new HashSet<RecordKey>();
 		Set<String> emptyTables = new HashSet<String>();
 		int pushing_bytes = 0;
-		
+
 		// YS version
 		// for (RecordKey key : asyncPushingCandidates) {
 		// seenSet.add(key);
@@ -233,7 +243,7 @@ public abstract class MigrationManager {
 		// if (logger.isLoggable(Level.INFO))
 		// logger.info("The rest size of candidates: " +
 		// asyncPushingCandidates.size());
-		
+
 		// Remove the records that have been sent during fore-ground pushing
 		RecordKey sentKey = null;
 		while ((sentKey = skipRequestQueue.poll()) != null) {
@@ -241,7 +251,7 @@ public abstract class MigrationManager {
 			if (keys != null)
 				keys.remove(sentKey);
 		}
- 		
+
 		if (roundrobin) {
 			if (useCount) {
 				// RR & count
@@ -337,24 +347,24 @@ public abstract class MigrationManager {
 
 						if (set.isEmpty()) {
 							emptyTables.add(tableName);
-//							if (!pushingSet.isEmpty()) {
-//								VanillaDdDb.taskMgr().runTask(new Task() {
-//
-//									@Override
-//									public void run() {
-//
-//										VanillaDdDb.initAndStartProfiler();
-//										try {
-//											Thread.sleep(10000);
-//										} catch (InterruptedException e) {
-//											// TODO Auto-generated catch block
-//											e.printStackTrace();
-//										}
-//										VanillaDdDb.stopProfilerAndReport();
-//									}
-//
-//								});
-//							}
+							// if (!pushingSet.isEmpty()) {
+							// VanillaDdDb.taskMgr().runTask(new Task() {
+							//
+							// @Override
+							// public void run() {
+							//
+							// VanillaDdDb.initAndStartProfiler();
+							// try {
+							// Thread.sleep(10000);
+							// } catch (InterruptedException e) {
+							// // TODO Auto-generated catch block
+							// e.printStackTrace();
+							// }
+							// VanillaDdDb.stopProfilerAndReport();
+							// }
+							//
+							// });
+							// }
 							break;
 						} else {
 							break;
@@ -386,16 +396,16 @@ public abstract class MigrationManager {
 		 * "The rest size of candidates: " + candidatesLeft + "\n" +
 		 * sb.toString());
 		 */
-		
+
 		return pushingKeys.toArray(new RecordKey[0]);
 	}
-	
+
 	private void startBackgroundPush() {
 		if (backPushStarted)
 			return;
-		
+
 		backPushStarted = true;
-		
+
 		// Only the source node can send the bg push request
 		if (isSourceNode) {
 			// Use another thread to start background pushing
@@ -403,52 +413,36 @@ public abstract class MigrationManager {
 				@Override
 				public void run() {
 					TupleSet ts = new TupleSet(MigrationManager.SINK_ID_ASYNC_PUSHING);
-					
+
 					Elasql.connectionMgr().pushTupleSet(Elasql.migrationMgr().getSourcePartition(), ts);
-	
+
 					if (logger.isLoggable(Level.INFO))
 						logger.info("Trigger background pushing");
 					/*
-					long tCount = (System.currentTimeMillis() - CalvinStoredProcedureTask.txStartTime) / printStatusPeriod;
-					StringBuilder sb = new StringBuilder();
-					String preStr = "";
-	
-					for (String tableName : bgPushCandidates.keySet()) {
-						Set<RecordKey> keys = bgPushCandidates.get(tableName);
-						if (keys != null) {
-							sb.append(tableName);
-							sb.append(":");
-							sb.append(keys.size());
-							sb.append(",");
-						}
-					}
-					preStr = "\nTable remain|" + sb.toString() + "\n";
-					sb = new StringBuilder();
-					for (long i = 0; i < tCount - 1; i++)
-						sb.append(preStr);
-					if (logger.isLoggable(Level.INFO))
-						logger.info(sb.toString());
-					while (true) {
-						sb = new StringBuilder();
-						for (String tableName : bgPushCandidates.keySet()) {
-							Set<RecordKey> keys = bgPushCandidates.get(tableName);
-							if (keys != null) {
-								sb.append(tableName);
-								sb.append(":");
-								sb.append(keys.size());
-								sb.append(",");
-							}
-						}
-	
-						if (logger.isLoggable(Level.INFO))
-							logger.info("\nTable remain|" + sb.toString());
-						try {
-							Thread.sleep(printStatusPeriod);
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
-					*/
+					 * long tCount = (System.currentTimeMillis() -
+					 * CalvinStoredProcedureTask.txStartTime) /
+					 * printStatusPeriod; StringBuilder sb = new
+					 * StringBuilder(); String preStr = "";
+					 * 
+					 * for (String tableName : bgPushCandidates.keySet()) {
+					 * Set<RecordKey> keys = bgPushCandidates.get(tableName); if
+					 * (keys != null) { sb.append(tableName); sb.append(":");
+					 * sb.append(keys.size()); sb.append(","); } } preStr =
+					 * "\nTable remain|" + sb.toString() + "\n"; sb = new
+					 * StringBuilder(); for (long i = 0; i < tCount - 1; i++)
+					 * sb.append(preStr); if (logger.isLoggable(Level.INFO))
+					 * logger.info(sb.toString()); while (true) { sb = new
+					 * StringBuilder(); for (String tableName :
+					 * bgPushCandidates.keySet()) { Set<RecordKey> keys =
+					 * bgPushCandidates.get(tableName); if (keys != null) {
+					 * sb.append(tableName); sb.append(":");
+					 * sb.append(keys.size()); sb.append(","); } }
+					 * 
+					 * if (logger.isLoggable(Level.INFO)) logger.info(
+					 * "\nTable remain|" + sb.toString()); try {
+					 * Thread.sleep(printStatusPeriod); } catch
+					 * (InterruptedException e) { e.printStackTrace(); } }
+					 */
 				}
 			});
 		}
