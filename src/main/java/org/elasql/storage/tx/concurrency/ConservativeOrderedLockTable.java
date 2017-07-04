@@ -26,14 +26,14 @@ import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
 public class ConservativeOrderedLockTable {
 
 	private static final int NUM_ANCHOR = 1009;
-	
+
 	enum LockType {
 		IS_LOCK, IX_LOCK, S_LOCK, SIX_LOCK, X_LOCK
 	}
 
 	private class Lockers {
 		static final long NONE = -1; // for sixLocker, xLocker and wbLocker
-		
+
 		List<Long> sLockers, ixLockers, isLockers;
 		// only one tx can hold xLock(sixLock) on single item
 		long sixLocker, xLocker;
@@ -47,16 +47,11 @@ public class ConservativeOrderedLockTable {
 			xLocker = NONE;
 			requestQueue = new LinkedList<Long>();
 		}
-		
+
 		@Override
 		public String toString() {
-			return "{S: " + sLockers +
-					", IX: " + ixLockers +
-					", IS: " + isLockers +
-					", SIX: " + sixLocker +
-					", X: " + xLocker +
-					", requests: " + requestQueue +
-					"}";
+			return "{S: " + sLockers + ", IX: " + ixLockers + ", IS: " + isLockers + ", SIX: " + sixLocker + ", X: "
+					+ xLocker + ", requests: " + requestQueue + "}";
 		}
 	}
 
@@ -105,7 +100,7 @@ public class ConservativeOrderedLockTable {
 	 */
 	void sLock(Object obj, long txNum) {
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -121,29 +116,30 @@ public class ConservativeOrderedLockTable {
 				 * object or it cannot get lock on this object, it must wait.
 				 */
 				Long head = lockers.requestQueue.peek();
-				while (!sLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
 
 					anchor.wait();
-					
+
 					// Since a transaction may delete the lockers of an object
 					// after releasing them, it should call prepareLockers()
 					// here, instead of using lockers it obtains earlier.
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
+				if (!sLockable(lockers, txNum))
+					throw new LockAbortException();
 
 				// get the s lock
 				lockers.requestQueue.poll();
 				lockers.sLockers.add(txNum);
 
-				// Wake up other waiting transactions (on this object) to let them
+				// Wake up other waiting transactions (on this object) to let
+				// them
 				// fight for the lockers on this object.
 				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}
@@ -161,9 +157,9 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void xLock(Object obj, long txNum) {
-		// See the comments in sLock(..) for the explanation of the algorithm 
+		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -173,23 +169,24 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
-				while (!xLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
+				/* && !waitingTooLong(timestamp) */) {
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
-
+				// if (!xLockable(lockers, txNum))
+				// throw new LockAbortException();
 				// get the x lock
 				lockers.requestQueue.poll();
 				lockers.xLocker = txNum;
-				
+
 				// An X lock blocks all other lockers, so it don't need to
 				// wake up anyone.
 			} catch (InterruptedException e) {
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}
@@ -207,9 +204,9 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void sixLock(Object obj, long txNum) {
-		// See the comments in sLock(..) for the explanation of the algorithm 
+		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -219,9 +216,9 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+
 				Long head = lockers.requestQueue.peek();
-				while (!sixLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while ((!sixLockable(lockers, txNum) || (head != null && head.longValue() != txNum))) {
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
@@ -230,11 +227,10 @@ public class ConservativeOrderedLockTable {
 				// get the six lock
 				lockers.requestQueue.poll();
 				lockers.sixLocker = txNum;
-				
+
 				anchor.notifyAll();
 			} catch (InterruptedException e) {
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}
@@ -251,9 +247,9 @@ public class ConservativeOrderedLockTable {
 	 *            a transaction number
 	 */
 	void isLock(Object obj, long txNum) {
-		// See the comments in sLock(..) for the explanation of the algorithm 
+		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -264,8 +260,7 @@ public class ConservativeOrderedLockTable {
 
 			try {
 				Long head = lockers.requestQueue.peek();
-				while (!isLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while (!isLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
@@ -274,11 +269,10 @@ public class ConservativeOrderedLockTable {
 				// get the is lock
 				lockers.requestQueue.poll();
 				lockers.isLockers.add(txNum);
-				
+
 				anchor.notifyAll();
 			} catch (InterruptedException e) {
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}
@@ -295,9 +289,9 @@ public class ConservativeOrderedLockTable {
 	 *            a transaction number
 	 */
 	void ixLock(Object obj, long txNum) {
-		// See the comments in sLock(..) for the explanation of the algorithm 
+		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -308,8 +302,7 @@ public class ConservativeOrderedLockTable {
 
 			try {
 				Long head = lockers.requestQueue.peek();
-				while (!ixLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while (!ixLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
@@ -318,11 +311,10 @@ public class ConservativeOrderedLockTable {
 				// get the ix lock
 				lockers.requestQueue.poll();
 				lockers.ixLockers.add(txNum);
-				
+
 				anchor.notifyAll();
 			} catch (InterruptedException e) {
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}
@@ -343,19 +335,18 @@ public class ConservativeOrderedLockTable {
 		Object anchor = getAnchor(obj);
 		synchronized (anchor) {
 			Lockers lks = lockerMap.get(obj);
-			
+
 			if (lks == null)
 				return;
-			
+
 			releaseLock(lks, txNum, lockType, anchor);
 
 			// Remove the locker, if there is no other transaction
 			// holding it
-			if (!sLocked(lks) && !xLocked(lks) && !sixLocked(lks)
-					&& !isLocked(lks) && !ixLocked(lks)
+			if (!sLocked(lks) && !xLocked(lks) && !sixLocked(lks) && !isLocked(lks) && !ixLocked(lks)
 					&& lks.requestQueue.isEmpty())
 				lockerMap.remove(obj);
-			
+
 			// There might be someone waiting for the lock
 			anchor.notifyAll();
 		}
@@ -383,8 +374,7 @@ public class ConservativeOrderedLockTable {
 		return lockers;
 	}
 
-	private void releaseLock(Lockers lks, long txNum, LockType lockType,
-			Object anchor) {
+	private void releaseLock(Lockers lks, long txNum, LockType lockType, Object anchor) {
 		switch (lockType) {
 		case X_LOCK:
 			if (lks.xLocker == txNum) {
@@ -476,8 +466,7 @@ public class ConservativeOrderedLockTable {
 	}
 
 	private boolean isTheOnlySLocker(Lockers lks, long txNum) {
-		return lks != null && lks.sLockers.size() == 1
-				&& lks.sLockers.contains(txNum);
+		return lks != null && lks.sLockers.size() == 1 && lks.sLockers.contains(txNum);
 	}
 
 	private boolean isTheOnlyIsLocker(Lockers lks, long txNum) {
@@ -505,33 +494,31 @@ public class ConservativeOrderedLockTable {
 	 */
 
 	private boolean sLockable(Lockers lks, long txNum) {
-		return (!xLocked(lks) || hasXLock(lks, txNum))
-				&& (!sixLocked(lks) || hasSixLock(lks, txNum))
+		return (!xLocked(lks) || hasXLock(lks, txNum)) && (!sixLocked(lks) || hasSixLock(lks, txNum))
 				&& (!ixLocked(lks) || isTheOnlyIxLocker(lks, txNum));
 	}
 
 	private boolean xLockable(Lockers lks, long txNum) {
-		return (!sLocked(lks) || isTheOnlySLocker(lks, txNum))
-				&& (!sixLocked(lks) || hasSixLock(lks, txNum))
+		return (!sLocked(lks) || isTheOnlySLocker(lks, txNum)) && (!sixLocked(lks) || hasSixLock(lks, txNum))
 				&& (!ixLocked(lks) || isTheOnlyIxLocker(lks, txNum))
-				&& (!isLocked(lks) || isTheOnlyIsLocker(lks, txNum))
-				&& (!xLocked(lks) || hasXLock(lks, txNum));
+				&& (!isLocked(lks) || isTheOnlyIsLocker(lks, txNum)) && (!xLocked(lks) || hasXLock(lks, txNum));
 	}
 
 	private boolean sixLockable(Lockers lks, long txNum) {
-		return (!sixLocked(lks) || hasSixLock(lks, txNum))
-				&& (!ixLocked(lks) || isTheOnlyIxLocker(lks, txNum))
-				&& (!sLocked(lks) || isTheOnlySLocker(lks, txNum))
-				&& (!xLocked(lks) || hasXLock(lks, txNum));
+		return (!sixLocked(lks) || hasSixLock(lks, txNum)) && (!ixLocked(lks) || isTheOnlyIxLocker(lks, txNum))
+				&& (!sLocked(lks) || isTheOnlySLocker(lks, txNum)) && (!xLocked(lks) || hasXLock(lks, txNum));
 	}
 
 	private boolean ixLockable(Lockers lks, long txNum) {
-		return (!sLocked(lks) || isTheOnlySLocker(lks, txNum))
-				&& (!sixLocked(lks) || hasSixLock(lks, txNum))
+		return (!sLocked(lks) || isTheOnlySLocker(lks, txNum)) && (!sixLocked(lks) || hasSixLock(lks, txNum))
 				&& (!xLocked(lks) || hasXLock(lks, txNum));
 	}
 
 	private boolean isLockable(Lockers lks, long txNum) {
 		return (!xLocked(lks) || hasXLock(lks, txNum));
+	}
+
+	private boolean waitingTooLong(long starttime) {
+		return System.currentTimeMillis() - starttime > 10000;
 	}
 }

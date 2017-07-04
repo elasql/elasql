@@ -24,7 +24,6 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 	private static Constant FALSE = new IntegerConstant(0);
 	private static Constant TRUE = new IntegerConstant(1);
-	protected boolean forceReadWriteTx = false;
 
 	public AsyncMigrateProc(long txNum) {
 		super(txNum, new AsyncMigrateParamHelper());
@@ -35,8 +34,8 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 		// Lock the pushing records
 		for (RecordKey key : paramHelper.getPushingKeys())
 			addWriteKey(key);
-		isExecutingInSrc = false;
-		forceReadWriteTx = true;
+		isAsyncMigrateProc = true;
+		
 		// isBgPush = true;
 	}
 
@@ -128,7 +127,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 		
 		// Receive the data from the source node and save them
 		for (RecordKey key : paramHelper.getPushingKeys()) {
-
+			//System.out.println("++++++++++Receieve "+key);
 			CachedRecord rec = cacheMgr.readFromRemote(key);
 
 			// Flush them to the local storage engine
@@ -136,7 +135,6 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 				rec.getFldValMap().remove("exists");
 				rec.getDirtyFldNames().remove("exists");
 				cacheMgr.insert(key, rec.getFldValMap());
-
 			}
 		}
 		cacheMgr.flush();

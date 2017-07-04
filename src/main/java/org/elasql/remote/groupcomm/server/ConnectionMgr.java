@@ -123,6 +123,8 @@ public class ConnectionMgr
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
 		P2pMessage p2pmsg = new P2pMessage(reading, nodeId, ChannelType.SERVER);
+		if(reading.sinkId()==-2)
+			p2pmsg.isAsunc = true;
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
 
@@ -147,12 +149,17 @@ public class ConnectionMgr
 				Elasql.migrationMgr().onReceiveStopMigrateReq(ts.getMetadata());
 				break;
 			}
+			if(ts.sinkId() == -2)
+				System.out.println("Receieve Async push data at ConnectMgr");
+			
 			if (sequencerMode)
 				return;
 			for (Tuple t : ts.getTupleSet()) {
 				if(t.rec == null){
-					System.out.println("Receiver : "+p2pmsg.getReceiver()+" SinkID :"+ts.sinkId() + " Size :"+ts.getTupleSet().size());
-					System.out.println(t);
+					String str = "Receiver : "+p2pmsg.getReceiver()+" SinkID :"+ts.sinkId() + " Size :"+ts.getTupleSet().size();
+					str = str+t;
+					
+					System.out.println(str);
 				}
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
 

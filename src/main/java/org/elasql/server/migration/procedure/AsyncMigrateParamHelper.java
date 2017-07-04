@@ -15,6 +15,11 @@ public class AsyncMigrateParamHelper extends StoredProcedureParamHelper {
 	@Override
 	public void prepareParameters(Object... pars) {
 		pushingKeys = (RecordKey[]) pars;
+		this.setReadOnly(false);
+	}
+	@Override
+	public boolean isReadOnly() {
+		return false;
 	}
 	
 	public RecordKey[] getPushingKeys() {

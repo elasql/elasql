@@ -182,7 +182,7 @@ public abstract class MigrationManager {
 			logger.info("Migration starts at " + (System.currentTimeMillis() - startTime) / 1000);
 		
 		// Start background pushes immediately
-		//startBackgroundPush();
+		startBackgroundPush();
 	}
 
 	public void stopMigration() {
@@ -408,7 +408,7 @@ public abstract class MigrationManager {
 	
 					if (logger.isLoggable(Level.INFO))
 						logger.info("Trigger background pushing");
-					
+					/*
 					long tCount = (System.currentTimeMillis() - CalvinStoredProcedureTask.txStartTime) / printStatusPeriod;
 					StringBuilder sb = new StringBuilder();
 					String preStr = "";
@@ -448,6 +448,7 @@ public abstract class MigrationManager {
 							e.printStackTrace();
 						}
 					}
+					*/
 				}
 			});
 		}

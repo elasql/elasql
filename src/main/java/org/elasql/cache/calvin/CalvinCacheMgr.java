@@ -31,21 +31,21 @@ import org.vanilladb.core.storage.tx.Transaction;
  * The class that deal with remote records for parent transaction.
  */
 public class CalvinCacheMgr {
-	
+
 	private static class KeyRecordPair {
 		RecordKey key;
 		CachedRecord record;
-		
+
 		KeyRecordPair(RecordKey key, CachedRecord record) {
 			this.key = key;
 			this.record = record;
 		}
 	}
-	
+
 	// For single thread
 	private Transaction tx;
 	private Map<RecordKey, CachedRecord> cachedRecords;
-	
+
 	// For multi-threading
 	public BlockingQueue<KeyRecordPair> inbox;
 
@@ -53,52 +53,54 @@ public class CalvinCacheMgr {
 		this.tx = tx;
 		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
 	}
-	
+
 	/**
-	 * Prepare for receiving the records from remote nodes. This must be called before starting
-	 * receiving those records.
+	 * Prepare for receiving the records from remote nodes. This must be called
+	 * before starting receiving those records.
 	 */
 	void createInboxForRemotes() {
 		inbox = new LinkedBlockingQueue<KeyRecordPair>();
 	}
-	
+
 	/**
-	 * Tell the post office that this transaction has done with the remote records. It will not
-	 * be able to receive remote records after calling this. This will make the post office clean
-	 * the remote cache for this transaction.
+	 * Tell the post office that this transaction has done with the remote
+	 * records. It will not be able to receive remote records after calling
+	 * this. This will make the post office clean the remote cache for this
+	 * transaction.
 	 */
 	public void notifyTxCommitted() {
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		// inbox is null
-		
+
 		// Notify the post office the transaction has committed
 		postOffice.notifyTxCommitted(tx.getTransactionNumber());
 		inbox = null;
 	}
-	
+
 	public CachedRecord readFromLocal(RecordKey key) {
 		CachedRecord rec = cachedRecords.get(key);
 		if (rec != null)
 			return rec;
-		
+
 		rec = VanillaCoreCrud.read(key, tx);
 		if (rec != null) {
 			rec.setSrcTxNum(tx.getTransactionNumber());
+			rec.setLocal(true);
 			cachedRecords.put(key, rec);
 		}
-		
+
 		return rec;
 	}
-	
+
 	public CachedRecord readFromRemote(RecordKey key) {
 		CachedRecord rec = cachedRecords.get(key);
-		if (rec != null)
+		if (rec != null )
 			return rec;
-		
+
 		if (inbox == null)
 			throw new RuntimeException("tx." + tx.getTransactionNumber() + " needs to"
 					+ " call prepareForRemotes() before receiving remote records.");
-		
+
 		try {
 			// Wait for remote records
 			KeyRecordPair pair = inbox.take();
@@ -113,6 +115,7 @@ public class CalvinCacheMgr {
 
 		return rec;
 	}
+
 
 	public void update(RecordKey key, CachedRecord rec) {
 		rec.setSrcTxNum(tx.getTransactionNumber());
@@ -132,31 +135,35 @@ public class CalvinCacheMgr {
 		dummyRec.delete();
 		cachedRecords.put(key, dummyRec);
 	}
-	
+
 	public void flush() {
 		for (Map.Entry<RecordKey, CachedRecord> entry : cachedRecords.entrySet()) {
 			RecordKey key = entry.getKey();
 			CachedRecord rec = entry.getValue();
-			
+
 			if (rec.isDeleted())
 				VanillaCoreCrud.delete(key, tx);
-			else if (rec.isNewInserted())
+			else if (rec.isNewInserted()) {
 				VanillaCoreCrud.insert(key, rec, tx);
-			else if (rec.isDirty())
+			} else if (rec.isDirty())
 				VanillaCoreCrud.update(key, rec, tx);
 		}
 	}
-	
+
 	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
-		if(inbox==null)
+		if (inbox == null)
 			System.out.println("receiveRemoteRecord : Inbox is null");
-		if(rec==null)
+		if (rec == null)
 			System.out.println("receiveRemoteRecord : Rec is null");
-		if(rec==null)
+		if (rec == null)
 			System.out.println("receiveRemoteRecord : key is null");
 		inbox.add(new KeyRecordPair(key, rec));
 	}
-	public void setInsert(RecordKey key){
-		cachedRecords.get(key).setNewInserted(true);
+
+	public void setInsert(RecordKey key, CachedRecord rec) {
+		rec.setNewInserted(true);
+		cachedRecords.put(key, rec);
+
+		// cachedRecords.get(key).setNewInserted(true);
 	}
 }

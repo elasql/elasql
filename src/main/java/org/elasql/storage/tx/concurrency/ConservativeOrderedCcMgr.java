@@ -28,10 +28,10 @@ import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
 
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	protected static ConservativeOrderedLockTable lockTbl = new ConservativeOrderedLockTable();
-	
-	// For normal operations - using conservative locking 
+
+	// For normal operations - using conservative locking
 	private Set<Object> bookedObjs, readObjs, writeObjs;
-	
+
 	// For Indexes - using crabbing locking
 	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
 	private Set<BlockId> writtenIndexBlks = new HashSet<BlockId>();
@@ -52,16 +52,16 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	public void bookReadKeys(Collection<RecordKey> keys) {
 		if (keys != null) {
 			for (RecordKey key : keys) {
-				// The key needs to be booked only once. 
+				// The key needs to be booked only once.
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);
 			}
-			
+
 			bookedObjs.addAll(keys);
 			readObjs.addAll(keys);
 		}
 	}
-	
+
 	/**
 	 * Book the write lock of the specified object.
 	 * 
@@ -71,30 +71,41 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	public void bookWriteKeys(Collection<RecordKey> keys) {
 		if (keys != null) {
 			for (RecordKey key : keys) {
-				// The key needs to be booked only once. 
+				// The key needs to be booked only once.
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);
 			}
-			
+
 			bookedObjs.addAll(keys);
 			writeObjs.addAll(keys);
 		}
 	}
-	
+
 	/**
-	 * Request (get the locks immediately) the locks which the transaction
-	 * has booked. If the locks can not be obtained in the time, it will
-	 * make the thread wait until it can obtain all locks it requests.
+	 * Request (get the locks immediately) the locks which the transaction has
+	 * booked. If the locks can not be obtained in the time, it will make the
+	 * thread wait until it can obtain all locks it requests.
 	 */
-	public void requestLocks() {
+	public void requestLocks(boolean isMigrate) {
 		bookedObjs.clear();
-		
-		for (Object obj : writeObjs)
+
+		for (Object obj : writeObjs) {
+			if (isMigrate)
+				System.out.println("Tx L: " + txNum + "xlock on " + obj);
 			lockTbl.xLock(obj, txNum);
-		
-		for (Object obj : readObjs)
+
+		}
+		if (isMigrate)
+			System.out.println("Tx L: " + txNum + "xlock Comleted");
+		for (Object obj : readObjs) {
+			if (isMigrate)
+				System.out.println("Tx L: " + txNum + "slock on " + obj);
 			if (!writeObjs.contains(obj))
 				lockTbl.sLock(obj, txNum);
+
+		}
+		if (isMigrate)
+			System.out.println("Tx L: " + txNum + "slock Comleted");
 	}
 
 	public void onTxCommit(Transaction tx) {
@@ -241,15 +252,15 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	public void readRecord(RecordId recId) {
 		// do nothing
 	}
-	
+
 	private void releaseLocks() {
 		for (Object obj : writeObjs)
 			lockTbl.release(obj, txNum, LockType.X_LOCK);
-		
+
 		for (Object obj : readObjs)
 			if (!writeObjs.contains(obj))
 				lockTbl.release(obj, txNum, LockType.S_LOCK);
-		
+
 		readObjs.clear();
 		writeObjs.clear();
 	}

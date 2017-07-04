@@ -112,7 +112,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected boolean isAsyncMigrateProc = false;
 	private boolean someKeyMigrated = false;
 
-	private boolean islog = true;
+	private boolean islog = false;
 	private Map<RecordKey, CachedRecord> readings;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
@@ -190,12 +190,13 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				localReadKeys.addAll(readKeysInMigration);
 				// Add migrated Write to local write (Source will/already
 				// migrate to it)
-				localWriteKeys.addAll(pullKeys);
+				localWriteKeys.addAll(writeKeysInMigration);
 				// Remove migrated ReadKeys from Remote (Source will/already
 				// migrate to it)
 				remoteReadKeys.removeAll(readKeysInMigration);
-				// Dest should have the pullKeys Write lock to prevent other early access
-				//localWriteKeys.addAll(pullKeys);
+				// Dest should have the pullKeys Write lock to prevent other
+				// early access
+				localWriteKeys.addAll(pullKeys);
 			}
 
 			// ActiveParticipants would be Dest and Src(if have write on it)
@@ -227,6 +228,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 			// Deal with pull keys whether lunch pulling
 			if (!pullKeys.isEmpty()) {
+				// !Prevent ReadOnly but touch migration rage case
+				// if(!localWriteKeys.isEmpty()&&)
+				// activeParticipants.add(migraMgr.getSourcePartition());
 				// Set all not migrated key to migrated
 				migraMgr.setRecordMigrated(pullKeys);
 				// Set pulling flag
@@ -259,7 +263,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Decide the role
 		if (activeParticipants.contains(localNodeId))
 			isActiveParticipant = true;
-		else if (!localReadKeys.isEmpty())
+		else if (!localReadKeys.isEmpty() || (!pullKeys.isEmpty() && isSourceNode))
 			isPassiveParticipant = true;
 
 		// create a transaction
@@ -287,7 +291,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		 * } else { postOffice.skipTransaction(txNum);
 		 */
 
-		if (islog) {
+		if (islog && isInMigrating) {
 			String str = "******\nisInMigrating : " + isInMigrating;
 			str = str + "\n Txnum : " + txNum;
 			str = str + "\n isMigrationTx : " + isMigrationTx;
@@ -353,7 +357,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 
-		ccMgr.requestLocks();
+		ccMgr.requestLocks(isInMigrating && islog);
 	}
 
 	@Override
@@ -361,7 +365,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		try {
 			// Get conservative locks it has asked before
 			getConservativeLocks();
-			System.out.println("Tx : "+txNum+" End of get lock!");
+			if (islog)
+				System.out.println("Tx : " + txNum + " End of get lock!");
 			// Execute transaction
 			executeTransactionLogic();
 
@@ -374,23 +379,25 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 			// Something might be done after committing
 			afterCommit();
-			
-			
+			if (islog)
+				System.out.println("Tx : " + txNum + " Commited!");
 
 		} catch (Exception e) {
 			StringWriter errors = new StringWriter();
 			e.printStackTrace(new PrintWriter(errors));
 			String str = "TX : " + txNum + "Abort cause Exception!\n";
-			str = str + "\n Readings : ";
-			for (Integer k : recordKeyToSortArray(readings.keySet()))
-				str = str + " , " + k;
-			str = str + "\n Error check : \n";
-			for (Entry<RecordKey, CachedRecord> pair : readings.entrySet()) {
-				if (pair.getValue() == null)
-					str = str + "key" + pair.getKey() + "is null!\n";
-				else if (pair.getValue().getVal("i_name") == null)
-					str = str + "key" + pair.getKey() + "no map!\n";
+			if (readings != null) {
+				str = str + "\n Readings : ";
+				for (Integer k : recordKeyToSortArray(readings.keySet()))
+					str = str + " , " + k;
+				str = str + "\n Error check : \n";
+				for (Entry<RecordKey, CachedRecord> pair : readings.entrySet()) {
+					if (pair.getValue() == null)
+						str = str + "key" + pair.getKey() + "is null!\n";
+					else if (pair.getValue().getVal("i_name") == null)
+						str = str + "key" + pair.getKey() + "no map!\n";
 
+				}
 			}
 			System.out.println(str + errors.toString());
 
@@ -462,8 +469,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				pullMigrationData(readings);
 		}
 
-		
-		
 		// if (isInMigrating && !isExecutingInSrc && isSourceNode)
 		// return;
 
@@ -479,12 +484,16 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// Read the remote records
 		collectRemoteReadings(readings);
-		/*
-		 * if (!this.isSourceNode && islog) { String str = "********\n Txnum : "
-		 * + txNum; str = str + "\n Final Readings : "; for (Integer k :
-		 * recordKeyToSortArray(readings.keySet())) str = str + " , " + k; str =
-		 * str + "\n********"; System.out.println(str); }
-		 */
+
+		if (islog && (this.isSourceNode || this.isDestNode)) {
+			String str = "********\n Txnum : " + txNum;
+			str = str + "\n Final Readings : ";
+			for (Integer k : recordKeyToSortArray(readings.keySet()))
+				str = str + " , " + k;
+			str = str + "\n********";
+			System.out.println(str);
+		}
+
 		// Write the local records
 		executeSql(readings);
 	}
@@ -695,7 +704,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	// Only for the source node
 	private void pushMigrationData() {
 
-		//System.out.println("Push data at Source");
+		// System.out.println("Push data at Source");
 		// Wait for pull request
 		waitForPullRequest();
 
@@ -715,7 +724,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	// Only for the destination node
 	private void pullMigrationData(Map<RecordKey, CachedRecord> readings) {
-		//System.out.println("Pull data at Destination");
+		// System.out.println("Pull data at Destination");
 		// Send pull request
 		sendAPullRequest(migraMgr.getSourcePartition());
 
