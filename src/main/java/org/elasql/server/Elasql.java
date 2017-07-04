@@ -131,8 +131,13 @@ public class Elasql extends VanillaDb {
 			logger.info("initializing using Sequencer mode");
 			
 			VanillaDb.init(dirName);
+			initCacheMgr();
+			initPartitionMetaMgr(partitionMetaMgr);
+			
+			initScheduler(factory);
 			initConnectionMgr(myNodeId, true);
 			initMigration();
+			initDdLogMgr();
 			// initialize core modules
 			return;
 		}

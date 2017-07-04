@@ -31,6 +31,7 @@ import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
 import org.elasql.server.migration.MigrationManager;
 import org.elasql.sql.RecordKey;
@@ -90,8 +91,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	// Migration
 	private MigrationManager migraMgr = Elasql.migrationMgr();
-	private boolean isSourceNode;
-	private boolean isDestNode;
+	private boolean isSourceNode, isDestNode, isSeqNode;
 
 	private Set<RecordKey> pullKeys = new HashSet<RecordKey>();
 	// Not Migrated Readkeys
@@ -122,6 +122,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Becareful with this
 		this.isSourceNode = (localNodeId == migraMgr.getSourcePartition());
 		this.isDestNode = (localNodeId == migraMgr.getDestPartition());
+		this.isSeqNode = (localNodeId == ConnectionMgr.SEQ_NODE_ID);
 		if (paramHelper == null)
 			throw new NullPointerException("paramHelper should not be null");
 	}
@@ -144,6 +145,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 **********************/
 
 	public void prepare(Object... pars) {
+
+		if (isSeqNode)
+			System.out.println("Get Tom Tx: " + txNum);
+
 		// check if this transaction is in a migration period
 		isInMigrating = migraMgr.isMigrating();
 		isAnalyzing = migraMgr.isAnalyzing();

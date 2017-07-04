@@ -39,7 +39,7 @@ import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class ConnectionMgr
-		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener{
+		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
 
 	public static final int SEQ_NODE_ID = PartitionMetaMgr.NUM_PARTITIONS;
@@ -65,34 +65,35 @@ public class ConnectionMgr
 		}
 		serverAppl.startPFD();
 
-		if (!sequencerMode) {
-			VanillaDb.taskMgr().runTask(new Task() {
+		VanillaDb.taskMgr().runTask(new Task() {
 
-				@Override
-				public void run() {
-					while (true) {
-						try {
-							TotalOrderMessage tom = tomQueue.take();
-							for (int i = 0; i < tom.getMessages().length; ++i) {
-								StoredProcedureCall spc = (StoredProcedureCall) tom.getMessages()[i];
-								spc.setTxNum(tom.getTotalOrderIdStart() + i);
-								Elasql.scheduler().schedule(spc);
-							}
-						} catch (InterruptedException e) {
-							e.printStackTrace();
+			@Override
+			public void run() {
+				while (true) {
+					try {
+						TotalOrderMessage tom = tomQueue.take();
+						for (int i = 0; i < tom.getMessages().length; ++i) {
+							StoredProcedureCall spc = (StoredProcedureCall) tom.getMessages()[i];
+							spc.setTxNum(tom.getTotalOrderIdStart() + i);
+							Elasql.scheduler().schedule(spc);
 						}
+					} catch (InterruptedException e) {
+						e.printStackTrace();
 					}
-
 				}
-			});
-		} else {
+
+			}
+		});
+
+		if (sequencerMode) {
+		
 			// Add Start Analysis to TOM
 			VanillaDb.taskMgr().runTask(new Task() {
 
 				@Override
 				public void run() {
 					try {
-						Thread.sleep( 30 * 1000);
+						Thread.sleep(30 * 1000);
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -123,7 +124,7 @@ public class ConnectionMgr
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
 		P2pMessage p2pmsg = new P2pMessage(reading, nodeId, ChannelType.SERVER);
-		if(reading.sinkId()==-2)
+		if (reading.sinkId() == -2)
 			p2pmsg.isAsunc = true;
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
@@ -149,16 +150,17 @@ public class ConnectionMgr
 				Elasql.migrationMgr().onReceiveStopMigrateReq(ts.getMetadata());
 				break;
 			}
-			if(ts.sinkId() == -2)
+			if (ts.sinkId() == -2)
 				System.out.println("Receieve Async push data at ConnectMgr");
-			
+
 			if (sequencerMode)
 				return;
 			for (Tuple t : ts.getTupleSet()) {
-				if(t.rec == null){
-					String str = "Receiver : "+p2pmsg.getReceiver()+" SinkID :"+ts.sinkId() + " Size :"+ts.getTupleSet().size();
-					str = str+t;
-					
+				if (t.rec == null) {
+					String str = "Receiver : " + p2pmsg.getReceiver() + " SinkID :" + ts.sinkId() + " Size :"
+							+ ts.getTupleSet().size();
+					str = str + t;
+
 					System.out.println(str);
 				}
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
@@ -170,8 +172,6 @@ public class ConnectionMgr
 
 	@Override
 	public void onRecvServerTotalOrderedMessage(TotalOrderMessage tom) {
-		if (sequencerMode)
-			return;
 
 		try {
 			tomQueue.put(tom);
@@ -184,9 +184,9 @@ public class ConnectionMgr
 	public void onNodeFail(int id, ChannelType ct) {
 		// do nothing
 	}
-	
+
 	@Override
-	public String mkClientResponse(Object o){
+	public String mkClientResponse(Object o) {
 		return ((ClientResponse) o).toString();
 	}
 }
