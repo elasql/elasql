@@ -86,7 +86,7 @@ public class ConnectionMgr
 		});
 
 		if (sequencerMode) {
-		
+			
 			// Add Start Analysis to TOM
 			VanillaDb.taskMgr().runTask(new Task() {
 

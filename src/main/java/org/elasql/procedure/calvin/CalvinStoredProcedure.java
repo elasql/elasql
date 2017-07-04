@@ -146,9 +146,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	public void prepare(Object... pars) {
 
-		if (isSeqNode)
-			System.out.println("Get Tom Tx: " + txNum);
-
 		// check if this transaction is in a migration period
 		isInMigrating = migraMgr.isMigrating();
 		isAnalyzing = migraMgr.isAnalyzing();
@@ -335,6 +332,23 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			str = str + "\n ******";
 			System.out.println(str);
 
+		}
+		// Clay moinitoring
+		if (isSeqNode && System.currentTimeMillis() < MigrationManager.monitor_stop_time) {
+			HashSet<Integer> s = new HashSet<Integer>();
+			Integer vetxId;
+			for (RecordKey k : remoteReadKeys) {
+				vetxId = (Integer.parseInt(k.getKeyVal("i_id").toString()) -1) / MigrationManager.DataRange ;
+				migraMgr.encreaseWeight(vetxId);
+				s.add(vetxId);
+			}
+			migraMgr.encreaseEdge(s);
+		}
+
+		if (isSeqNode && MigrationManager.isMonitor.get()
+				&& System.currentTimeMillis() > MigrationManager.monitor_stop_time) {
+			migraMgr.getStat();
+			MigrationManager.isMonitor.set(false);
 		}
 		/*
 		 * if (!this.isSourceNode && islog) { String str = "********" +

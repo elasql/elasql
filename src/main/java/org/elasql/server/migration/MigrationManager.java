@@ -8,16 +8,18 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.procedure.calvin.CalvinStoredProcedureTask;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
@@ -56,19 +58,108 @@ public abstract class MigrationManager {
 	private boolean useCount = true;
 	private boolean backPushStarted = false;
 	private boolean isSourceNode;
-	private boolean isMoniterNode;
 
+	// Clay structure
 	private int SourceNode, DestNode;
+	private boolean isSeqNode;
+	public static int DataRange = 100;
+	private static double Beta = 0.5;
+	private static HashMap<Integer, Vertex> VertexKeys = new HashMap<Integer, Vertex>(1000000);
 
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
+
+	public static final long monitor_stop_time = System.currentTimeMillis() + 30 * 1000;
+	public static AtomicBoolean isMonitor = new AtomicBoolean(true);
 
 	public MigrationManager(long printStatusPeriod) {
 		this.SourceNode = 0;
 		this.DestNode = 1;
 		this.printStatusPeriod = printStatusPeriod;
 		isSourceNode = (Elasql.serverId() == getSourcePartition());
+		isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
 	}
+
+	public void encreaseWeight(Integer vetxId) {
+
+		if (!VertexKeys.containsKey(vetxId))
+			VertexKeys.put(vetxId, new Vertex(vetxId));
+		else
+			VertexKeys.get(vetxId).add();
+	}
+
+	public static void encreaseWeight(RecordKey k) {
+		Integer vetxId = Integer.parseInt(k.getKeyVal("i_id").toString()) / DataRange;
+		if (!VertexKeys.containsKey(vetxId))
+			VertexKeys.put(vetxId, new Vertex(vetxId));
+		else
+			VertexKeys.get(vetxId).add();
+	}
+
+	public void encreaseEdge(Set<Integer> s) {
+		for (int i : s)
+			for (int j : s)
+				if (j != i)
+					VertexKeys.get(i).addEdge(j);
+	}
+
+	public void getStat() {
+		// System.out.println(VertexKeys);
+		double[] VertxLoadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		double[] EdgeLoadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		int p;
+		for (Vertex e : VertexKeys.values()) {
+			p = e.getId() * DataRange / 100000;
+			System.out.println("o :"+e.getId()+"p :"+p);
+			VertxLoadPerPart[p] += (double) e.getWeight() / 30;
+			for (Integer ew : e.getEdge().values())
+				EdgeLoadPerPart[p] += (double) ew / 30;
+
+		}
+
+		for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
+			System.out.println("Part : " + i + " Vertex : " + VertxLoadPerPart[i] + " Edge : " + EdgeLoadPerPart[i]);
+
+	}
+
+	// public static void main(String[] arg){
+	//
+	// System.out.println("df");
+	//
+	// HashMap<String, Constant> tmp = new HashMap<String, Constant>();
+	// tmp.put("i_id", new IntegerConstant(1));
+	// RecordKey tmpK = new RecordKey("item", tmp);
+	// encreaseWeight(tmpK);
+	//
+	// tmp = new HashMap<String, Constant>();
+	// tmp.put("i_id", new IntegerConstant(1));
+	// tmpK = new RecordKey("item", tmp);
+	// encreaseWeight(tmpK);
+	//
+	// tmp = new HashMap<String, Constant>();
+	// tmp.put("i_id", new IntegerConstant(101));
+	// tmpK = new RecordKey("item", tmp);
+	// encreaseWeight(tmpK);
+	//
+	// tmp = new HashMap<String, Constant>();
+	// tmp.put("i_id", new IntegerConstant(201));
+	// tmpK = new RecordKey("item", tmp);
+	// encreaseWeight(tmpK);
+	//
+	// tmp = new HashMap<String, Constant>();
+	// tmp.put("i_id", new IntegerConstant(301));
+	// tmpK = new RecordKey("item", tmp);
+	// encreaseWeight(tmpK);
+	//
+	// HashSet<Integer> s = new HashSet<Integer>();
+	// s.add(0);
+	// s.add(1);
+	// s.add(3);
+	// encreaseEdge(s);
+	// encreaseEdge(s);
+	// System.out.println(VertexKeys);
+	//
+	// }
 
 	public abstract boolean keyIsInMigrationRange(RecordKey key);
 
@@ -447,4 +538,5 @@ public abstract class MigrationManager {
 			});
 		}
 	}
+
 }
