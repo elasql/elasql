@@ -75,7 +75,7 @@ public abstract class PartitionMetaMgr {
 		Thread thread = new Thread(new Runnable() {
 			public void run() {
 				try {
-					Thread.sleep(670000);
+					Thread.sleep(250000);
 					File dir = new File(".");
 					File outputFile = new File(dir, "loc_tbl.txt");
 					FileWriter wrFile = new FileWriter(outputFile);
