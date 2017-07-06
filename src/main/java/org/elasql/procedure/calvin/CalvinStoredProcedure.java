@@ -112,7 +112,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected boolean isAsyncMigrateProc = false;
 	private boolean someKeyMigrated = false;
 
-	private boolean islog = false;
+	private boolean islog = true;
 	private Map<RecordKey, CachedRecord> readings;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
@@ -234,7 +234,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				// if(!localWriteKeys.isEmpty()&&)
 				// activeParticipants.add(migraMgr.getSourcePartition());
 				// Set all not migrated key to migrated
-				migraMgr.setRecordMigrated(pullKeys);
+				migraMgr.setRecordLocation(pullKeys);
 				// Set pulling flag
 				activePulling = true;
 			}

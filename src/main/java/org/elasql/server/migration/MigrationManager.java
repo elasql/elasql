@@ -110,7 +110,7 @@ public abstract class MigrationManager {
 		int p;
 		for (Vertex e : VertexKeys.values()) {
 			p = e.getId() * DataRange / 100000;
-			System.out.println("o :"+e.getId()+"p :"+p);
+			System.out.println("o :" + e.getId() + "p :" + p);
 			VertxLoadPerPart[p] += (double) e.getWeight() / 30;
 			for (Integer ew : e.getEdge().values())
 				EdgeLoadPerPart[p] += (double) ew / 30;
@@ -236,6 +236,29 @@ public abstract class MigrationManager {
 		}
 	}
 
+	public void setRecordLocation(Collection<RecordKey> keys) {
+		if (isSourceNode) {
+			for (RecordKey key : keys) {
+				Boolean status = newInsertedData.get(key);
+				if (status != null && status == Boolean.FALSE) {
+					skipRequestQueue.add(key);
+					newInsertedData.put(key, Boolean.TRUE);
+				} else {
+					status = analyzedData.get(key);
+					if (status != null && status == Boolean.FALSE) {
+						skipRequestQueue.add(key);
+						analyzedData.put(key, Boolean.TRUE);
+					}
+				}
+				Elasql.partitionMetaMgr().setPartition(key, DestNode);
+			}
+		} else {
+			for (RecordKey key : keys)
+				Elasql.partitionMetaMgr().setPartition(key, DestNode);
+		}
+
+	}
+
 	// NOTE: This can only be called by the scheduler
 	public boolean isRecordMigrated(RecordKey key) {
 		if (isSourceNode) {
@@ -251,8 +274,15 @@ public abstract class MigrationManager {
 			// must not be inserted before the migration starts. Therefore,
 			// the record must have been foreground pushed.
 			return true;
-		} else
-			return migratedKeys.contains(key);
+		} else {
+			if (Elasql.partitionMetaMgr().getPartition(key) != SourceNode) {
+				if (Elasql.partitionMetaMgr().getPartition(key) != DestNode)
+					System.out.println("Something wrong : " + key + " Not at Dest");
+				return true;
+			} else 
+				return false;
+
+		}
 	}
 
 	// NOTE: only for the normal transactions on the source node

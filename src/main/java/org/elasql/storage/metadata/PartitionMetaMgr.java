@@ -15,6 +15,9 @@
  ******************************************************************************/
 package org.elasql.storage.metadata;
 
+import java.util.HashMap;
+import java.util.LinkedList;
+
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
@@ -25,7 +28,9 @@ public abstract class PartitionMetaMgr {
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
+		locationTable = new HashMap<RecordKey, Integer>();
 	}
+	private static HashMap<RecordKey, Integer> locationTable;
 
 	/**
 	 * Check if a record is fully replicated on each node.
@@ -44,7 +49,19 @@ public abstract class PartitionMetaMgr {
 	 * @return the id of the partition where the record is
 	 */
 	public int getPartition(RecordKey key){
-		return getLocation(key);
+		
+		Integer old = locationTable.get(key);
+		if (old == null)
+			return getLocation(key);
+		else
+			return old;
 	}
-	public abstract int getLocation(RecordKey key);
+
+	public void setPartition(RecordKey key, int loc) {
+
+		locationTable.put(key, new Integer(loc));
+
+	}
+
+	protected abstract int getLocation(RecordKey key);
 }

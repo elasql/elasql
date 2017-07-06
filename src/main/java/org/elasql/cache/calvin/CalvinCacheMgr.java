@@ -74,7 +74,7 @@ public class CalvinCacheMgr {
 
 		// Notify the post office the transaction has committed
 		postOffice.notifyTxCommitted(tx.getTransactionNumber());
-		inbox = null;
+		//inbox = null;
 	}
 
 	public CachedRecord readFromLocal(RecordKey key) {
