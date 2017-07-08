@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -112,7 +113,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected boolean isAsyncMigrateProc = false;
 	private boolean someKeyMigrated = false;
 
-	private boolean islog = true;
+	private boolean islog = false;
 	private Map<RecordKey, CachedRecord> readings;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
@@ -334,19 +335,22 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		}
 		// Clay moinitoring
-		if (isSeqNode && System.currentTimeMillis() < MigrationManager.monitor_stop_time) {
-			HashSet<Integer> s = new HashSet<Integer>();
+		if (isSeqNode && System.currentTimeMillis() < MigrationManager.MONITOR_STOP_TIME) {
+			LinkedList<Integer> vertexIdSet = new LinkedList<Integer>();
 			Integer vetxId;
+			int partId;
 			for (RecordKey k : remoteReadKeys) {
-				vetxId = (Integer.parseInt(k.getKeyVal("i_id").toString()) -1) / MigrationManager.DataRange ;
-				migraMgr.encreaseWeight(vetxId);
-				s.add(vetxId);
+				vetxId = ((int) k.getKeyVal("i_id").asJavaVal()-1) / migraMgr.dataRange;
+				partId = Elasql.partitionMetaMgr().getPartition(k);
+				migraMgr.encreaseWeight(vetxId, partId);
+				vertexIdSet.add(vetxId);
 			}
-			migraMgr.encreaseEdge(s);
+			migraMgr.encreaseEdge(vertexIdSet);
+
 		}
 
 		if (isSeqNode && MigrationManager.isMonitor.get()
-				&& System.currentTimeMillis() > MigrationManager.monitor_stop_time) {
+				&& System.currentTimeMillis() > MigrationManager.MONITOR_STOP_TIME) {
 			migraMgr.getStat();
 			MigrationManager.isMonitor.set(false);
 		}

@@ -84,26 +84,26 @@ public class ConnectionMgr
 
 			}
 		});
-
-		if (sequencerMode) {
-			
-			// Add Start Analysis to TOM
-			VanillaDb.taskMgr().runTask(new Task() {
-
-				@Override
-				public void run() {
-					try {
-						Thread.sleep(30 * 1000);
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					Elasql.migrationMgr().onReceiveAnalysisReq(null);
-
-				}
-			});
-
-		}
+		
+//		if (sequencerMode) {
+//			
+//			// Add Start Analysis to TOM
+//			VanillaDb.taskMgr().runTask(new Task() {
+//
+//				@Override
+//				public void run() {
+//					try {
+//						Thread.sleep(30 * 1000);
+//					} catch (InterruptedException e) {
+//						// TODO Auto-generated catch block
+//						e.printStackTrace();
+//					}
+//					Elasql.migrationMgr().onReceiveAnalysisReq(null);
+//
+//				}
+//			});
+//
+//		}
 	}
 
 	public void sendClientResponse(int clientId, int rteId, long txNum, SpResultSet rs) {

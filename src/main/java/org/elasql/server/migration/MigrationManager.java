@@ -1,5 +1,6 @@
 package org.elasql.server.migration;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -8,7 +9,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,104 +60,147 @@ public abstract class MigrationManager {
 	private boolean isSourceNode;
 
 	// Clay structure
-	private int SourceNode, DestNode;
+	private int sourceNode, destNode;
 	private boolean isSeqNode;
-	public static int DataRange = 100;
-	private static double Beta = 0.5;
-	private static HashMap<Integer, Vertex> VertexKeys = new HashMap<Integer, Vertex>(1000000);
+	public static final int MONITORING_TIME = 30 * 1000;
+	private final int LOOK_AHEAD = 100;
+	public static int dataRange = 100;
+	public static double BETA = 0.5;
+	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
 
-	public static final long monitor_stop_time = System.currentTimeMillis() + 30 * 1000;
+	public static final long MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
 	public static AtomicBoolean isMonitor = new AtomicBoolean(true);
 
 	public MigrationManager(long printStatusPeriod) {
-		this.SourceNode = 0;
-		this.DestNode = 1;
+		this.sourceNode = 0;
+		this.destNode = 1;
 		this.printStatusPeriod = printStatusPeriod;
 		isSourceNode = (Elasql.serverId() == getSourcePartition());
 		isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
 	}
 
-	public void encreaseWeight(Integer vetxId) {
+	public void encreaseWeight(Integer vetxId, int partId) {
 
-		if (!VertexKeys.containsKey(vetxId))
-			VertexKeys.put(vetxId, new Vertex(vetxId));
+		if (!vertexKeys.containsKey(vetxId))
+			vertexKeys.put(vetxId, new Vertex(vetxId, partId));
 		else
-			VertexKeys.get(vetxId).add();
+			vertexKeys.get(vetxId).add();
 	}
 
-	public static void encreaseWeight(RecordKey k) {
-		Integer vetxId = Integer.parseInt(k.getKeyVal("i_id").toString()) / DataRange;
-		if (!VertexKeys.containsKey(vetxId))
-			VertexKeys.put(vetxId, new Vertex(vetxId));
+	public void encreaseWeight(RecordKey k, int partId) {
+		Integer vetxId = Integer.parseInt(k.getKeyVal("i_id").toString()) / dataRange;
+		if (!vertexKeys.containsKey(vetxId))
+			vertexKeys.put(vetxId, new Vertex(vetxId, partId));
 		else
-			VertexKeys.get(vetxId).add();
+			vertexKeys.get(vetxId).add();
 	}
 
-	public void encreaseEdge(Set<Integer> s) {
-		for (int i : s)
-			for (int j : s)
+	public void encreaseEdge(List<Integer> vertexIdSet) {
+		for (int i : vertexIdSet)
+			for (int j : vertexIdSet)
 				if (j != i)
-					VertexKeys.get(i).addEdge(j);
+					vertexKeys.get(i).addEdge(j, vertexKeys.get(j).getPartId());
+	}
+
+	public HashMap<Integer, Vertex> getVertexKeys() {
+		return vertexKeys;
 	}
 
 	public void getStat() {
 		// System.out.println(VertexKeys);
-		double[] VertxLoadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
-		double[] EdgeLoadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
-		int p;
-		for (Vertex e : VertexKeys.values()) {
-			p = e.getId() * DataRange / 100000;
-			System.out.println("o :" + e.getId() + "p :" + p);
-			VertxLoadPerPart[p] += (double) e.getWeight() / 30;
-			for (Integer ew : e.getEdge().values())
-				EdgeLoadPerPart[p] += (double) ew / 30;
 
+		long start_t = System.currentTimeMillis();
+		ArrayList<Partition> partitions = new ArrayList<Partition>();
+		for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
+			partitions.add(new Partition(i));
+
+		for (Vertex e : vertexKeys.values())
+			partitions.get(e.getPartId()).addVertex(e);
+
+		for (Partition p : partitions) {
+			System.out.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
+
+			for (Vertex v : p.getFirstTen())
+				System.out.println(
+						"Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :" + v.getVertexWeight());
 		}
 
-		for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
-			System.out.println("Part : " + i + " Vertex : " + VertxLoadPerPart[i] + " Edge : " + EdgeLoadPerPart[i]);
+		double avgLoad = 0;
+		for (Partition p : partitions)
+			avgLoad += p.getTotalLoad();
+		avgLoad /= PartitionMetaMgr.NUM_PARTITIONS;
+
+		LinkedList<Partition> overloadParts = new LinkedList<Partition>();
+		for (Partition p : partitions)
+			if (p.getTotalLoad() > avgLoad)
+				overloadParts.add(p);
+
+		Collections.sort(overloadParts);
+		// Get Most Overloaded Partition
+		Partition overloadPart = overloadParts.getLast();
+
+		Candidate migraCandidate = new Candidate();
+		// Init Clump with most Hotest Vertex
+		migraCandidate.addCandidate(overloadPart.getHotestVertex());
+		System.out.println("A Takes : " + (System.currentTimeMillis() - start_t));
+		
+		// Expend LOOK_AHEAD times
+		for (int a = 0; a < LOOK_AHEAD; a++){
+			if(a == 5000)
+				System.out.println("B Takes : " + (System.currentTimeMillis() - start_t));
+			migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
+		}
+		System.out.println(migraCandidate);
+
+		System.out.println("C Takes : " + (System.currentTimeMillis() - start_t));
 
 	}
 
-	// public static void main(String[] arg){
+	// public static void main(String[] arg) {
 	//
 	// System.out.println("df");
+	// int partId;
 	//
 	// HashMap<String, Constant> tmp = new HashMap<String, Constant>();
 	// tmp.put("i_id", new IntegerConstant(1));
 	// RecordKey tmpK = new RecordKey("item", tmp);
-	// encreaseWeight(tmpK);
+	// partId = 0;
+	// encreaseWeight(tmpK, partId);
 	//
 	// tmp = new HashMap<String, Constant>();
 	// tmp.put("i_id", new IntegerConstant(1));
 	// tmpK = new RecordKey("item", tmp);
-	// encreaseWeight(tmpK);
+	// partId = 0;
+	// encreaseWeight(tmpK, partId);
 	//
 	// tmp = new HashMap<String, Constant>();
 	// tmp.put("i_id", new IntegerConstant(101));
 	// tmpK = new RecordKey("item", tmp);
-	// encreaseWeight(tmpK);
+	// partId = 0;
+	// encreaseWeight(tmpK, partId);
 	//
 	// tmp = new HashMap<String, Constant>();
 	// tmp.put("i_id", new IntegerConstant(201));
 	// tmpK = new RecordKey("item", tmp);
-	// encreaseWeight(tmpK);
+	// partId = 0;
+	// encreaseWeight(tmpK, partId);
 	//
 	// tmp = new HashMap<String, Constant>();
 	// tmp.put("i_id", new IntegerConstant(301));
 	// tmpK = new RecordKey("item", tmp);
-	// encreaseWeight(tmpK);
+	// partId = 0;
+	// encreaseWeight(tmpK, partId);
 	//
-	// HashSet<Integer> s = new HashSet<Integer>();
+	// LinkedList<Integer> s = new LinkedList<Integer>();
 	// s.add(0);
 	// s.add(1);
 	// s.add(3);
 	// encreaseEdge(s);
 	// encreaseEdge(s);
-	// System.out.println(VertexKeys);
+	// System.out.println(vertexKeys);
 	//
 	// }
 
@@ -184,12 +227,12 @@ public abstract class MigrationManager {
 	// That is, NUM_PARTITIONS is read before the properties loaded.
 
 	public int getSourcePartition() {
-		return SourceNode;
+		return sourceNode;
 		// return NUM_PARTITIONS - 2;
 	}
 
 	public int getDestPartition() {
-		return DestNode;
+		return destNode;
 		// return NUM_PARTITIONS - 1;
 	}
 
@@ -250,11 +293,11 @@ public abstract class MigrationManager {
 						analyzedData.put(key, Boolean.TRUE);
 					}
 				}
-				Elasql.partitionMetaMgr().setPartition(key, DestNode);
+				Elasql.partitionMetaMgr().setPartition(key, destNode);
 			}
 		} else {
 			for (RecordKey key : keys)
-				Elasql.partitionMetaMgr().setPartition(key, DestNode);
+				Elasql.partitionMetaMgr().setPartition(key, destNode);
 		}
 
 	}
@@ -275,11 +318,11 @@ public abstract class MigrationManager {
 			// the record must have been foreground pushed.
 			return true;
 		} else {
-			if (Elasql.partitionMetaMgr().getPartition(key) != SourceNode) {
-				if (Elasql.partitionMetaMgr().getPartition(key) != DestNode)
+			if (Elasql.partitionMetaMgr().getPartition(key) != sourceNode) {
+				if (Elasql.partitionMetaMgr().getPartition(key) != destNode)
 					System.out.println("Something wrong : " + key + " Not at Dest");
 				return true;
-			} else 
+			} else
 				return false;
 
 		}
