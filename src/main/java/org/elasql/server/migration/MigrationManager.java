@@ -154,10 +154,12 @@ public abstract class MigrationManager {
 				System.out.println("B Takes : " + (System.currentTimeMillis() - start_t));
 			migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
 		}
-		System.out.println(migraCandidate);
+		//System.out.println(migraCandidate);
 
 		System.out.println("C Takes : " + (System.currentTimeMillis() - start_t));
-
+		
+		broadcastMigrateKeys(migraCandidate.getCandidateIds().toArray(new Integer[0]));
+		
 	}
 
 	// public static void main(String[] arg) {
@@ -211,6 +213,8 @@ public abstract class MigrationManager {
 	}
 
 	public abstract boolean keyIsInMigrationRange(RecordKey key);
+	
+	public abstract void broadcastMigrateKeys(Object[] metadata);
 
 	public abstract void onReceiveStartMigrationReq(Object[] metadata);
 

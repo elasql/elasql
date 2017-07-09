@@ -65,6 +65,9 @@ public class Candidate {
 	public int getHotestNeighbor() {
 		return Collections.max(neighbors.values()).id;
 	}
+	public HashSet<Integer> getCandidateIds(){
+		return candidateIds;
+	}
 
 	@Override
 	public String toString() {
