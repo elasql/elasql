@@ -42,6 +42,7 @@ public class Candidate {
 	}
 
 	public void addNeighbor(Integer id, int partId, int weight) {
+
 		// Avoid self loop
 		if (candidateIds.contains(id))
 			return;
@@ -56,8 +57,10 @@ public class Candidate {
 	public void addCandidate(Vertex v) {
 		load += v.getVertexWeight();
 		candidateIds.add(v.getId());
+		// Naive version don't concider other partition node
 		for (OutEdge o : v.getEdge().values())
-			addNeighbor(o.id, o.partId, o.weight);
+			if (o.partId == v.getPartId())
+				addNeighbor(o.id, o.partId, o.weight);
 		// once expend this node remove it form neighbor
 		neighbors.remove(v.getId());
 	}
@@ -65,23 +68,23 @@ public class Candidate {
 	public int getHotestNeighbor() {
 		return Collections.max(neighbors.values()).id;
 	}
-	public HashSet<Integer> getCandidateIds(){
+
+	public HashSet<Integer> getCandidateIds() {
 		return candidateIds;
 	}
 
 	@Override
 	public String toString() {
 		String str = "Load : " + this.load + " Neighbor : " + neighbors.size() + "\n";
-		 str += "Candidate Id : ";
-		 ArrayList<Integer> cc = new ArrayList<Integer>(candidateIds);
-		 Collections.sort(cc);
-		 for (int id : cc)
-		 str += ", " + id;
+		str += "Candidate Id : ";
+		ArrayList<Integer> cc = new ArrayList<Integer>(candidateIds);
+		Collections.sort(cc);
+		for (int id : cc)
+			str += ", " + id;
 		/*
-		for (int id : candidateIds)
-			if (id*MigrationManager.dataRange > 100000)
-				str += "Somethigs Wrong Tuple " + id + "in candidateIds\n";
-		*/
+		 * for (int id : candidateIds) if (id*MigrationManager.dataRange >
+		 * 100000) str += "Somethigs Wrong Tuple " + id + "in candidateIds\n";
+		 */
 		str += "\n";
 		return str;
 	}
