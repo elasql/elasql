@@ -13,6 +13,7 @@ public class LaunchClayProc extends AllExecuteProcedure<StoredProcedureParamHelp
 		super(txNum, StoredProcedureParamHelper.DefaultParamHelper());
 		if (isSeqNode)
 			Elasql.migrationMgr().startClayMonitoring();
+		System.out.println("Clay Monitoring starts with tx number: " + txNum);
 	}
 
 	@Override
@@ -28,7 +29,7 @@ public class LaunchClayProc extends AllExecuteProcedure<StoredProcedureParamHelp
 
 	@Override
 	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
-		System.out.println("Clay Monitoring starts with tx number: " + txNum);
+		
 
 	}
 }

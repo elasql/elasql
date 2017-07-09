@@ -112,6 +112,7 @@ public abstract class MigrationManager {
 	}
 
 	public void startClayMonitoring() {
+		System.out.println("Start Monitoring");
 		isMonitoring.set(true);
 		MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
 		vertexKeys.clear();
