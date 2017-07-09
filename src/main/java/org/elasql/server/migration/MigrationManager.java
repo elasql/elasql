@@ -413,6 +413,7 @@ public abstract class MigrationManager {
 	public void stopMigration() {
 		isMigrating.set(false);
 		isMigrated.set(true);
+		backPushStarted = false;
 		if (migratedKeys != null)
 			migratedKeys.clear();
 		if (newInsertedData != null)
