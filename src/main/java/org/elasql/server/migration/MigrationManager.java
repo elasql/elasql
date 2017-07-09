@@ -63,7 +63,7 @@ public abstract class MigrationManager {
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
 	public static final int MONITORING_TIME = 30 * 1000;
-	private static int CLAY_EPOCH = 0;
+	public static int CLAY_EPOCH = 0;
 	private final int LOOK_AHEAD = 200;
 	public static int dataRange = 100;
 	public static double BETA = 0.5;

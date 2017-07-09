@@ -344,6 +344,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			for (RecordKey k : remoteReadKeys) {
 				vetxId = ((int) k.getKeyVal("i_id").asJavaVal() - 1) / migraMgr.dataRange;
 				partId = Elasql.partitionMetaMgr().getPartition(k);
+				if(migraMgr.CLAY_EPOCH == 1 && vetxId == 0 && partId == 0)
+					System.out.println("Killing zero is key "+k);
 				migraMgr.encreaseWeight(vetxId, partId);
 				vertexIdSet.add(vetxId);
 			}
