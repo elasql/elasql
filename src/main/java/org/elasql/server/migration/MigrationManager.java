@@ -179,7 +179,9 @@ public abstract class MigrationManager {
 				+ " Edge : " + overloadPart.getEdgeLoad());
 		System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : " + partitions.get(0).getLoad()
 				+ " Edge : " + partitions.get(0).getEdgeLoad());
-		System.out.println(migraCandidate.getCandidateIds());
+		ArrayList<Integer> aa = new ArrayList<Integer>(migraCandidate.getCandidateIds());
+		Collections.sort(aa);
+		System.out.println(aa);
 		if (CLAY_EPOCH == 1)
 			return;
 
