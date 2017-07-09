@@ -13,6 +13,9 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 	public StopMigrationProc(long txNum) {
 		super(txNum, StoredProcedureParamHelper.DefaultParamHelper());
 		Elasql.migrationMgr().stopMigration();
+		
+		if(isSeqNode)
+			Elasql.migrationMgr().onReceieveLaunchClayReq(null);
 	}
 
 	@Override

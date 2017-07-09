@@ -98,7 +98,7 @@ public class ConnectionMgr
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
-					Elasql.migrationMgr().onReceieveLaunchClayReq(null);;
+					Elasql.migrationMgr().onReceieveLaunchClayReq(null);
 
 				}
 			});
