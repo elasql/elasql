@@ -15,6 +15,8 @@
  ******************************************************************************/
 package org.elasql.procedure.calvin;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,8 +26,6 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
@@ -336,12 +336,13 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		}
 		// Clay moinitoring
-		if (isSeqNode && System.currentTimeMillis() < MigrationManager.MONITOR_STOP_TIME) {
+		if (isSeqNode && MigrationManager.isMonitoring.get()
+				&& System.currentTimeMillis() < MigrationManager.MONITOR_STOP_TIME) {
 			LinkedList<Integer> vertexIdSet = new LinkedList<Integer>();
 			Integer vetxId;
 			int partId;
 			for (RecordKey k : remoteReadKeys) {
-				vetxId = ((int) k.getKeyVal("i_id").asJavaVal()-1) / migraMgr.dataRange;
+				vetxId = ((int) k.getKeyVal("i_id").asJavaVal() - 1) / migraMgr.dataRange;
 				partId = Elasql.partitionMetaMgr().getPartition(k);
 				migraMgr.encreaseWeight(vetxId, partId);
 				vertexIdSet.add(vetxId);
@@ -350,10 +351,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		}
 
-		if (isSeqNode && MigrationManager.isMonitor.get()
+		if (isSeqNode && MigrationManager.isMonitoring.get()
 				&& System.currentTimeMillis() > MigrationManager.MONITOR_STOP_TIME) {
-			migraMgr.getStat();
-			MigrationManager.isMonitor.set(false);
+			migraMgr.generateMigrationPlan();
+			MigrationManager.isMonitoring.set(false);
 		}
 		/*
 		 * if (!this.isSourceNode && islog) { String str = "********" +

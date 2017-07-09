@@ -63,6 +63,7 @@ public abstract class MigrationManager {
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
 	public static final int MONITORING_TIME = 30 * 1000;
+	private static int CLAY_EPOCH = 0;
 	private final int LOOK_AHEAD = 200;
 	public static int dataRange = 100;
 	public static double BETA = 0.5;
@@ -72,8 +73,8 @@ public abstract class MigrationManager {
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
 
-	public static final long MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
-	public static AtomicBoolean isMonitor = new AtomicBoolean(true);
+	public static long MONITOR_STOP_TIME = -1;
+	public static AtomicBoolean isMonitoring = new AtomicBoolean(true);
 
 	public MigrationManager(long printStatusPeriod) {
 		this.sourceNode = 0;
@@ -110,7 +111,14 @@ public abstract class MigrationManager {
 		return vertexKeys;
 	}
 
-	public void getStat() {
+	public void startClayMonitoring() {
+		isMonitoring.set(true);
+		MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
+		vertexKeys.clear();
+	}
+
+	public void generateMigrationPlan() {
+
 		// System.out.println(VertexKeys);
 
 		long start_t = System.currentTimeMillis();
@@ -121,6 +129,7 @@ public abstract class MigrationManager {
 		for (Vertex e : vertexKeys.values())
 			partitions.get(e.getPartId()).addVertex(e);
 
+		System.out.println("Clay No." + CLAY_EPOCH + " Monitoring Finish!");
 		for (Partition p : partitions) {
 			System.out.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
 
@@ -146,7 +155,6 @@ public abstract class MigrationManager {
 		Candidate migraCandidate = new Candidate();
 		// Init Clump with most Hotest Vertex
 		migraCandidate.addCandidate(overloadPart.getHotestVertex());
-		System.out.println("A Takes : " + (System.currentTimeMillis() - start_t));
 
 		// Expend LOOK_AHEAD times
 		for (int a = 0; a < LOOK_AHEAD; a++)
@@ -156,24 +164,23 @@ public abstract class MigrationManager {
 		// Preparse Param
 		LinkedList<Integer> params = new LinkedList<Integer>(migraCandidate.getCandidateIds());
 
-		
-
 		// Determinstic select last load partition as Dest
 		Collections.sort(partitions);
 		params.addFirst(new Integer(partitions.get(0).getId()));
-		
-		//Add Source at the Source
+
+		// Add Source at the Source
 		params.addFirst(new Integer(overloadPart.getId()));
 
-		System.out.println("C Takes : " + (System.currentTimeMillis() - start_t));
-
-		
+		System.out.println("Clay No." + CLAY_EPOCH + " Migration Plan Generation Takes : "
+				+ (System.currentTimeMillis() - start_t) + " ms");
 
 		System.out.println("Source is Part : " + overloadPart.getId() + " Weight : " + overloadPart.getLoad()
 				+ " Edge : " + overloadPart.getEdgeLoad());
 		System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : " + partitions.get(0).getLoad()
 				+ " Edge : " + partitions.get(0).getEdgeLoad());
-		
+
+		CLAY_EPOCH = CLAY_EPOCH + 1;
+
 		broadcastMigrateKeys(params.toArray(new Integer[0]));
 
 	}
@@ -232,6 +239,8 @@ public abstract class MigrationManager {
 
 	public abstract boolean keyIsInMigrationRange(RecordKey key);
 
+	public abstract void onReceieveLaunchClayReq(Object[] metadata);
+
 	public abstract void broadcastMigrateKeys(Object[] metadata);
 
 	public abstract void onReceiveStartMigrationReq(Object[] metadata);
@@ -258,12 +267,12 @@ public abstract class MigrationManager {
 		return sourceNode;
 		// return NUM_PARTITIONS - 2;
 	}
-	
-	public void setSourcePartition(int id){
+
+	public void setSourcePartition(int id) {
 		this.sourceNode = id;
 	}
-	
-	public void setDestPartition(int id){
+
+	public void setDestPartition(int id) {
 		this.destNode = id;
 	}
 
