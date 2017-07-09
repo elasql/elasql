@@ -63,7 +63,7 @@ public abstract class MigrationManager {
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
 	public static final int MONITORING_TIME = 30 * 1000;
-	private final int LOOK_AHEAD = 100;
+	private final int LOOK_AHEAD = 200;
 	public static int dataRange = 100;
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
@@ -156,11 +156,14 @@ public abstract class MigrationManager {
 		// Preparse Param
 		LinkedList<Integer> params = new LinkedList<Integer>(migraCandidate.getCandidateIds());
 
-		params.addFirst(new Integer(overloadPart.getId()));
+		
 
 		// Determinstic select last load partition as Dest
 		Collections.sort(partitions);
 		params.addFirst(new Integer(partitions.get(0).getId()));
+		
+		//Add Source at the Source
+		params.addFirst(new Integer(overloadPart.getId()));
 
 		System.out.println("C Takes : " + (System.currentTimeMillis() - start_t));
 
@@ -168,7 +171,7 @@ public abstract class MigrationManager {
 
 		System.out.println("Source is Part : " + overloadPart.getId() + " Weight : " + overloadPart.getLoad()
 				+ " Edge : " + overloadPart.getEdgeLoad());
-		System.out.println("Source is Part : " + partitions.get(0).getId() + " Weight : " + partitions.get(0).getLoad()
+		System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : " + partitions.get(0).getLoad()
 				+ " Edge : " + partitions.get(0).getEdgeLoad());
 		
 		broadcastMigrateKeys(params.toArray(new Integer[0]));
@@ -254,6 +257,14 @@ public abstract class MigrationManager {
 	public int getSourcePartition() {
 		return sourceNode;
 		// return NUM_PARTITIONS - 2;
+	}
+	
+	public void setSourcePartition(int id){
+		this.sourceNode = id;
+	}
+	
+	public void setDestPartition(int id){
+		this.destNode = id;
 	}
 
 	public int getDestPartition() {
