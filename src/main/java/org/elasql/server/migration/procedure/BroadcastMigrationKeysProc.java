@@ -9,7 +9,7 @@ import org.elasql.server.Elasql;
 import org.elasql.server.migration.MigrationManager;
 import org.elasql.sql.RecordKey;
 
-public class BroadcastMigrationKeysProc extends CalvinStoredProcedure<BroadcastMigrationKeysParamHelper>{
+public class BroadcastMigrationKeysProc extends CalvinStoredProcedure<BroadcastMigrationKeysParamHelper> {
 
 	public BroadcastMigrationKeysProc(long txNum) {
 		super(txNum, new BroadcastMigrationKeysParamHelper());
@@ -18,26 +18,24 @@ public class BroadcastMigrationKeysProc extends CalvinStoredProcedure<BroadcastM
 
 	@Override
 	protected void prepareKeys() {
-		System.out.println("I am "+this.localNodeId + "I get migration range");
+		System.out.println("I am " + this.localNodeId + "I get migration range");
 		Elasql.migrationMgr().addMigrationRanges(paramHelper.getMigrateKeys());
-		
+
+		if (isSeqNode) {
+			System.out.println("I am " + this.localNodeId + "I commit BroadCastMigration");
+			Elasql.migrationMgr().onReceiveAnalysisReq(null);
+		}
+
 	}
 
 	@Override
 	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
 		// TODO Auto-generated method stub
-		
+
 	}
+
 	@Override
-	protected void afterCommit() {
-		if (isSeqNode) {
-			Elasql.migrationMgr().onReceiveAnalysisReq(null);
-		}
-	}
-	
-	
-	@Override
-	public boolean willResponseToClients(){
+	public boolean willResponseToClients() {
 		return false;
 	}
 
