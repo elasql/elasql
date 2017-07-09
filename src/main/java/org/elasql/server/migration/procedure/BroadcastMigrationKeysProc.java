@@ -18,7 +18,8 @@ public class BroadcastMigrationKeysProc extends CalvinStoredProcedure<BroadcastM
 
 	@Override
 	protected void prepareKeys() {
-		System.out.println("I am " + this.localNodeId + "I get migration range");
+		System.out.println("I am " + this.localNodeId + "Source is " + paramHelper.getSouceNode() + " Dest is "
+				+ paramHelper.getDestNode());
 		Elasql.migrationMgr().addMigrationRanges(paramHelper.getMigrateKeys());
 
 		if (isSeqNode) {
