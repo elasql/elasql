@@ -4,7 +4,9 @@ import java.util.Map;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
+import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.MigrationManager;
 import org.elasql.sql.RecordKey;
 
 public class BroadcastMigrationKeysProc extends CalvinStoredProcedure<BroadcastMigrationKeysParamHelper>{
@@ -26,6 +28,13 @@ public class BroadcastMigrationKeysProc extends CalvinStoredProcedure<BroadcastM
 		// TODO Auto-generated method stub
 		
 	}
+	@Override
+	protected void afterCommit() {
+		if (isSeqNode) {
+			Elasql.migrationMgr().onReceiveAnalysisReq(null);
+		}
+	}
+	
 	
 	@Override
 	public boolean willResponseToClients(){

@@ -92,7 +92,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	// Migration
 	private MigrationManager migraMgr = Elasql.migrationMgr();
-	private boolean isSourceNode, isDestNode, isSeqNode;
+	boolean isSourceNode, isDestNode;
+	protected boolean isSeqNode;
 
 	private Set<RecordKey> pullKeys = new HashSet<RecordKey>();
 	// Not Migrated Readkeys
