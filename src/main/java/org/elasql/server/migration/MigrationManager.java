@@ -67,6 +67,7 @@ public abstract class MigrationManager {
 	public static int dataRange = 100;
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
+	private HashSet<Integer> migrateRanges = new HashSet<Integer>();
 
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
@@ -146,10 +147,10 @@ public abstract class MigrationManager {
 		// Init Clump with most Hotest Vertex
 		migraCandidate.addCandidate(overloadPart.getHotestVertex());
 		System.out.println("A Takes : " + (System.currentTimeMillis() - start_t));
-		
+
 		// Expend LOOK_AHEAD times
-		for (int a = 0; a < LOOK_AHEAD; a++){
-			if(a == 5000)
+		for (int a = 0; a < LOOK_AHEAD; a++) {
+			if (a == 5000)
 				System.out.println("B Takes : " + (System.currentTimeMillis() - start_t));
 			migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
 		}
@@ -203,6 +204,11 @@ public abstract class MigrationManager {
 	// System.out.println(vertexKeys);
 	//
 	// }
+
+	public void addMigrationRanges(Integer[] integers) {
+		for (int i : integers)
+			this.migrateRanges.add(i);
+	}
 
 	public abstract boolean keyIsInMigrationRange(RecordKey key);
 
