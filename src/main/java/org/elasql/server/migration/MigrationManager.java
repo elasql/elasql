@@ -182,7 +182,7 @@ public abstract class MigrationManager {
 		ArrayList<Integer> aa = new ArrayList<Integer>(migraCandidate.getCandidateIds());
 		Collections.sort(aa);
 		System.out.println(aa);
-		if (CLAY_EPOCH == 1)
+		if (CLAY_EPOCH == 2)
 			return;
 
 		CLAY_EPOCH = CLAY_EPOCH + 1;
