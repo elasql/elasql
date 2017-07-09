@@ -74,7 +74,7 @@ public abstract class MigrationManager {
 	private long printStatusPeriod;
 
 	public static long MONITOR_STOP_TIME = -1;
-	public static AtomicBoolean isMonitoring = new AtomicBoolean(true);
+	public static AtomicBoolean isMonitoring = new AtomicBoolean(false);
 
 	public MigrationManager(long printStatusPeriod) {
 		this.sourceNode = 0;
