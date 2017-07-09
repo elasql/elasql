@@ -180,6 +180,11 @@ public abstract class MigrationManager {
 		System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : " + partitions.get(0).getLoad()
 				+ " Edge : " + partitions.get(0).getEdgeLoad());
 
+		if (CLAY_EPOCH == 1) {
+			System.out.println(migraCandidate.getCandidateIds());
+			return;
+		}
+
 		CLAY_EPOCH = CLAY_EPOCH + 1;
 
 		broadcastMigrateKeys(params.toArray(new Integer[0]));
