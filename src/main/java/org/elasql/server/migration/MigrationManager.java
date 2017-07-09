@@ -67,7 +67,7 @@ public abstract class MigrationManager {
 	public static int dataRange = 100;
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
-	private HashSet<Integer> migrateRanges = new HashSet<Integer>();
+	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
 
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
@@ -208,6 +208,8 @@ public abstract class MigrationManager {
 	// }
 
 	public void addMigrationRanges(Integer[] integers) {
+		// Clear previous migration range
+		migrateRanges.clear();
 		for (int i : integers)
 			this.migrateRanges.add(i);
 	}
