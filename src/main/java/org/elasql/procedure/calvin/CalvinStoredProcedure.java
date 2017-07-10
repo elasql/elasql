@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.logging.Level;
 import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
@@ -354,6 +355,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		if (isSeqNode && MigrationManager.isMonitoring.get()
 				&& System.currentTimeMillis() > MigrationManager.MONITOR_STOP_TIME) {
+
+			System.out.println(
+					"Clay Stop Monitoring at " + (System.currentTimeMillis() - MigrationManager.startTime) / 1000);
 			migraMgr.generateMigrationPlan();
 			MigrationManager.isMonitoring.set(false);
 		}
@@ -405,6 +409,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 			// Something might be done after committing
 			afterCommit();
+
 			if (islog)
 				System.out.println("Tx : " + txNum + " Commited!");
 

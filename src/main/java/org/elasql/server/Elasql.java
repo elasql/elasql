@@ -67,9 +67,9 @@ public class Elasql extends VanillaDb {
 			}
 		}
 	}
-	
+
 	public static final ServiceType SERVICE_TYPE;
-	
+
 	static {
 		// read service type properties
 		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",
@@ -87,7 +87,7 @@ public class Elasql extends VanillaDb {
 
 	// connection information
 	private static int myNodeId;
-	
+
 	/**
 	 * Initializes the system. This method is called during system startup. For
 	 * sequencers, it can set {@code initVanillaDb} as {@code false} to avoid
@@ -113,10 +113,10 @@ public class Elasql extends VanillaDb {
 				logger.warning("error reading the class name for partition manager");
 			throw new RuntimeException();
 		}
-		
+
 		init(dirName, id, isSequencer, factory, partMetaMgr);
 	}
-	
+
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
 			PartitionMetaMgr partitionMetaMgr) {
 		myNodeId = id;
@@ -129,11 +129,11 @@ public class Elasql extends VanillaDb {
 
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
-			
+
 			VanillaDb.init(dirName);
 			initCacheMgr();
 			initPartitionMetaMgr(partitionMetaMgr);
-			
+
 			initScheduler(factory);
 			initConnectionMgr(myNodeId, true);
 			initMigration();
@@ -148,7 +148,7 @@ public class Elasql extends VanillaDb {
 		// initialize DD modules
 		initCacheMgr();
 		initPartitionMetaMgr(partitionMetaMgr);
-		
+
 		initScheduler(factory);
 		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
@@ -204,7 +204,7 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static Scheduler initCalvinScheduler(CalvinStoredProcedureFactory factory) {
-		CalvinScheduler scheduler = new CalvinScheduler(factory);
+		CalvinScheduler scheduler = new CalvinScheduler(factory, remoteRecReceiver);
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
@@ -215,7 +215,7 @@ public class Elasql extends VanillaDb {
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
-	
+
 	public static void initPartitionMetaMgr(PartitionMetaMgr partitionMetaMgr) {
 		try {
 			// Add a warper partition-meta-mgr for handling notifications
@@ -227,15 +227,13 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 	}
-	
-	public static void initMigration(){
-		String prop = System.getProperty(Elasql.class.getName()
-				+ ".MIGRATION_MGR");
+
+	public static void initMigration() {
+		String prop = System.getProperty(Elasql.class.getName() + ".MIGRATION_MGR");
 		String migrationCls = "org.elasql.bench.migration.MicroMigrationManager";
 
 		try {
-			migrateMgr = (MigrationManager) Class.forName(migrationCls)
-					.newInstance();
+			migrateMgr = (MigrationManager) Class.forName(migrationCls).newInstance();
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("error reading the class name for migration manager: " + migrationCls);
@@ -274,8 +272,8 @@ public class Elasql extends VanillaDb {
 	public static DdLogMgr DdLogMgr() {
 		return ddLogMgr;
 	}
-	
-	public static MigrationManager migrationMgr(){
+
+	public static MigrationManager migrationMgr() {
 		return migrateMgr;
 	}
 

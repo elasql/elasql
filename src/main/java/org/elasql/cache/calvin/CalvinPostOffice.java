@@ -52,7 +52,7 @@ public class CalvinPostOffice implements RemoteRecordReceiver {
 		dispatchers[id].registerCacheMgr(txNum, cacheMgr);
 	}
 
-	void notifyTxCommitted(long txNum) {
+	public void notifyTxCommitted(long txNum) {
 		int id = (int) (txNum % NUM_DISPATCHERS);
 		dispatchers[id].ungisterTransaction(txNum);
 	}

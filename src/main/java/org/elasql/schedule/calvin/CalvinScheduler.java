@@ -18,6 +18,8 @@ package org.elasql.schedule.calvin;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.elasql.cache.RemoteRecordReceiver;
+import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureTask;
@@ -28,12 +30,14 @@ import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class CalvinScheduler extends Task implements Scheduler {
-	
+
 	private CalvinStoredProcedureFactory factory;
+	private CalvinPostOffice postOffice;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 
-	public CalvinScheduler(CalvinStoredProcedureFactory factory) {
+	public CalvinScheduler(CalvinStoredProcedureFactory factory, RemoteRecordReceiver postOffice) {
 		this.factory = factory;
+		this.postOffice = (CalvinPostOffice) postOffice;
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -56,8 +60,8 @@ public class CalvinScheduler extends Task implements Scheduler {
 					continue;
 
 				// create store procedure and prepare
-				CalvinStoredProcedure<?> sp = factory.getStoredProcedure(
-						call.getPid(), call.getTxNum());
+				CalvinStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
+
 				sp.prepare(call.getPars());
 
 				// log request
@@ -67,13 +71,13 @@ public class CalvinScheduler extends Task implements Scheduler {
 				// if this node doesn't have to participate this transaction,
 				// skip it
 				if (!sp.isParticipated()) {
+					this.postOffice.notifyTxCommitted(call.getTxNum());
 					continue;
 				}
 
 				// create a new task for multi-thread
-				CalvinStoredProcedureTask spt = new CalvinStoredProcedureTask(
-						call.getClientId(), call.getConnectionId(), call.getTxNum(),
-						sp);
+				CalvinStoredProcedureTask spt = new CalvinStoredProcedureTask(call.getClientId(),
+						call.getConnectionId(), call.getTxNum(), sp);
 
 				// perform conservative locking
 				spt.bookConservativeLocks();

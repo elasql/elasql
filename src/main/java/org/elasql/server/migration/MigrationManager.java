@@ -32,7 +32,7 @@ public abstract class MigrationManager {
 	public static final int SINK_ID_ASYNC_PUSHING = -888;
 	public static final int SINK_ID_STOP_MIGRATION = -999;
 
-	private static long startTime = System.currentTimeMillis();
+	public static long startTime = System.currentTimeMillis();
 
 	private AtomicBoolean isMigrating = new AtomicBoolean(false);
 	private AtomicBoolean isMigrated = new AtomicBoolean(false);
@@ -110,84 +110,101 @@ public abstract class MigrationManager {
 	public HashMap<Integer, Vertex> getVertexKeys() {
 		return vertexKeys;
 	}
+	
+	public void cleanUpClay(){
+		for(Vertex v : vertexKeys.values())
+			v.clear();
+		vertexKeys.clear();
+	}
 
 	public void startClayMonitoring() {
-		System.out.println("Start Monitoring");
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Clay Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
+
 		isMonitoring.set(true);
 		MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
-		vertexKeys.clear();
+
 	}
 
 	public void generateMigrationPlan() {
 
 		// System.out.println(VertexKeys);
 
-		long start_t = System.currentTimeMillis();
-		ArrayList<Partition> partitions = new ArrayList<Partition>();
-		for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
-			partitions.add(new Partition(i));
+		VanillaDb.taskMgr().runTask(new Task() {
 
-		for (Vertex e : vertexKeys.values())
-			partitions.get(e.getPartId()).addVertex(e);
+			@Override
+			public void run() {
 
-		System.out.println("Clay No." + CLAY_EPOCH + " Monitoring Finish!");
-		for (Partition p : partitions) {
-			System.out.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
+				long start_t = System.currentTimeMillis();
+				ArrayList<Partition> partitions = new ArrayList<Partition>();
+				for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
+					partitions.add(new Partition(i));
 
-			for (Vertex v : p.getFirstTen())
-				System.out.println(
-						"Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :" + v.getVertexWeight());
-		}
+				for (Vertex e : vertexKeys.values())
+					partitions.get(e.getPartId()).addVertex(e);
 
-		double avgLoad = 0;
-		for (Partition p : partitions)
-			avgLoad += p.getTotalLoad();
-		avgLoad /= PartitionMetaMgr.NUM_PARTITIONS;
+				System.out.println("Clay No." + CLAY_EPOCH + " Monitoring Finish!");
+				for (Partition p : partitions) {
+					System.out
+							.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
 
-		LinkedList<Partition> overloadParts = new LinkedList<Partition>();
-		for (Partition p : partitions)
-			if (p.getTotalLoad() > avgLoad)
-				overloadParts.add(p);
+					for (Vertex v : p.getFirstTen())
+						System.out.println("Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :"
+								+ v.getVertexWeight());
+				}
 
-		Collections.sort(overloadParts);
-		// Get Most Overloaded Partition
-		Partition overloadPart = overloadParts.getLast();
+				double avgLoad = 0;
+				for (Partition p : partitions)
+					avgLoad += p.getTotalLoad();
+				avgLoad /= PartitionMetaMgr.NUM_PARTITIONS;
 
-		Candidate migraCandidate = new Candidate();
-		// Init Clump with most Hotest Vertex
-		migraCandidate.addCandidate(overloadPart.getHotestVertex());
+				LinkedList<Partition> overloadParts = new LinkedList<Partition>();
+				for (Partition p : partitions)
+					if (p.getTotalLoad() > avgLoad)
+						overloadParts.add(p);
 
-		// Expend LOOK_AHEAD times
-		for (int a = 0; a < LOOK_AHEAD; a++)
-			migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
+				Collections.sort(overloadParts);
+				// Get Most Overloaded Partition
+				Partition overloadPart = overloadParts.getLast();
 
-		// System.out.println(migraCandidate);
-		// Preparse Param
-		LinkedList<Integer> params = new LinkedList<Integer>(migraCandidate.getCandidateIds());
+				Candidate migraCandidate = new Candidate();
+				// Init Clump with most Hotest Vertex
+				migraCandidate.addCandidate(overloadPart.getHotestVertex());
 
-		// Determinstic select last load partition as Dest
-		Collections.sort(partitions);
-		params.addFirst(new Integer(partitions.get(0).getId()));
+				// Expend LOOK_AHEAD times
+				for (int a = 0; a < LOOK_AHEAD; a++)
+					migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
 
-		// Add Source at the Source
-		params.addFirst(new Integer(overloadPart.getId()));
+				// System.out.println(migraCandidate);
+				// Preparse Param
+				LinkedList<Integer> params = new LinkedList<Integer>(migraCandidate.getCandidateIds());
 
-		System.out.println("Clay No." + CLAY_EPOCH + " Migration Plan Generation Takes : "
-				+ (System.currentTimeMillis() - start_t) + " ms");
+				// Determinstic select last load partition as Dest
+				Collections.sort(partitions);
+				params.addFirst(new Integer(partitions.get(0).getId()));
 
-		System.out.println("Source is Part : " + overloadPart.getId() + " Weight : " + overloadPart.getLoad()
-				+ " Edge : " + overloadPart.getEdgeLoad());
-		System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : " + partitions.get(0).getLoad()
-				+ " Edge : " + partitions.get(0).getEdgeLoad());
-		ArrayList<Integer> aa = new ArrayList<Integer>(migraCandidate.getCandidateIds());
-		Collections.sort(aa);
-		System.out.println(aa);
-		if (CLAY_EPOCH == 2)
-			return;
+				// Add Source at the Source
+				params.addFirst(new Integer(overloadPart.getId()));
 
-		CLAY_EPOCH = CLAY_EPOCH + 1;
+				System.out.println("Clay No." + CLAY_EPOCH + " Migration Plan Generation Takes : "
+						+ (System.currentTimeMillis() - start_t) + " ms");
 
-		broadcastMigrateKeys(params.toArray(new Integer[0]));
+				System.out.println("Source is Part : " + overloadPart.getId() + " Weight : " + overloadPart.getLoad()
+						+ " Edge : " + overloadPart.getEdgeLoad());
+				System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : "
+						+ partitions.get(0).getLoad() + " Edge : " + partitions.get(0).getEdgeLoad());
+				ArrayList<Integer> aa = new ArrayList<Integer>(migraCandidate.getCandidateIds());
+				Collections.sort(aa);
+				System.out.println(aa);
+
+				CLAY_EPOCH = CLAY_EPOCH + 1;
+				if (logger.isLoggable(Level.INFO))
+					logger.info("Clay BroadKeyscast at " + (System.currentTimeMillis() - startTime) / 1000);
+
+				broadcastMigrateKeys(params.toArray(new Integer[0]));
+
+			}
+		});
 
 	}
 

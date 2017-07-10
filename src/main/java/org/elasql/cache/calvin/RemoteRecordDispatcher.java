@@ -106,7 +106,7 @@ public class RemoteRecordDispatcher extends Task {
 					// Transfer the cached records
 					if (cachedRecs != null) {
 						if (rq.cacheMgr.inbox == null) {
-							String str = System.currentTimeMillis()+"";
+							String str = System.currentTimeMillis() + "";
 							str = str + " from tx : " + rq.txNum;
 							str = str + "\n RRRecord  : ";
 							for (Integer rec : recordKeyToSortArray(cachedRecs))
@@ -142,7 +142,6 @@ public class RemoteRecordDispatcher extends Task {
 						// If it is not, add it to committed tx.
 						committedTxs.add(ur.txNum);
 					}
-
 					break;
 				case REMOTE_RECORD:
 					RemoteRecord rr = (RemoteRecord) e;

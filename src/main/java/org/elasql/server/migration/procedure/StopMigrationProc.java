@@ -6,6 +6,8 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.procedure.calvin.AllExecuteProcedure;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.vanilladb.core.server.VanillaDb;
+import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
 public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamHelper> {
@@ -13,9 +15,19 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 	public StopMigrationProc(long txNum) {
 		super(txNum, StoredProcedureParamHelper.DefaultParamHelper());
 		Elasql.migrationMgr().stopMigration();
-		
-		if(isSeqNode)
-			Elasql.migrationMgr().onReceieveLaunchClayReq(null);
+
+		if (isSeqNode && Elasql.migrationMgr().CLAY_EPOCH < 2) {
+			VanillaDb.taskMgr().runTask(new Task() {
+
+				@Override
+				public void run() {
+					Elasql.migrationMgr().cleanUpClay();
+					Elasql.migrationMgr().onReceieveLaunchClayReq(null);
+
+				}
+			});
+
+		}
 	}
 
 	@Override
@@ -23,9 +35,9 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 		// Do nothing
 
 	}
-	
+
 	@Override
-	public boolean willResponseToClients(){
+	public boolean willResponseToClients() {
 		return false;
 	}
 
