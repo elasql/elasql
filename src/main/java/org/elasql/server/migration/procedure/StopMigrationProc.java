@@ -21,8 +21,16 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 
 				@Override
 				public void run() {
-					Elasql.migrationMgr().cleanUpClay();
-					Elasql.migrationMgr().onReceieveLaunchClayReq(null);
+					//
+					if (!Elasql.migrationMgr().isReachTarget) {
+						// Continue form last data trace
+						Elasql.migrationMgr().updateMigratedVertexKeys();
+						Elasql.migrationMgr().generateMigrationPlan();
+					} else {
+						//New mointoring
+						Elasql.migrationMgr().cleanUpClay();
+						Elasql.migrationMgr().onReceieveLaunchClayReq(null);
+					}
 
 				}
 			});

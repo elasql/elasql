@@ -43,6 +43,10 @@ public class Vertex implements Comparable<Vertex> {
 		return id;
 	}
 
+	public void setPartId(int part) {
+		this.partId = part;
+	}
+
 	public int getPartId() {
 		return partId;
 	}
@@ -59,6 +63,7 @@ public class Vertex implements Comparable<Vertex> {
 		else
 			w.weight++;
 	}
+	
 
 	public void clear() {
 		this.weight = 0;

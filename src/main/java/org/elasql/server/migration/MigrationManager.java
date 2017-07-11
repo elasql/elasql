@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.Vertex.OutEdge;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.VanillaDb;
@@ -69,6 +70,7 @@ public abstract class MigrationManager {
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
+	public boolean isReachTarget = false;
 
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
@@ -110,9 +112,9 @@ public abstract class MigrationManager {
 	public HashMap<Integer, Vertex> getVertexKeys() {
 		return vertexKeys;
 	}
-	
-	public void cleanUpClay(){
-		for(Vertex v : vertexKeys.values())
+
+	public void cleanUpClay() {
+		for (Vertex v : vertexKeys.values())
 			v.clear();
 		vertexKeys.clear();
 	}
@@ -124,6 +126,16 @@ public abstract class MigrationManager {
 		isMonitoring.set(true);
 		MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
 
+	}
+
+	public void updateMigratedVertexKeys() {
+		for (Integer i : migrateRanges) {
+			vertexKeys.get(i).setPartId(getDestPartition());
+		}
+		for (Vertex v : vertexKeys.values())
+			for (OutEdge o : v.getEdge().values())
+				if (migrateRanges.contains(o.id))
+					o.partId = getDestPartition();
 	}
 
 	public void generateMigrationPlan() {
