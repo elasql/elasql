@@ -63,14 +63,14 @@ public abstract class MigrationManager {
 	// Clay structure
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
-	public static final int MONITORING_TIME = 30 * 1000;
+	public static final int MONITORING_TIME = 20 * 1000;
 	public static int CLAY_EPOCH = 0;
 	private final int LOOK_AHEAD = 200;
 	public static int dataRange = 100;
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
-	public boolean isReachTarget = false;
+	public boolean isReachTarget = true;
 
 	// The time starts from the time which the first transaction arrives at
 	private long printStatusPeriod;
