@@ -32,6 +32,7 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.HeuristicNodeInserter;
 import org.elasql.schedule.tpart.SupaTGraph;
+import org.elasql.schedule.tpart.TGraph;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
 import org.elasql.storage.log.DdLogMgr;
@@ -199,7 +200,7 @@ public class Elasql extends VanillaDb {
 
 	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
 		TPartPartitioner scheduler = new TPartPartitioner(factory,  new HeuristicNodeInserter(),
-				new CacheOptimizedSinker(), new SupaTGraph());
+				new CacheOptimizedSinker(), new TGraph());
 
 		taskMgr().runTask(scheduler);
 		return scheduler;
