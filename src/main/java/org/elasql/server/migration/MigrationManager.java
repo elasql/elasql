@@ -58,12 +58,12 @@ public abstract class MigrationManager {
 	private boolean roundrobin = true;
 	private boolean useCount = true;
 	private boolean backPushStarted = false;
-	private boolean isSourceNode;
+	//private boolean isSourceNode;
 
 	// Clay structure
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
-	public static final int MONITORING_TIME = 20 * 1000;
+	public static final int MONITORING_TIME = 10 * 1000;
 	public static int CLAY_EPOCH = 0;
 	private final int LOOK_AHEAD = 200;
 	public static int dataRange = 100;
@@ -82,8 +82,11 @@ public abstract class MigrationManager {
 		this.sourceNode = 0;
 		this.destNode = 1;
 		this.printStatusPeriod = printStatusPeriod;
-		isSourceNode = (Elasql.serverId() == getSourcePartition());
+		//isSourceNode = (Elasql.serverId() == getSourcePartition());
 		isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
+	}
+	public boolean isSourceNode(){
+		return (Elasql.serverId() == getSourcePartition());
 	}
 
 	public void encreaseWeight(Integer vetxId, int partId) {
@@ -323,7 +326,7 @@ public abstract class MigrationManager {
 	// Executed on the source node
 	public void analysisComplete(Map<RecordKey, Boolean> analyzedKeys) {
 		// Only the source node can call this method
-		if (!isSourceNode)
+		if (!isSourceNode())
 			throw new RuntimeException("Something wrong");
 
 		// Set all keys in the data set as pushing candidates
@@ -340,7 +343,7 @@ public abstract class MigrationManager {
 
 	// NOTE: This can only be called by the scheduler
 	public void setRecordMigrated(Collection<RecordKey> keys) {
-		if (isSourceNode) {
+		if (isSourceNode()) {
 			for (RecordKey key : keys) {
 				Boolean status = newInsertedData.get(key);
 				if (status != null && status == Boolean.FALSE) {
@@ -360,7 +363,7 @@ public abstract class MigrationManager {
 	}
 
 	public void setRecordLocation(Collection<RecordKey> keys) {
-		if (isSourceNode) {
+		if (isSourceNode()) {
 			for (RecordKey key : keys) {
 				Boolean status = newInsertedData.get(key);
 				if (status != null && status == Boolean.FALSE) {
@@ -384,7 +387,7 @@ public abstract class MigrationManager {
 
 	// NOTE: This can only be called by the scheduler
 	public boolean isRecordMigrated(RecordKey key) {
-		if (isSourceNode) {
+		if (isSourceNode()) {
 			Boolean status = newInsertedData.get(key);
 			if (status != null)
 				return status;
@@ -652,7 +655,7 @@ public abstract class MigrationManager {
 		backPushStarted = true;
 
 		// Only the source node can send the bg push request
-		if (isSourceNode) {
+		if (isSourceNode()) {
 			// Use another thread to start background pushing
 			VanillaDb.taskMgr().runTask(new Task() {
 				@Override
