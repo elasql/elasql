@@ -48,7 +48,7 @@ public abstract class PartitionMetaMgr {
 	 * 
 	 * public void setLot(X loc) { this.loc = loc; } }
 	 */
-	private static HashMap<RecordKey, LinkedList<Integer>> locationTable;
+	private static HashMap<RecordKey, Integer> locationTable;
 
 	static {
 
@@ -65,7 +65,7 @@ public abstract class PartitionMetaMgr {
 		BENCH_START_TIME = System.currentTimeMillis();
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
-		locationTable = new HashMap<RecordKey, LinkedList<Integer>>();
+		locationTable = new HashMap<RecordKey, Integer>(1000000);
 		/*
 		 * new PeriodicalJob(3000, 500000, new Runnable() {
 		 * 
@@ -156,11 +156,11 @@ public abstract class PartitionMetaMgr {
 	 * @return the id of the partition where the record is
 	 */
 	public int getPartition(RecordKey key) {
-		LinkedList<Integer> old = locationTable.get(key);
+		Integer old = locationTable.get(key);
 		if (old == null)
 			return getLocation(key);
 		else
-			return old.getFirst();
+			return old;
 	}
 
 	public void setPartition(RecordKey key, int loc) {
@@ -173,13 +173,8 @@ public abstract class PartitionMetaMgr {
 			e.printStackTrace();
 		}
 
-		LinkedList<Integer> old = locationTable.get(key);
-		if (old == null) {
-			LinkedList<Integer> l = new LinkedList<Integer>();
-			l.addFirst(loc);
-			locationTable.put(key, l);
-		} else
-			old.set(0, loc);
+		locationTable.put(key, new Integer(loc));
+
 
 	}
 

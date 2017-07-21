@@ -200,7 +200,7 @@ public class Elasql extends VanillaDb {
 
 	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
 		TPartPartitioner scheduler = new TPartPartitioner(factory,  new HeuristicNodeInserter(),
-				new CacheOptimizedSinker(), new TGraph());
+				new CacheOptimizedSinker(), new SupaTGraph());
 
 		taskMgr().runTask(scheduler);
 		return scheduler;
