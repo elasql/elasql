@@ -120,6 +120,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public boolean isReadOnly() {
 		return paramHelper.isReadOnly();
 	}
+	
+	public long getTxNum() {
+		return txNum;
+	}
 
 	protected void addReadKey(RecordKey readKey) {
 		readKeys.add(readKey);

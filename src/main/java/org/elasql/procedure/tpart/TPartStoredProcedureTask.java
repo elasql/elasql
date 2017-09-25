@@ -39,7 +39,8 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 		// }
 
 		if (tsp.isMaster()) {
-			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+			if (clientId != -1)
+				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 			// System.out.println("Commit: " + (System.nanoTime() - startTime));
 		}
 		// System.out.println("task time:" + (System.nanoTime() -

@@ -130,34 +130,34 @@ public class CacheOptimizedSinker extends Sinker {
 			// write back
 			// System.out.println("Write back edges: ");
 			if (node.getWriteBackEdges().size() > 0 && !replicated) {
-				int sourceServerId;
+				int dataCurrentPos;
 				
 				for (Edge e : node.getWriteBackEdges()) {
 
-					int targetServerId = e.getTarget().getPartId();
+					int dataWriteBackPos = e.getTarget().getPartId();
 					RecordKey k = e.getResourceKey();
-					sourceServerId = parMeta.getPartition(k);
+					dataCurrentPos = parMeta.getPartition(k);
 					
-					if(sourceServerId != targetServerId){
+					if(dataCurrentPos != dataWriteBackPos){
 						
 						//destination perform insert
-						if(targetServerId == myId)
+						if(dataWriteBackPos == myId)
 							plan.addMigraInsertInfo(k);
 						
 						//source perform delete
-						if(sourceServerId == myId)
+						if(dataCurrentPos == myId)
 							plan.addMigraDeleteInfo(k);
 						
-						parMeta.setPartition(k, targetServerId);
+						parMeta.setPartition(k, dataWriteBackPos);
 					}
 					
-					if (targetServerId == myId) {
+					if (dataWriteBackPos == myId) {
 						// tell the task to write back local
 						plan.addLocalWriteBackInfo(k);
 						writeBackFlags.add(k);
 					} else {
 						// push the data if write back to remote
-						plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
+						plan.addPushingInfo(k, dataWriteBackPos, txNum, TPartCacheMgr.toSinkId(dataWriteBackPos));
 
 					}
 					
@@ -207,7 +207,7 @@ public class CacheOptimizedSinker extends Sinker {
 		for (RecordKey key : writeBackFlags) 
 			cm.setWriteBackInfo(key, sinkProcessId);
 		
-		
+		parMeta.removeOverflowedKeys();
 		
 
 		return localTasks;
