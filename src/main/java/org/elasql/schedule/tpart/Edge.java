@@ -20,4 +20,9 @@ public class Edge {
 		return resource;
 	}
 
+	@Override
+	public String toString() {
+		return String.format("{Resource: %s, from/to tx: %d, part: %d}", resource, target.getTxNum(),
+				target.getPartId());
+	}
 }

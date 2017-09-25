@@ -70,6 +70,8 @@ public class Elasql extends VanillaDb {
 	
 	public static final ServiceType SERVICE_TYPE;
 	
+	public static final long START_TIME_MS = System.currentTimeMillis();
+	
 	static {
 		// read service type properties
 		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",

@@ -96,7 +96,7 @@ public class Node {
 	public String toString() {
 		return "[Node] Txn-id: " + getTask().getTxNum() + ", " + "read-edges: "
 				+ readEdges + ", write-edges: " + writeEdges + ", weight: "
-				+ task.getWeight();
+				+ task.getWeight() + ", part id: " + partId;
 	}
 
 	@Override
