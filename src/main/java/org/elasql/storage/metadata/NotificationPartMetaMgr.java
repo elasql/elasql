@@ -53,7 +53,7 @@ public class NotificationPartMetaMgr extends PartitionMetaMgr {
 		if (key.getTableName().equals(TABLE_NAME))
 			return -1; // Not belongs to anyone, preventing for inserting to local
 		
-		return underliedPartMetaMgr.getPartition(key);
+		return underliedPartMetaMgr.getLocation(key);
 	}
 
 }
