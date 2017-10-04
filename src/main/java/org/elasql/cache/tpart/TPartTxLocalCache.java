@@ -36,10 +36,10 @@ public class TPartTxLocalCache {
 	 *            the id of the sink where the transaction executes
 	 * @return the specified record
 	 */
-	public CachedRecord readFromSink(RecordKey key, int mySinkId) {
+	public CachedRecord readFromSink(RecordKey key) {
 
 		CachedRecord rec = null;
-		rec = cacheMgr.readFromSink(key, mySinkId, tx);
+		rec = cacheMgr.readFromSink(key, tx);
 		rec.setSrcTxNum(txNum);
 		recordCache.put(key, rec);
 
@@ -112,7 +112,7 @@ public class TPartTxLocalCache {
 				// it might be pushed from the same transaction on the other
 				// machine.
 
-				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
+				cacheMgr.writeBack(key, rec, tx);
 
 			}
 		} else {
@@ -122,7 +122,7 @@ public class TPartTxLocalCache {
 
 				CachedRecord rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
 
-				cacheMgr.writeBack(key, plan.sinkProcessId(), rec, tx);
+				cacheMgr.writeBack(key, rec, tx);
 
 			}
 

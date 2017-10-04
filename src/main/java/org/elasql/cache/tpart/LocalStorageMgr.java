@@ -7,10 +7,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.sql.RecordKey;
-import org.elasql.util.PeriodicalJob;
 import org.vanilladb.core.storage.tx.Transaction;
 
-public class LocalStorage {
+/**
+ * A manager that handles the access to the local storage. Thread-safe.
+ * 
+ * @author Yu-Shan Lin
+ */
+public class LocalStorageMgr {
 	
 	private static final int NUM_ANCHOR = 1009;
 	
@@ -25,8 +29,6 @@ public class LocalStorage {
 	 * == Writing ==
 	 *    Write
 	 *    Remove self from the write queue
-	 * 
-	 * @author SLMT
 	 *
 	 */
 	private class LockRequests {
@@ -45,29 +47,20 @@ public class LocalStorage {
 	// Lock-stripping
 	private final Object anchors[] = new Object[NUM_ANCHOR];
 	
-	public LocalStorage() {
+	public LocalStorageMgr() {
 		for (int i = 0; i < anchors.length; i++)
 			anchors[i] = new Object();
-		new PeriodicalJob(5_000, 300_000, new Runnable() {
-
-			@Override
-			public void run() {
-				System.out.println("Size: " + requestMap.size());
-			}
-			
-		}).start();
 	}
 	
 	/**
-	 * Request the shared lock of a record for reading it in the near future.
-	 * A sink process can request the shared lock of the same object multiple times.
-	 * Those requests will be handled separately.
+	 * Request the shared lock of a record for reading it in the near future. <br />
+	 * <br />
+	 * All requests should be issued in the same thread.
 	 * 
 	 * @param key
 	 * @param txNum
 	 */
 	public void requestSharedLock(RecordKey key, long txNum) {
-//		System.out.println(String.format("%d request reads on %s", sinkProcessId, key));
 		synchronized (getAnchor(key)) {
 			LockRequests requests = getLockRequests(key);
 			
@@ -82,17 +75,18 @@ public class LocalStorage {
 	/**
 	 * Request the exclusive lock of a record for reading and modifying it 
 	 * in the near future. If it had requested the shared lock of the record,
-	 * the request would be upgraded for the exclusive lock. 
+	 * the request would be upgraded for the exclusive lock. <br />
+	 * <br />
+	 * All requests should be issued in the same thread.
 	 * 
 	 * @param key
 	 * @param txNum
 	 */
 	public void requestExclusiveLock(RecordKey key, long txNum) {
-//		System.out.println(String.format("%d request writes on %s", sinkProcessId, key));
 		synchronized (getAnchor(key)) {
 			LockRequests requests = getLockRequests(key);
 			
-			// Remove the shared request using the same sink process id
+			// Remove the shared lock request for the same transaction
 			if (!requests.sharedLocks.isEmpty() &&
 					requests.sharedLocks.peekLast() == txNum)
 				requests.sharedLocks.removeLast();
@@ -102,7 +96,7 @@ public class LocalStorage {
 	}
 	
 	/**
-	 * Read the requested record. If a sink process only requested a shared lock,
+	 * Read the requested record. If a transaction only requested a shared lock,
 	 * the lock would be release immediately after the process got the record. 
 	 * 
 	 * @param key
@@ -118,17 +112,15 @@ public class LocalStorage {
 				long txNum = tx.getTransactionNumber();
 				long xh = peekHead(requests.exclusiveLocks);
 				
-//				System.out.println(String.format("%d reads %s: %s", txNum, key, requests));
-				
-				// Compare its process id (SI) with the head (XH) of the exclusive lock queue.
+				// Compare its number (txNum) with the head (XH) of the exclusive lock queue.
 	
-				// If SI > XH, wait for the next check
+				// If txNum > XH, wait for the next check
 				while (txNum > xh) {
 					anchor.wait(10000);
 					xh = peekHead(requests.exclusiveLocks);
 				}
 				
-				// If SI = XH, check if SI is also smaller than the head (SH) of shared lock queue
+				// If txNum = XH, check if txNum is also smaller than the head (SH) of shared lock queue
 				// If it wasn't, continue waiting and checking SH
 				// If it was, read the object (but do nothing to the queue)
 				if (txNum == xh) {
@@ -142,7 +134,7 @@ public class LocalStorage {
 					return VanillaCoreCrud.read(key, tx);
 				}
 				
-				// If SI < XH, read the object and remove itself from the shared lock queue
+				// If txNum < XH, read the object and remove itself from the shared lock queue
 				// Then, notify the other waiting
 				// Check if it can remove this request pair
 				CachedRecord rec = VanillaCoreCrud.read(key, tx);
@@ -150,7 +142,7 @@ public class LocalStorage {
 				// Convert to Integer to avoid calling remove(index)
 				if (!requests.sharedLocks.remove((Long) txNum)) {
 					throw new RuntimeException(
-							"Cannot find " + txNum + " in neithor "
+							"Cannot find Tx." + txNum + " in neithor "
 									+ "shared queue or the head of exclusive queue of " + key);
 				}
 				
@@ -160,8 +152,6 @@ public class LocalStorage {
 				anchor.notifyAll();
 				
 				return rec;
-				
-				// TODO: Is it possible that SI < XH, but the tx actually requesting x lock ?
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				throw new RuntimeException(
@@ -184,8 +174,6 @@ public class LocalStorage {
 			long txNum = tx.getTransactionNumber();
 			LockRequests requests = getLockRequests(key);
 			
-//			System.out.println(String.format("%d writes %s: %s", txNum, key, requests));
-			
 			// Write and remove itself from the queue
 			// Check if it can remove this request pair
 			writeToVanillaCore(key, rec, tx);
@@ -193,7 +181,7 @@ public class LocalStorage {
 			// It should be the head of exclusive locks
 			if (txNum != requests.exclusiveLocks.peekFirst())
 				throw new RuntimeException(
-						"" + txNum + " is not the head of exclusive queue of " + key);
+						"Tx." + txNum + " is not the head of exclusive queue of " + key);
 			
 			requests.exclusiveLocks.pollFirst();
 			if (requests.sharedLocks.isEmpty() && requests.exclusiveLocks.isEmpty())

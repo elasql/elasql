@@ -99,7 +99,7 @@ public class WriteBackTest {
 	@Test
 	public void testWriteback() {
 		final RecordKey commonKey = createRecordKey(1);
-		final LocalStorage localStorage = new LocalStorage();
+		final LocalStorageMgr localStorage = new LocalStorageMgr();
 		final BlockingQueue<CachedRecord> returnQueue = new LinkedBlockingQueue<CachedRecord>();
 		
 		// Set sink reads and write-back info
