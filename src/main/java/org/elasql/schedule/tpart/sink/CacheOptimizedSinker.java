@@ -66,10 +66,12 @@ public class CacheOptimizedSinker extends Sinker {
 		/*
 		 * Prepare the cache info and sink plan.
 		 */
-
-		Set<RecordKey> sinkReadings = new HashSet<RecordKey>();		
+		
+		// Note that if there are multiple sink reads on the same object,
+		// it shall make the same number of sink reading requests to CacheMgr.
+//		List<RecordKey> sinkReadings = new LinkedList<RecordKey>();
 		// the version of record that will be write back to local storage
-		Set<RecordKey> writeBackFlags = new HashSet<RecordKey>();
+//		List<RecordKey> writeBackFlags = new LinkedList<RecordKey>();
 
 		// create procedure tasks
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
@@ -96,13 +98,18 @@ public class CacheOptimizedSinker extends Sinker {
 					plan.addReadingInfo(e.getResourceKey(), srcTxn);
 
 					if (isLocalResource && e.getTarget().isSinkNode()) {
-						sinkReadings.add(e.getResourceKey());
+//						System.out.println(String.format("Tx.%d sink read %s in pro.%d", node.getTxNum(), e.getResourceKey(), sinkProcessId));
+//						sinkReadings.add(e.getResourceKey());
+						cm.registerSinkReading(e.getResourceKey(), txNum);
 						plan.addSinkReadingInfo(e.getResourceKey());
 					}
 
 				} else if (isLocalResource && e.getTarget().isSinkNode()) {
 					// if is not local task and the source of the edge is sink
 					// node add the push tag to sinkPushTask
+//					System.out.println(String.format("Tx.%d sink push %s in pro.%d", node.getTxNum(), e.getResourceKey(), sinkProcessId));
+//					sinkReadings.add(e.getResourceKey());
+					cm.registerSinkReading(e.getResourceKey(), txNum);
 					plan.addSinkPushingInfo(e.getResourceKey(), node.getPartId(), TPartCacheMgr.toSinkId(myId),
 							node.getTxNum());
 				}
@@ -137,7 +144,9 @@ public class CacheOptimizedSinker extends Sinker {
 						if (targetServerId == myId) {
 							// tell the task to write back local
 							plan.addLocalWriteBackInfo(k);
-							writeBackFlags.add(k);
+//							System.out.println(String.format("Tx.%d write back %s in pro.%d", node.getTxNum(), e.getResourceKey(), sinkProcessId));
+//							writeBackFlags.add(k);
+							cm.registerSinkWriteback(e.getResourceKey(), txNum);
 						} else {
 							// push the data if write back to remote
 							plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
@@ -147,7 +156,9 @@ public class CacheOptimizedSinker extends Sinker {
 					} else {
 						if (targetServerId == myId) {
 
-							writeBackFlags.add(k);
+//							writeBackFlags.add(k);
+//							System.out.println(String.format("Tx.%d write back %s in pro.%d", node.getTxNum(), e.getResourceKey(), sinkProcessId));
+							cm.registerSinkWriteback(e.getResourceKey(), txNum);
 							plan.addLocalWriteBackInfo(k);
 						}
 					}
@@ -174,14 +185,14 @@ public class CacheOptimizedSinker extends Sinker {
 		// }
 		
 		// set sink readings
-		for (RecordKey key : sinkReadings) {
-			cm.registerSinkReading(key, sinkProcessId);
-		}
+//		for (RecordKey key : sinkReadings) {
+//			cm.registerSinkReading(key, sinkProcessId);
+//		}
 
 		// set write back flags
-		for (RecordKey key : writeBackFlags) {
-			cm.registerSinkWriteback(key, sinkProcessId);
-		}
+//		for (RecordKey key : writeBackFlags) {
+//			cm.registerSinkWriteback(key, sinkProcessId);
+//		}
 
 		return localTasks;
 	}

@@ -118,7 +118,7 @@ public class WriteBackTest {
 						Connection.TRANSACTION_SERIALIZABLE, false, 1);
 				CachedRecord record = createCachedRecord(1, 10001);
 				record.setNewInserted(true);
-				localStorage.writeBack(commonKey, 1, record, tx);
+				localStorage.writeBack(commonKey, record, tx);
 			}
 		});
 		threads[0].start();
@@ -130,9 +130,9 @@ public class WriteBackTest {
 			public void run() {
 				Transaction tx = VanillaDb.txMgr().newTransaction(
 						Connection.TRANSACTION_SERIALIZABLE, false, 3);
-				CachedRecord record = localStorage.read(commonKey, 3, tx);
+				CachedRecord record = localStorage.read(commonKey, tx);
 				record.setVal("tvalue", new IntegerConstant(20001));
-				localStorage.writeBack(commonKey, 3, record, tx);
+				localStorage.writeBack(commonKey, record, tx);
 			}
 		});
 		threads[2].start();
@@ -144,7 +144,7 @@ public class WriteBackTest {
 			public void run() {
 				Transaction tx = VanillaDb.txMgr().newTransaction(
 						Connection.TRANSACTION_SERIALIZABLE, false, 2);
-				CachedRecord record = localStorage.read(commonKey, 2, tx);
+				CachedRecord record = localStorage.read(commonKey, tx);
 				
 				try {
 					returnQueue.put(record);

@@ -41,9 +41,10 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		}
 		return anchors[0];
 	}
-
+	
+	// TODO: Update this
 	public CachedRecord readFromSink(RecordKey key, int mySinkId, Transaction tx) {
-		return localStorage.read(key, mySinkId, tx);
+		return localStorage.read(key, tx);
 	}
 
 	public CachedRecord takeFromTx(RecordKey key, long src, long dest) {
@@ -73,16 +74,17 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	public void cacheRemoteRecord(Tuple t) {
 		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, true);
 	}
-
+	
+	// TODO: Update this
 	public void writeBack(RecordKey key, int sinkProcessId, CachedRecord rec, Transaction tx) {
-		localStorage.writeBack(key, sinkProcessId, rec, tx);
+		localStorage.writeBack(key, rec, tx);
 	}
 	
-	public void registerSinkReading(RecordKey key, int sinkProcessId) {
-		localStorage.requestSharedLock(key, sinkProcessId);
+	public void registerSinkReading(RecordKey key, long txNum) {
+		localStorage.requestSharedLock(key, txNum);
 	}
 
-	public void registerSinkWriteback(RecordKey key, int sinkProcessId) {
-		localStorage.requestExclusiveLock(key, sinkProcessId);
+	public void registerSinkWriteback(RecordKey key, long txNum) {
+		localStorage.requestExclusiveLock(key, txNum);
 	}
 }
