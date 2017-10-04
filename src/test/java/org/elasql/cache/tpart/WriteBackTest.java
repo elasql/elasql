@@ -6,6 +6,8 @@ import static org.vanilladb.core.sql.Type.INTEGER;
 import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -96,32 +98,71 @@ public class WriteBackTest {
 	 */
 	@Test
 	public void testWriteback() {
-		RecordKey commonKey = createRecordKey(1);
-		WriteBackRecMgr writeBackMgr = new WriteBackRecMgr();
+		final RecordKey commonKey = createRecordKey(1);
+		final LocalStorage localStorage = new LocalStorage();
+		final BlockingQueue<CachedRecord> returnQueue = new LinkedBlockingQueue<CachedRecord>();
 		
-		// Set writeback info (in scheduler)
-		writeBackMgr.setWriteBackInfo(commonKey, 1);
-		writeBackMgr.setWriteBackInfo(commonKey, 3);
+		// Set sink reads and write-back info
+		localStorage.requestSharedLock(commonKey, 2);
+		localStorage.requestSharedLock(commonKey, 3);
+		localStorage.requestExclusiveLock(commonKey, 1);
+		localStorage.requestExclusiveLock(commonKey, 3);
+		
+		Thread[] threads = new Thread[3];
 		
 		// Tx.1 inserts a record
-		Transaction tx = VanillaDb.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, false, 1);
-		CachedRecord record = createCachedRecord(1, 10001);
-		record.setNewInserted(true);
-		writeBackMgr.writeBackRecord(commonKey, 1, record, tx);
+		threads[0] = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				Transaction tx = VanillaDb.txMgr().newTransaction(
+						Connection.TRANSACTION_SERIALIZABLE, false, 1);
+				CachedRecord record = createCachedRecord(1, 10001);
+				record.setNewInserted(true);
+				localStorage.writeBack(commonKey, 1, record, tx);
+			}
+		});
+		threads[0].start();
+		
 		
 		// Tx.3 reads and modify the record
-		tx = VanillaDb.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, false, 3);
-		record = writeBackMgr.read(commonKey, 3, tx);
-		record.setVal("tvalue", new IntegerConstant(20001));
-		writeBackMgr.writeBackRecord(commonKey, 3, record, tx);
+		threads[2] = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				Transaction tx = VanillaDb.txMgr().newTransaction(
+						Connection.TRANSACTION_SERIALIZABLE, false, 3);
+				CachedRecord record = localStorage.read(commonKey, 3, tx);
+				record.setVal("tvalue", new IntegerConstant(20001));
+				localStorage.writeBack(commonKey, 3, record, tx);
+			}
+		});
+		threads[2].start();
+		
 		
 		// Tx.2 reads the record
-		tx = VanillaDb.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, false, 2);
-		record = writeBackMgr.read(commonKey, 2, tx);
+		threads[1] = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				Transaction tx = VanillaDb.txMgr().newTransaction(
+						Connection.TRANSACTION_SERIALIZABLE, false, 2);
+				CachedRecord record = localStorage.read(commonKey, 2, tx);
+				
+				try {
+					returnQueue.put(record);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		});
+		threads[1].start();
 		
-		assertEquals("bad writeback", 10001, record.getVal("tvalue"));
+		try {
+			assertEquals("bad writeback", 10001, returnQueue.take().getVal("tvalue").asJavaVal());
+			
+			// TODO: But we can not know if there is a exception happened in a thread
+			for (Thread t : threads)
+				t.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}	
 	}
 }

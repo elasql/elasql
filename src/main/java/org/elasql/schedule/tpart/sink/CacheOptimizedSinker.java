@@ -1,9 +1,10 @@
 package org.elasql.schedule.tpart.sink;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
@@ -66,10 +67,9 @@ public class CacheOptimizedSinker extends Sinker {
 		 * Prepare the cache info and sink plan.
 		 */
 
-		// // the version of record will read from remote site
-
+		Set<RecordKey> sinkReadings = new HashSet<RecordKey>();		
 		// the version of record that will be write back to local storage
-		List<RecordKey> writeBackFlags = new ArrayList<RecordKey>();
+		Set<RecordKey> writeBackFlags = new HashSet<RecordKey>();
 
 		// create procedure tasks
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
@@ -95,8 +95,10 @@ public class CacheOptimizedSinker extends Sinker {
 				if (taskIsLocal) {
 					plan.addReadingInfo(e.getResourceKey(), srcTxn);
 
-					if (isLocalResource && e.getTarget().isSinkNode())
+					if (isLocalResource && e.getTarget().isSinkNode()) {
+						sinkReadings.add(e.getResourceKey());
 						plan.addSinkReadingInfo(e.getResourceKey());
+					}
 
 				} else if (isLocalResource && e.getTarget().isSinkNode()) {
 					// if is not local task and the source of the edge is sink
@@ -170,10 +172,15 @@ public class CacheOptimizedSinker extends Sinker {
 		// VanillaDdDb.tPartCacheMgr().setRemoteFlag(key.getRecordKey(),
 		// key.getSource(), key.getDestination());
 		// }
+		
+		// set sink readings
+		for (RecordKey key : sinkReadings) {
+			cm.registerSinkReading(key, sinkProcessId);
+		}
 
 		// set write back flags
 		for (RecordKey key : writeBackFlags) {
-			cm.setWriteBackInfo(key, sinkProcessId);
+			cm.registerSinkWriteback(key, sinkProcessId);
 		}
 
 		return localTasks;
