@@ -214,7 +214,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 		
 		// Check which node has the corresponding record
-		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
+		int nodeId = Elasql.partitionMetaMgr().getCurrentLocation(readKey);
 		if (nodeId == localNodeId)
 			localReadKeys.add(readKey);
 		else
@@ -228,7 +228,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	protected void addWriteKey(RecordKey writeKey) {
 		// Check which node has the corresponding record
-		int nodeId = Elasql.partitionMetaMgr().getPartition(writeKey);
+		int nodeId = Elasql.partitionMetaMgr().getCurrentLocation(writeKey);
 		if (nodeId == localNodeId)
 			localWriteKeys.add(writeKey);
 		activeParticipants.add(nodeId);
@@ -236,7 +236,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	
 	protected void addInsertKey(RecordKey insertKey) {
 		// Check which node has the corresponding record
-		int nodeId = Elasql.partitionMetaMgr().getPartition(insertKey);
+		int nodeId = Elasql.partitionMetaMgr().getCurrentLocation(insertKey);
 		if (nodeId == localNodeId)
 			localInsertKeys.add(insertKey);
 		activeParticipants.add(nodeId);

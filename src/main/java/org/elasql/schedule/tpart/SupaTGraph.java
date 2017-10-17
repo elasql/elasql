@@ -38,7 +38,7 @@ public class SupaTGraph extends TGraph {
 			
 			// Let the node write back the data of removed keys to the original position
 			for (RecordKey key : overflowedKeys) {
-				int originalLocation = partMgr.getLocation(key);
+				int originalLocation = partMgr.getPartition(key);
 				node.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
 				
 				// remove the handled resource from the map

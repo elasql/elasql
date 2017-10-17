@@ -109,7 +109,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 					int lastPart = -1;
 					// Check if there are records on two different partitions
 					for (RecordKey key : task.getReadSet()) {
-						int thisPart = parMetaMgr.getPartition(key);
+						int thisPart = parMetaMgr.getCurrentLocation(key);
 						if (lastPart != -1 && lastPart != thisPart) {
 							isCrossPartitionTx = true;
 							break;

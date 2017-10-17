@@ -71,7 +71,7 @@ public class TGraph {
 			Node node = resPosPair.getValue();
 
 			if (node.getTask() != null)
-				node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getPartition(res)], res));
+				node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getCurrentLocation(res)], res));
 		}
 		resPos.clear();
 	}
@@ -96,7 +96,7 @@ public class TGraph {
 	public Node getResourcePosition(RecordKey res) {
 		if (resPos.containsKey(res))
 			return resPos.get(res);
-		return sinkNodes[parMeta.getPartition(res)];
+		return sinkNodes[parMeta.getCurrentLocation(res)];
 	}
 
 	public List<Node> getNodes() {

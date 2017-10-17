@@ -162,15 +162,15 @@ public abstract class PartitionMetaMgr {
 	 *            the key of the record
 	 * @return the id of the partition where the record is
 	 */
-	public int getPartition(RecordKey key) {
+	public int getCurrentLocation(RecordKey key) {
 		Integer old = locationTable.get(key);
 		if (old == null)
-			return getLocation(key);
+			return getPartition(key);
 		else
 			return old;
 	}
 
-	public void setPartition(RecordKey key, int loc) {
+	public void setCurrentLocation(RecordKey key, int loc) {
 		try {
 			BWRLOGFILE.write((System.currentTimeMillis() - BENCH_START_TIME) + "," + key.getKeyVal("i_id") + "," + loc);
 			BWRLOGFILE.newLine();
@@ -234,5 +234,5 @@ public abstract class PartitionMetaMgr {
 	 * @param key
 	 * @return
 	 */
-	public abstract int getLocation(RecordKey key);
+	public abstract int getPartition(RecordKey key);
 }

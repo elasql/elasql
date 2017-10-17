@@ -135,7 +135,7 @@ public class CacheOptimizedSinker extends Sinker {
 
 					int dataWriteBackPos = e.getTarget().getPartId();
 					RecordKey k = e.getResourceKey();
-					dataCurrentPos = parMeta.getPartition(k);
+					dataCurrentPos = parMeta.getCurrentLocation(k);
 					
 					if(dataCurrentPos != dataWriteBackPos){
 						
@@ -147,7 +147,7 @@ public class CacheOptimizedSinker extends Sinker {
 						if(dataCurrentPos == myId)
 							plan.addMigraDeleteInfo(k);
 						
-						parMeta.setPartition(k, dataWriteBackPos);
+						parMeta.setCurrentLocation(k, dataWriteBackPos);
 					}
 					
 					if (dataWriteBackPos == myId) {
