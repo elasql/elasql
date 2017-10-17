@@ -157,7 +157,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			//Timers.getTimer().startComponentTimer("read");
 			// Read the records from the local sink
 			for (RecordKey k : plan.getSinkReadingInfo()) {
-				readings.put(k, cache.readFromSink(k, sinkId));
+				readings.put(k, cache.readFromSink(k));
 			}
 
 			// Read all needed records
@@ -197,7 +197,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 				TupleSet rs = new TupleSet(sinkId);
 				for (PushInfo pushInfo : entry.getValue()) {
 					long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
-					CachedRecord rec = cache.readFromSink(pushInfo.getRecord(), sinkId);
+					CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
 					// TODO deal with null value record
 					rec.setSrcTxNum(sinkTxnNum);
 					rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);

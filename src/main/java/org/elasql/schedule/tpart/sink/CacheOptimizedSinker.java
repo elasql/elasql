@@ -1,9 +1,10 @@
 package org.elasql.schedule.tpart.sink;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
@@ -70,11 +71,6 @@ public class CacheOptimizedSinker extends Sinker {
 		 * Prepare the cache info and sink plan.
 		 */
 
-		// // the version of record will read from remote site
-
-		// the version of record that will be write back to local storage
-		List<RecordKey> writeBackFlags = new ArrayList<RecordKey>();
-
 		// create procedure tasks
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
 
@@ -99,12 +95,15 @@ public class CacheOptimizedSinker extends Sinker {
 				if (taskIsLocal) {
 					plan.addReadingInfo(e.getResourceKey(), srcTxn);
 
-					if (isLocalResource && e.getTarget().isSinkNode())
+					if (isLocalResource && e.getTarget().isSinkNode()) {
+						cm.registerSinkReading(e.getResourceKey(), txNum);
 						plan.addSinkReadingInfo(e.getResourceKey());
+					}
 
 				} else if (isLocalResource && e.getTarget().isSinkNode()) {
 					// if is not local task and the source of the edge is sink
 					// node add the push tag to sinkPushTask
+					cm.registerSinkReading(e.getResourceKey(), txNum);
 					plan.addSinkPushingInfo(e.getResourceKey(), node.getPartId(), TPartCacheMgr.toSinkId(myId),
 							node.getTxNum());
 				}
@@ -154,7 +153,7 @@ public class CacheOptimizedSinker extends Sinker {
 					if (dataWriteBackPos == myId) {
 						// tell the task to write back local
 						plan.addLocalWriteBackInfo(k);
-						writeBackFlags.add(k);
+						cm.registerSinkWriteback(k, txNum);
 					} else {
 						// push the data if write back to remote
 						plan.addPushingInfo(k, dataWriteBackPos, txNum, TPartCacheMgr.toSinkId(dataWriteBackPos));
@@ -166,7 +165,7 @@ public class CacheOptimizedSinker extends Sinker {
 						if (targetServerId == myId) {
 							// tell the task to write back local
 							plan.addLocalWriteBackInfo(k);
-							writeBackFlags.add(k);
+							cm.registerSinkWriteback(e.getResourceKey(), txNum);
 						} else {
 							// push the data if write back to remote
 							plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
@@ -176,8 +175,7 @@ public class CacheOptimizedSinker extends Sinker {
 						plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.toSinkId(targetServerId));
 					} else {
 						if (targetServerId == myId) {
-
-							writeBackFlags.add(k);
+							cm.registerSinkWriteback(e.getResourceKey(), txNum);
 							plan.addLocalWriteBackInfo(k);
 						}
 					}*/
@@ -196,20 +194,7 @@ public class CacheOptimizedSinker extends Sinker {
 
 			node.setSunk(true);
 		}
-
-		// // set remote flags
-		// for (CachedEntryKey key : remoteFlags) {
-		// VanillaDdDb.tPartCacheMgr().setRemoteFlag(key.getRecordKey(),
-		// key.getSource(), key.getDestination());
-		// }
-
-		// set write back flags
-		for (RecordKey key : writeBackFlags) 
-			cm.setWriteBackInfo(key, sinkProcessId);
 		
-		parMeta.removeOverflowedKeys();
-		
-
 		return localTasks;
 	}
 }

@@ -22,7 +22,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		return (partId + 1) * -1;
 	}
 
-	private static WriteBackRecMgr writeBackMgr = new WriteBackRecMgr();
+	private static LocalStorageMgr localStorage = new LocalStorageMgr();
 
 	private Map<CachedEntryKey, CachedRecord> exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>();
 
@@ -40,10 +40,6 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			hash += anchors.length;
 		}
 		return anchors[0];
-	}
-
-	public CachedRecord readFromSink(RecordKey key, int mySinkId, Transaction tx) {
-		return writeBackMgr.read(key, mySinkId, tx);
 	}
 
 	public CachedRecord takeFromTx(RecordKey key, long src, long dest) {
@@ -77,12 +73,20 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	public void cacheRemoteRecord(Tuple t) {
 		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, true);
 	}
-
-	public void writeBack(RecordKey key, int sinkProcessId, CachedRecord rec, Transaction tx) {
-		writeBackMgr.writeBackRecord(key, sinkProcessId, rec, tx);
+	
+	public CachedRecord readFromSink(RecordKey key, Transaction tx) {
+		return localStorage.read(key, tx);
+	}
+	
+	public void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
+		localStorage.writeBack(key, rec, tx);
+	}
+	
+	public void registerSinkReading(RecordKey key, long txNum) {
+		localStorage.requestSharedLock(key, txNum);
 	}
 
-	public void setWriteBackInfo(RecordKey key, int sinkProcessId) {
-		writeBackMgr.setWriteBackInfo(key, sinkProcessId);
+	public void registerSinkWriteback(RecordKey key, long txNum) {
+		localStorage.requestExclusiveLock(key, txNum);
 	}
 }
