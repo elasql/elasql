@@ -5,8 +5,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
+import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.tx.concurrency.tpart.LocalStorageCcMgr;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
@@ -22,7 +24,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		return (partId + 1) * -1;
 	}
 
-	private static LocalStorageMgr localStorage = new LocalStorageMgr();
+	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
 
 	private Map<CachedEntryKey, CachedRecord> exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>();
 
@@ -71,18 +73,32 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 	
 	public CachedRecord readFromSink(RecordKey key, Transaction tx) {
-		return localStorage.read(key, tx);
+		localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
+		CachedRecord rec = VanillaCoreCrud.read(key, tx);
+		localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
+		return rec;
 	}
 	
 	public void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
-		localStorage.writeBack(key, rec, tx);
+		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+		writeToVanillaCore(key, rec, tx);
+		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
 	}
 	
 	public void registerSinkReading(RecordKey key, long txNum) {
-		localStorage.requestSharedLock(key, txNum);
+		localCcMgr.requestSinkRead(key, txNum);
 	}
 
 	public void registerSinkWriteback(RecordKey key, long txNum) {
-		localStorage.requestExclusiveLock(key, txNum);
+		localCcMgr.requestWriteBack(key, txNum);
+	}
+	
+	private void writeToVanillaCore(RecordKey key, CachedRecord rec, Transaction tx) {
+		if (rec.isDeleted())
+			VanillaCoreCrud.delete(key, tx);
+		else if (rec.isNewInserted())
+			VanillaCoreCrud.insert(key, rec, tx);
+		else if (rec.isDirty())
+			VanillaCoreCrud.update(key, rec, tx);
 	}
 }
