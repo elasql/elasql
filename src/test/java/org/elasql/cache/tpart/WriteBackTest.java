@@ -99,14 +99,14 @@ public class WriteBackTest {
 	@Test
 	public void testWriteback() {
 		final RecordKey commonKey = createRecordKey(1);
-		final LocalStorageMgr localStorage = new LocalStorageMgr();
+		final TPartCacheMgr cacheMgr = new TPartCacheMgr();
 		final BlockingQueue<CachedRecord> returnQueue = new LinkedBlockingQueue<CachedRecord>();
 		
 		// Set sink reads and write-back info
-		localStorage.requestSharedLock(commonKey, 2);
-		localStorage.requestSharedLock(commonKey, 3);
-		localStorage.requestExclusiveLock(commonKey, 1);
-		localStorage.requestExclusiveLock(commonKey, 3);
+		cacheMgr.registerSinkReading(commonKey, 2);
+		cacheMgr.registerSinkReading(commonKey, 3);
+		cacheMgr.registerSinkWriteback(commonKey, 1);
+		cacheMgr.registerSinkWriteback(commonKey, 3);
 		
 		Thread[] threads = new Thread[3];
 		
@@ -118,7 +118,7 @@ public class WriteBackTest {
 						Connection.TRANSACTION_SERIALIZABLE, false, 1);
 				CachedRecord record = createCachedRecord(1, 10001);
 				record.setNewInserted(true);
-				localStorage.writeBack(commonKey, record, tx);
+				cacheMgr.writeBack(commonKey, record, tx);
 			}
 		});
 		threads[0].start();
@@ -130,9 +130,9 @@ public class WriteBackTest {
 			public void run() {
 				Transaction tx = VanillaDb.txMgr().newTransaction(
 						Connection.TRANSACTION_SERIALIZABLE, false, 3);
-				CachedRecord record = localStorage.read(commonKey, tx);
+				CachedRecord record = cacheMgr.readFromSink(commonKey, tx);
 				record.setVal("tvalue", new IntegerConstant(20001));
-				localStorage.writeBack(commonKey, record, tx);
+				cacheMgr.writeBack(commonKey, record, tx);
 			}
 		});
 		threads[2].start();
@@ -144,7 +144,7 @@ public class WriteBackTest {
 			public void run() {
 				Transaction tx = VanillaDb.txMgr().newTransaction(
 						Connection.TRANSACTION_SERIALIZABLE, false, 2);
-				CachedRecord record = localStorage.read(commonKey, tx);
+				CachedRecord record = cacheMgr.readFromSink(commonKey, tx);
 				
 				try {
 					returnQueue.put(record);
