@@ -1,20 +1,18 @@
-package org.elasql.cache.tpart;
+package org.elasql.storage.tx.concurrency.tpart;
 
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.elasql.cache.CachedRecord;
-import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.sql.RecordKey;
-import org.vanilladb.core.storage.tx.Transaction;
 
 /**
- * A manager that handles the access to the local storage. Thread-safe.
+ * A concurrency control manager that handles the access to the local storage in T-Part,
+ *  such as sink readings and write-backs of T-Graphs.
  * 
  * @author Yu-Shan Lin
  */
-public class LocalStorageMgr {
+public class LocalStorageCcMgr {
 	
 	private static final int NUM_ANCHOR = 1009;
 	
@@ -47,7 +45,7 @@ public class LocalStorageMgr {
 	// Lock-stripping
 	private final Object anchors[] = new Object[NUM_ANCHOR];
 	
-	public LocalStorageMgr() {
+	public LocalStorageCcMgr() {
 		for (int i = 0; i < anchors.length; i++)
 			anchors[i] = new Object();
 	}
@@ -60,7 +58,7 @@ public class LocalStorageMgr {
 	 * @param key
 	 * @param txNum
 	 */
-	public void requestSharedLock(RecordKey key, long txNum) {
+	public void requestSinkRead(RecordKey key, long txNum) {
 		synchronized (getAnchor(key)) {
 			LockRequests requests = getLockRequests(key);
 			
@@ -82,7 +80,7 @@ public class LocalStorageMgr {
 	 * @param key
 	 * @param txNum
 	 */
-	public void requestExclusiveLock(RecordKey key, long txNum) {
+	public void requestWriteBack(RecordKey key, long txNum) {
 		synchronized (getAnchor(key)) {
 			LockRequests requests = getLockRequests(key);
 			
@@ -96,7 +94,7 @@ public class LocalStorageMgr {
 	}
 	
 	/**
-	 * Read the requested record. If a transaction only requested a shared lock,
+	 * If a transaction only requested for sink read,
 	 * the lock would be release immediately after the process got the record. 
 	 * 
 	 * @param key
@@ -104,25 +102,24 @@ public class LocalStorageMgr {
 	 * @param tx
 	 * @return
 	 */
-	public CachedRecord read(RecordKey key, Transaction tx) {
+	public void beforeSinkRead(RecordKey key, long txNum) {
 		Object anchor = getAnchor(key);
 		synchronized (anchor) {
 			try {
 				LockRequests requests = getLockRequests(key);
-				long txNum = tx.getTransactionNumber();
 				long xh = peekHead(requests.exclusiveLocks);
 				
 				// Compare its number (txNum) with the head (XH) of the exclusive lock queue.
 	
 				// If txNum > XH, wait for the next check
 				while (txNum > xh) {
-					anchor.wait(10000);
+					anchor.wait();
 					xh = peekHead(requests.exclusiveLocks);
 				}
 				
 				// If txNum = XH, check if txNum is also smaller than the head (SH) of shared lock queue
 				// If it wasn't, continue waiting and checking SH
-				// If it was, read the object (but do nothing to the queue)
+				// If it was, allow to read the object (but do nothing to the queue)
 				if (txNum == xh) {
 					long sh = peekHead(requests.sharedLocks);
 					
@@ -130,28 +127,10 @@ public class LocalStorageMgr {
 						anchor.wait();
 						sh = peekHead(requests.sharedLocks);
 					}
-					
-					return VanillaCoreCrud.read(key, tx);
 				}
 				
-				// If txNum < XH, read the object and remove itself from the shared lock queue
-				// Then, notify the other waiting
-				// Check if it can remove this request pair
-				CachedRecord rec = VanillaCoreCrud.read(key, tx);
+				// If txNum < XH, allow to read the object
 				
-				// Convert to Integer to avoid calling remove(index)
-				if (!requests.sharedLocks.remove((Long) txNum)) {
-					throw new RuntimeException(
-							"Cannot find Tx." + txNum + " in neithor "
-									+ "shared queue or the head of exclusive queue of " + key);
-				}
-				
-				if (requests.sharedLocks.isEmpty() && requests.exclusiveLocks.isEmpty())
-					requestMap.remove(key);
-				
-				anchor.notifyAll();
-				
-				return rec;
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				throw new RuntimeException(
@@ -160,23 +139,53 @@ public class LocalStorageMgr {
 		}
 	}
 	
-	/**
-	 * Write back the record and release the lock that the sink process holds.
-	 * 
-	 * @param key
-	 * @param sinkProcessId
-	 * @param rec
-	 * @param tx
-	 */
-	public void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
+	public void beforeWriteBack(RecordKey key, long txNum) {
 		Object anchor = getAnchor(key);
 		synchronized (anchor) {
-			long txNum = tx.getTransactionNumber();
 			LockRequests requests = getLockRequests(key);
 			
-			// Write and remove itself from the queue
-			// Check if it can remove this request pair
-			writeToVanillaCore(key, rec, tx);
+			// It should be the head of exclusive locks
+			if (txNum != requests.exclusiveLocks.peekFirst())
+				throw new RuntimeException(
+						"Tx." + txNum + " is not the head of exclusive queue of " + key);
+			
+			// Do nothing
+			// In T-Part, a transaction's write-back must come after a former transaction's
+			// sink-read on the same record.
+			// That is, we don't need to do anything for a write-back since a former transaction
+			// has waited during its sink-read. The write-back transaction must be blocked by
+			// the sink-read transaction in TPartCacheMgr.
+		}
+	}
+	
+	public void afterSinkRead(RecordKey key, long txNum) {
+		Object anchor = getAnchor(key);
+		synchronized (anchor) {
+			LockRequests requests = getLockRequests(key);
+			
+			// If it was the head of the exclusive queue, it should return immediately.
+			if (txNum == peekHead(requests.exclusiveLocks))
+				return;
+			
+			// Remove itself from shared lock queue
+			// Convert to Long object to avoid calling remove(index)
+			if (!requests.sharedLocks.remove((Long) txNum)) {
+				throw new RuntimeException(
+						"Cannot find Tx." + txNum + " in neithor "
+								+ "shared queue or the head of exclusive queue of " + key);
+			}
+			
+			if (requests.sharedLocks.isEmpty() && requests.exclusiveLocks.isEmpty())
+				requestMap.remove(key);
+			
+			anchor.notifyAll();
+		}
+	}
+	
+	public void afterWriteback(RecordKey key, long txNum) {
+		Object anchor = getAnchor(key);
+		synchronized (anchor) {
+			LockRequests requests = getLockRequests(key);
 			
 			// It should be the head of exclusive locks
 			if (txNum != requests.exclusiveLocks.peekFirst())
@@ -204,15 +213,6 @@ public class LocalStorageMgr {
 			requestMap.put(key, requests);
 		}
 		return requests;
-	}
-	
-	private void writeToVanillaCore(RecordKey key, CachedRecord rec, Transaction tx) {
-		if (rec.isDeleted())
-			VanillaCoreCrud.delete(key, tx);
-		else if (rec.isNewInserted())
-			VanillaCoreCrud.insert(key, rec, tx);
-		else if (rec.isDirty())
-			VanillaCoreCrud.update(key, rec, tx);
 	}
 	
 	// XXX: This may not be a good solution, but it is a simple solution
