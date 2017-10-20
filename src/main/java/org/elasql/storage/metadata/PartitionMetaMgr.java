@@ -31,43 +31,39 @@ import org.elasql.util.ElasqlProperties;
 public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
-	public final static File LOGDIR;
-	public final static File LOGFILE;
+//	public final static File LOGDIR;
+//	public final static File LOGFILE;
 	public static FileWriter WRLOGFILE;
 	public static BufferedWriter BWRLOGFILE;
-	private static final long BENCH_START_TIME;
-	/*
-	 * private class Tuple<X> { public X loc; public int times;
-	 * 
-	 * public Tuple(X loc) { this.loc = loc; this.times = 0; }
-	 * 
-	 * public void encrease() { this.times++; }
-	 * 
-	 * public void setLot(X loc) { this.loc = loc; } }
-	 */
-	private static HashMap<RecordKey, Integer> locationTable;
+//	private static final long BENCH_START_TIME;
 	
+	private static HashMap<RecordKey, Integer> locationTable;
 	private static enum PickingMethods { NO, FIFO, LRU, CLOCK };
 	private static final PickingMethods PICKING_METHOD = PickingMethods.FIFO;
-	private static final int LOC_TABLE_MAX_SIZE = 200000;
+	private static final int LOC_TABLE_MAX_SIZE;
 	// TODO: Maybe we could limit the size of the queue by 2 x LOC_TABLE_MAX_SIZE
 	private static Queue<RecordKey> fifoQueue = new LinkedList<RecordKey>();
 
 	static {
 
-		LOGDIR = new File(".");
-		LOGFILE = new File(LOGDIR, "loc_log.txt");
-		try {
-			WRLOGFILE = new FileWriter(LOGFILE);
-			BWRLOGFILE = new BufferedWriter(WRLOGFILE);
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+//		LOGDIR = new File(".");
+//		LOGFILE = new File(LOGDIR, "loc_log.txt");
+//		try {
+//			WRLOGFILE = new FileWriter(LOGFILE);
+//			BWRLOGFILE = new BufferedWriter(WRLOGFILE);
+//		} catch (IOException e1) {
+//			e1.printStackTrace();
+//		}
 
-		BENCH_START_TIME = System.currentTimeMillis();
+//		BENCH_START_TIME = System.currentTimeMillis();
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
-		locationTable = new HashMap<RecordKey, Integer>(1000000);
+		LOC_TABLE_MAX_SIZE = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".LOC_TABLE_MAX_SIZE", -1);
+		if (LOC_TABLE_MAX_SIZE == -1)
+			locationTable = new HashMap<RecordKey, Integer>();
+		else
+			locationTable = new HashMap<RecordKey, Integer>(LOC_TABLE_MAX_SIZE + 1000);
 		
 //		new PeriodicalJob(3000, 500000, new Runnable() {
 //			@Override
@@ -78,8 +74,8 @@ public abstract class PartitionMetaMgr {
 //			}
 //		).start();
 		
-		Thread thread = new Thread(new Runnable() {
-			public void run() {
+//		Thread thread = new Thread(new Runnable() {
+//			public void run() {
 //				try {
 //					Thread.sleep(450000);
 //					File dir = new File(".");
@@ -138,9 +134,9 @@ public abstract class PartitionMetaMgr {
 //				} catch (IOException e) {
 //					e.printStackTrace();
 //				}
-			}
-		});
-		thread.start();
+//			}
+//		});
+//		thread.start();
 	}
 
 	/**
@@ -168,21 +164,23 @@ public abstract class PartitionMetaMgr {
 	}
 
 	public void setCurrentLocation(RecordKey key, int loc) {
-		try {
-			BWRLOGFILE.write((System.currentTimeMillis() - BENCH_START_TIME) + "," + key.getKeyVal("i_id") + "," + loc);
-			BWRLOGFILE.newLine();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+//		try {
+//			BWRLOGFILE.write((System.currentTimeMillis() - BENCH_START_TIME) + "," + key.getKeyVal("i_id") + "," + loc);
+//			BWRLOGFILE.newLine();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
 		
 		// If the new location matches the original partition, remove it from location table.
 		boolean isInLocTable = locationTable.containsKey(key);
 		if (isInLocTable && getPartition(key) == loc)
 			locationTable.remove(key);
 		else {
-			if (PICKING_METHOD == PickingMethods.FIFO) {
-				if (!isInLocTable) {
-					fifoQueue.add(key);
+			if (LOC_TABLE_MAX_SIZE != -1) {
+				if (PICKING_METHOD == PickingMethods.FIFO) {
+					if (!isInLocTable) {
+						fifoQueue.add(key);
+					}
 				}
 			}
 			
@@ -197,6 +195,10 @@ public abstract class PartitionMetaMgr {
 	 */
 	public Set<RecordKey> chooseOverflowedKeys() {
 		Set<RecordKey> removedKeys = new HashSet<RecordKey>();
+		
+		// If the limit is -1 (unlimited), return immediately.
+		if (LOC_TABLE_MAX_SIZE == -1)
+			return removedKeys;
 		
 		// Pick the keys that will be removed
 		if (PICKING_METHOD == PickingMethods.FIFO) {

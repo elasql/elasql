@@ -32,6 +32,7 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.HeuristicNodeInserter;
 import org.elasql.schedule.tpart.SupaTGraph;
+import org.elasql.schedule.tpart.TGraph;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
 import org.elasql.storage.log.DdLogMgr;
@@ -51,7 +52,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB.
 	 */
 	public enum ServiceType {
-		NAIVE, CALVIN, TPART;
+		NAIVE, CALVIN, TPART, TPART_LAP;
 
 		static ServiceType fromInteger(int index) {
 			switch (index) {
@@ -61,6 +62,8 @@ public class Elasql extends VanillaDb {
 				return CALVIN;
 			case 2:
 				return TPART;
+			case 3:
+				return TPART_LAP;
 			default:
 				throw new RuntimeException("Unsupport service type");
 			}
@@ -157,9 +160,9 @@ public class Elasql extends VanillaDb {
 			remoteRecReceiver = new CalvinPostOffice();
 			break;
 		case TPART:
+		case TPART_LAP:
 			remoteRecReceiver = new TPartCacheMgr();
 			break;
-
 		default:
 			throw new UnsupportedOperationException();
 		}
@@ -178,6 +181,7 @@ public class Elasql extends VanillaDb {
 			scheduler = initCalvinScheduler((CalvinStoredProcedureFactory) factory);
 			break;
 		case TPART:
+		case TPART_LAP:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			scheduler = initTPartScheduler((TPartStoredProcedureFactory) factory);
@@ -200,8 +204,14 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
+		TGraph graph;
+		if (SERVICE_TYPE == ServiceType.TPART_LAP)
+			graph = new SupaTGraph();
+		else
+			graph = new TGraph();
+		
 		TPartPartitioner scheduler = new TPartPartitioner(factory,  new HeuristicNodeInserter(),
-				new CacheOptimizedSinker(), new SupaTGraph());
+				new CacheOptimizedSinker(), graph);
 
 		taskMgr().runTask(scheduler);
 		return scheduler;
