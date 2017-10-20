@@ -35,7 +35,7 @@ public class LocalStorageCcMgr {
 		
 		@Override
 		public String toString() {
-			return "S Reqs: " + sharedLocks + ", X Reqs: " + exclusiveLocks;
+			return "[S Reqs: " + sharedLocks + ", X Reqs: " + exclusiveLocks + "]";
 		}
 	}
 	
@@ -61,6 +61,10 @@ public class LocalStorageCcMgr {
 	public void requestSinkRead(RecordKey key, long txNum) {
 		synchronized (getAnchor(key)) {
 			LockRequests requests = getLockRequests(key);
+			
+			if (!requests.sharedLocks.isEmpty() &&
+					requests.sharedLocks.peekLast() == txNum)
+				return;
 			
 			if (!requests.exclusiveLocks.isEmpty() &&
 					requests.exclusiveLocks.peekLast() == txNum)
@@ -88,6 +92,10 @@ public class LocalStorageCcMgr {
 			if (!requests.sharedLocks.isEmpty() &&
 					requests.sharedLocks.peekLast() == txNum)
 				requests.sharedLocks.removeLast();
+			
+			if (requests.sharedLocks.contains(txNum) || requests.exclusiveLocks.contains(txNum))
+				throw new RuntimeException(String.format("Something wrong for Tx.%d !! Reqs: %s",
+						txNum, requests));
 			
 			requests.exclusiveLocks.add(txNum);
 		}
@@ -142,19 +150,32 @@ public class LocalStorageCcMgr {
 	public void beforeWriteBack(RecordKey key, long txNum) {
 		Object anchor = getAnchor(key);
 		synchronized (anchor) {
-			LockRequests requests = getLockRequests(key);
-			
-			// It should be the head of exclusive locks
-			if (txNum != requests.exclusiveLocks.peekFirst())
+			try {
+				LockRequests requests = getLockRequests(key);
+				
+				// It must be the head of exclusive locks
+				long xh = peekHead(requests.exclusiveLocks);
+				while (txNum > xh) {
+					anchor.wait();
+					xh = peekHead(requests.exclusiveLocks);
+				}
+				
+				if (txNum != xh)
+					throw new RuntimeException(String.format("Tx.%d is not the head of "
+							+ "exclsive locks of %s (the head is tx.%d)", txNum, key, xh));
+				
+				// The head of shared locks must greater than it
+				long sh = peekHead(requests.sharedLocks);
+				while (txNum > sh) {
+					anchor.wait();
+					sh = peekHead(requests.sharedLocks);
+				}
+				
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 				throw new RuntimeException(
-						"Tx." + txNum + " is not the head of exclusive queue of " + key);
-			
-			// Do nothing
-			// In T-Part, a transaction's write-back must come after a former transaction's
-			// sink-read on the same record.
-			// That is, we don't need to do anything for a write-back since a former transaction
-			// has waited during its sink-read. The write-back transaction must be blocked by
-			// the sink-read transaction in TPartCacheMgr.
+						"Interrupted when waitting for sink read " + key);
+			}
 		}
 	}
 	
@@ -175,6 +196,7 @@ public class LocalStorageCcMgr {
 								+ "shared queue or the head of exclusive queue of " + key);
 			}
 			
+			// Remove the entry if there is no other waiting on it
 			if (requests.sharedLocks.isEmpty() && requests.exclusiveLocks.isEmpty())
 				requestMap.remove(key);
 			
@@ -193,6 +215,8 @@ public class LocalStorageCcMgr {
 						"Tx." + txNum + " is not the head of exclusive queue of " + key);
 			
 			requests.exclusiveLocks.pollFirst();
+			
+			// Remove the entry if there is no other waiting on it
 			if (requests.sharedLocks.isEmpty() && requests.exclusiveLocks.isEmpty())
 				requestMap.remove(key);
 			
