@@ -1,11 +1,9 @@
 package org.elasql.schedule.tpart;
 
+import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.elasql.procedure.tpart.TPartCacheWriteBackProc;
-import org.elasql.procedure.tpart.TPartStoredProcedure;
-import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -23,30 +21,32 @@ public class SupaTGraph extends TGraph {
 	public void addWriteBackEdge() {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		
-		// Add a node for handling overflowed keys in the location table
+		// Get the overflowed keys that need to be placed back to the original locations
 		Set<RecordKey> overflowedKeys = partMgr.chooseOverflowedKeys();
 		if (overflowedKeys != null && overflowedKeys.size() > 0) {
 			
-			// Insert a node to handle the removed keys
-			TPartStoredProcedure<?> writeBackProc = new TPartCacheWriteBackProc(overflowedKeys);
-			writeBackProc.prepare();
-			TPartStoredProcedureTask task = new TPartStoredProcedureTask(-1, -1, writeBackProc.getTxNum(),
-					writeBackProc);
-			Node node = new Node(task);
-			node.setPartId(0);
-			this.insertNode(node);
-			
-			// Let the node write back the data of removed keys to the original position
+			// Make each key that will be processed in this graph
+			// be written back to the original location by the last one using it
+			Set<RecordKey> noOneHandledKeys = new HashSet<RecordKey>();
 			for (RecordKey key : overflowedKeys) {
+				Node handler = resPos.remove(key);
+				if (handler != null) {
+					int originalLocation = partMgr.getPartition(key);
+					handler.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
+				} else
+					noOneHandledKeys.add(key);
+			}
+			
+			// For the keys that on one handles, let the last node read and write them back.
+			Node lastNode = getLastInsertedNode();
+			for (RecordKey key : noOneHandledKeys) {
 				int originalLocation = partMgr.getPartition(key);
-				node.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
-				
-				// remove the handled resource from the map
-				resPos.remove(key);
+				lastNode.addReadEdges(new Edge(getResourcePosition(key), key));
+				lastNode.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
 			}
 		}
 		
-		// Add write back edges to other nodes
+		// Put the rest of the records on where they are
 		for (Entry<RecordKey, Node> resPosPair : resPos.entrySet()) {
 			RecordKey res = resPosPair.getKey();
 			Node node = resPosPair.getValue();

@@ -1,16 +1,15 @@
 package org.elasql.schedule.tpart;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 
-
 public class Node {
-	private List<Edge> readEdges;
-	private List<Edge> writeEdges;
-	private List<Edge> writeBackEdges;
+	private Set<Edge> readEdges;
+	private Set<Edge> writeEdges;
+	private Set<Edge> writeBackEdges;
 	private int partId;
 	private TPartStoredProcedureTask task;
 	private boolean sunk;
@@ -20,9 +19,9 @@ public class Node {
 
 	public Node(TPartStoredProcedureTask task) {
 		this.task = task;
-		readEdges = new ArrayList<Edge>();
-		writeEdges = new ArrayList<Edge>();
-		writeBackEdges = new ArrayList<Edge>();
+		readEdges = new HashSet<Edge>();
+		writeEdges = new HashSet<Edge>();
+		writeBackEdges = new HashSet<Edge>();
 	}
 	
 	public int[] getPartRecordCntArray(){
@@ -33,15 +32,15 @@ public class Node {
 		partitionRecordCount = array;
 	}
 
-	public List<Edge> getReadEdges() {
+	public Set<Edge> getReadEdges() {
 		return readEdges;
 	}
 
-	public List<Edge> getWriteEdges() {
+	public Set<Edge> getWriteEdges() {
 		return writeEdges;
 	}
 
-	public List<Edge> getWriteBackEdges() {
+	public Set<Edge> getWriteBackEdges() {
 		return writeBackEdges;
 	}
 
@@ -94,7 +93,7 @@ public class Node {
 
 	@Override
 	public String toString() {
-		return "[Node] Txn-id: " + getTask().getTxNum() + ", " + "read-edges: "
+		return "[Node] Txn-id: " + getTxNum() + ", " + "read-edges: "
 				+ readEdges + ", write-edges: " + writeEdges + ", weight: "
 				+ task.getWeight() + ", part id: " + partId;
 	}
@@ -106,14 +105,14 @@ public class Node {
 		if (obj.getClass() != Node.class)
 			return false;
 		Node n = (Node) obj;
-		return (n.task.getTxNum() == this.task.getTxNum() && n.partId == this.partId);
+		return (n.getTxNum() == getTxNum() && n.partId == this.partId);
 	}
 
 	@Override
 	public int hashCode() {
 		int hash = 17;
 		hash = hash * 31
-				+ (int) (this.task.getTxNum() ^ (this.task.getTxNum() >>> 32));
+				+ (int) (getTxNum() ^ (getTxNum() >>> 32));
 		hash = hash * 31 + this.partId;
 		return hash;
 	}

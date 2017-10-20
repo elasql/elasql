@@ -25,4 +25,25 @@ public class Edge {
 		return String.format("{Resource: %s, from/to tx: %d, part: %d}", resource, target.getTxNum(),
 				target.getPartId());
 	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		
+		if (!obj.getClass().equals(this.getClass()))
+			return false;
+		
+		Edge e = (Edge) obj;
+		
+		return this.resource.equals(e.resource) && this.target.equals(e.target);
+	}
+
+	@Override
+	public int hashCode() {
+		int hash = 17;
+		hash = hash * 31 + resource.hashCode();
+		hash = hash * 31 + target.hashCode();
+		return hash;
+	}
 }

@@ -64,13 +64,20 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
-		// create a transaction
-		boolean isReadOnly = paramHelper.isReadOnly();
-		tx = Elasql.txMgr().newTransaction(Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
-		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
-
 		// prepare keys
 		prepareKeys();
+	}
+
+	public void decideExceutionPlan(SunkPlan p) {
+		if (plan != null)
+			throw new RuntimeException("The execution plan has been set");
+		
+		// Set plan
+		plan = p;
+		
+		// create a transaction
+		tx = Elasql.txMgr().newTransaction(Connection.TRANSACTION_SERIALIZABLE, plan.isReadOnly(), txNum);
+		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 
 		// create a local cache
 		cache = new TPartTxLocalCache(tx);
@@ -90,14 +97,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			paramHelper.setCommitted(false);
 		}
 		return paramHelper.createResultSet();
-	}
-
-	public void setSunkPlan(SunkPlan p) {
-		plan = p;
-	}
-
-	public SunkPlan getSunkPlan() {
-		return plan;
 	}
 
 	public boolean isMaster() {
@@ -161,7 +160,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			}
 
 			// Read all needed records
-			for (RecordKey k : readKeys) {
+			for (RecordKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
 					long srcTxNum = plan.getReadSrcTxNum(k);
 					readings.put(k, cache.read(k, srcTxNum));

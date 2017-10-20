@@ -1,10 +1,8 @@
 package org.elasql.schedule.tpart.sink;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
@@ -76,22 +74,18 @@ public class CacheOptimizedSinker extends Sinker {
 
 		for (Node node : graph.getNodes()) {
 			// System.out.println("Tx: " + node.getTxNum());
-
 			// task is local if the tx logic should be executed locally
 			boolean taskIsLocal = (node.getPartId() == myId);
 			boolean replicated = false;
 
 			long txNum = node.getTxNum();
 			SunkPlan plan = new SunkPlan(sinkProcessId, taskIsLocal);
-			node.getTask().setSunkPlan(plan);
 
 			// readings
-
 			for (Edge e : node.getReadEdges()) {
-				// System.out.println("key:" + e.getResourceKey() + ",target:"
-				// + e.getTarget().getTxNum());
 				long srcTxn = e.getTarget().getTxNum();
 				boolean isLocalResource = (e.getTarget().getPartId() == myId);
+				
 				if (taskIsLocal) {
 					plan.addReadingInfo(e.getResourceKey(), srcTxn);
 
@@ -110,7 +104,6 @@ public class CacheOptimizedSinker extends Sinker {
 			}
 
 			// for every local task, push to remote if dest. node not in local
-			// System.out.println("Write edges: ");
 			if (taskIsLocal) {
 				for (Edge e : node.getWriteEdges()) {
 
@@ -127,25 +120,33 @@ public class CacheOptimizedSinker extends Sinker {
 			}
 
 			// write back
-			// System.out.println("Write back edges: ");
 			if (node.getWriteBackEdges().size() > 0 && !replicated) {
-				int dataCurrentPos;
+				int dataCurrentPos, dataOriginalPos;
 				
 				for (Edge e : node.getWriteBackEdges()) {
 
 					int dataWriteBackPos = e.getTarget().getPartId();
 					RecordKey k = e.getResourceKey();
 					dataCurrentPos = parMeta.getCurrentLocation(k);
+					dataOriginalPos = parMeta.getPartition(k);
 					
-					if(dataCurrentPos != dataWriteBackPos){
+					// The record's location changes
+					if(dataCurrentPos != dataWriteBackPos) {
+						// the non-origin destination perform insertion
+						// Note that it still needs the write back edges
+						// since it need to get the record to be inserted
+						if (dataWriteBackPos != dataOriginalPos	&&
+								dataWriteBackPos == myId)
+							plan.addCacheInsertion(k);
 						
-						//destination perform insert
-						if(dataWriteBackPos == myId)
-							plan.addMigraInsertInfo(k);
-						
-						//source perform delete
-						if(dataCurrentPos == myId)
-							plan.addMigraDeleteInfo(k);
+						// the non-origin source perform deletion
+						if(dataCurrentPos != dataOriginalPos &&
+								dataCurrentPos == myId) {
+							plan.addCacheDeletion(k);
+							// Since the node does not have the write-back edge,
+							// we need to register the lock here.
+							cm.registerSinkWriteback(k, txNum);
+						}
 						
 						parMeta.setCurrentLocation(k, dataWriteBackPos);
 					}
@@ -157,7 +158,6 @@ public class CacheOptimizedSinker extends Sinker {
 					} else {
 						// push the data if write back to remote
 						plan.addPushingInfo(k, dataWriteBackPos, txNum, TPartCacheMgr.toSinkId(dataWriteBackPos));
-
 					}
 					
 					/*
@@ -187,8 +187,9 @@ public class CacheOptimizedSinker extends Sinker {
 			 * be scheduled locally if 1) the task is partitioned into current
 			 * server or 2) the task needs to write back records to this server.
 			 */
-			if (taskIsLocal || plan.hasLocalWriteBack() || plan.hasSinkPush()) {
-				// System.out.println("Task: " + node.getTxNum());
+			if (taskIsLocal || plan.hasLocalWriteBack() || plan.hasSinkPush() ||
+					!plan.getCacheDeletions().isEmpty()) {
+				node.getTask().decideExceutionPlan(plan);
 				localTasks.add(node.getTask());
 			}
 

@@ -103,6 +103,10 @@ public class TGraph {
 		return nodes;
 	}
 	
+	public Node getLastInsertedNode() {
+		return nodes.get(nodes.size() - 1);
+	}
+	
 	public String getStatistics() {
 		StringBuilder sb = new StringBuilder();
 		

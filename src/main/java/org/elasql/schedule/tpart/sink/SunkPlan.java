@@ -23,10 +23,8 @@ public class SunkPlan {
 	private List<RecordKey> localWriteBackInfo = new ArrayList<RecordKey>();
 
 	// Migration flags
-	private Set<RecordKey> migraInsertSet = new HashSet<RecordKey>();
-	private Set<RecordKey> migraDeleteSet = new HashSet<RecordKey>();
-
-	private Map<Integer, List<RecordKey>> remoteWriteBackInfo;
+	private Set<RecordKey> cacheInsertions = new HashSet<RecordKey>();
+	private Set<RecordKey> cacheDeletions = new HashSet<RecordKey>();
 
 	private Map<RecordKey, Set<Long>> writeDestMap = new HashMap<RecordKey, Set<Long>>();
 
@@ -101,16 +99,9 @@ public class SunkPlan {
 	public void addLocalWriteBackInfo(RecordKey key) {
 		localWriteBackInfo.add(key);
 	}
-
-	public void addRemoteWriteBackInfo(RecordKey key, Integer destServerId) {
-		if (remoteWriteBackInfo == null)
-			remoteWriteBackInfo = new HashMap<Integer, List<RecordKey>>();
-		List<RecordKey> keys = remoteWriteBackInfo.get(key);
-		if (keys == null) {
-			keys = new ArrayList<RecordKey>();
-			remoteWriteBackInfo.put(destServerId, keys);
-		}
-		keys.add(key);
+	
+	public Set<RecordKey> getReadSet() {
+		return readingInfoMap.keySet();
 	}
 
 	public long getReadSrcTxNum(RecordKey key) {
@@ -125,10 +116,6 @@ public class SunkPlan {
 		return localWriteBackInfo;
 	}
 
-	public Map<Integer, List<RecordKey>> getRemoteWriteBackInfo() {
-		return remoteWriteBackInfo;
-	}
-
 	public boolean hasLocalWriteBack() {
 		return localWriteBackInfo.size() > 0;
 	}
@@ -137,20 +124,24 @@ public class SunkPlan {
 		return sinkPushingInfoMap.size() > 0;
 	}
 
-	public void addMigraInsertInfo(RecordKey key) {
-		migraInsertSet.add(key);
+	public void addCacheInsertion(RecordKey key) {
+		cacheInsertions.add(key);
 	}
 
-	public void addMigraDeleteInfo(RecordKey key) {
-		migraDeleteSet.add(key);
+	public void addCacheDeletion(RecordKey key) {
+		cacheDeletions.add(key);
 	}
 
-	public Set<RecordKey> getMigraInsertInfo() {
-		return migraInsertSet;
+	public Set<RecordKey> getCacheInsertions() {
+		return cacheInsertions;
 	}
 
-	public Set<RecordKey> getMigraDeleteInfo() {
-		return migraDeleteSet;
+	public Set<RecordKey> getCacheDeletions() {
+		return cacheDeletions;
+	}
+	
+	public boolean isReadOnly() {
+		return localWriteBackInfo.isEmpty();
 	}
 
 	@Override
@@ -175,10 +166,6 @@ public class SunkPlan {
 
 		sb.append("Local Writing Back Info: ");
 		sb.append(localWriteBackInfo);
-		sb.append("\n");
-
-		sb.append("Remote Writing Back Info: ");
-		sb.append(remoteWriteBackInfo);
 		sb.append("\n");
 
 		sb.append("Write Dest: ");
@@ -222,6 +209,14 @@ public class SunkPlan {
 			}
 		}
 
+		sb.append("\n");
+		
+		sb.append("Cache Insertions: ");
+		sb.append(cacheInsertions);
+		sb.append("\n");
+		
+		sb.append("Cache Deletions: ");
+		sb.append(cacheDeletions);
 		sb.append("\n");
 
 		return sb.toString();

@@ -25,6 +25,8 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 	@Override
 	public void run() {
+		Thread.currentThread().setName("Tx." + txNum);
+		
 		//Timers.createTimer(txNum);
 		SpResultSet rs = null;
 		//Timers.getTimer().startExecution();
@@ -72,8 +74,8 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 		this.parId = parId;
 	}
 
-	public void setSunkPlan(SunkPlan plan) {
-		tsp.setSunkPlan(plan);
+	public void decideExceutionPlan(SunkPlan plan) {
+		tsp.decideExceutionPlan(plan);
 	}
 
 	public ProcedureType getProcedureType() {

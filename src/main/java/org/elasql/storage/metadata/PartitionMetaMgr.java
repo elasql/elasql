@@ -27,7 +27,6 @@ import java.util.Set;
 
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
-import org.elasql.util.PeriodicalJob;
 
 public abstract class PartitionMetaMgr {
 
@@ -51,6 +50,7 @@ public abstract class PartitionMetaMgr {
 	private static enum PickingMethods { NO, FIFO, LRU, CLOCK };
 	private static final PickingMethods PICKING_METHOD = PickingMethods.FIFO;
 	private static final int LOC_TABLE_MAX_SIZE = 200000;
+	// TODO: Maybe we could limit the size of the queue by 2 x LOC_TABLE_MAX_SIZE
 	private static Queue<RecordKey> fifoQueue = new LinkedList<RecordKey>();
 
 	static {
@@ -61,7 +61,6 @@ public abstract class PartitionMetaMgr {
 			WRLOGFILE = new FileWriter(LOGFILE);
 			BWRLOGFILE = new BufferedWriter(WRLOGFILE);
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 
@@ -70,14 +69,14 @@ public abstract class PartitionMetaMgr {
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 		locationTable = new HashMap<RecordKey, Integer>(1000000);
 		
-		new PeriodicalJob(3000, 500000, new Runnable() {
-			@Override
-			public void run() {
-				System.out.println("Location Table : " + locationTable.size() +
-						", Queue: " + fifoQueue.size());
-				}
-			}
-		).start();
+//		new PeriodicalJob(3000, 500000, new Runnable() {
+//			@Override
+//			public void run() {
+//				System.out.println("Location Table : " + locationTable.size() +
+//						", Queue: " + fifoQueue.size());
+//				}
+//			}
+//		).start();
 		
 		Thread thread = new Thread(new Runnable() {
 			public void run() {
@@ -135,10 +134,8 @@ public abstract class PartitionMetaMgr {
 //						bwrFile.write(e.getKey() + " loc: " + e.getValue() + "\n");
 //					bwrFile.close();
 //				} catch (InterruptedException e) {
-//					// TODO Auto-generated catch block
 //					e.printStackTrace();
 //				} catch (IOException e) {
-//					// TODO Auto-generated catch block
 //					e.printStackTrace();
 //				}
 			}
@@ -175,16 +172,14 @@ public abstract class PartitionMetaMgr {
 			BWRLOGFILE.write((System.currentTimeMillis() - BENCH_START_TIME) + "," + key.getKeyVal("i_id") + "," + loc);
 			BWRLOGFILE.newLine();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
 		// If the new location matches the original partition, remove it from location table.
 		boolean isInLocTable = locationTable.containsKey(key);
-		
-//		if (isInLocTable && getLocation(key) == loc)
-//			locationTable.remove(key);
-//		else {
+		if (isInLocTable && getPartition(key) == loc)
+			locationTable.remove(key);
+		else {
 			if (PICKING_METHOD == PickingMethods.FIFO) {
 				if (!isInLocTable) {
 					fifoQueue.add(key);
@@ -192,26 +187,16 @@ public abstract class PartitionMetaMgr {
 			}
 			
 			locationTable.put(key, new Integer(loc));
-//		}
-	}
-	
-	private static Set<RecordKey> removedKeys = null;
-	
-	public void removeOverflowedKeys() {
-		if (removedKeys != null) {
-			for (RecordKey key : removedKeys)
-				locationTable.remove(key);
-			removedKeys = null;
 		}
 	}
 	
 	/**
-	 * Check if the size of the location table excess the limitation and remove overflowed keys in the table. 
+	 * Choose the keys that should be removed next time.
 	 * 
 	 * @return
 	 */
 	public Set<RecordKey> chooseOverflowedKeys() {
-		removedKeys = new HashSet<RecordKey>();
+		Set<RecordKey> removedKeys = new HashSet<RecordKey>();
 		
 		// Pick the keys that will be removed
 		if (PICKING_METHOD == PickingMethods.FIFO) {
@@ -227,9 +212,6 @@ public abstract class PartitionMetaMgr {
 	
 	/**
 	 * Get the original location (may not be the current location)
-	 * 
-	 * XXX: A better naming is to name this 'partition', 'getPartition' =>
-	 * 'getCurrentLocation'.
 	 * 
 	 * @param key
 	 * @return

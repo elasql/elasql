@@ -27,6 +27,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
 
 	private Map<CachedEntryKey, CachedRecord> exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>();
+	
+	private Map<RecordKey, CachedRecord> recordCache = new ConcurrentHashMap<RecordKey, CachedRecord>();
 
 	private final Object anchors[] = new Object[1009];
 
@@ -34,6 +36,13 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
+		
+//		new PeriodicalJob(3000, 500000, new Runnable() {
+//			@Override
+//			public void run() {
+//				System.out.println("Cache Size : " + recordCache.size());
+//			}
+//		}).start();
 	}
 
 	private Object prepareAnchor(Object o) {
@@ -44,8 +53,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		return anchors[0];
 	}
 
-	public CachedRecord takeFromTx(RecordKey key, long src, long dest) {
-		
+	CachedRecord takeFromTx(RecordKey key, long src, long dest) {
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 		synchronized (prepareAnchor(k)) {
 			try {
@@ -58,12 +66,13 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 				throw new RuntimeException();
 			}
 		}
-		
-	
-		
 	}
 
-	public void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
+	void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
+		if (rec == null)
+			throw new NullPointerException(String.format(
+					"The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
+		
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 		synchronized (prepareAnchor(k)) {
 			exchange.put(k, rec);
@@ -76,16 +85,55 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, true);
 	}
 	
-	public CachedRecord readFromSink(RecordKey key, Transaction tx) {
+	CachedRecord readFromSink(RecordKey key, Transaction tx) {
 		localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
-		CachedRecord rec = VanillaCoreCrud.read(key, tx);
+		
+		CachedRecord rec = null;
+		
+		// Check the cache first
+		rec = recordCache.get(key);
+		if (rec != null) // Copy the record to ensure thread-safety
+			rec = new CachedRecord(rec);
+		
+		// Read from the local storage
+		if (rec == null)
+			rec = VanillaCoreCrud.read(key, tx);
+		
 		localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
+		
+		if (rec == null)
+			throw new RuntimeException("Cannot find the record of " + key);
+		
 		return rec;
 	}
 	
-	public void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
+	void insertToCache(RecordKey key, CachedRecord rec, long txNum) {
+		localCcMgr.beforeWriteBack(key, txNum);
+		
+		recordCache.put(key, rec);
+		
+		localCcMgr.afterWriteback(key, txNum);
+	}
+	
+	void deleteFromCache(RecordKey key, long txNum) {
+		localCcMgr.beforeWriteBack(key, txNum);
+		
+		if (recordCache.remove(key) == null)
+			throw new RuntimeException("There is no record for " + key + " in the cache");
+		
+		localCcMgr.afterWriteback(key, txNum);
+	}
+	
+	void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
 		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+		
+		// Check if there is corresponding keys in the cache
+		if (recordCache.containsKey(key))
+			recordCache.put(key, rec);
+		
+		// If it should not be in the cache, write-back to the local storage
 		writeToVanillaCore(key, rec, tx);
+		
 		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
 	}
 	
