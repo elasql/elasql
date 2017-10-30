@@ -8,6 +8,7 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.tx.concurrency.tpart.LocalStorageCcMgr;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -26,9 +27,9 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
 
-	private Map<CachedEntryKey, CachedRecord> exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>();
+	private Map<CachedEntryKey, CachedRecord> exchange;
 	
-	private Map<RecordKey, CachedRecord> recordCache = new ConcurrentHashMap<RecordKey, CachedRecord>();
+	private Map<RecordKey, CachedRecord> recordCache;
 
 	private final Object anchors[] = new Object[1009];
 
@@ -36,6 +37,17 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
+		
+		if (PartitionMetaMgr.LOC_TABLE_MAX_SIZE == -1) {
+			recordCache = new ConcurrentHashMap<RecordKey, CachedRecord>();
+			exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>();
+		}
+			
+		else {
+			recordCache = new ConcurrentHashMap<RecordKey, CachedRecord>(PartitionMetaMgr.LOC_TABLE_MAX_SIZE + 1000);
+			exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>(PartitionMetaMgr.LOC_TABLE_MAX_SIZE + 1000);
+		}
+			
 		
 //		new PeriodicalJob(3000, 500000, new Runnable() {
 //			@Override
