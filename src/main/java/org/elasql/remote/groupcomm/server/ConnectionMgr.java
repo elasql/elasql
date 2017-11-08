@@ -92,8 +92,8 @@ public class ConnectionMgr
 
 				@Override
 				public void run() {
-					long CHANGE_PREIOD = 90 * 1000;
-					long SKEW_PREIOD = 30 * 1000;
+					long CHANGE_PREIOD = 183 * 1000;
+					long SKEW_PREIOD = 96 * 1000;
 					int i = 0;
 					
 					try {
