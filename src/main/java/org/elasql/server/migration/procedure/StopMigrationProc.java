@@ -16,7 +16,7 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 		super(txNum, StoredProcedureParamHelper.DefaultParamHelper());
 		Elasql.migrationMgr().stopMigration();
 
-		if (isSeqNode && Elasql.migrationMgr().CLAY_EPOCH < 1) {
+		if (isSeqNode && Elasql.migrationMgr().CLAY_EPOCH < 2) {
 			VanillaDb.taskMgr().runTask(new Task() {
 
 				@Override
