@@ -181,7 +181,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					// Construct a tuple set
 					TupleSet rs = new TupleSet(sinkId);
 					for (PushInfo pushInfo : entry.getValue()) {
-						CachedRecord rec = readings.get(pushInfo.getRecord());
+						CachedRecord rec = cache.read(pushInfo.getRecord(), txNum);
 						cachedEntrySet.add(new CachedEntryKey(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum()));
 						rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
 					}

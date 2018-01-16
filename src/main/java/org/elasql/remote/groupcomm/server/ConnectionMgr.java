@@ -131,4 +131,10 @@ public class ConnectionMgr
 	public void onNodeFail(int id, ChannelType ct) {
 		// do nothing
 	}
+
+	@Override
+	public String mkClientResponse(Object o) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

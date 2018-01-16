@@ -40,7 +40,7 @@ public abstract class PartitionMetaMgr {
 	private static HashMap<RecordKey, Integer> locationTable;
 	private static enum PickingMethods { NO, FIFO, LRU, CLOCK };
 	private static final PickingMethods PICKING_METHOD = PickingMethods.FIFO;
-	private static final int LOC_TABLE_MAX_SIZE;
+	public static final int LOC_TABLE_MAX_SIZE;
 	// TODO: Maybe we could limit the size of the queue by 2 x LOC_TABLE_MAX_SIZE
 	private static Queue<RecordKey> fifoQueue = new LinkedList<RecordKey>();
 

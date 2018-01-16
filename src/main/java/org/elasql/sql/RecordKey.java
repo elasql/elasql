@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.elasql.server.Elasql;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.Type;
 import org.vanilladb.core.sql.predicate.ConstantExpression;
@@ -33,7 +32,7 @@ import org.vanilladb.core.sql.predicate.FieldNameExpression;
 import org.vanilladb.core.sql.predicate.Predicate;
 import org.vanilladb.core.sql.predicate.Term;
 
-public class RecordKey implements Serializable {
+public class RecordKey implements Serializable, Comparable<RecordKey> {
 	/**
 	 * 
 	 */
@@ -86,7 +85,24 @@ public class RecordKey implements Serializable {
 		}
 		return pred;
 	}
-
+	
+	@Override
+	public int compareTo(RecordKey rk) {
+		if (tableName.compareTo("item") == 0) {
+			if ((int)getKeyVal("i_id").asJavaVal() < (int)rk.getKeyVal("i_id").asJavaVal())
+				return -1;
+			else if ((int)getKeyVal("i_id").asJavaVal() > (int)rk.getKeyVal("i_id").asJavaVal())
+				return 1;
+		}
+//		else if (tableName.compareTo("ycsb") == 0) {
+//			if ((String)getKeyVal("i_id").asJavaVal() < (int)rk.getKeyVal("i_id").asJavaVal())
+//				return -1;
+//			else if ((int)getKeyVal("i_id").asJavaVal() > (int)rk.getKeyVal("i_id").asJavaVal())
+//				return 1;
+//		}
+		return 0;
+	}
+	
 	@Override
 	public String toString() {
 		return tableName + ":" + keyEntryMap.toString();
