@@ -16,6 +16,13 @@ public class TGraph {
 	protected Map<RecordKey, Node> resPos = new HashMap<RecordKey, Node>();
 	protected Node[] sinkNodes;
 	protected PartitionMetaMgr parMeta;
+	
+	// Statistics (lazy evaluation)
+	private boolean isStatsCalculated = false;
+	private int[] numOfNodes;
+	private int imbalDis;
+	private int[] remoteReadEdges;
+	private int totalRemoteReads;
 
 	public TGraph() {
 		sinkNodes = new Node[PartitionMetaMgr.NUM_PARTITIONS];
@@ -83,6 +90,7 @@ public class TGraph {
 
 	public void removeSunkNodes() {
 		nodes.clear();
+		isStatsCalculated = false;
 	}
 
 	/**
@@ -107,14 +115,15 @@ public class TGraph {
 		return nodes.get(nodes.size() - 1);
 	}
 	
-	public String getStatistics() {
-		StringBuilder sb = new StringBuilder();
+	private void calculateStatistics() {
+		if (isStatsCalculated)
+			return;
 		
 		// Count the # of nodes in each partition
-		int[] numOfNodes = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		numOfNodes = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		// Count how many remote read edges starting from each partition
-		int[] remoteReadEdges = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		remoteReadEdges = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		for (Node node : nodes) {
 			int partId = node.getPartId();
@@ -127,15 +136,51 @@ public class TGraph {
 			}
 		}
 		
+		// Count imbalance distance = sum(|(count - avg)|)
+		imbalDis = 0;
+		int avg = nodes.size() / PartitionMetaMgr.NUM_PARTITIONS;
+		for (int numOfNode : numOfNodes)
+			imbalDis += Math.abs(numOfNode - avg);
+		
+		// Count the total number of remote read edges
+		totalRemoteReads = 0;
+		for (int remoteReadEdge : remoteReadEdges)
+			totalRemoteReads += remoteReadEdge;
+		
+		isStatsCalculated = true;
+	}
+	
+	public int getImbalancedDis() {
+		calculateStatistics();
+		return imbalDis;
+	}
+	
+	public int getNumberOfRemotes() {
+		calculateStatistics();
+		return totalRemoteReads;
+	}
+	
+	public Map<RecordKey, Node> getResourceNodeMap() {
+		return new HashMap<RecordKey, Node>(resPos);
+	}
+	
+	public String getStatistics() {
+		StringBuilder sb = new StringBuilder();
+		
+		calculateStatistics();
+		
 		sb.append("============= T-Graph Statistics ==============\n");
 		sb.append("# of nodes: ");
 		for (int numOfNode : numOfNodes)
 			sb.append(String.format("%d ", numOfNode));
 		sb.append("\n");
+		sb.append("Imbalance distance: " + imbalDis + "\n");
 		sb.append("# of remote read edges: ");
 		for (int remoteRead : remoteReadEdges)
 			sb.append(String.format("%d ", remoteRead));
-		sb.append("\n===============================================\n");
+		sb.append("\n");
+		sb.append("Total # of remote read edges: " + totalRemoteReads + "\n");
+		sb.append("===============================================\n");
 		
 		return sb.toString();
 	}

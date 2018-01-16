@@ -13,15 +13,10 @@ public class HeuristicNodeInserter implements NodeInserter {
 	public void insert(TGraph graph, Node node) {
 		double minCost = Double.MAX_VALUE;
 		int partId = 0;
-		
-		// first count the number of record for each partition and cache
-		// them in the node
-		node.setPartRecordCntArray(TPartPartitioner.costFuncCal.calPartitionRecordCount(node, graph));
-		
+
 		for (int p = 0; p < PartitionMetaMgr.NUM_PARTITIONS; p++) {
 			node.setPartId(p);
-			double cost = TPartPartitioner.costFuncCal.calAddNodeCost(node,
-					graph);
+			double cost = TPartPartitioner.costFuncCal.calAddNodeCost(node, graph);
 			if (cost < minCost) {
 				minCost = cost;
 				partId = p;

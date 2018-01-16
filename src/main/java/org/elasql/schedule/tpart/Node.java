@@ -13,23 +13,12 @@ public class Node {
 	private int partId;
 	private TPartStoredProcedureTask task;
 	private boolean sunk;
-	// cache the number of record for each partition
-	// this variable is used to speedup the insert process
-	private int[] partitionRecordCount;  
 
 	public Node(TPartStoredProcedureTask task) {
 		this.task = task;
 		readEdges = new HashSet<Edge>();
 		writeEdges = new HashSet<Edge>();
 		writeBackEdges = new HashSet<Edge>();
-	}
-	
-	public int[] getPartRecordCntArray(){
-		return partitionRecordCount;
-	}
-	
-	public void setPartRecordCntArray(int[] array){
-		partitionRecordCount = array;
 	}
 
 	public Set<Edge> getReadEdges() {
