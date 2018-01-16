@@ -136,14 +136,14 @@ public class TPartPartitioner extends Task implements Scheduler {
 		}
 		
 		// XXX: Show the statistics of the T-Graph
-		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
-		if (id % 100 == 0) {
-			String stat = graph.getStatistics();
-			System.out.println("Time: " + time);
-			System.out.println("T-Graph id: " + (id + 1));
-			System.out.println(stat);
-		}
-		id++;
+//		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
+//		if (id % 100 == 0) {
+//			String stat = graph.getStatistics();
+//			System.out.println("Time: " + time);
+//			System.out.println("T-Graph id: " + (id + 1));
+//			System.out.println(stat);
+//		}
+//		id++;
 
 		if (graph.getNodes().size() != 0) {
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
