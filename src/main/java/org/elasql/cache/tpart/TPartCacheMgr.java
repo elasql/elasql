@@ -62,7 +62,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		if (hash < 0) {
 			hash += anchors.length;
 		}
-		return anchors[0];
+		return anchors[hash];
 	}
 
 	CachedRecord takeFromTx(RecordKey key, long src, long dest) {
