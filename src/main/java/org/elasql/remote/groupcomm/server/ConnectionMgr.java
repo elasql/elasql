@@ -92,10 +92,13 @@ public class ConnectionMgr
 
 				@Override
 				public void run() {
-					long CHANGE_PREIOD = 183 * 1000000;
-//					long SKEW_PREIOD = 159 * 1000;
-					long SKEW_PREIOD = 96 * 1000;
-					int i = 0;
+					// Micro 
+//					long CHANGE_PREIOD = 90 * 1000;
+//					long SKEW_PREIOD = 30 * 1000;
+					
+					// YCSB
+					long CHANGE_PREIOD = 60 * 1000;
+					long SKEW_PREIOD = 159 * 1000;
 					
 					try {
 						Thread.sleep(SKEW_PREIOD);
@@ -110,12 +113,7 @@ public class ConnectionMgr
 						Elasql.migrationMgr().onReceieveLaunchClayReq(null);
 						
 						try {
-							if (i == 0) {
-								Thread.sleep(CHANGE_PREIOD-SKEW_PREIOD);
-								i++;
-							}
-							else
-								Thread.sleep(CHANGE_PREIOD);
+							Thread.sleep(CHANGE_PREIOD);
 							
 						} catch (InterruptedException e) {
 							// TODO Auto-generated catch block
