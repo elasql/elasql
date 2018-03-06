@@ -84,6 +84,16 @@ public class Vertex implements Comparable<Vertex> {
 	public HashMap<Integer, OutEdge> getEdge() {
 		return this.edge;
 	}
+	
+	public int toMetis(StringBuilder sb) {
+		sb.append(weight + "");
+		for (OutEdge o : edge.values()) {
+			sb.append(" " + (o.id+1));
+			sb.append(" " + o.weight);
+		}
+		sb.append("\n");
+		return edge.size();
+	}
 
 	public String toString() {
 		String str = "Vertex id : " + this.id + " Weight :" + this.weight + "\n";

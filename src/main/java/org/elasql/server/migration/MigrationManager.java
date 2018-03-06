@@ -1,5 +1,9 @@
 package org.elasql.server.migration;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -123,8 +127,12 @@ public abstract class MigrationManager {
 	}
 
 	public void startClayMonitoring() {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("Clay Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
+		if (logger.isLoggable(Level.INFO)) {
+			if (PartitionMetaMgr.USE_SCHISM)
+				logger.info("Schism Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
+			else
+				logger.info("Clay Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
+		}
 
 		isMonitoring.set(true);
 		MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
@@ -339,6 +347,27 @@ public abstract class MigrationManager {
 		analyzedData = analyzedKeys;
 
 		System.out.println("End of analysis: " + (System.currentTimeMillis() - startTime) / 1000);
+	}
+	
+	public void outputMetis(long txNum) {
+		File metisDir = new File(".");
+		File metidFile = new File(metisDir, "metis_mesh_DR_new_"+MigrationManager.dataRange+"_"+txNum+".txt");
+		FileWriter wmetidFile;
+		BufferedWriter bwmetidFile;
+		try {
+			wmetidFile = new FileWriter(metidFile);
+			bwmetidFile = new BufferedWriter(wmetidFile);
+			int end_id = PartitionMetaMgr.NUM_PARTITIONS * 100000 / MigrationManager.dataRange;
+			StringBuilder sb = new StringBuilder();
+			long numEdge = 0;
+			for (int i = 0; i < end_id; i++)
+				numEdge += vertexKeys.get(i).toMetis(sb);
+			bwmetidFile.write(vertexKeys.size()+" "+numEdge/2+" 011\n");
+			bwmetidFile.append(sb);
+			bwmetidFile.close();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
 	}
 
 	// NOTE: This can only be called by the scheduler

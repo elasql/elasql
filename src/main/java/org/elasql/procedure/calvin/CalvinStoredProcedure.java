@@ -356,10 +356,15 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		if (isSeqNode && MigrationManager.isMonitoring.get()
 				&& System.currentTimeMillis() > MigrationManager.MONITOR_STOP_TIME) {
-
-			System.out.println(
-					"Clay Stop Monitoring at " + (System.currentTimeMillis() - MigrationManager.startTime) / 1000);
-			migraMgr.generateMigrationPlan();
+			if (PartitionMetaMgr.USE_SCHISM) {
+				System.out.println(
+						"Schism Stop Monitoring at " + (System.currentTimeMillis() - MigrationManager.startTime) / 1000);
+				migraMgr.outputMetis(txNum);
+			} else {
+				System.out.println(
+						"Clay Stop Monitoring at " + (System.currentTimeMillis() - MigrationManager.startTime) / 1000);
+				migraMgr.generateMigrationPlan();
+			}
 			MigrationManager.isMonitoring.set(false);
 		}
 		/*

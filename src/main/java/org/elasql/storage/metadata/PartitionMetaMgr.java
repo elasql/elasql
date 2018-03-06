@@ -24,6 +24,8 @@ import org.elasql.util.ElasqlProperties;
 public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
+	
+	public final static boolean USE_SCHISM = true;
 
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
