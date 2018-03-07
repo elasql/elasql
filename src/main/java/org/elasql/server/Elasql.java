@@ -114,11 +114,11 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 
-		init(dirName, id, isSequencer, factory, partMetaMgr);
+		init(dirName, id, isSequencer, factory, partMetaMgr, null);
 	}
 
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
-			PartitionMetaMgr partitionMetaMgr) {
+			PartitionMetaMgr partitionMetaMgr, MigrationManager migraMgr) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
@@ -136,7 +136,7 @@ public class Elasql extends VanillaDb {
 
 			initScheduler(factory);
 			initConnectionMgr(myNodeId, true);
-			initMigration();
+			initMigration(migraMgr);
 			initDdLogMgr();
 			// initialize core modules
 			return;
@@ -144,7 +144,7 @@ public class Elasql extends VanillaDb {
 
 		// initialize core modules
 		VanillaDb.init(dirName);
-		initMigration();
+		initMigration(migraMgr);
 		// initialize DD modules
 		initCacheMgr();
 		initPartitionMetaMgr(partitionMetaMgr);
@@ -228,17 +228,8 @@ public class Elasql extends VanillaDb {
 		}
 	}
 
-	public static void initMigration() {
-		String prop = System.getProperty(Elasql.class.getName() + ".MIGRATION_MGR");
-		String migrationCls = "org.elasql.bench.migration.MicroMigrationManager";
-
-		try {
-			migrateMgr = (MigrationManager) Class.forName(migrationCls).newInstance();
-		} catch (Exception e) {
-			if (logger.isLoggable(Level.WARNING))
-				logger.warning("error reading the class name for migration manager: " + migrationCls);
-			throw new RuntimeException();
-		}
+	public static void initMigration(MigrationManager migraMgr) {
+		migrateMgr = migraMgr;
 	}
 
 	public static void initConnectionMgr(int id, boolean isSequencer) {

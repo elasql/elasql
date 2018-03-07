@@ -343,8 +343,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			Integer vetxId;
 			int partId;
 			for (RecordKey k : remoteReadKeys) {
-//				vetxId = ((int) k.getKeyVal("i_id").asJavaVal() - 1) / migraMgr.dataRange;
-				vetxId = (Integer.parseInt(k.getKeyVal("ycsb_id").toString()) - 1) / migraMgr.dataRange;
+				vetxId = migraMgr.convertToVertexId(k);
 				partId = Elasql.partitionMetaMgr().getPartition(k);
 
 				migraMgr.encreaseWeight(vetxId, partId);
@@ -776,10 +775,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	private ArrayList<Integer> recordKeyToSortArray(Set<RecordKey> s) {
 		ArrayList<Integer> l = new ArrayList<Integer>();
-		for (RecordKey k : s) {
-//			l.add((int) k.getKeyVal("i_id").asJavaVal());
-			l.add(Integer.parseInt(k.getKeyVal("ycsb_id").toString()));
-		}
+		for (RecordKey k : s)
+			l.add(migraMgr.retrieveIdAsInt(k));
 		Collections.sort(l);
 		return l;
 	}

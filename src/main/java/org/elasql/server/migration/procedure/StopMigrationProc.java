@@ -5,6 +5,7 @@ import java.util.Map;
 import org.elasql.cache.CachedRecord;
 import org.elasql.procedure.calvin.AllExecuteProcedure;
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.MigrationManager;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
@@ -16,7 +17,7 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 		super(txNum, StoredProcedureParamHelper.DefaultParamHelper());
 		Elasql.migrationMgr().stopMigration();
 
-		if (isSeqNode && Elasql.migrationMgr().CLAY_EPOCH < 2) {
+		if (isSeqNode && MigrationManager.clayEpoch < MigrationManager.TOTAL_CLAY_EPOCH) {
 			VanillaDb.taskMgr().runTask(new Task() {
 
 				@Override

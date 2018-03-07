@@ -92,36 +92,25 @@ public class ConnectionMgr
 
 				@Override
 				public void run() {
-					// Micro 
-//					long CHANGE_PREIOD = 90 * 1000;
-//					long SKEW_PREIOD = 30 * 1000;
-					
-					// YCSB
-					long CHANGE_PREIOD = 60 * 1000;
-					long SKEW_PREIOD = 159 * 1000;
+					MigrationManager migraMgr = Elasql.migrationMgr();
 					
 					try {
-						Thread.sleep(SKEW_PREIOD);
+						Thread.sleep(migraMgr.getWaitingTime());
 					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 					
 					while(true) {
-						MigrationManager.CLAY_EPOCH = 0;
-						Elasql.migrationMgr().cleanUpClay();
-						Elasql.migrationMgr().onReceieveLaunchClayReq(null);
+						MigrationManager.clayEpoch = 0;
+						migraMgr.cleanUpClay();
+						migraMgr.onReceieveLaunchClayReq(null);
 						
 						try {
-							Thread.sleep(CHANGE_PREIOD);
-							
+							Thread.sleep(migraMgr.getMigrationPreiod());
 						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 					}
-					
-
 				}
 			});
 

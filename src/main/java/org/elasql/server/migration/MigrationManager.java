@@ -30,6 +30,8 @@ import org.vanilladb.core.server.task.Task;
 
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
+	
+	public static final int TOTAL_CLAY_EPOCH = 2;
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -68,7 +70,7 @@ public abstract class MigrationManager {
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
 	public static final int MONITORING_TIME = 10 * 1000;
-	public static int CLAY_EPOCH = 0;
+	public static int clayEpoch = 0;
 	private final int LOOK_AHEAD = 200;
 	public static int dataRange = 100;
 	public static double BETA = 0.5;
@@ -89,6 +91,7 @@ public abstract class MigrationManager {
 		//isSourceNode = (Elasql.serverId() == getSourcePartition());
 		isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
 	}
+	
 	public boolean isSourceNode(){
 		return (Elasql.serverId() == getSourcePartition());
 	}
@@ -166,7 +169,7 @@ public abstract class MigrationManager {
 				for (Vertex e : vertexKeys.values())
 					partitions.get(e.getPartId()).addVertex(e);
 
-				System.out.println("Clay No." + CLAY_EPOCH + " Monitoring Finish!");
+				System.out.println("Clay No." + clayEpoch + " Monitoring Finish!");
 				for (Partition p : partitions) {
 					System.out
 							.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
@@ -209,7 +212,7 @@ public abstract class MigrationManager {
 				// Add Source at the Source
 				params.addFirst(new Integer(overloadPart.getId()));
 
-				System.out.println("Clay No." + CLAY_EPOCH + " Migration Plan Generation Takes : "
+				System.out.println("Clay No." + clayEpoch + " Migration Plan Generation Takes : "
 						+ (System.currentTimeMillis() - start_t) + " ms");
 
 				System.out.println("Source is Part : " + overloadPart.getId() + " Weight : " + overloadPart.getLoad()
@@ -220,7 +223,7 @@ public abstract class MigrationManager {
 				Collections.sort(aa);
 				System.out.println(aa);
 
-				CLAY_EPOCH = CLAY_EPOCH + 1;
+				clayEpoch = clayEpoch + 1;
 				if (logger.isLoggable(Level.INFO))
 					logger.info("Clay BroadKeyscast at " + (System.currentTimeMillis() - startTime) / 1000);
 
@@ -282,8 +285,24 @@ public abstract class MigrationManager {
 		for (int i : integers)
 			this.migrateRanges.add(i);
 	}
+	
+	public int convertToVertexId(RecordKey k) {
+		return (retrieveIdAsInt(k) - 1) / MigrationManager.dataRange;
+	}
+	
+	public abstract int retrieveIdAsInt(RecordKey k);
 
 	public abstract boolean keyIsInMigrationRange(RecordKey key);
+	
+	/**
+	 * @return how long it should wait for starting migration experiments (in ms)
+	 */
+	public abstract long getWaitingTime();
+	
+	/**
+	 * @return how long to initialize a new migration job (in ms)
+	 */
+	public abstract long getMigrationPreiod();
 
 	public abstract void onReceieveLaunchClayReq(Object[] metadata);
 
