@@ -16,9 +16,7 @@
 package org.elasql.storage.metadata;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -29,6 +27,9 @@ import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
 public abstract class PartitionMetaMgr {
+	
+	public final static boolean LOAD_METIS_PARTITIONS = false;
+	public final static int METIS_DATA_RANGE = 100;
 
 	public final static int NUM_PARTITIONS;
 //	public final static File LOGDIR;
