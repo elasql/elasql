@@ -1,7 +1,6 @@
 package org.elasql.server.migration;
 
 import java.util.HashMap;
-import java.util.Map.Entry;
 
 public class Vertex implements Comparable<Vertex> {
 
@@ -51,7 +50,7 @@ public class Vertex implements Comparable<Vertex> {
 		return partId;
 	}
 
-	public void add() {
+	public void incrementWeight() {
 		this.weight++;
 	}
 

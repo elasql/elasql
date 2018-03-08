@@ -16,7 +16,6 @@
 package org.elasql.storage.metadata;
 
 import java.util.HashMap;
-import java.util.LinkedList;
 
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
@@ -25,7 +24,7 @@ public abstract class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
 	
-	public final static boolean USE_SCHISM = true;
+	public final static boolean USE_SCHISM = false;
 
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()

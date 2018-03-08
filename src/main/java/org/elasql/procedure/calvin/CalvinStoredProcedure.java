@@ -346,11 +346,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				vetxId = migraMgr.convertToVertexId(k);
 				partId = Elasql.partitionMetaMgr().getPartition(k);
 
-				migraMgr.encreaseWeight(vetxId, partId);
+				migraMgr.updateWeightOnVertex(vetxId, partId);
 				vertexIdSet.add(vetxId);
 			}
-			migraMgr.encreaseEdge(vertexIdSet);
-
+			migraMgr.updateWeightOnEdges(vertexIdSet);
 		}
 
 		if (isSeqNode && MigrationManager.isMonitoring.get()

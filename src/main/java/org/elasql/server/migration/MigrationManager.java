@@ -96,23 +96,15 @@ public abstract class MigrationManager {
 		return (Elasql.serverId() == getSourcePartition());
 	}
 
-	public void encreaseWeight(Integer vetxId, int partId) {
-
-		if (!vertexKeys.containsKey(vetxId))
+	public void updateWeightOnVertex(Integer vetxId, int partId) {
+		Vertex vertex = vertexKeys.get(vetxId);
+		if (vertex == null)
 			vertexKeys.put(vetxId, new Vertex(vetxId, partId));
 		else
-			vertexKeys.get(vetxId).add();
+			vertex.incrementWeight();
 	}
 
-	public void encreaseWeight(RecordKey k, int partId) {
-		Integer vetxId = Integer.parseInt(k.getKeyVal("i_id").toString()) / dataRange;
-		if (!vertexKeys.containsKey(vetxId))
-			vertexKeys.put(vetxId, new Vertex(vetxId, partId));
-		else
-			vertexKeys.get(vetxId).add();
-	}
-
-	public void encreaseEdge(List<Integer> vertexIdSet) {
+	public void updateWeightOnEdges(List<Integer> vertexIdSet) {
 		for (int i : vertexIdSet)
 			for (int j : vertexIdSet)
 				if (j != i)
@@ -381,7 +373,7 @@ public abstract class MigrationManager {
 			long numEdge = 0;
 			for (int i = 0; i < end_id; i++)
 				numEdge += vertexKeys.get(i).toMetis(sb);
-			bwmetidFile.write(vertexKeys.size()+" "+numEdge/2+" 011\n");
+			bwmetidFile.write(vertexKeys.size() + " " + numEdge/2 + " 011\n");
 			bwmetidFile.append(sb);
 			bwmetidFile.close();
 		} catch (IOException e1) {
