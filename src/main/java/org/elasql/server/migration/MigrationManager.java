@@ -72,7 +72,7 @@ public abstract class MigrationManager {
 	public static final int MONITORING_TIME = 10 * 1000;
 	public static int clayEpoch = 0;
 	private final int LOOK_AHEAD = 200;
-	public static int dataRange = 100;
+	public static final int DATA_RANGE_SIZE = 100;
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
@@ -278,13 +278,13 @@ public abstract class MigrationManager {
 			this.migrateRanges.add(i);
 	}
 	
-	public int convertToVertexId(RecordKey k) {
-		return (retrieveIdAsInt(k) - 1) / MigrationManager.dataRange;
-	}
+	public abstract int convertToVertexId(RecordKey k);
 	
 	public abstract int retrieveIdAsInt(RecordKey k);
-
-	public abstract boolean keyIsInMigrationRange(RecordKey key);
+	
+	public boolean keyIsInMigrationRange(RecordKey key) {
+		return migrateRanges.contains(convertToVertexId(key));
+	}
 	
 	/**
 	 * @return how long it should wait for starting migration experiments (in ms)
@@ -362,13 +362,13 @@ public abstract class MigrationManager {
 	
 	public void outputMetis(long txNum) {
 		File metisDir = new File(".");
-		File metidFile = new File(metisDir, "metis_mesh_DR_new_"+MigrationManager.dataRange+"_"+txNum+".txt");
+		File metidFile = new File(metisDir, "metis_mesh_DR_new_"+MigrationManager.DATA_RANGE_SIZE+"_"+txNum+".txt");
 		FileWriter wmetidFile;
 		BufferedWriter bwmetidFile;
 		try {
 			wmetidFile = new FileWriter(metidFile);
 			bwmetidFile = new BufferedWriter(wmetidFile);
-			int end_id = PartitionMetaMgr.NUM_PARTITIONS * 100000 / MigrationManager.dataRange;
+			int end_id = PartitionMetaMgr.NUM_PARTITIONS * 100000 / MigrationManager.DATA_RANGE_SIZE;
 			StringBuilder sb = new StringBuilder();
 			long numEdge = 0;
 			for (int i = 0; i < end_id; i++)
