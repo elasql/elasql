@@ -278,6 +278,8 @@ public abstract class MigrationManager {
 			this.migrateRanges.add(i);
 	}
 	
+	public abstract int getRecordCount();
+	
 	public abstract int convertToVertexId(RecordKey k);
 	
 	public abstract int retrieveIdAsInt(RecordKey k);
@@ -368,12 +370,19 @@ public abstract class MigrationManager {
 		try {
 			wmetidFile = new FileWriter(metidFile);
 			bwmetidFile = new BufferedWriter(wmetidFile);
-			int end_id = PartitionMetaMgr.NUM_PARTITIONS * 100000 / MigrationManager.DATA_RANGE_SIZE;
+			int vertexCount = getRecordCount() / MigrationManager.DATA_RANGE_SIZE;
 			StringBuilder sb = new StringBuilder();
 			long numEdge = 0;
-			for (int i = 0; i < end_id; i++)
-				numEdge += vertexKeys.get(i).toMetis(sb);
-			bwmetidFile.write(vertexKeys.size() + " " + numEdge/2 + " 011\n");
+			for (int i = 0; i < vertexCount; i++) {
+				Vertex v = vertexKeys.get(i);
+				if (v != null) {
+					numEdge += v.toMetis(sb);
+				} else {
+					sb.append("0\n");
+				}
+			}
+				
+			bwmetidFile.write(String.format("%d %d 011\n", vertexCount, numEdge / 2));
 			bwmetidFile.append(sb);
 			bwmetidFile.close();
 		} catch (IOException e1) {
