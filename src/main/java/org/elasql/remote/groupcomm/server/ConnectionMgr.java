@@ -84,37 +84,6 @@ public class ConnectionMgr
 
 			}
 		});
-		
-		if (sequencerMode) {
-			
-			// Add Start Analysis to TOM
-			VanillaDb.taskMgr().runTask(new Task() {
-
-				@Override
-				public void run() {
-					MigrationManager migraMgr = Elasql.migrationMgr();
-					
-					try {
-						Thread.sleep(migraMgr.getWaitingTime());
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					
-					while(true) {
-						MigrationManager.clayEpoch = 0;
-						migraMgr.cleanUpClay();
-						migraMgr.onReceieveLaunchClayReq(null);
-						
-						try {
-							Thread.sleep(migraMgr.getMigrationPreiod());
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
-				}
-			});
-
-		}
 	}
 
 	public void sendClientResponse(int clientId, int rteId, long txNum, SpResultSet rs) {

@@ -92,6 +92,31 @@ public abstract class MigrationManager {
 		isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
 	}
 	
+	public void scheduleControllerThread() {
+		VanillaDb.taskMgr().runTask(new Task() {
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(getWaitingTime());
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				while(true) {
+					clayEpoch = 0;
+					cleanUpClay();
+					onReceieveLaunchClayReq(null);
+					
+					try {
+						Thread.sleep(getMigrationPreiod());
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		});
+	}
+	
 	public boolean isSourceNode(){
 		return (Elasql.serverId() == getSourcePartition());
 	}
