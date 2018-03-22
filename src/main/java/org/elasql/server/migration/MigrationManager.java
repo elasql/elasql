@@ -31,7 +31,7 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
-	public static final int TOTAL_CLAY_EPOCH = 2;
+	public static final int TOTAL_CLAY_EPOCH = 5; // 5 is enough for Google Workloads
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -69,10 +69,12 @@ public abstract class MigrationManager {
 	// Clay structure
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
-	public static final int MONITORING_TIME = 10 * 1000;
+//	public static final int MONITORING_TIME = 5 * 1000; // for clay
+	public static final int MONITORING_TIME = 30 * 1000; // for Schism
 	public static int clayEpoch = 0;
-	private final int LOOK_AHEAD = 200;
-	public static final int DATA_RANGE_SIZE = 100;
+//	private final int LOOK_AHEAD = 200;
+	private final int LOOK_AHEAD = 5; // For Google Workloads. 5 is good enough.
+	public static final int DATA_RANGE_SIZE = 20;
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
@@ -187,6 +189,7 @@ public abstract class MigrationManager {
 					partitions.get(e.getPartId()).addVertex(e);
 
 				System.out.println("Clay No." + clayEpoch + " Monitoring Finish!");
+				// Debug
 				for (Partition p : partitions) {
 					System.out
 							.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
@@ -238,6 +241,7 @@ public abstract class MigrationManager {
 						+ partitions.get(0).getLoad() + " Edge : " + partitions.get(0).getEdgeLoad());
 				ArrayList<Integer> aa = new ArrayList<Integer>(migraCandidate.getCandidateIds());
 				Collections.sort(aa);
+				// Debug
 				System.out.println(aa);
 
 				clayEpoch = clayEpoch + 1;
