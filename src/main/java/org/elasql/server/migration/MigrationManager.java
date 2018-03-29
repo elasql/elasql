@@ -74,7 +74,7 @@ public abstract class MigrationManager {
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
 	private final int LOOK_AHEAD = 5; // For Google Workloads. 5 is good enough.
-	public static final int DATA_RANGE_SIZE = 20;
+	public static final int DATA_RANGE_SIZE = 10;
 	public static double BETA = 0.5;
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
