@@ -88,8 +88,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 		for (StoredProcedureCall call : calls)
 			spcQueue.add(call);
 	}
-	
-	private int id = 0;
 
 	public void run() {
 		List<TPartStoredProcedureTask> batchedTasks = new LinkedList<TPartStoredProcedureTask>();
@@ -127,6 +125,12 @@ public class TPartPartitioner extends Task implements Scheduler {
 		}
 	}
 	
+	private int batchId = 0;
+	private int imbalanced = 0;
+	private int remoteTxRead = 0;
+	private int remoteSinkRead = 0;
+	private int recordCount = 0;
+	
 	private void processBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		costFuncCal.analyzeBatch(batchedTasks);
 		
@@ -136,14 +140,25 @@ public class TPartPartitioner extends Task implements Scheduler {
 		}
 		
 		// XXX: Show the statistics of the T-Graph
-//		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
-//		if (id % 100 == 0) {
-//			String stat = graph.getStatistics();
-//			System.out.println("Time: " + time);
-//			System.out.println("T-Graph id: " + (id + 1));
-//			System.out.println(stat);
-//		}
-//		id++;
+		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
+		if (batchId % 100 == 0) {
+			String stat = graph.getStatistics();
+			System.out.println("Time: " + time);
+			System.out.println("T-Graph id: " + (batchId + 1));
+			System.out.print(stat);
+			
+			imbalanced += graph.getImbalancedDis();
+			remoteTxRead += graph.getRemoteTxReads();
+			remoteSinkRead += graph.getRemoteSinkReads();
+			recordCount++;
+			
+			System.out.println("======== Total Statistics ========");
+			System.out.println(String.format("Avg. imbal: %f, avg. remote tx reads: %f, "
+					+ "avg. remote sink reads: %f", ((double) imbalanced) / recordCount,
+					((double) remoteTxRead) / recordCount, ((double) remoteSinkRead) / recordCount));
+			System.out.println("==================================\n");
+		}
+		batchId++;
 
 		if (graph.getNodes().size() != 0) {
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);

@@ -21,8 +21,10 @@ public class TGraph {
 	private boolean isStatsCalculated = false;
 	private int[] numOfNodes;
 	private int imbalDis;
-	private int[] remoteReadEdges;
-	private int totalRemoteReads;
+	private int[] remoteTxReads;
+	private int totalRemoteTxReads;
+	private int[] remoteSinkReads;
+	private int totalRemoteSinkReads;
 
 	public TGraph() {
 		sinkNodes = new Node[PartitionMetaMgr.NUM_PARTITIONS];
@@ -123,7 +125,8 @@ public class TGraph {
 		numOfNodes = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		// Count how many remote read edges starting from each partition
-		remoteReadEdges = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		remoteTxReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		remoteSinkReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		for (Node node : nodes) {
 			int partId = node.getPartId();
@@ -131,8 +134,14 @@ public class TGraph {
 			numOfNodes[partId]++;
 			
 			for (Edge edge : node.getReadEdges()) {
-				if (partId != edge.getTarget().getPartId())
-					remoteReadEdges[partId]++;
+				if (partId != edge.getTarget().getPartId()) {
+					if (edge.getTarget().isSinkNode()) {
+						remoteSinkReads[partId]++;
+					} else {
+						remoteTxReads[partId]++;
+					}
+				}
+					
 			}
 		}
 		
@@ -143,9 +152,12 @@ public class TGraph {
 			imbalDis += Math.abs(numOfNode - avg);
 		
 		// Count the total number of remote read edges
-		totalRemoteReads = 0;
-		for (int remoteReadEdge : remoteReadEdges)
-			totalRemoteReads += remoteReadEdge;
+		totalRemoteTxReads = 0;
+		for (int remoteTxRead : remoteTxReads)
+			totalRemoteTxReads += remoteTxRead;
+		totalRemoteSinkReads = 0;
+		for (int remoteReadEdge : remoteSinkReads)
+			totalRemoteSinkReads += remoteReadEdge;
 		
 		isStatsCalculated = true;
 	}
@@ -155,9 +167,14 @@ public class TGraph {
 		return imbalDis;
 	}
 	
-	public int getNumberOfRemotes() {
+	public int getRemoteTxReads() {
 		calculateStatistics();
-		return totalRemoteReads;
+		return totalRemoteTxReads;
+	}
+	
+	public int getRemoteSinkReads() {
+		calculateStatistics();
+		return totalRemoteSinkReads;
 	}
 	
 	public Map<RecordKey, Node> getResourceNodeMap() {
@@ -175,11 +192,16 @@ public class TGraph {
 			sb.append(String.format("%d ", numOfNode));
 		sb.append("\n");
 		sb.append("Imbalance distance: " + imbalDis + "\n");
-		sb.append("# of remote read edges: ");
-		for (int remoteRead : remoteReadEdges)
-			sb.append(String.format("%d ", remoteRead));
+		sb.append("# of remote tx reads: ");
+		for (int txRead : remoteTxReads)
+			sb.append(String.format("%d ", txRead));
 		sb.append("\n");
-		sb.append("Total # of remote read edges: " + totalRemoteReads + "\n");
+		sb.append("Total # of remote tx reads: " + totalRemoteTxReads + "\n");
+		sb.append("# of remote sink reads: ");
+		for (int sinkRead : remoteSinkReads)
+			sb.append(String.format("%d ", sinkRead));
+		sb.append("\n");
+		sb.append("Total # of remote sink reads: " + totalRemoteSinkReads + "\n");
 		sb.append("===============================================\n");
 		
 		return sb.toString();
