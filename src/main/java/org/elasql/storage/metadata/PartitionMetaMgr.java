@@ -20,6 +20,7 @@ import java.io.FileWriter;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
@@ -38,7 +39,7 @@ public abstract class PartitionMetaMgr {
 	public static BufferedWriter BWRLOGFILE;
 //	private static final long BENCH_START_TIME;
 	
-	private static HashMap<RecordKey, Integer> locationTable;
+	private static Map<RecordKey, Integer> locationTable;
 	private static enum PickingMethods { NO, FIFO, LRU, CLOCK };
 	private static final PickingMethods PICKING_METHOD = PickingMethods.FIFO;
 	public static final int LOC_TABLE_MAX_SIZE;
@@ -74,6 +75,26 @@ public abstract class PartitionMetaMgr {
 //				}
 //			}
 //		).start();
+		
+//		new PeriodicalJob(3000, 500000, new Runnable() {
+//			@Override
+//			public void run() {
+//				int[] counts = new int[20];
+//				counts[0] = 100_000;
+//				
+//				for (Entry<RecordKey, Integer> entry : locationTable.entrySet()) {
+//					int id = Integer.parseInt((String) entry.getKey().getKeyVal("ycsb_id").asJavaVal());
+//					int partId = entry.getValue();
+//					
+//					if (id <= 100_000) {
+//						counts[0]--;
+//						counts[partId]++;
+//					}
+//				}
+//				
+//				System.out.println(Arrays.toString(counts));
+//			}
+//		}).start();
 		
 //		Thread thread = new Thread(new Runnable() {
 //			public void run() {

@@ -130,7 +130,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private int remoteTxRead = 0;
 	private int remoteSinkRead = 0;
 	private int recordCount = 0;
-	private int nextReportTime = 30;
+	private long nextReportTime = 0;
 	
 	private void processBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		costFuncCal.analyzeBatch(batchedTasks);
@@ -164,7 +164,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 				remoteTxRead = 0;
 				remoteSinkRead = 0;
 				recordCount = 0;
-				nextReportTime += 3;
+				nextReportTime = time + 3;
 			}
 //		}
 		batchId++;
