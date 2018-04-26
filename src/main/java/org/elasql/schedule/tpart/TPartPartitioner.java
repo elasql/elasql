@@ -1,5 +1,6 @@
 package org.elasql.schedule.tpart;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -42,6 +43,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private TPartStoredProcedureFactory factory;
 
 	private PartitionMetaMgr parMetaMgr = Elasql.partitionMetaMgr();
+	
+	private File dumpDir = new File("batch_dump");
 
 	static {
 		HAS_REORDERING = ElasqlProperties.getLoader()
@@ -82,6 +85,13 @@ public class TPartPartitioner extends Task implements Scheduler {
 		this.sinker = sinker;
 		this.graph = graph;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
+		
+		// Clear the dump dir
+		dumpDir.mkdirs();
+		for (File file : dumpDir.listFiles()) {
+			if (file.isFile())
+				file.delete();
+		}
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -165,6 +175,9 @@ public class TPartPartitioner extends Task implements Scheduler {
 				remoteSinkRead = 0;
 				recordCount = 0;
 				nextReportTime = time + 3;
+				
+				// Dump the current graph
+//				GraphDumper.dumpToFile(new File(dumpDir, String.format("%d_%d.txt", time, batchId)), graph);
 			}
 //		}
 		batchId++;

@@ -85,15 +85,15 @@ public class LookAheadCalculator extends CostFunctionCalculator {
 	@Override
 	public void updateAddNodeCost(Node newNode, TGraph graph) {
 		// Update use counts of resource
-		for (RecordKey key : newNode.getTask().getReadSet()) {
-			UseCount count = useCounts.get(key);
-			
-			if (count == null) {
-				throw new RuntimeException("We do not have use count for " + key);
-			}
-			
-			count.decrement();
-		}
+//		for (RecordKey key : newNode.getTask().getReadSet()) {
+//			UseCount count = useCounts.get(key);
+//			
+//			if (count == null) {
+//				throw new RuntimeException("We do not have use count for " + key);
+//			}
+//			
+//			count.decrement();
+//		}
 		
 		partLoads[newNode.getPartId()] += newNode.getWeight();
 	}
