@@ -6,10 +6,9 @@ import java.util.List;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.schedule.tpart.Edge;
-import org.elasql.schedule.tpart.Node;
-import org.elasql.schedule.tpart.TGraph;
-import org.elasql.schedule.tpart.TPartPartitioner;
+import org.elasql.schedule.tpart.graph.Edge;
+import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -46,9 +45,7 @@ public class CacheOptimizedSinker extends Sinker {
 		plans = createSunkPlan(graph);
 
 		// clean up this sink's info
-		graph.clearSinkNodeEdges();
-		graph.removeSunkNodes();
-		TPartPartitioner.costFuncCal.reset();
+		graph.clear();
 
 		sinkProcessId++;
 
@@ -72,7 +69,7 @@ public class CacheOptimizedSinker extends Sinker {
 		// create procedure tasks
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
 
-		for (Node node : graph.getNodes()) {
+		for (TxNode node : graph.getTxNodes()) {
 			// System.out.println("Tx: " + node.getTxNum());
 			// task is local if the tx logic should be executed locally
 			boolean taskIsLocal = (node.getPartId() == myId);
@@ -192,8 +189,6 @@ public class CacheOptimizedSinker extends Sinker {
 				node.getTask().decideExceutionPlan(plan);
 				localTasks.add(node.getTask());
 			}
-
-			node.setSunk(true);
 		}
 		
 		return localTasks;

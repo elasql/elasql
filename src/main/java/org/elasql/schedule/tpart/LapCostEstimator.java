@@ -5,10 +5,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class LookAheadCalculator extends CostFunctionCalculator {
+public class LapCostEstimator extends CostEstimator {
 	
 	private static class UseCount {
 		
@@ -61,11 +62,11 @@ public class LookAheadCalculator extends CostFunctionCalculator {
 	}
 	
 	@Override
-	public double calAddNodeCost(Node newNode, TGraph graph) {
+	public double estimateTaskCostOnPart(TGraph graph, TPartStoredProcedureTask task, int assignedPart) {
 		// calculate cross partition edge cost
 		double crossEdgeCost = 0;
-		for (RecordKey key : newNode.getTask().getReadSet()) {
-			if (graph.getResourcePosition(key).getPartId() != newNode.getPartId()) {
+		for (RecordKey key : task.getReadSet()) {
+			if (graph.getResourcePosition(key).getPartId() != assignedPart) {
 				UseCount count = useCounts.get(key);
 				
 				if (count == null) {
@@ -77,15 +78,15 @@ public class LookAheadCalculator extends CostFunctionCalculator {
 		}
 
 		// calculate partition load cost
-		double loadCost = partLoads[newNode.getPartId()] + newNode.getWeight();
+		double loadCost = partLoads[assignedPart] + task.getWeight();
 
 		return truncate(loadCost * (1 - BETA) + crossEdgeCost * BETA, 4);
 	}
 	
 	@Override
-	public void updateAddNodeCost(Node newNode, TGraph graph) {
+	public void updateAddNodeCost(TGraph graph, TPartStoredProcedureTask task, int assignedPartId) {
 		// Update use counts of resource
-		for (RecordKey key : newNode.getTask().getReadSet()) {
+		for (RecordKey key : task.getReadSet()) {
 			UseCount count = useCounts.get(key);
 			
 			if (count == null) {
@@ -95,6 +96,6 @@ public class LookAheadCalculator extends CostFunctionCalculator {
 			count.decrement();
 		}
 		
-		partLoads[newNode.getPartId()] += newNode.getWeight();
+		partLoads[assignedPartId] += task.getWeight();
 	}
 }

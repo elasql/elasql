@@ -1,4 +1,4 @@
-package org.elasql.schedule.tpart;
+package org.elasql.schedule.tpart.graph;
 
 import org.elasql.sql.RecordKey;
 

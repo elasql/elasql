@@ -31,9 +31,9 @@ import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.HeuristicNodeInserter;
-import org.elasql.schedule.tpart.SupaTGraph;
-import org.elasql.schedule.tpart.TGraph;
 import org.elasql.schedule.tpart.TPartPartitioner;
+import org.elasql.schedule.tpart.graph.LapTGraph;
+import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashBasedPartitionMetaMgr;
@@ -206,7 +206,7 @@ public class Elasql extends VanillaDb {
 	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
 		TGraph graph;
 		if (SERVICE_TYPE == ServiceType.TPART_LAP)
-			graph = new SupaTGraph();
+			graph = new LapTGraph();
 		else
 			graph = new TGraph();
 		

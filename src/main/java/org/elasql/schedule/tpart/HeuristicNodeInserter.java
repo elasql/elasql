@@ -1,20 +1,17 @@
 package org.elasql.schedule.tpart;
 
-import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class HeuristicNodeInserter implements NodeInserter {
-	
-	public HeuristicNodeInserter() {
-	}
 
 	/**
 	 * Insert this node to the partition that will result in minimal cost.
 	 */
-	public void insert(TGraph graph, Node node) {
+	public void insert(TGraph graph, CostEstimator costEstimator, TPartStoredProcedureTask task) {
 		double minCost = Double.MAX_VALUE;
-		int partId = 0;
+		int minCostPart = 0;
 		
 		//===
 //		StringBuilder sb = null;
@@ -37,12 +34,11 @@ public class HeuristicNodeInserter implements NodeInserter {
 //		}
 		//===
 		
-		for (int p = 0; p < PartitionMetaMgr.NUM_PARTITIONS; p++) {
-			node.setPartId(p);
-			double cost = TPartPartitioner.costFuncCal.calAddNodeCost(node, graph);
+		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++) {
+			double cost = costEstimator.estimateTaskCostOnPart(graph, task, partId);
 			if (cost < minCost) {
 				minCost = cost;
-				partId = p;
+				minCostPart = partId;
 			}
 			
 //			if (sb != null) {
@@ -56,23 +52,22 @@ public class HeuristicNodeInserter implements NodeInserter {
 //			System.out.println(sb.toString());
 //		}
 		
-		node.setPartId(partId);
-		TPartPartitioner.costFuncCal.updateAddNodeCost(node, graph);
-		graph.insertNode(node);
+		costEstimator.updateAddNodeCost(graph, task, minCostPart);
+		graph.insertTxNode(task, minCostPart);
 	}
 	
-	private void showReadWriteSet(TGraph graph, StringBuilder sb, Node node) {
-		sb.append("Tx " + node.getTxNum() + " reads [");
-		
-		for (RecordKey key : node.getTask().getReadSet()) {
-			long source = graph.getResourcePosition(key).getPartId();
-			long ycsbId = Long.parseLong((String) key.getKeyVal("ycsb_id").asJavaVal());
-			sb.append(String.format("(%d, %d), ", ycsbId, source));
-		}
-		sb.delete(sb.length() - 2, sb.length());
-		sb.append("], ");
-		
-		if (node.getTask().getWriteSet().size() > 0)
-			sb.append("ITS RW Tx, ");
-	}
+//	private void showReadWriteSet(TGraph graph, StringBuilder sb, Node node) {
+//		sb.append("Tx " + node.getTxNum() + " reads [");
+//		
+//		for (RecordKey key : node.getTask().getReadSet()) {
+//			long source = graph.getResourcePosition(key).getPartId();
+//			long ycsbId = Long.parseLong((String) key.getKeyVal("ycsb_id").asJavaVal());
+//			sb.append(String.format("(%d, %d), ", ycsbId, source));
+//		}
+//		sb.delete(sb.length() - 2, sb.length());
+//		sb.append("], ");
+//		
+//		if (node.getTask().getWriteSet().size() > 0)
+//			sb.append("ITS RW Tx, ");
+//	}
 }
