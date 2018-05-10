@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
@@ -27,6 +28,7 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 	}
 	
 	private double[] loadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
+	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 
 	/**
 	 * Insert this node to the partition that will result in minimal cost.
@@ -65,8 +67,17 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 	private double estimateCost(TGraph graph, TPartStoredProcedureTask task, int targetPart) {
 		// calculate cross partition edge cost
 		double crossEdgeCost = 0;
+		
+		// count read edges
 		for (RecordKey key : task.getReadSet()) {
 			if (graph.getResourcePosition(key).getPartId() != targetPart) {
+				crossEdgeCost++;
+			}
+		}
+		
+		// count write-back edges
+		for (RecordKey key : task.getWriteSet()) {
+			if (partMgr.getPartition(key) != targetPart) {
 				crossEdgeCost++;
 			}
 		}

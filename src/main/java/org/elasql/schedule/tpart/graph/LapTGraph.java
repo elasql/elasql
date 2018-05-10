@@ -9,10 +9,6 @@ import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class LapTGraph extends TGraph {
-	
-	public LapTGraph() {
-		super();
-	}
 
 	@Override
 	/**
