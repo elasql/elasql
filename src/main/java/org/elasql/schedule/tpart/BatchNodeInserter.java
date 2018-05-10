@@ -1,15 +1,17 @@
 package org.elasql.schedule.tpart;
 
+import java.util.List;
+
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
 
-public interface NodeInserter {
+public interface BatchNodeInserter {
 
 	/**
-	 * Insert a transaction node into the given T-graph with the specified task.
+	 * Insert a batch of transaction requests into the given T-Graph.
 	 * 
 	 * @param graph
 	 * @param node
 	 */
-	void insert(TGraph graph, CostEstimator costEstimator, TPartStoredProcedureTask task);
+	void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks);
 }

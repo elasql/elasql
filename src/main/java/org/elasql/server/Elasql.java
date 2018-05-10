@@ -30,7 +30,9 @@ import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
-import org.elasql.schedule.tpart.HeuristicNodeInserter;
+import org.elasql.schedule.tpart.BatchNodeInserter;
+import org.elasql.schedule.tpart.CostAwareNodeInserter;
+import org.elasql.schedule.tpart.LapNodeInserter;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.schedule.tpart.graph.LapTGraph;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -205,14 +207,19 @@ public class Elasql extends VanillaDb {
 
 	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
 		TGraph graph;
-		if (SERVICE_TYPE == ServiceType.TPART_LAP)
-			graph = new LapTGraph();
-		else
-			graph = new TGraph();
+		BatchNodeInserter inserter;
 		
-		TPartPartitioner scheduler = new TPartPartitioner(factory,  new HeuristicNodeInserter(),
+		if (SERVICE_TYPE == ServiceType.TPART_LAP) {
+			graph = new LapTGraph();
+			inserter = new LapNodeInserter();
+		} else {
+			graph = new TGraph();
+			inserter = new CostAwareNodeInserter();
+		}
+		
+		TPartPartitioner scheduler = new TPartPartitioner(factory,  inserter,
 				new CacheOptimizedSinker(), graph);
-
+		
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
