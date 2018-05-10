@@ -11,6 +11,7 @@ public class SinkNode extends Node {
 	@Override
 	public double getWeight() {
 		// TODO: Should be the loading of the server
+		// but it is not used for now. So it's fine.
 		return 1;
 	}
 
