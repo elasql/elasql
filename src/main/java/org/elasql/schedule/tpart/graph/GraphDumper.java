@@ -1,4 +1,4 @@
-package org.elasql.schedule.tpart;
+package org.elasql.schedule.tpart.graph;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -40,7 +40,7 @@ public class GraphDumper {
 	}
 
 	public static void dumpToFile(File file, TGraph graph) {
-		List<Node> nodes = graph.getNodes();
+		List<TxNode> nodes = graph.getTxNodes();
 		Map<DumpedEdge, Integer> edges = new HashMap<DumpedEdge, Integer>();
 
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
@@ -55,7 +55,7 @@ public class GraphDumper {
 			}
 
 			// Print the partition of each node
-			for (Node node : nodes) {
+			for (TxNode node : nodes) {
 				long txNum = node.getTxNum();
 				
 				writer.write(String.format("%d %d", txNum, node.getPartId()));

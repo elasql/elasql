@@ -1,4 +1,4 @@
-package org.elasql.schedule.tpart;
+package org.elasql.schedule.tpart.graph;
 
 import java.util.HashSet;
 import java.util.Map.Entry;
@@ -8,11 +8,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class SupaTGraph extends TGraph {
-	public SupaTGraph() {
-		super();
-		System.out.println("LAP running");
-	}
+public class LapTGraph extends TGraph {
 
 	@Override
 	/**
@@ -29,7 +25,7 @@ public class SupaTGraph extends TGraph {
 			// be written back to the original location by the last one using it
 			Set<RecordKey> noOneHandledKeys = new HashSet<RecordKey>();
 			for (RecordKey key : overflowedKeys) {
-				Node handler = resPos.remove(key);
+				TxNode handler = resPos.remove(key);
 				if (handler != null) {
 					int originalLocation = partMgr.getPartition(key);
 					handler.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
@@ -38,7 +34,7 @@ public class SupaTGraph extends TGraph {
 			}
 			
 			// For the keys that on one handles, let the last node read and write them back.
-			Node lastNode = getLastInsertedNode();
+			TxNode lastNode = getLastInsertedTxNode();
 			for (RecordKey key : noOneHandledKeys) {
 				int originalLocation = partMgr.getPartition(key);
 				lastNode.addReadEdges(new Edge(getResourcePosition(key), key));
@@ -47,13 +43,10 @@ public class SupaTGraph extends TGraph {
 		}
 		
 		// Put the rest of the records on where they are
-		for (Entry<RecordKey, Node> resPosPair : resPos.entrySet()) {
+		for (Entry<RecordKey, TxNode> resPosPair : resPos.entrySet()) {
 			RecordKey res = resPosPair.getKey();
-			Node node = resPosPair.getValue();
-
-			// null means it is sink node
-			if (node.getTask() != null)
-				node.addWriteBackEdges(new Edge(sinkNodes[node.getPartId()], res));
+			TxNode node = resPosPair.getValue();
+			node.addWriteBackEdges(new Edge(sinkNodes[node.getPartId()], res));
 		}
 		
 		// Clear the resource map for the next run

@@ -1,4 +1,4 @@
-package org.elasql.schedule.tpart;
+package org.elasql.schedule.tpart.graph;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -6,16 +6,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class TGraph {
-	private List<Node> nodes = new LinkedList<Node>();
-	/// XXX A Map indicate where are the records' position
-	protected Map<RecordKey, Node> resPos = new HashMap<RecordKey, Node>();
-	protected Node[] sinkNodes;
-	protected PartitionMetaMgr parMeta;
+	
+	protected SinkNode[] sinkNodes;
+	private List<TxNode> txNodes = new LinkedList<TxNode>();
+	protected Map<RecordKey, TxNode> resPos = new HashMap<RecordKey, TxNode>();
+	
+	private PartitionMetaMgr parMeta;
 	
 	// Statistics (lazy evaluation)
 	private boolean isStatsCalculated = false;
@@ -27,29 +29,25 @@ public class TGraph {
 	private int totalRemoteSinkReads;
 
 	public TGraph() {
-		sinkNodes = new Node[PartitionMetaMgr.NUM_PARTITIONS];
-		for (int i = 0; i < sinkNodes.length; i++) {
-			Node node = new Node(null);
-			node.setPartId(i);
-			sinkNodes[i] = node;
-		}
+		sinkNodes = new SinkNode[PartitionMetaMgr.NUM_PARTITIONS];
+		for (int partId = 0; partId < sinkNodes.length; partId++)
+			sinkNodes[partId] = new SinkNode(partId);
 		parMeta = Elasql.partitionMetaMgr();
 	}
 
 	/**
-	 * Insert the new node into the t-graph.
+	 * Insert a new tx node into the t-graph.
 	 * 
 	 * @param node
 	 */
-	public void insertNode(Node node) {
-		if (node.getTask() == null)
-			return;
-
-		nodes.add(node);
-
-		if (node.getTask().getReadSet() != null) {
+	public void insertTxNode(TPartStoredProcedureTask task, int assignedPartId) {
+		TxNode node = new TxNode(task, assignedPartId);
+		txNodes.add(node);
+		
+		// Establish forward pushing edges
+		if (task.getReadSet() != null) {
 			// create a read edge to the latest txn that writes that resource
-			for (RecordKey res : node.getTask().getReadSet()) {
+			for (RecordKey res : task.getReadSet()) {
 
 				Node targetNode;
 
@@ -62,10 +60,11 @@ public class TGraph {
 				targetNode.addWriteEdges(new Edge(node, res));
 			}
 		}
-
-		if (node.getTask().getWriteSet() != null) {
+		
+		// Update the resource locations
+		if (task.getWriteSet() != null) {
 			// update the resource position
-			for (RecordKey res : node.getTask().getWriteSet())
+			for (RecordKey res : task.getWriteSet())
 				resPos.put(res, node);
 		}
 	}
@@ -75,23 +74,23 @@ public class TGraph {
 	 */
 	public void addWriteBackEdge() {
 		// XXX should implement different write back strategy
-		for (Entry<RecordKey, Node> resPosPair : resPos.entrySet()) {
+		for (Entry<RecordKey, TxNode> resPosPair : resPos.entrySet()) {
 			RecordKey res = resPosPair.getKey();
-			Node node = resPosPair.getValue();
-
-			if (node.getTask() != null)
-				node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getCurrentLocation(res)], res));
+			TxNode node = resPosPair.getValue();
+			node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getCurrentLocation(res)], res));
 		}
 		resPos.clear();
 	}
-
-	public void clearSinkNodeEdges() {
+	
+	public void clear() {
+		// clear the edges from sink nodes
 		for (int i = 0; i < sinkNodes.length; i++)
 			sinkNodes[i].getWriteEdges().clear();
-	}
-
-	public void removeSunkNodes() {
-		nodes.clear();
+		
+		// remove all tx nodes
+		txNodes.clear();
+		
+		// reset the statistics
 		isStatsCalculated = false;
 	}
 
@@ -109,12 +108,12 @@ public class TGraph {
 		return sinkNodes[parMeta.getCurrentLocation(res)];
 	}
 
-	public List<Node> getNodes() {
-		return nodes;
+	public List<TxNode> getTxNodes() {
+		return txNodes;
 	}
 	
-	public Node getLastInsertedNode() {
-		return nodes.get(nodes.size() - 1);
+	public TxNode getLastInsertedTxNode() {
+		return txNodes.get(txNodes.size() - 1);
 	}
 	
 	private void calculateStatistics() {
@@ -128,7 +127,7 @@ public class TGraph {
 		remoteTxReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		remoteSinkReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
-		for (Node node : nodes) {
+		for (TxNode node : txNodes) {
 			int partId = node.getPartId();
 			
 			numOfNodes[partId]++;
@@ -147,7 +146,7 @@ public class TGraph {
 		
 		// Count imbalance distance = sum(|(count - avg)|)
 		imbalDis = 0;
-		int avg = nodes.size() / PartitionMetaMgr.NUM_PARTITIONS;
+		int avg = txNodes.size() / PartitionMetaMgr.NUM_PARTITIONS;
 		for (int numOfNode : numOfNodes)
 			imbalDis += Math.abs(numOfNode - avg);
 		
@@ -211,7 +210,7 @@ public class TGraph {
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		
-		for (Node node : nodes)
+		for (Node node : txNodes)
 			sb.append(node + "\n");
 		
 		return sb.toString();
