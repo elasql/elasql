@@ -342,6 +342,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			LinkedList<Integer> vertexIdSet = new LinkedList<Integer>();
 			Integer vetxId;
 			int partId;
+			// Since only the sequence node can get in, remoteReadKeys basically
+			// contains all the read keys of the transaction.
 			for (RecordKey k : remoteReadKeys) {
 				vetxId = migraMgr.convertToVertexId(k);
 				partId = Elasql.partitionMetaMgr().getPartition(k);

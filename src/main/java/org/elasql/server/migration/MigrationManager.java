@@ -31,7 +31,8 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
-	public static final int TOTAL_CLAY_EPOCH = 5; // 5 is enough for Google Workloads
+	// This has been tuned for Google Workloads
+	public static final int TOTAL_CLAY_EPOCH = 20;
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -69,13 +70,16 @@ public abstract class MigrationManager {
 	// Clay structure
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
-//	public static final int MONITORING_TIME = 5 * 1000; // for clay
-	public static final int MONITORING_TIME = 30 * 1000; // for Schism
+	public static final int MONITORING_TIME = 1 * 1000; // for clay
+//	public static final int MONITORING_TIME = 30 * 1000; // for Schism
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
-	private final int LOOK_AHEAD = 5; // For Google Workloads. 5 is good enough.
+	private final int LOOK_AHEAD = 5;
 	public static final int DATA_RANGE_SIZE = 10;
 	public static double BETA = 0.5;
+	
+	// XXX: this is not thread-safe. If a clay did not end before next clay started,
+	// there would be multiple threads accessing it.
 	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
 	public boolean isReachTarget = true;
@@ -104,7 +108,9 @@ public abstract class MigrationManager {
 					e.printStackTrace();
 				}
 				
-				while(true) {
+				long startTime = System.currentTimeMillis();
+				
+				while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
 					clayEpoch = 0;
 					cleanUpClay();
 					onReceieveLaunchClayReq(null);
@@ -125,6 +131,7 @@ public abstract class MigrationManager {
 
 	public void updateWeightOnVertex(Integer vetxId, int partId) {
 		Vertex vertex = vertexKeys.get(vetxId);
+		// Note that a vertex represents a range of records.
 		if (vertex == null)
 			vertexKeys.put(vetxId, new Vertex(vetxId, partId));
 		else
@@ -326,6 +333,8 @@ public abstract class MigrationManager {
 	 * @return how long to initialize a new migration job (in ms)
 	 */
 	public abstract long getMigrationPreiod();
+	
+	public abstract long getMigrationStopTime();
 
 	public abstract void onReceieveLaunchClayReq(Object[] metadata);
 
