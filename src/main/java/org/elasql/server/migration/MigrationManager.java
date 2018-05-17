@@ -70,12 +70,12 @@ public abstract class MigrationManager {
 	// Clay structure
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
-	public static final int MONITORING_TIME = 1 * 1000; // for clay
-//	public static final int MONITORING_TIME = 30 * 1000; // for Schism
+	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
+			40 * 1000: 1 * 1000; // [Schism: Clay]
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
 	private final int LOOK_AHEAD = 5;
-	public static final int DATA_RANGE_SIZE = 10;
+	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 10; // [Schism: Clay]
 	public static double BETA = 0.5;
 	
 	// XXX: this is not thread-safe. If a clay did not end before next clay started,
