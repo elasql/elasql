@@ -76,19 +76,24 @@ public abstract class PartitionMetaMgr {
 //			}
 //		).start();
 		
+		// Only for 4 nodes with micro-benchmarks
+		// Note: Remember to use ConcurrentHashMap
 //		new PeriodicalJob(3000, 500000, new Runnable() {
 //			@Override
 //			public void run() {
-//				int[] counts = new int[20];
-//				counts[0] = 100_000;
+//				int[] counts = new int[4];
+//				for (int i = 0; i < counts.length; i++)
+//					counts[i] = 25_000;
 //				
 //				for (Entry<RecordKey, Integer> entry : locationTable.entrySet()) {
-//					int id = Integer.parseInt((String) entry.getKey().getKeyVal("ycsb_id").asJavaVal());
-//					int partId = entry.getValue();
+////					int id = Integer.parseInt((String) entry.getKey().getKeyVal("ycsb_id").asJavaVal());
+//					int id = (Integer) entry.getKey().getKeyVal("i_id").asJavaVal();
+//					int sourcePart = entry.getKey().hashCode() % 4;
+//					int newPart = entry.getValue();
 //					
 //					if (id <= 100_000) {
-//						counts[0]--;
-//						counts[partId]++;
+//						counts[sourcePart]--;
+//						counts[newPart]++;
 //					}
 //				}
 //				
