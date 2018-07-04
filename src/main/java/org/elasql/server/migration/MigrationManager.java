@@ -71,7 +71,7 @@ public abstract class MigrationManager {
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
-			40 * 1000: 1 * 1000; // [Schism: Clay]
+			30 * 1000: 1 * 1000; // [Schism: Clay]
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
 	private final int LOOK_AHEAD = 5;
