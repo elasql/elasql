@@ -32,7 +32,7 @@ public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
 	// This has been tuned for Google Workloads
-	public static final int TOTAL_CLAY_EPOCH = 20;
+	public static final int TOTAL_CLAY_EPOCH = 8;
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -71,7 +71,7 @@ public abstract class MigrationManager {
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
-			30 * 1000: 1 * 1000; // [Schism: Clay]
+			30 * 1000: 3 * 1000; // [Schism: Clay]
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
 	private final int LOOK_AHEAD = 5;
