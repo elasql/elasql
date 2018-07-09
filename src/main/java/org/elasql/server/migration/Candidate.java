@@ -68,6 +68,10 @@ public class Candidate {
 	public int getHotestNeighbor() {
 		return Collections.max(neighbors.values()).id;
 	}
+	
+	public boolean hasNeighbor() {
+		return !neighbors.isEmpty();
+	}
 
 	public HashSet<Integer> getCandidateIds() {
 		return candidateIds;

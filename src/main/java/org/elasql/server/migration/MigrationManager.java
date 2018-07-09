@@ -74,7 +74,8 @@ public abstract class MigrationManager {
 			30 * 1000: 3 * 1000; // [Schism: Clay]
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
-	private final int LOOK_AHEAD = 5;
+//	private final int LOOK_AHEAD = 5;
+	private final int LOOK_AHEAD = 20;
 	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 10; // [Schism: Clay]
 	public static double BETA = 0.5;
 	
@@ -225,8 +226,15 @@ public abstract class MigrationManager {
 				migraCandidate.addCandidate(overloadPart.getHotestVertex());
 
 				// Expend LOOK_AHEAD times
-				for (int a = 0; a < LOOK_AHEAD; a++)
-					migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
+				for (int a = 0; a < LOOK_AHEAD; a++) {
+					if (migraCandidate.hasNeighbor()) {
+						migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
+					} else {
+						System.out.println(String.format(
+								"This is %d iteration of look ahead, it cannot find more neighbor", a));
+						break;
+					}
+				}
 
 				// System.out.println(migraCandidate);
 				// Preparse Param
