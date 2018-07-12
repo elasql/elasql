@@ -75,7 +75,8 @@ public abstract class MigrationManager {
 //			30 * 1000: 10 * 1000; // for consolidation
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
-	private final int LOOK_AHEAD = 20;
+	private final int LOOK_AHEAD = 20; // for Google-workloads
+//	private final int LOOK_AHEAD = 2000; // for multi-tanent
 //	private final int LOOK_AHEAD = 3000; // for consolidation
 	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 10; // [Schism: Clay]
 	public static double BETA = 0.5;
