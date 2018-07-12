@@ -12,6 +12,10 @@ import org.elasql.util.ElasqlProperties;
 public class CostAwareNodeInserter implements BatchNodeInserter {
 	
 	public static final double BETA;
+	
+	protected static final long CHANGE_TX_NUM = 2000000;
+//	protected boolean isScalingOut = false;
+//	protected boolean isConsolidating = false;
 
 	static {
 		BETA = ElasqlProperties.getLoader().getPropertyAsDouble(CostAwareNodeInserter.class.getName() + ".BETA", 1.0);
@@ -45,11 +49,31 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 	}
 		
 	private void insertNode(TGraph graph, TPartStoredProcedureTask task) {
+		// for scaling-out experiments
+//		if (!isScalingOut && task.getTxNum() >= CHANGE_TX_NUM) {
+//			isScalingOut = true;
+//			System.out.println("Start scaling out at " + 
+//					(System.currentTimeMillis() - Elasql.START_TIME_MS) + " ms");
+//		}
+		// for consolidation experiments
+//		if (!isConsolidating && task.getTxNum() >= CHANGE_TX_NUM) {
+//			isConsolidating = true;
+//			System.out.println("Start consolidation at " + 
+//					(System.currentTimeMillis() - Elasql.START_TIME_MS) + " ms");
+//		}
+		
 		// Evaluate the cost on each part
 		double minCost = Double.MAX_VALUE;
 		int minCostPart = 0;
 		
 		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++) {
+			// for scaling-out experiments
+//			if (!isScalingOut && partId > 2)
+//				break;
+			// for consolidation experiments
+//			if (isConsolidating && partId > 2)
+//				break;
+			
 			double cost = estimateCost(graph, task, partId);
 			if (cost < minCost) {
 				minCost = cost;

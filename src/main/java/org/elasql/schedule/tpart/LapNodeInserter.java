@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
@@ -68,17 +69,40 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 	}
 		
 	private void insertNode(TGraph graph, TPartStoredProcedureTask task) {
+		// for scaling-out experiments
+//		if (!isScalingOut && task.getTxNum() >= CHANGE_TX_NUM) {
+//			isScalingOut = true;
+//			System.out.println("Start scaling out at " + 
+//					(System.currentTimeMillis() - Elasql.START_TIME_MS) + " ms");
+//		}
+		// for consolidation experiments
+//		if (!isConsolidating && task.getTxNum() >= CHANGE_TX_NUM) {
+//			isConsolidating = true;
+//			System.out.println("Start consolidation at " + 
+//					(System.currentTimeMillis() - Elasql.START_TIME_MS) + " ms");
+//		}
+		
 		// Evaluate the cost on each part
 		double minCost = Double.MAX_VALUE;
 		int minCostPart = 0;
 		
 		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++) {
+			// for scaling-out experiments
+//			if (!isScalingOut && partId > 2) 
+//				break;
+			// for consolidation experiments
+//			if (isConsolidating && partId > 2)
+//				break;
+			
 			double cost = estimateCost(graph, task, partId);
 			if (cost < minCost) {
 				minCost = cost;
 				minCostPart = partId;
 			}
 		}
+		
+//		if (task.getTxNum() % 10000 == 0)
+//			System.out.println("Tx." + task.getTxNum() + " select " + minCostPart);
 		
 		// Insert the node
 		graph.insertTxNode(task, minCostPart);

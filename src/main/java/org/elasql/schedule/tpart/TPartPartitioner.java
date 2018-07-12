@@ -16,10 +16,10 @@ import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
+import org.elasql.schedule.tpart.graph.GraphDumper;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.server.Elasql;
-import org.elasql.server.Elasql.ServiceType;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
@@ -101,48 +101,12 @@ public class TPartPartitioner extends Task implements Scheduler {
 		}
 	}
 	
-	private int batchId = 0;
-	private int imbalanced = 0;
-	private int remoteTxRead = 0;
-	private int remoteSinkRead = 0;
-	private int recordCount = 0;
-	private long nextReportTime = 0;
-	
 	private void processBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
 		
-		// XXX: Show the statistics of the T-Graph
-		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
-//		if (batchId % 100 == 0) {
-//			String stat = graph.getStatistics();
-//			System.out.println("Time: " + time);
-//			System.out.println("T-Graph id: " + (batchId + 1));
-//			System.out.print(stat);
-			
-			imbalanced += graph.getImbalancedDis();
-			remoteTxRead += graph.getRemoteTxReads();
-			remoteSinkRead += graph.getRemoteSinkReads();
-			recordCount++;
-			
-			if (time >= nextReportTime) {
-//				System.out.println("======== Total Statistics ========");
-				System.out.println(String.format("Time: %d, avg. imbal: %f, avg. remote tx reads: %f, "
-						+ "avg. remote sink reads: %f", time, ((double) imbalanced) / recordCount,
-						((double) remoteTxRead) / recordCount, ((double) remoteSinkRead) / recordCount));
-//				System.out.println("==================================\n");
-				
-				imbalanced = 0;
-				remoteTxRead = 0;
-				remoteSinkRead = 0;
-				recordCount = 0;
-				nextReportTime = time + 3;
-				
-				// Dump the current graph
-//				GraphDumper.dumpToFile(new File(dumpDir, String.format("%d_%d.txt", time, batchId)), graph);
-			}
-//		}
-		batchId++;
+		// Debug
+//		printGraphStatistics();
 
 		if (graph.getTxNodes().size() != 0) {
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
@@ -169,5 +133,46 @@ public class TPartPartitioner extends Task implements Scheduler {
 			TPartStoredProcedureTask p = plans.next();
 			VanillaDb.taskMgr().runTask(p);
 		}
+	}
+	
+	private int batchId = 0;
+	private int imbalanced = 0;
+	private int remoteTxRead = 0;
+	private int remoteSinkRead = 0;
+	private int recordCount = 0;
+	private long nextReportTime = 0;
+	
+	private void printGraphStatistics() {
+		// XXX: Show the statistics of the T-Graph
+		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
+		if (batchId % 100 == 0) {
+			String stat = graph.getStatistics();
+			System.out.println("Time: " + time);
+			System.out.println("T-Graph id: " + (batchId + 1));
+			System.out.print(stat);
+			
+			imbalanced += graph.getImbalancedDis();
+			remoteTxRead += graph.getRemoteTxReads();
+			remoteSinkRead += graph.getRemoteSinkReads();
+			recordCount++;
+			
+			if (time >= nextReportTime) {
+				System.out.println("======== Total Statistics ========");
+				System.out.println(String.format("Time: %d, avg. imbal: %f, avg. remote tx reads: %f, "
+						+ "avg. remote sink reads: %f", time, ((double) imbalanced) / recordCount,
+						((double) remoteTxRead) / recordCount, ((double) remoteSinkRead) / recordCount));
+				System.out.println("==================================\n");
+				
+				imbalanced = 0;
+				remoteTxRead = 0;
+				remoteSinkRead = 0;
+				recordCount = 0;
+				nextReportTime = time + 3;
+				
+				// Dump the current graph
+				GraphDumper.dumpToFile(new File(dumpDir, String.format("%d_%d.txt", time, batchId)), graph);
+			}
+		}
+		batchId++;
 	}
 }
