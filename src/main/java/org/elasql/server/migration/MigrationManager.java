@@ -32,7 +32,7 @@ public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
 	// This has been tuned for Google Workloads
-	public static final int TOTAL_CLAY_EPOCH = 8;
+	public static final int TOTAL_CLAY_EPOCH = 3;
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -72,10 +72,11 @@ public abstract class MigrationManager {
 	private boolean isSeqNode;
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
 			30 * 1000: 3 * 1000; // [Schism: Clay]
+//			30 * 1000: 10 * 1000; // for consolidation
 	public static int clayEpoch = 0;
 //	private final int LOOK_AHEAD = 200;
-//	private final int LOOK_AHEAD = 5;
 	private final int LOOK_AHEAD = 20;
+//	private final int LOOK_AHEAD = 3000; // for consolidation
 	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 10; // [Schism: Clay]
 	public static double BETA = 0.5;
 	
@@ -206,7 +207,8 @@ public abstract class MigrationManager {
 						System.out.println("Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :"
 								+ v.getVertexWeight());
 				}
-
+				
+				// Normal Clay: Get Most Overloaded Partition
 				double avgLoad = 0;
 				for (Partition p : partitions)
 					avgLoad += p.getTotalLoad();
@@ -218,8 +220,11 @@ public abstract class MigrationManager {
 						overloadParts.add(p);
 
 				Collections.sort(overloadParts);
-				// Get Most Overloaded Partition
 				Partition overloadPart = overloadParts.getLast();
+				
+				// For consolidation: always choose the 4th partition as the overloaded one
+//				Partition overloadPart = partitions.remove(3);
+					
 
 				Candidate migraCandidate = new Candidate();
 				// Init Clump with most Hotest Vertex
