@@ -26,7 +26,7 @@ import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.storage.metadata.NotificationPartMetaMgr;
+import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.sql.Constant;
@@ -101,7 +101,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Waiting for the notification from node no." + nodeId);
 				
-				RecordKey notKey = NotificationPartMetaMgr.createRecordKey(nodeId, MASTER_NODE);
+				RecordKey notKey = NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE);
 				CachedRecord rec = cacheMgr.readFromRemote(notKey);
 				Constant con = rec.getVal(KEY_FINISH);
 				int value = (int) con.asJavaVal();
@@ -120,8 +120,8 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		Map<String, Constant> fldVals = new HashMap<String, Constant>();
 		fldVals.put(KEY_FINISH, new IntegerConstant(1));
 		
-		RecordKey notKey = NotificationPartMetaMgr.createRecordKey(Elasql.serverId(), MASTER_NODE);
-		CachedRecord notVal = NotificationPartMetaMgr.createRecord(Elasql.serverId(), MASTER_NODE,
+		RecordKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
+		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE,
 				txNum, fldVals);
 
 		TupleSet ts = new TupleSet(-1);

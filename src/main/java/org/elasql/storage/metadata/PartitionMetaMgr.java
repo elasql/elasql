@@ -27,10 +27,7 @@ import java.util.Set;
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
-public abstract class PartitionMetaMgr {
-	
-	public final static boolean LOAD_METIS_PARTITIONS = false;
-	public final static int METIS_DATA_RANGE = 1;
+public class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
 //	public final static File LOGDIR;
@@ -45,6 +42,8 @@ public abstract class PartitionMetaMgr {
 	public static final int LOC_TABLE_MAX_SIZE;
 	// TODO: Maybe we could limit the size of the queue by 2 x LOC_TABLE_MAX_SIZE
 	private static Queue<RecordKey> fifoQueue = new LinkedList<RecordKey>();
+	
+	private PartitionPlan partPlan;
 
 	static {
 
@@ -165,6 +164,10 @@ public abstract class PartitionMetaMgr {
 //		});
 //		thread.start();
 	}
+	
+	public PartitionMetaMgr(PartitionPlan plan) {
+		partPlan = plan;
+	}
 
 	/**
 	 * Check if a record is fully replicated on each node.
@@ -173,7 +176,23 @@ public abstract class PartitionMetaMgr {
 	 *            the key of the record
 	 * @return if the record is fully replicated
 	 */
-	public abstract boolean isFullyReplicated(RecordKey key);
+	public boolean isFullyReplicated(RecordKey key) {
+		return partPlan.isFullyReplicated(key);
+	}
+	
+	/**
+	 * Get the original location (may not be the current location)
+	 * 
+	 * @param key
+	 * @return
+	 */
+	public int getPartition(RecordKey key) {
+		return partPlan.getPartition(key);
+	}
+	
+	public void changePartitionPlan(PartitionPlan newPlan) {
+		partPlan = newPlan;
+	}
 
 	/**
 	 * Decides the partition of each record.
@@ -185,7 +204,7 @@ public abstract class PartitionMetaMgr {
 	public int getCurrentLocation(RecordKey key) {
 		Integer old = locationTable.get(key);
 		if (old == null)
-			return getPartition(key);
+			return partPlan.getPartition(key);
 		else
 			return old;
 	}
@@ -238,12 +257,4 @@ public abstract class PartitionMetaMgr {
 		
 		return removedKeys;
 	}
-	
-	/**
-	 * Get the original location (may not be the current location)
-	 * 
-	 * @param key
-	 * @return
-	 */
-	public abstract int getPartition(RecordKey key);
 }

@@ -8,7 +8,7 @@ import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
-public class NotificationPartMetaMgr extends PartitionMetaMgr {
+public class NotificationPartitionPlan implements PartitionPlan {
 	
 	public static final String TABLE_NAME = "notification";
 	public static final String KEY_SOURCE_NAME = "src_server_id";
@@ -34,10 +34,10 @@ public class NotificationPartMetaMgr extends PartitionMetaMgr {
 		return rec;
 	}
 	
-	private PartitionMetaMgr underliedPartMetaMgr;
+	private PartitionPlan underlayerPlan;
 	
-	public NotificationPartMetaMgr(PartitionMetaMgr partMetaMgr) {
-		underliedPartMetaMgr = partMetaMgr;
+	public NotificationPartitionPlan(PartitionPlan plan) {
+		underlayerPlan = plan;
 	}
 	
 	@Override
@@ -45,7 +45,7 @@ public class NotificationPartMetaMgr extends PartitionMetaMgr {
 		if (key.getTableName().equals(TABLE_NAME))
 			return false;
 		
-		return underliedPartMetaMgr.isFullyReplicated(key);
+		return underlayerPlan.isFullyReplicated(key);
 	}
 
 	@Override
@@ -53,7 +53,7 @@ public class NotificationPartMetaMgr extends PartitionMetaMgr {
 		if (key.getTableName().equals(TABLE_NAME))
 			return -1; // Not belongs to anyone, preventing for inserting to local
 		
-		return underliedPartMetaMgr.getPartition(key);
+		return underlayerPlan.getPartition(key);
 	}
 
 }

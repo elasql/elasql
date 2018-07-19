@@ -38,9 +38,10 @@ import org.elasql.schedule.tpart.graph.LapTGraph;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
 import org.elasql.storage.log.DdLogMgr;
-import org.elasql.storage.metadata.HashBasedPartitionMetaMgr;
-import org.elasql.storage.metadata.NotificationPartMetaMgr;
+import org.elasql.storage.metadata.HashPartitionPlan;
+import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.storage.metadata.PartitionPlan;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 
@@ -106,24 +107,24 @@ public class Elasql extends VanillaDb {
 	 *            is this server a sequencer
 	 */
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory) {
-		PartitionMetaMgr partMetaMgr = null;
-		Class<?> parMgrCls = ElasqlProperties.getLoader().getPropertyAsClass(
-				Elasql.class.getName() + ".DEFAULT_PARTITION_META_MGR", HashBasedPartitionMetaMgr.class,
-				PartitionMetaMgr.class);
+		PartitionPlan partitionPlan = null;
+		Class<?> planCls = ElasqlProperties.getLoader().getPropertyAsClass(
+				Elasql.class.getName() + ".DEFAULT_PARTITION_META_MGR", HashPartitionPlan.class,
+				PartitionPlan.class);
 
 		try {
-			partMetaMgr = (PartitionMetaMgr) parMgrCls.newInstance();
+			partitionPlan = (PartitionPlan) planCls.newInstance();
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("error reading the class name for partition manager");
 			throw new RuntimeException();
 		}
 
-		init(dirName, id, isSequencer, factory, partMetaMgr);
+		init(dirName, id, isSequencer, factory, partitionPlan);
 	}
 
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
-			PartitionMetaMgr partitionMetaMgr) {
+			PartitionPlan partitionPlan) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
@@ -143,7 +144,7 @@ public class Elasql extends VanillaDb {
 
 		// initialize DD modules
 		initCacheMgr();
-		initPartitionMetaMgr(partitionMetaMgr);
+		initPartitionMetaMgr(partitionPlan);
 		initScheduler(factory);
 		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
@@ -224,11 +225,12 @@ public class Elasql extends VanillaDb {
 		return scheduler;
 	}
 
-	public static void initPartitionMetaMgr(PartitionMetaMgr partitionMetaMgr) {
+	public static void initPartitionMetaMgr(PartitionPlan plan) {
 		try {
 			// Add a warper partition-meta-mgr for handling notifications
 			// between servers
-			parMetaMgr = new NotificationPartMetaMgr(partitionMetaMgr);
+			plan = new NotificationPartitionPlan(plan);
+			parMetaMgr = new PartitionMetaMgr(plan);
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("error reading the class name for partition manager");
