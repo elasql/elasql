@@ -118,8 +118,10 @@ public class TPartPartitioner extends Task implements Scheduler {
 //		printGraphStatistics();
 		
 		// Add the migration txs to the end of the batch
-		for (TPartStoredProcedureTask task : migrationTasks) {
+		while (!migrationTasks.isEmpty()) {
+			TPartStoredProcedureTask task = migrationTasks.remove();
 			ColdMigrationProcedure sp = (ColdMigrationProcedure) task.getProcedure();
+			sp.prepareMigrationKeys(graph);
 			graph.insertTxNode(task, sp.getMigrationRange().getDestPartId());
 		}
 		

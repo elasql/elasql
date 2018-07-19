@@ -2,11 +2,14 @@ package org.elasql.procedure.tpart;
 
 import java.util.Set;
 
+import org.elasql.migration.MigrationMgr;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
+import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class TPartStoredProcedureTask extends StoredProcedureTask {
@@ -43,6 +46,13 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+			
+			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
+				// Send a notification to the sequencer
+				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
+				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
+			}
+				
 			// System.out.println("Commit: " + (System.nanoTime() - startTime));
 		}
 		// System.out.println("task time:" + (System.nanoTime() -

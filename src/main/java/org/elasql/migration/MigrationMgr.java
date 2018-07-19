@@ -21,6 +21,8 @@ public abstract class MigrationMgr {
 	public static final int SP_COLD_MIGRATION = -102;
 	public static final int SP_MIGRATION_END = -103;
 	
+	public static final int MSG_COLD_FINISH = -100;
+	
 	private static final int CHUNK_SIZE = 4000;
 	
 	private static final long START_MIGRATION_TIME = 20_000; // in ms
@@ -80,6 +82,9 @@ public abstract class MigrationMgr {
 	
 	public void sendMigrationStartRequest(RangePartitionPlan oldPlan,
 			RangePartitionPlan newPlan, String targetTable, boolean isAppiaThread) {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Send a MigrationStart request.");
+		
 		// Send a store procedure call
 		Object[] params = new Object[] {oldPlan, newPlan, targetTable};
 		Object[] call = { new StoredProcedureCall(-1, -1, SP_MIGRATION_START, params)};
@@ -87,6 +92,9 @@ public abstract class MigrationMgr {
 	}
 	
 	public void sendColdMigrationRequest(MigrationRange range, boolean isAppiaThread) {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Send a ColdMigration request, range: " + range + ".");
+		
 		// Send a store procedure call
 		Object[] params = new Object[] {range};
 		Object[] call = { new StoredProcedureCall(-1, -1, SP_COLD_MIGRATION, params)};
@@ -94,6 +102,9 @@ public abstract class MigrationMgr {
 	}
 	
 	public void sendMigrationFinishRequest(boolean isAppiaThread) {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Send a MigrationFinish request.");
+		
 		// Send a store procedure call
 		Object[] params = null;
 		Object[] call = { new StoredProcedureCall(-1, -1, SP_MIGRATION_END, params)};
@@ -139,7 +150,7 @@ public abstract class MigrationMgr {
 			logger.info("The migration finishes.");
 	}
 	
-	public Integer getLocation(RecordKey key) {
+	public Integer getSourcePart(RecordKey key) {
 		int id = toId(key);
 		for (MigrationRange range : targetRanges)
 			if (range.contains(id))

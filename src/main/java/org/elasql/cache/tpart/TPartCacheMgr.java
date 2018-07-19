@@ -114,7 +114,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
 		
 		if (rec == null)
-			throw new RuntimeException("Cannot find the record of " + key);
+			throw new RuntimeException("Tx." + tx.getTransactionNumber()
+				+ " cannot find the record of " + key);
 		
 		return rec;
 	}

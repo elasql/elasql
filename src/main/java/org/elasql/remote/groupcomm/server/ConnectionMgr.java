@@ -20,6 +20,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.migration.MigrationMgr;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
@@ -113,6 +114,12 @@ public class ConnectionMgr
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
+			
+			if (ts.sinkId() == MigrationMgr.MSG_COLD_FINISH) {
+				Elasql.migrationMgr().onReceiveColdMigrationFinish();
+				return;
+			}
+			
 			for (Tuple t : ts.getTupleSet())
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
 		} else
