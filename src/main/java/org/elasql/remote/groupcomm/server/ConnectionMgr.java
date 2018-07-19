@@ -91,6 +91,10 @@ public class ConnectionMgr
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
 
+	public void sendBroadcastRequest(Object[] objs, boolean isAppiaThread) {
+		serverAppl.sendBroadcastRequest(objs, isAppiaThread);
+	}
+
 	public void callStoredProc(int pid, Object... pars) {
 		StoredProcedureCall[] spcs = { new StoredProcedureCall(myId, pid, pars) };
 		serverAppl.sendTotalOrderRequest(spcs);

@@ -22,6 +22,7 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.migration.MigrationMgr;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -46,7 +47,7 @@ import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 
 public class Elasql extends VanillaDb {
-	private static Logger logger = Logger.getLogger(VanillaDb.class.getName());
+	private static Logger logger = Logger.getLogger(Elasql.class.getName());
 
 	public static final long START_TX_NUMBER = 0;
 
@@ -90,6 +91,7 @@ public class Elasql extends VanillaDb {
 	private static RemoteRecordReceiver remoteRecReceiver;
 	private static Scheduler scheduler;
 	private static DdLogMgr ddLogMgr;
+	private static MigrationMgr migraMgr;
 
 	// connection information
 	private static int myNodeId;
@@ -106,7 +108,8 @@ public class Elasql extends VanillaDb {
 	 * @param isSequencer
 	 *            is this server a sequencer
 	 */
-	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory) {
+	public static void init(String dirName, int id, boolean isSequencer,
+			DdStoredProcedureFactory factory) {
 		PartitionPlan partitionPlan = null;
 		Class<?> planCls = ElasqlProperties.getLoader().getPropertyAsClass(
 				Elasql.class.getName() + ".DEFAULT_PARTITION_META_MGR", HashPartitionPlan.class,
@@ -120,11 +123,11 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 
-		init(dirName, id, isSequencer, factory, partitionPlan);
+		init(dirName, id, isSequencer, factory, partitionPlan, null);
 	}
 
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
-			PartitionPlan partitionPlan) {
+			PartitionPlan partitionPlan, MigrationMgr migraMgr) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
@@ -135,7 +138,10 @@ public class Elasql extends VanillaDb {
 
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
+			initPartitionMetaMgr(partitionPlan);
 			initConnectionMgr(myNodeId, true);
+			initMigrationMgr(migraMgr);
+			migraMgr.startMigrationTrigger();
 			return;
 		}
 
@@ -148,6 +154,7 @@ public class Elasql extends VanillaDb {
 		initScheduler(factory);
 		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
+		initMigrationMgr(migraMgr);
 	}
 
 	// ================
@@ -224,6 +231,10 @@ public class Elasql extends VanillaDb {
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}
+	
+	public static void initMigrationMgr(MigrationMgr migrationMgr) {
+		migraMgr = migrationMgr;
+	}
 
 	public static void initPartitionMetaMgr(PartitionPlan plan) {
 		try {
@@ -268,6 +279,10 @@ public class Elasql extends VanillaDb {
 
 	public static DdLogMgr DdLogMgr() {
 		return ddLogMgr;
+	}
+	
+	public static MigrationMgr migrationMgr() {
+		return migraMgr;
 	}
 
 	// ===============

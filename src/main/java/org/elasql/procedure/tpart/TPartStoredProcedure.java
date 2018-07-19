@@ -28,7 +28,7 @@ import org.vanilladb.core.storage.tx.Transaction;
 public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper> implements DdStoredProcedure {
 
 	public static enum ProcedureType {
-		NOP, NORMAL, UTILITY
+		NOP, NORMAL, UTILITY, MIGRATION
 	}
 
 	// Protected resource

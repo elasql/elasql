@@ -8,7 +8,7 @@ import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
-public class NotificationPartitionPlan implements PartitionPlan {
+public class NotificationPartitionPlan extends PartitionPlan {
 	
 	public static final String TABLE_NAME = "notification";
 	public static final String KEY_SOURCE_NAME = "src_server_id";
@@ -55,5 +55,18 @@ public class NotificationPartitionPlan implements PartitionPlan {
 		
 		return underlayerPlan.getPartition(key);
 	}
-
+	
+	@Override
+	public int numberOfPartitions() {
+		return underlayerPlan.numberOfPartitions();
+	}
+	
+	public PartitionPlan getUnderlayerPlan() {
+		return underlayerPlan;
+	}
+	
+	@Override
+	public String toString() {
+		return String.format("NotificationPlan: [%s]", underlayerPlan.toString());
+	}
 }

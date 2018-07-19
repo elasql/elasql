@@ -25,6 +25,7 @@ public class SunkPlan {
 	// Migration flags
 	private Set<RecordKey> cacheInsertions = new HashSet<RecordKey>();
 	private Set<RecordKey> cacheDeletions = new HashSet<RecordKey>();
+	private Set<RecordKey> storageInsertions = new HashSet<RecordKey>();
 
 	private Map<RecordKey, Set<Long>> writeDestMap = new HashMap<RecordKey, Set<Long>>();
 
@@ -131,6 +132,10 @@ public class SunkPlan {
 	public void addCacheDeletion(RecordKey key) {
 		cacheDeletions.add(key);
 	}
+	
+	public void addStorageInsertion(RecordKey key) {
+		storageInsertions.add(key);
+	}
 
 	public Set<RecordKey> getCacheInsertions() {
 		return cacheInsertions;
@@ -138,6 +143,10 @@ public class SunkPlan {
 
 	public Set<RecordKey> getCacheDeletions() {
 		return cacheDeletions;
+	}
+	
+	public Set<RecordKey> getStorageInsertions() {
+		return storageInsertions;
 	}
 	
 	public boolean isReadOnly() {
@@ -217,6 +226,10 @@ public class SunkPlan {
 		
 		sb.append("Cache Deletions: ");
 		sb.append(cacheDeletions);
+		sb.append("\n");
+		
+		sb.append("Storage Deletions: ");
+		sb.append(storageInsertions);
 		sb.append("\n");
 
 		return sb.toString();

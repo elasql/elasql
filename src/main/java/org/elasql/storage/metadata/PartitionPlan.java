@@ -2,7 +2,7 @@ package org.elasql.storage.metadata;
 
 import org.elasql.sql.RecordKey;
 
-public interface PartitionPlan {
+public abstract class PartitionPlan {
 	
 	/**
 	 * Check if a record is fully replicated on each node.
@@ -11,7 +11,7 @@ public interface PartitionPlan {
 	 *            the key of the record
 	 * @return if the record is fully replicated
 	 */
-	public boolean isFullyReplicated(RecordKey key);
+	public abstract boolean isFullyReplicated(RecordKey key);
 
 	/**
 	 * Query the belonging partition.
@@ -20,6 +20,10 @@ public interface PartitionPlan {
 	 *            the key of the record
 	 * @return the id of the partition
 	 */
-	public int getPartition(RecordKey key);
+	public abstract int getPartition(RecordKey key);
+	
+	public int numberOfPartitions() {
+		return PartitionMetaMgr.NUM_PARTITIONS;
+	}
 
 }

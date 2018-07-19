@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
@@ -44,6 +45,7 @@ public class PartitionMetaMgr {
 	private static Queue<RecordKey> fifoQueue = new LinkedList<RecordKey>();
 	
 	private PartitionPlan partPlan;
+	private boolean isInMigration;
 
 	static {
 
@@ -190,8 +192,21 @@ public class PartitionMetaMgr {
 		return partPlan.getPartition(key);
 	}
 	
-	public void changePartitionPlan(PartitionPlan newPlan) {
+	public void startMigration(PartitionPlan newPlan) {
 		partPlan = newPlan;
+		isInMigration = true;
+	}
+	
+	public void finishMigration() {
+		isInMigration = false;
+	}
+	
+	public PartitionPlan getPartitionPlan() {
+		return partPlan;
+	}
+	
+	public int getCurrentNumOfParts() {
+		return partPlan.numberOfPartitions();
 	}
 
 	/**
@@ -202,11 +217,17 @@ public class PartitionMetaMgr {
 	 * @return the id of the partition where the record is
 	 */
 	public int getCurrentLocation(RecordKey key) {
-		Integer old = locationTable.get(key);
-		if (old == null)
-			return partPlan.getPartition(key);
-		else
-			return old;
+		Integer partId = locationTable.get(key);
+		if (partId != null)
+			return partId;
+		
+		if (isInMigration) {
+			partId = Elasql.migrationMgr().getLocation(key);
+			if (partId != null)
+				return partId;
+		}
+		
+		return partPlan.getPartition(key);
 	}
 
 	public void setCurrentLocation(RecordKey key, int loc) {
@@ -232,6 +253,14 @@ public class PartitionMetaMgr {
 			
 			locationTable.put(key, new Integer(loc));
 		}
+	}
+	
+	public Integer queryLocationTable(RecordKey key) {
+		return locationTable.get(key);
+	}
+	
+	public boolean removeFromLocationTable(RecordKey key) {
+		return locationTable.remove(key) != null;
 	}
 	
 	/**

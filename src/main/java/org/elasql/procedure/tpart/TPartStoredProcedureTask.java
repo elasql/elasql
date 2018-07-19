@@ -77,6 +77,10 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 	public void decideExceutionPlan(SunkPlan plan) {
 		tsp.decideExceutionPlan(plan);
 	}
+	
+	public TPartStoredProcedure<?> getProcedure() {
+		return tsp;
+	}
 
 	public ProcedureType getProcedureType() {
 		if (tsp == null)

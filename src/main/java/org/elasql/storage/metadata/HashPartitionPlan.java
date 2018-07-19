@@ -2,9 +2,9 @@ package org.elasql.storage.metadata;
 
 import org.elasql.sql.RecordKey;
 
-public class HashPartitionPlan implements PartitionPlan {
+public class HashPartitionPlan extends PartitionPlan {
 	
-	int numOfParts;
+	private int numOfParts;
 	
 	public HashPartitionPlan() {
 		numOfParts = PartitionMetaMgr.NUM_PARTITIONS;
@@ -22,5 +22,10 @@ public class HashPartitionPlan implements PartitionPlan {
 	@Override
 	public int getPartition(RecordKey key) {
 		return key.hashCode() % numOfParts;
+	}
+	
+	@Override
+	public int numberOfPartitions() {
+		return numOfParts;
 	}
 }

@@ -44,7 +44,7 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 		}
 		
 		// Reset the statistics
-		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++)
+		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++)
 			loadPerPart[partId] = 0.0;
 	}
 		
@@ -66,7 +66,7 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 		double minCost = Double.MAX_VALUE;
 		int minCostPart = 0;
 		
-		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++) {
+		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++) {
 			// for scaling-out experiments
 //			if (!isScalingOut && partId > 2)
 //				break;

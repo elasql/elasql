@@ -110,6 +110,12 @@ public class TPartTxLocalCache {
 			for (RecordKey key : plan.getLocalWriteBackInfo()) {
 
 				CachedRecord rec = recordCache.get(key);
+				
+				// For migration
+				if (plan.getStorageInsertions().contains(key)) {
+					cacheMgr.insertToLocalStorage(key, rec, tx);
+					continue;
+				}
 
 				// If there is no such record in the local cache,
 				// it might be pushed from the same transaction on the other
@@ -136,7 +142,7 @@ public class TPartTxLocalCache {
 
 		}
 		
-		// Clean up migrted rec
+		// Clean up migrated rec
 		for (RecordKey key : plan.getCacheDeletions())
 			cacheMgr.deleteFromCache(key, txNum);
 		

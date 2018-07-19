@@ -149,6 +149,20 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
 	}
 	
+	// This is also a type of writeback
+	void insertToLocalStorage(RecordKey key, CachedRecord rec, Transaction tx) {
+		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+		
+		// Check if there is corresponding keys in the cache
+		if (recordCache.containsKey(key))
+			recordCache.remove(key);
+		
+		// Force insert to local storage
+		VanillaCoreCrud.insert(key, rec, tx);
+		
+		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
+	}
+	
 	public void registerSinkReading(RecordKey key, long txNum) {
 		localCcMgr.requestSinkRead(key, txNum);
 	}

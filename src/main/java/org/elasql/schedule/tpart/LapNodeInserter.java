@@ -6,7 +6,6 @@ import java.util.Map;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
-import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 

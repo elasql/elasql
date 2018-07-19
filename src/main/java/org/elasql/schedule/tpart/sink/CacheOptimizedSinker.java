@@ -5,6 +5,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.migration.tpart.sp.ColdMigrationProcedure;
+import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -120,62 +122,89 @@ public class CacheOptimizedSinker extends Sinker {
 			if (node.getWriteBackEdges().size() > 0 && !replicated) {
 				int dataCurrentPos, dataOriginalPos;
 				
-				for (Edge e : node.getWriteBackEdges()) {
-
-					int dataWriteBackPos = e.getTarget().getPartId();
-					RecordKey k = e.getResourceKey();
-					dataCurrentPos = parMeta.getCurrentLocation(k);
-					dataOriginalPos = parMeta.getPartition(k);
+				// MigrationTx: remove the corresponding range from the migration manager
+				if (node.getTask().getProcedureType() == ProcedureType.MIGRATION) {
+					// Migration Tx:
+					// 1. The master node must be at the destination node
+					// 2. All write backs are insertions to local storage
+					ColdMigrationProcedure sp = (ColdMigrationProcedure) node.getTask().getProcedure();
 					
-					// The record's location changes
-					if(dataCurrentPos != dataWriteBackPos) {
-						// the non-origin destination perform insertion
-						// Note that it still needs the write back edges
-						// since it need to get the record to be inserted
-						if (dataWriteBackPos != dataOriginalPos	&&
-								dataWriteBackPos == myId)
-							plan.addCacheInsertion(k);
+					for (Edge e : node.getWriteBackEdges()) {
+						RecordKey k = e.getResourceKey();
 						
-						// the non-origin source perform deletion
-						if(dataCurrentPos != dataOriginalPos &&
-								dataCurrentPos == myId) {
-							plan.addCacheDeletion(k);
-							// Since the node does not have the write-back edge,
-							// we need to register the lock here.
+						if (sp.getMigrationRange().getDestPartId() == myId) {
+							plan.addStorageInsertion(k);
+							plan.addLocalWriteBackInfo(k);
 							cm.registerSinkWriteback(k, txNum);
 						}
+					}
+					
+					// Update the migration status
+					Elasql.migrationMgr().markMigrationRangeMoved(sp.getMigrationRange());
+					
+					// Update location information
+					for (RecordKey key : sp.getLocalCacheToStorage()) {
+						parMeta.removeFromLocationTable(key);
+					}
+					
+				} else { // Normal tx
+					for (Edge e : node.getWriteBackEdges()) {
+	
+						int dataWriteBackPos = e.getTarget().getPartId();
+						RecordKey k = e.getResourceKey();
+						dataCurrentPos = parMeta.getCurrentLocation(k);
+						dataOriginalPos = parMeta.getPartition(k);
 						
-						parMeta.setCurrentLocation(k, dataWriteBackPos);
-					}
-					
-					if (dataWriteBackPos == myId) {
-						// tell the task to write back local
-						plan.addLocalWriteBackInfo(k);
-						cm.registerSinkWriteback(k, txNum);
-					} else {
-						// push the data if write back to remote
-						plan.addPushingInfo(k, dataWriteBackPos, txNum, TPartCacheMgr.toSinkId(dataWriteBackPos));
-					}
-					
-					/*
-					if (taskIsLocal) {
-						if (targetServerId == myId) {
+						// The record's location changes
+						if(dataCurrentPos != dataWriteBackPos) {
+							// the non-origin destination perform insertion
+							// Note that it still needs the write back edges
+							// since it need to get the record to be inserted
+							if (dataWriteBackPos != dataOriginalPos	&&
+									dataWriteBackPos == myId)
+								plan.addCacheInsertion(k);
+							
+							// the non-origin source perform deletion
+							if(dataCurrentPos != dataOriginalPos &&
+									dataCurrentPos == myId) {
+								plan.addCacheDeletion(k);
+								// Since the node does not have the write-back edge,
+								// we need to register the lock here.
+								cm.registerSinkWriteback(k, txNum);
+							}
+							
+							parMeta.setCurrentLocation(k, dataWriteBackPos);
+						}
+						
+						if (dataWriteBackPos == myId) {
 							// tell the task to write back local
 							plan.addLocalWriteBackInfo(k);
-							cm.registerSinkWriteback(e.getResourceKey(), txNum);
+							cm.registerSinkWriteback(k, txNum);
 						} else {
 							// push the data if write back to remote
-							plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
-
+							plan.addPushingInfo(k, dataWriteBackPos, txNum, TPartCacheMgr.toSinkId(dataWriteBackPos));
 						}
-						// XXX : pass rec to local tx , check this , writeinfo only pass to local tx which txm > 0 ,hence this might be a dead code 
-						plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.toSinkId(targetServerId));
-					} else {
-						if (targetServerId == myId) {
-							cm.registerSinkWriteback(e.getResourceKey(), txNum);
-							plan.addLocalWriteBackInfo(k);
-						}
-					}*/
+						
+						/*
+						if (taskIsLocal) {
+							if (targetServerId == myId) {
+								// tell the task to write back local
+								plan.addLocalWriteBackInfo(k);
+								cm.registerSinkWriteback(e.getResourceKey(), txNum);
+							} else {
+								// push the data if write back to remote
+								plan.addPushingInfo(k, targetServerId, txNum, TPartCacheMgr.toSinkId(targetServerId));
+	
+							}
+							// XXX : pass rec to local tx , check this , writeinfo only pass to local tx which txm > 0 ,hence this might be a dead code 
+							plan.addWritingInfo(e.getResourceKey(), TPartCacheMgr.toSinkId(targetServerId));
+						} else {
+							if (targetServerId == myId) {
+								cm.registerSinkWriteback(e.getResourceKey(), txNum);
+								plan.addLocalWriteBackInfo(k);
+							}
+						}*/
+					}
 				}
 			}
 
