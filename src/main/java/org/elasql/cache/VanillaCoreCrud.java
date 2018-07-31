@@ -73,7 +73,8 @@ public class VanillaCoreCrud {
 		return rec;
 	}
 
-	public static void update(RecordKey key, CachedRecord rec, Transaction tx) {
+	// True: Found match record, False: Cannot find match record
+	public static boolean update(RecordKey key, CachedRecord rec, Transaction tx) {
 		TablePlan tp = new TablePlan(key.getTableName(), tx);
 		Map<String, IndexInfo> indexInfoMap = Elasql.catalogMgr()
 				.getIndexInfo(key.getTableName(), tx);
@@ -129,7 +130,9 @@ public class VanillaCoreCrud {
 				}
 				s.setVal(fld, newval);
 			}
-		}
+		} else
+			return false;
+		
 		// close opened indexes
 		for (String fld : targetflds) {
 			Index idx = targetIdxMap.get(fld);
@@ -140,6 +143,8 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
+		
+		return true;
 	}
 
 	public static void insert(RecordKey key, CachedRecord rec, Transaction tx) {

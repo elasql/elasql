@@ -25,7 +25,7 @@ public abstract class MigrationMgr {
 	
 	private static final int CHUNK_SIZE = 4000;
 	
-	private static final long START_MIGRATION_TIME = 20_000; // in ms
+	private static final long START_MIGRATION_TIME = 120_000; // in ms
 	
 	private Deque<MigrationRange> targetRanges;
 	
@@ -116,9 +116,11 @@ public abstract class MigrationMgr {
 	// Currently, it can only handle range partitioning
 	public void initializeMigration(RangePartitionPlan oldPartPlan,
 			RangePartitionPlan newPartPlan, String targetTable) {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("A new migration starts. Old: " + oldPartPlan +
-					", new: " + newPartPlan);
+		if (logger.isLoggable(Level.INFO)) {
+			long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+			logger.info(String.format("a new migration starts at %d. Old: %s, New: %s"
+					, time / 1000, oldPartPlan, newPartPlan));
+		}
 		
 		// Analyze the migration plans to find out which ranges to migrate
 		targetRanges = generateMigrationRanges(oldPartPlan, newPartPlan, targetTable);
@@ -146,12 +148,15 @@ public abstract class MigrationMgr {
 		Elasql.partitionMetaMgr().finishMigration();
 		targetRanges = null;
 		
-		if (logger.isLoggable(Level.INFO))
-			logger.info("The migration finishes.");
+		if (logger.isLoggable(Level.INFO)) {
+			long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+			logger.info(String.format("the migration finishes at %d."
+					, time / 1000));
+		}
 	}
 	
 	public Integer getSourcePart(RecordKey key) {
-		int id = toId(key);
+		int id = toNumericId(key);
 		for (MigrationRange range : targetRanges)
 			if (range.contains(id))
 				return range.getSourcePartId();
@@ -162,9 +167,9 @@ public abstract class MigrationMgr {
 	
 	public abstract String getMigrationTableName();
 	
-	public abstract Iterator<RecordKey> getKeyIterator(MigrationRange range);
+	public abstract Iterator<RecordKey> toKeyIterator(MigrationRange range);
 	
-	public abstract int toId(RecordKey key);
+	public abstract int toNumericId(RecordKey key);
 	
 	// ======== Private Functions =========
 	

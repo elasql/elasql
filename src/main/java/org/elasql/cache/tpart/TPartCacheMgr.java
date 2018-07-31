@@ -2,6 +2,8 @@ package org.elasql.cache.tpart;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
@@ -9,10 +11,12 @@ import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.storage.tx.concurrency.tpart.LocalStorageCcMgr;
+import org.elasql.storage.tx.concurrency.tpart.LocalStorageLockTable;
+import org.elasql.storage.tx.concurrency.tpart.LocalStorageLockTable.LockType;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
+	private static Logger logger = Logger.getLogger(TPartCacheMgr.class.getName());
 
 	/**
 	 * Looks up the sink id for the specified partition.
@@ -25,7 +29,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		return (partId + 1) * -1;
 	}
 
-	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
+//	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
+	private static LocalStorageLockTable lockTable = new LocalStorageLockTable();
 
 	private Map<CachedEntryKey, CachedRecord> exchange;
 	
@@ -69,6 +74,9 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 		synchronized (prepareAnchor(k)) {
 			try {
+				// Debug: Tracing the waiting key
+//				Thread.currentThread().setName("Tx." + dest + " waits for " + key
+//						+ " from tx." + src);
 				// wait if the record has not delivered
 				while (!exchange.containsKey(k)) {
 					prepareAnchor(k).wait();
@@ -98,7 +106,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 	
 	CachedRecord readFromSink(RecordKey key, Transaction tx) {
-		localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
+//		localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
+		lockTable.sLock(key, tx.getTransactionNumber());
 		
 		CachedRecord rec = null;
 		
@@ -111,7 +120,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		if (rec == null)
 			rec = VanillaCoreCrud.read(key, tx);
 		
-		localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
+//		localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
+		lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
 		
 		if (rec == null)
 			throw new RuntimeException("Tx." + tx.getTransactionNumber()
@@ -121,55 +131,66 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 	
 	void insertToCache(RecordKey key, CachedRecord rec, long txNum) {
-		localCcMgr.beforeWriteBack(key, txNum);
+//		localCcMgr.beforeWriteBack(key, txNum);
+		lockTable.xLock(key, txNum);
 		
 		recordCache.put(key, rec);
 		
-		localCcMgr.afterWriteback(key, txNum);
+//		localCcMgr.afterWriteback(key, txNum);
+		lockTable.release(key, txNum, LockType.X_LOCK);
 	}
 	
 	void deleteFromCache(RecordKey key, long txNum) {
-		localCcMgr.beforeWriteBack(key, txNum);
+//		localCcMgr.beforeWriteBack(key, txNum);
+		lockTable.xLock(key, txNum);
 		
 		if (recordCache.remove(key) == null)
 			throw new RuntimeException("There is no record for " + key + " in the cache");
 		
-		localCcMgr.afterWriteback(key, txNum);
+//		localCcMgr.afterWriteback(key, txNum);
+		lockTable.release(key, txNum, LockType.X_LOCK);
 	}
 	
 	void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
-		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+//		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+		lockTable.xLock(key, tx.getTransactionNumber());
 		
 		// Check if there is corresponding keys in the cache
 		if (recordCache.containsKey(key))
 			recordCache.put(key, rec);
+		else 
+			// If it was not in the cache, write-back to the local storage
+			writeToVanillaCore(key, rec, tx);
 		
-		// If it should not be in the cache, write-back to the local storage
-		writeToVanillaCore(key, rec, tx);
-		
-		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
+//		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
+		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
 	}
 	
 	// This is also a type of writeback
 	void insertToLocalStorage(RecordKey key, CachedRecord rec, Transaction tx) {
-		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+//		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+		lockTable.xLock(key, tx.getTransactionNumber());
 		
 		// Check if there is corresponding keys in the cache
 		if (recordCache.containsKey(key))
 			recordCache.remove(key);
 		
 		// Force insert to local storage
+		rec.setNewInserted(true);
 		VanillaCoreCrud.insert(key, rec, tx);
 		
-		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
+//		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
+		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
 	}
 	
 	public void registerSinkReading(RecordKey key, long txNum) {
-		localCcMgr.requestSinkRead(key, txNum);
+//		localCcMgr.requestSinkRead(key, txNum);
+		lockTable.requestLock(key, txNum);
 	}
 
 	public void registerSinkWriteback(RecordKey key, long txNum) {
-		localCcMgr.requestWriteBack(key, txNum);
+//		localCcMgr.requestWriteBack(key, txNum);
+		lockTable.requestLock(key, txNum);
 	}
 	
 	private void writeToVanillaCore(RecordKey key, CachedRecord rec, Transaction tx) {
@@ -177,7 +198,20 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			VanillaCoreCrud.delete(key, tx);
 		else if (rec.isNewInserted())
 			VanillaCoreCrud.insert(key, rec, tx);
-		else if (rec.isDirty())
-			VanillaCoreCrud.update(key, rec, tx);
+		else if (rec.isDirty()) {
+			if (!VanillaCoreCrud.update(key, rec, tx)) {
+				// XXX: We use this to solve a migration problem
+				// If a hot record was on other machine and belonged to another partition (not local one),
+				// then the partitioning changed, the hot record would not go to the new partition immediately.
+				// It is highly possible the record would be written back to the new partition very soon.
+				// However, we didn't make hot records be inserted to the new partition.
+				// Therefore, they would not be in the database.
+				// In this case, we should insert the record if we could not find it.
+				if (logger.isLoggable(Level.FINE))
+					logger.fine("Insert the record " + key + " since we could not find it.");
+				
+				VanillaCoreCrud.insert(key, rec, tx);
+			}
+		}
 	}
 }

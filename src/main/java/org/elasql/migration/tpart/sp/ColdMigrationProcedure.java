@@ -4,6 +4,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.migration.MigrationRange;
@@ -15,11 +17,12 @@ import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationParamHelper> {
+	private static Logger logger = Logger.getLogger(ColdMigrationProcedure.class.getName());
 	
-	// the keys that are not moved
+	// the tuples that are not moved
 	private Set<RecordKey> coldKeys = new HashSet<RecordKey>(); 
 	
-	// the keys that are moved to the dest node by other txs
+	// the tuples that have been moved to the dest node by other txs
 	// these need to be deleted from cache and inserted to the local storage
 	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>(); 
 	
@@ -38,7 +41,7 @@ public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationPa
 		Map<RecordKey, Node> resPos = graph.getResourceNodeMap();
 		
 		// Iterate over the keys in the migration range
-		Iterator<RecordKey> keyIter = Elasql.migrationMgr().getKeyIterator(range);
+		Iterator<RecordKey> keyIter = Elasql.migrationMgr().toKeyIterator(range);
 		while (keyIter.hasNext()) {
 			RecordKey key = keyIter.next();
 			
@@ -68,12 +71,10 @@ public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationPa
 		
 		// Add to read & write keys
 		for (RecordKey key : coldKeys) {
-			System.out.println(key);
 			addReadKey(key);
 			addWriteKey(key);
 		}
 		for (RecordKey key : localInsertKeys) {
-			System.out.println(key);
 			addReadKey(key);
 			addWriteKey(key);
 		}
@@ -81,6 +82,9 @@ public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationPa
 
 	@Override
 	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Tx." + txNum + " starts a cold migration");
+		
 		// Do nothing
 	}
 

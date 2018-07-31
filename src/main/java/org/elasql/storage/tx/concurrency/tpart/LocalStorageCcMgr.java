@@ -103,7 +103,7 @@ public class LocalStorageCcMgr {
 	
 	/**
 	 * If a transaction only requested for sink read,
-	 * the lock would be release immediately after the process got the record. 
+	 * the lock would be release immediately after the transaction got the record. 
 	 * 
 	 * @param key
 	 * @param txNum
@@ -123,6 +123,9 @@ public class LocalStorageCcMgr {
 				while (txNum > xh) {
 					anchor.wait();
 					xh = peekHead(requests.exclusiveLocks);
+					// Debug: Tracing the waiting key
+//					Thread.currentThread().setName("Tx." + txNum + " waits for xlock of " + key
+//							+ " from tx." + xh);
 				}
 				
 				// If txNum = XH, check if txNum is also smaller than the head (SH) of shared lock queue
@@ -134,6 +137,9 @@ public class LocalStorageCcMgr {
 					while (txNum > sh) {
 						anchor.wait();
 						sh = peekHead(requests.sharedLocks);
+						// Debug: Tracing the waiting key
+//						Thread.currentThread().setName("Tx." + txNum + " waits for slock of " + key
+//								+ " from tx." + sh);
 					}
 				}
 				

@@ -108,9 +108,6 @@ public class ConnectionMgr
 
 	@Override
 	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
-		if (sequencerMode)
-			return;
-
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
