@@ -16,9 +16,9 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 public class ClayController {
 	private static Logger logger = Logger.getLogger(ClayController.class.getName());
 	
-	private static final int MAX_CLUMPS = 10; // # of plans to generate
+	private static final int MAX_CLUMPS = 25; // # of plans to generate
 //	private static final int LOOK_AHEAD = 5; // Recommended by the paper
-	private static final int LOOK_AHEAD = 20; // for Google-workloads
+	private static final int LOOK_AHEAD = 1000; // for Google-workloads
 //	private static final int LOOK_AHEAD = 2000; // for multi-tanent
 //	private static final int LOOK_AHEAD = 3000; // for consolidation
 //	private static final int DATA_RANGE_SIZE = 10;
@@ -52,20 +52,20 @@ public class ClayController {
 		
 		List<Partition> partitions = heatGraph.splitToPartitions();
 		// Debug
-		for (Partition p : partitions) {
-			System.out
-					.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
-
-			for (Vertex v : p.getFirstTen())
-				System.out.println("Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :"
-						+ v.getVertexWeight());
-		}
+//		for (Partition p : partitions) {
+//			System.out
+//					.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
+//
+//			for (Vertex v : p.getFirstTen())
+//				System.out.println("Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :"
+//						+ v.getVertexWeight());
+//		}
 		
 		// Normal Clay: Get Most Overloaded Partition
 		double avgLoad = 0;
 		for (Partition p : partitions)
 			avgLoad += p.getTotalLoad();
-		avgLoad /= PartitionMetaMgr.NUM_PARTITIONS;
+		avgLoad /= MigrationManager.currentNumOfPartitions();
 
 		LinkedList<Partition> overloadParts = new LinkedList<Partition>();
 		for (Partition p : partitions)

@@ -25,6 +25,10 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
+	public static final boolean IS_SCALING_OUT = true;
+	private static final boolean SCALING_FLAG = true;
+	private static boolean isScaled = false;
+	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
 			30 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
@@ -109,21 +113,42 @@ public abstract class MigrationManager {
 				
 				long startTime = System.currentTimeMillis();
 				
-				while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
-					if (!isClayOperating.get())
-						sendLaunchClayReq(null);
-					else
-						if (logger.isLoggable(Level.WARNING))
-							logger.warning("Clay is still operating. Stop initialization of next run.");
-					
-					try {
-						Thread.sleep(getMigrationPreiod());
-					} catch (InterruptedException e) {
-						e.printStackTrace();
+				if (SCALING_FLAG) {
+					sendLaunchClayReq(null);
+				} else {
+					while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
+						if (!isClayOperating.get())
+							sendLaunchClayReq(null);
+						else
+							if (logger.isLoggable(Level.WARNING))
+								logger.warning("Clay is still operating. Stop initialization of next run.");
+						
+						try {
+							Thread.sleep(getMigrationPreiod());
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
 					}
 				}
 			}
 		});
+	}
+	
+	public static int currentNumOfPartitions() {
+		if (SCALING_FLAG) {
+			if (isScaled) {
+				if (IS_SCALING_OUT)
+					return PartitionMetaMgr.NUM_PARTITIONS;
+				else
+					return PartitionMetaMgr.NUM_PARTITIONS - 1;
+			} else {
+				if (IS_SCALING_OUT)
+					return PartitionMetaMgr.NUM_PARTITIONS - 1;
+				else
+					return PartitionMetaMgr.NUM_PARTITIONS;
+			}
+		} else
+			return PartitionMetaMgr.NUM_PARTITIONS;
 	}
 	
 	public boolean isSourceNode(){
@@ -168,6 +193,8 @@ public abstract class MigrationManager {
 			// TODO: Schism
 //			migraMgr.outputMetis(txNum);
 		} else {
+			if (SCALING_FLAG)
+				isScaled = true;
 			generateMigrationPlans();
 		}
 	}

@@ -77,7 +77,7 @@ public class Clump {
 	}
 	
 	public List<MigrationPlan> toMigrationPlans(int destPart) {
-		MigrationPlan[] sources = new MigrationPlan[PartitionMetaMgr.NUM_PARTITIONS];
+		MigrationPlan[] sources = new MigrationPlan[MigrationManager.currentNumOfPartitions()];
 		for (int i = 0; i < sources.length; i++)
 			sources[i] = new MigrationPlan(i, destPart);
 		

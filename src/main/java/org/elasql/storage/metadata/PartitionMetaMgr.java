@@ -60,10 +60,6 @@ public abstract class PartitionMetaMgr {
 	public void setPartition(RecordKey key, int loc) {
 		locationTable.put(key, new Integer(loc));
 	}
-	
-	public int getCurrentNumOfParts() {
-		return NUM_PARTITIONS;
-	}
 
 	protected abstract int getLocation(RecordKey key);
 }

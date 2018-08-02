@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.elasql.server.migration.MigrationManager;
 import org.elasql.server.migration.Partition;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
@@ -32,7 +33,7 @@ public class HeatGraph {
 	
 	public List<Partition> splitToPartitions() {
 		List<Partition> partitions = new ArrayList<Partition>();
-		for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
+		for (int i = 0; i < MigrationManager.currentNumOfPartitions(); i++)
 			partitions.add(new Partition(i));
 
 		for (Vertex v : vertices.values())
