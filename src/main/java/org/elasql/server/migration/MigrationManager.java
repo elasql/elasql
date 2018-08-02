@@ -1,10 +1,5 @@
 package org.elasql.server.migration;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -22,7 +17,6 @@ import java.util.logging.Logger;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
-import org.elasql.server.migration.Vertex.OutEdge;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.VanillaDb;
@@ -31,8 +25,18 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
+	// Clay's Hyperparameters
 	// This has been tuned for Google Workloads
-	public static final int TOTAL_CLAY_EPOCH = 3;
+//	public static final int TOTAL_CLAY_EPOCH = 3;
+//	private static final int LOOK_AHEAD = 5; // Recommended by the paper
+//	private static final int LOOK_AHEAD = 20; // for Google-workloads
+//	private static final int LOOK_AHEAD = 2000; // for multi-tanent
+//	private static final int LOOK_AHEAD = 3000; // for consolidation
+	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
+			30 * 1000: 3 * 1000; // [Schism: Clay]
+//			30 * 1000: 10 * 1000; // for consolidation
+	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 10; // [Schism: Clay]
+	public static final double LOADING_FACTOR = 0.5; // similar to term "k" in the paper
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -69,36 +73,32 @@ public abstract class MigrationManager {
 
 	// Clay structure
 	private int sourceNode, destNode;
-	private boolean isSeqNode;
-	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
-			30 * 1000: 3 * 1000; // [Schism: Clay]
-//			30 * 1000: 10 * 1000; // for consolidation
-	public static int clayEpoch = 0;
-//	private final int LOOK_AHEAD = 200;
-	private final int LOOK_AHEAD = 20; // for Google-workloads
-//	private final int LOOK_AHEAD = 2000; // for multi-tanent
-//	private final int LOOK_AHEAD = 3000; // for consolidation
-	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 10; // [Schism: Clay]
-	public static double BETA = 0.5;
+	private boolean isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
 	
 	// XXX: this is not thread-safe. If a clay did not end before next clay started,
 	// there would be multiple threads accessing it.
-	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
+//	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
 	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
-	public boolean isReachTarget = true;
-
-	// The time starts from the time which the first transaction arrives at
-	private long printStatusPeriod;
+//	public boolean isReachTarget = true;
 
 	public static long MONITOR_STOP_TIME = -1;
-	public static AtomicBoolean isMonitoring = new AtomicBoolean(false);
+	
+	// Current States
+	private static AtomicBoolean isMonitoring = new AtomicBoolean(false);
+	
+	// XXX: This is not in the original design of Clay.
+	// This records how much clump have been migrated.
+	// And we give it a maximum # of epochs to limit the number.
+	// The original design is to use another metric (loading) to decide
+	// if we need to migrate more clumps. 
+//	private int clayEpoch = 0;
+	private ClayController clayControl;
+	private List<MigrationPlan> queuedMigrations;
 
 	public MigrationManager(long printStatusPeriod) {
 		this.sourceNode = 0;
 		this.destNode = 1;
-		this.printStatusPeriod = printStatusPeriod;
-		//isSourceNode = (Elasql.serverId() == getSourcePartition());
-		isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
+		this.clayControl = new ClayController(this);
 	}
 	
 	public void scheduleControllerThread() {
@@ -114,9 +114,9 @@ public abstract class MigrationManager {
 				long startTime = System.currentTimeMillis();
 				
 				while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
-					clayEpoch = 0;
-					cleanUpClay();
-					onReceieveLaunchClayReq(null);
+//					clayEpoch = 0;
+//					cleanUpClay();
+					sendLaunchClayReq(null);
 					
 					try {
 						Thread.sleep(getMigrationPreiod());
@@ -132,149 +132,218 @@ public abstract class MigrationManager {
 		return (Elasql.serverId() == getSourcePartition());
 	}
 
-	public void updateWeightOnVertex(Integer vetxId, int partId) {
-		Vertex vertex = vertexKeys.get(vetxId);
-		// Note that a vertex represents a range of records.
-		if (vertex == null)
-			vertexKeys.put(vetxId, new Vertex(vetxId, partId));
-		else
-			vertex.incrementWeight();
-	}
+//	public void updateWeightOnVertex(Integer vetxId, int partId) {
+//		Vertex vertex = vertexKeys.get(vetxId);
+//		// Note that a vertex represents a range of records.
+//		if (vertex == null)
+//			vertexKeys.put(vetxId, new Vertex(vetxId, partId));
+//		else
+//			vertex.incrementWeight();
+//	}
 
-	public void updateWeightOnEdges(List<Integer> vertexIdSet) {
-		for (int i : vertexIdSet)
-			for (int j : vertexIdSet)
-				if (j != i)
-					vertexKeys.get(i).addEdge(j, vertexKeys.get(j).getPartId());
-	}
+//	public void updateWeightOnEdges(List<Integer> vertexIdSet) {
+//		for (int i : vertexIdSet)
+//			for (int j : vertexIdSet)
+//				if (j != i)
+//					vertexKeys.get(i).addEdge(j, vertexKeys.get(j).getPartId());
+//	}
 
-	public HashMap<Integer, Vertex> getVertexKeys() {
-		return vertexKeys;
-	}
+//	public HashMap<Integer, Vertex> getVertexKeys() {
+//		return vertexKeys;
+//	}
 
-	public void cleanUpClay() {
-		for (Vertex v : vertexKeys.values())
-			v.clear();
-		vertexKeys.clear();
-	}
-
-	public void startClayMonitoring() {
+//	public void cleanUpClay() {
+//		for (Vertex v : vertexKeys.values())
+//			v.clear();
+//		vertexKeys.clear();
+//	}
+	
+	// Caller: scheduler thread on the sequencer node
+	public void startMonitoring() {
 		if (logger.isLoggable(Level.INFO)) {
 			if (PartitionMetaMgr.USE_SCHISM)
 				logger.info("Schism Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
 			else
 				logger.info("Clay Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
 		}
-
+		
+		if (!PartitionMetaMgr.USE_SCHISM) {
+			// TODO: Schism
+		} else {
+			clayControl.reset();
+		}
 		isMonitoring.set(true);
 		MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
-
 	}
-
-	public void updateMigratedVertexKeys() {
-		for (Integer i : migrateRanges) {
-			vertexKeys.get(i).setPartId(getDestPartition());
+	
+	// Caller: scheduler thread on the sequencer node
+	public void analyzeTransactionRequest(Collection<RecordKey> keys) {
+		clayControl.addToHeatGraph(keys);
+		
+		if (System.currentTimeMillis() > MONITOR_STOP_TIME) {
+			stopMonitoring();
 		}
-		for (Vertex v : vertexKeys.values())
-			for (OutEdge o : v.getEdge().values())
-				if (migrateRanges.contains(o.id))
-					o.partId = getDestPartition();
 	}
 
-	public void generateMigrationPlan() {
+//	public void updateMigratedVertexKeys() {
+//		for (Integer i : migrateRanges) {
+//			vertexKeys.get(i).setPartId(getDestPartition());
+//		}
+//		for (Vertex v : vertexKeys.values())
+//			for (OutEdge o : v.getOutEdges().values())
+//				if (migrateRanges.contains(o.vertexId))
+//					o.partId = getDestPartition();
+//	}
+	
+	private void stopMonitoring() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Migration manager stops monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
+
+		isMonitoring.set(false);
+		
+		if (PartitionMetaMgr.USE_SCHISM) {
+			// TODO: Schism
+//			migraMgr.outputMetis(txNum);
+		} else {
+			generateMigrationPlans();
+		}
+	}
+	
+	private void generateMigrationPlans() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Clay starts generating migration plans at " +
+					(System.currentTimeMillis() - startTime) / 1000);
+		
+		VanillaDb.taskMgr().runTask(new Task() {
+			@Override
+			public void run() {
+				queuedMigrations = clayControl.generateMigrationPlan();
+				MigrationPlan plan = queuedMigrations.remove(0);
+				broadcastMigrateKeys(plan.toStoredProcedureRequest());
+			}
+		});
+	}
+	
+	private void triggerNextMigration() {
+		if (queuedMigrations != null && !queuedMigrations.isEmpty()) {
+			MigrationPlan plan = queuedMigrations.remove(0);
+			broadcastMigrateKeys(plan.toStoredProcedureRequest());
+		} else if (clayControl.hasMorePlans()) {
+			generateMigrationPlans();
+			
+//			VanillaDb.taskMgr().runTask(new Task() {
+//				@Override
+//				public void run() {
+//					if (!Elasql.migrationMgr().isReachTarget) {
+//						// Continue form last data trace
+//						Elasql.migrationMgr().updateMigratedVertexKeys();
+//						Elasql.migrationMgr().generateMigrationPlan();
+//					} else {
+//						// New mointoring
+//						Elasql.migrationMgr().cleanUpClay();
+//						Elasql.migrationMgr().sendLaunchClayReq(null);
+//					}
+//
+//				}
+//			});
+
+		}
+	}
+
+//	public void generateMigrationPlan() {
 
 		// System.out.println(VertexKeys);
 
-		VanillaDb.taskMgr().runTask(new Task() {
+//		VanillaDb.taskMgr().runTask(new Task() {
+//
+//			@Override
+//			public void run() {
 
-			@Override
-			public void run() {
+//				long start_t = System.currentTimeMillis();
+//				ArrayList<Partition> partitions = new ArrayList<Partition>();
+//				for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
+//					partitions.add(new Partition(i));
+//
+//				for (Vertex e : vertexKeys.values())
+//					partitions.get(e.getPartId()).addVertex(e);
+//
+//				System.out.println("Clay No." + clayEpoch + " Monitoring Finish!");
+//				// Debug
+//				for (Partition p : partitions) {
+//					System.out
+//							.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
+//
+//					for (Vertex v : p.getFirstTen())
+//						System.out.println("Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :"
+//								+ v.getVertexWeight());
+//				}
+//				
+//				// Normal Clay: Get Most Overloaded Partition
+//				double avgLoad = 0;
+//				for (Partition p : partitions)
+//					avgLoad += p.getTotalLoad();
+//				avgLoad /= PartitionMetaMgr.NUM_PARTITIONS;
+//
+//				LinkedList<Partition> overloadParts = new LinkedList<Partition>();
+//				for (Partition p : partitions)
+//					if (p.getTotalLoad() > avgLoad)
+//						overloadParts.add(p);
+//
+//				Collections.sort(overloadParts);
+//				Partition overloadPart = overloadParts.getLast();
+//				
+//				// For consolidation: always choose the 4th partition as the overloaded one
+////				Partition overloadPart = partitions.remove(3);
+//					
+//
+//				Candidate migraCandidate = new Candidate();
+//				// Init Clump with most Hotest Vertex
+//				migraCandidate.addCandidate(overloadPart.getHotestVertex());
+//
+//				// Expend LOOK_AHEAD times
+//				for (int a = 0; a < LOOK_AHEAD; a++) {
+//					if (migraCandidate.hasNeighbor()) {
+//						migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
+//					} else {
+//						System.out.println(String.format(
+//								"This is %d iteration of look ahead, it cannot find more neighbor", a));
+//						break;
+//					}
+//				}
+//
+//				// System.out.println(migraCandidate);
+//				// Preparse Param
+//				LinkedList<Integer> params = new LinkedList<Integer>(migraCandidate.getCandidateIds());
+//
+//				// Determinstic select last load partition as Dest
+//				Collections.sort(partitions);
+//				params.addFirst(new Integer(partitions.get(0).getId()));
+//
+//				// Add Source at the Source
+//				params.addFirst(new Integer(overloadPart.getId()));
+//
+//				System.out.println("Clay No." + clayEpoch + " Migration Plan Generation Takes : "
+//						+ (System.currentTimeMillis() - start_t) + " ms");
+//
+//				System.out.println("Source is Part : " + overloadPart.getId() + " Weight : " + overloadPart.getLoad()
+//						+ " Edge : " + overloadPart.getEdgeLoad());
+//				System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : "
+//						+ partitions.get(0).getLoad() + " Edge : " + partitions.get(0).getEdgeLoad());
+//				ArrayList<Integer> aa = new ArrayList<Integer>(migraCandidate.getCandidateIds());
+//				Collections.sort(aa);
+//				// Debug
+//				System.out.println(aa);
+//
+//				clayEpoch = clayEpoch + 1;
+//				if (logger.isLoggable(Level.INFO))
+//					logger.info("Clay BroadKeyscast at " + (System.currentTimeMillis() - startTime) / 1000);
+//
+//				broadcastMigrateKeys(params.toArray(new Integer[0]));
 
-				long start_t = System.currentTimeMillis();
-				ArrayList<Partition> partitions = new ArrayList<Partition>();
-				for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
-					partitions.add(new Partition(i));
-
-				for (Vertex e : vertexKeys.values())
-					partitions.get(e.getPartId()).addVertex(e);
-
-				System.out.println("Clay No." + clayEpoch + " Monitoring Finish!");
-				// Debug
-				for (Partition p : partitions) {
-					System.out
-							.println("Part : " + p.getId() + " Weight : " + p.getLoad() + " Edge : " + p.getEdgeLoad());
-
-					for (Vertex v : p.getFirstTen())
-						System.out.println("Top Ten : " + v.getId() + " PartId : " + v.getPartId() + " Weight :"
-								+ v.getVertexWeight());
-				}
-				
-				// Normal Clay: Get Most Overloaded Partition
-				double avgLoad = 0;
-				for (Partition p : partitions)
-					avgLoad += p.getTotalLoad();
-				avgLoad /= PartitionMetaMgr.NUM_PARTITIONS;
-
-				LinkedList<Partition> overloadParts = new LinkedList<Partition>();
-				for (Partition p : partitions)
-					if (p.getTotalLoad() > avgLoad)
-						overloadParts.add(p);
-
-				Collections.sort(overloadParts);
-				Partition overloadPart = overloadParts.getLast();
-				
-				// For consolidation: always choose the 4th partition as the overloaded one
-//				Partition overloadPart = partitions.remove(3);
-					
-
-				Candidate migraCandidate = new Candidate();
-				// Init Clump with most Hotest Vertex
-				migraCandidate.addCandidate(overloadPart.getHotestVertex());
-
-				// Expend LOOK_AHEAD times
-				for (int a = 0; a < LOOK_AHEAD; a++) {
-					if (migraCandidate.hasNeighbor()) {
-						migraCandidate.addCandidate(vertexKeys.get(migraCandidate.getHotestNeighbor()));
-					} else {
-						System.out.println(String.format(
-								"This is %d iteration of look ahead, it cannot find more neighbor", a));
-						break;
-					}
-				}
-
-				// System.out.println(migraCandidate);
-				// Preparse Param
-				LinkedList<Integer> params = new LinkedList<Integer>(migraCandidate.getCandidateIds());
-
-				// Determinstic select last load partition as Dest
-				Collections.sort(partitions);
-				params.addFirst(new Integer(partitions.get(0).getId()));
-
-				// Add Source at the Source
-				params.addFirst(new Integer(overloadPart.getId()));
-
-				System.out.println("Clay No." + clayEpoch + " Migration Plan Generation Takes : "
-						+ (System.currentTimeMillis() - start_t) + " ms");
-
-				System.out.println("Source is Part : " + overloadPart.getId() + " Weight : " + overloadPart.getLoad()
-						+ " Edge : " + overloadPart.getEdgeLoad());
-				System.out.println("Dest is Part : " + partitions.get(0).getId() + " Weight : "
-						+ partitions.get(0).getLoad() + " Edge : " + partitions.get(0).getEdgeLoad());
-				ArrayList<Integer> aa = new ArrayList<Integer>(migraCandidate.getCandidateIds());
-				Collections.sort(aa);
-				// Debug
-				System.out.println(aa);
-
-				clayEpoch = clayEpoch + 1;
-				if (logger.isLoggable(Level.INFO))
-					logger.info("Clay BroadKeyscast at " + (System.currentTimeMillis() - startTime) / 1000);
-
-				broadcastMigrateKeys(params.toArray(new Integer[0]));
-
-			}
-		});
-
-	}
+//			}
+//		});
+//
+//	}
 
 	// public static void main(String[] arg) {
 	//
@@ -330,12 +399,12 @@ public abstract class MigrationManager {
 	
 	public abstract int getRecordCount();
 	
-	public abstract int convertToVertexId(RecordKey k);
+	public abstract int getPartitioningKey(RecordKey k);
 	
 	public abstract int retrieveIdAsInt(RecordKey k);
 	
 	public boolean keyIsInMigrationRange(RecordKey key) {
-		return migrateRanges.contains(convertToVertexId(key));
+		return migrateRanges.contains(getPartitioningKey(key));
 	}
 	
 	/**
@@ -350,7 +419,7 @@ public abstract class MigrationManager {
 	
 	public abstract long getMigrationStopTime();
 
-	public abstract void onReceieveLaunchClayReq(Object[] metadata);
+	public abstract void sendLaunchClayReq(Object[] metadata);
 
 	public abstract void broadcastMigrateKeys(Object[] metadata);
 
@@ -391,10 +460,10 @@ public abstract class MigrationManager {
 		return destNode;
 		// return NUM_PARTITIONS - 1;
 	}
-
-	public int getMonitorNode() {
-		return 2;
-	}
+	
+//	public int getCurrentClayEpoch() {
+//		return clayEpoch;
+//	}
 
 	// Executed on the source node
 	public void analysisComplete(Map<RecordKey, Boolean> analyzedKeys) {
@@ -414,33 +483,34 @@ public abstract class MigrationManager {
 		System.out.println("End of analysis: " + (System.currentTimeMillis() - startTime) / 1000);
 	}
 	
-	public void outputMetis(long txNum) {
-		File metisDir = new File(".");
-		File metidFile = new File(metisDir, "metis_mesh_DR_new_"+MigrationManager.DATA_RANGE_SIZE+"_"+txNum+".txt");
-		FileWriter wmetidFile;
-		BufferedWriter bwmetidFile;
-		try {
-			wmetidFile = new FileWriter(metidFile);
-			bwmetidFile = new BufferedWriter(wmetidFile);
-			int vertexCount = getRecordCount() / MigrationManager.DATA_RANGE_SIZE;
-			StringBuilder sb = new StringBuilder();
-			long numEdge = 0;
-			for (int i = 0; i < vertexCount; i++) {
-				Vertex v = vertexKeys.get(i);
-				if (v != null) {
-					numEdge += v.toMetis(sb);
-				} else {
-					sb.append("0\n");
-				}
-			}
-				
-			bwmetidFile.write(String.format("%d %d 011\n", vertexCount, numEdge / 2));
-			bwmetidFile.append(sb);
-			bwmetidFile.close();
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-	}
+	// For Schism
+//	public void outputMetis(long txNum) {
+//		File metisDir = new File(".");
+//		File metidFile = new File(metisDir, "metis_mesh_DR_new_"+MigrationManager.DATA_RANGE_SIZE+"_"+txNum+".txt");
+//		FileWriter wmetidFile;
+//		BufferedWriter bwmetidFile;
+//		try {
+//			wmetidFile = new FileWriter(metidFile);
+//			bwmetidFile = new BufferedWriter(wmetidFile);
+//			int vertexCount = getRecordCount() / MigrationManager.DATA_RANGE_SIZE;
+//			StringBuilder sb = new StringBuilder();
+//			long numEdge = 0;
+//			for (int i = 0; i < vertexCount; i++) {
+//				Vertex v = vertexKeys.get(i);
+//				if (v != null) {
+//					numEdge += v.toMetis(sb);
+//				} else {
+//					sb.append("0\n");
+//				}
+//			}
+//				
+//			bwmetidFile.write(String.format("%d %d 011\n", vertexCount, numEdge / 2));
+//			bwmetidFile.append(sb);
+//			bwmetidFile.close();
+//		} catch (IOException e1) {
+//			e1.printStackTrace();
+//		}
+//	}
 
 	// NOTE: This can only be called by the scheduler
 	public void setRecordMigrated(Collection<RecordKey> keys) {
@@ -464,8 +534,8 @@ public abstract class MigrationManager {
 	}
 
 	public void setRecordLocation(Collection<RecordKey> keys) {
-		if (isSourceNode()) {
-			for (RecordKey key : keys) {
+		for (RecordKey key : keys) {
+			if (isSourceNode()) {
 				Boolean status = newInsertedData.get(key);
 				if (status != null && status == Boolean.FALSE) {
 					skipRequestQueue.add(key);
@@ -477,13 +547,11 @@ public abstract class MigrationManager {
 						analyzedData.put(key, Boolean.TRUE);
 					}
 				}
-				Elasql.partitionMetaMgr().setPartition(key, destNode);
 			}
-		} else {
-			for (RecordKey key : keys)
-				Elasql.partitionMetaMgr().setPartition(key, destNode);
+			
+			// Update the locations of records
+			Elasql.partitionMetaMgr().setPartition(key, destNode);
 		}
-
 	}
 
 	// NOTE: This can only be called by the scheduler
@@ -555,6 +623,9 @@ public abstract class MigrationManager {
 			analyzedData.clear();
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Migration completes at " + (System.currentTimeMillis() - startTime) / 1000);
+		
+		if (isSeqNode)
+			triggerNextMigration();
 	}
 
 	public boolean isAnalyzing() {
@@ -567,6 +638,10 @@ public abstract class MigrationManager {
 
 	public boolean isMigrated() {
 		return isMigrated.get();
+	}
+	
+	public boolean isMonitoring() {
+		return isMonitoring.get();
 	}
 
 	// Only works on the source node

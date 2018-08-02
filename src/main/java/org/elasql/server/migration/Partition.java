@@ -30,7 +30,7 @@ public class Partition implements Comparable<Partition> {
 	}
 
 	public double getTotalLoad() {
-		return load + MigrationManager.BETA * edgeLoad;
+		return load + MigrationManager.LOADING_FACTOR * edgeLoad;
 	}
 
 	public void addVertex(Vertex v) {

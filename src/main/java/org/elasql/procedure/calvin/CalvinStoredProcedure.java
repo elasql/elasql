@@ -22,10 +22,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.logging.Level;
 import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
@@ -296,77 +294,54 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		 * } else { postOffice.skipTransaction(txNum);
 		 */
 
-		if (islog && isInMigrating) {
-			String str = "******\nisInMigrating : " + isInMigrating;
-			str = str + "\n Txnum : " + txNum;
-			str = str + "\n isMigrationTx : " + isMigrationTx;
-			Class<?> enclosingClass = getClass().getEnclosingClass();
-			if (enclosingClass != null) {
-				str = str + "\n Classname : " + enclosingClass.getName();
-
-			} else {
-				str = str + "\n Classname : " + getClass().getName();
-
-			}
-			str = str + "\n readKeysInMigration : ";
-			for (Integer k : recordKeyToSortArray(readKeysInMigration))
-				str = str + " , " + k;
-			str = str + "\n writeKeysInMigration : ";
-			for (Integer k : recordKeyToSortArray(writeKeysInMigration))
-				str = str + " , " + k;
-			str = str + "\n Local Read : ";
-			for (Integer k : recordKeyToSortArray(localReadKeys))
-				str = str + " , " + k;
-			str = str + "\n Local Write : ";
-			for (Integer k : recordKeyToSortArray(localWriteKeys))
-				str = str + " , " + k;
-			str = str + "\n Remote Read : ";
-			for (Integer k : recordKeyToSortArray(remoteReadKeys))
-				str = str + " , " + k;
-			str = str + "\n activeParticipants : " + activeParticipants;
-			str = str + "\n isParticipated : " + isParticipated();
-			str = str + "\n ReadNodes : ";
-			for (int k : readsPerNodes)
-				str = str + " , " + k;
-			str = str + "\n pullKeys : ";
-			for (Integer k : recordKeyToSortArray(pullKeys))
-				str = str + " , " + k;
-			str = str + "\n activePulling : " + activePulling;
-			str = str + "\n ******";
-			System.out.println(str);
-
-		}
-		// Clay moinitoring
-		if (isSeqNode && MigrationManager.isMonitoring.get()
-				&& System.currentTimeMillis() < MigrationManager.MONITOR_STOP_TIME) {
-			LinkedList<Integer> vertexIdSet = new LinkedList<Integer>();
-			Integer vetxId;
-			int partId;
+//		if (islog && isInMigrating) {
+//			String str = "******\nisInMigrating : " + isInMigrating;
+//			str = str + "\n Txnum : " + txNum;
+//			str = str + "\n isMigrationTx : " + isMigrationTx;
+//			Class<?> enclosingClass = getClass().getEnclosingClass();
+//			if (enclosingClass != null) {
+//				str = str + "\n Classname : " + enclosingClass.getName();
+//
+//			} else {
+//				str = str + "\n Classname : " + getClass().getName();
+//
+//			}
+//			str = str + "\n readKeysInMigration : ";
+//			for (Integer k : recordKeyToSortArray(readKeysInMigration))
+//				str = str + " , " + k;
+//			str = str + "\n writeKeysInMigration : ";
+//			for (Integer k : recordKeyToSortArray(writeKeysInMigration))
+//				str = str + " , " + k;
+//			str = str + "\n Local Read : ";
+//			for (Integer k : recordKeyToSortArray(localReadKeys))
+//				str = str + " , " + k;
+//			str = str + "\n Local Write : ";
+//			for (Integer k : recordKeyToSortArray(localWriteKeys))
+//				str = str + " , " + k;
+//			str = str + "\n Remote Read : ";
+//			for (Integer k : recordKeyToSortArray(remoteReadKeys))
+//				str = str + " , " + k;
+//			str = str + "\n activeParticipants : " + activeParticipants;
+//			str = str + "\n isParticipated : " + isParticipated();
+//			str = str + "\n ReadNodes : ";
+//			for (int k : readsPerNodes)
+//				str = str + " , " + k;
+//			str = str + "\n pullKeys : ";
+//			for (Integer k : recordKeyToSortArray(pullKeys))
+//				str = str + " , " + k;
+//			str = str + "\n activePulling : " + activePulling;
+//			str = str + "\n ******";
+//			System.out.println(str);
+//
+//		}
+		
+		// Monitoring of MigrationManager
+		if (isSeqNode && migraMgr.isMonitoring()) {
 			// Since only the sequence node can get in, remoteReadKeys basically
 			// contains all the read keys of the transaction.
-			for (RecordKey k : remoteReadKeys) {
-				vetxId = migraMgr.convertToVertexId(k);
-				partId = Elasql.partitionMetaMgr().getPartition(k);
-
-				migraMgr.updateWeightOnVertex(vetxId, partId);
-				vertexIdSet.add(vetxId);
-			}
-			migraMgr.updateWeightOnEdges(vertexIdSet);
+			migraMgr.analyzeTransactionRequest(remoteReadKeys);
 		}
-
-		if (isSeqNode && MigrationManager.isMonitoring.get()
-				&& System.currentTimeMillis() > MigrationManager.MONITOR_STOP_TIME) {
-			if (PartitionMetaMgr.USE_SCHISM) {
-				System.out.println(
-						"Schism Stop Monitoring at " + (System.currentTimeMillis() - MigrationManager.startTime) / 1000);
-				migraMgr.outputMetis(txNum);
-			} else {
-				System.out.println(
-						"Clay Stop Monitoring at " + (System.currentTimeMillis() - MigrationManager.startTime) / 1000);
-				migraMgr.generateMigrationPlan();
-			}
-			MigrationManager.isMonitoring.set(false);
-		}
+		
 		/*
 		 * if (!this.isSourceNode && islog) { String str = "********" +
 		 * System.currentTimeMillis() + "\n Txnum : " + txNum; str = str +

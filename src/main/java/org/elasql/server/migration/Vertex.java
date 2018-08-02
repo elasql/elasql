@@ -6,11 +6,11 @@ public class Vertex implements Comparable<Vertex> {
 
 	public class OutEdge implements Comparable<OutEdge> {
 		int weight;
-		int id;
+		int vertexId;
 		int partId;
 
 		public OutEdge(int id, int partId) {
-			this.id = id;
+			this.vertexId = id;
 			this.partId = partId;
 			this.weight = 1;
 		}
@@ -26,16 +26,17 @@ public class Vertex implements Comparable<Vertex> {
 
 	}
 
-	private HashMap<Integer, OutEdge> edge;
+	private HashMap<Integer, OutEdge> edges;
 	private int weight;
 	private int id;
 	private int partId;
+	private boolean moved;
 
 	public Vertex(int id, int partId) {
 		this.id = id;
 		this.weight = 1;
 		this.partId = partId;
-		edge = new HashMap<Integer, OutEdge>();
+		edges = new HashMap<Integer, OutEdge>();
 	}
 
 	public int getId() {
@@ -55,18 +56,25 @@ public class Vertex implements Comparable<Vertex> {
 	}
 
 	public void addEdge(Integer id, int partId) {
-		OutEdge w = edge.get(id);
+		OutEdge w = edges.get(id);
 
 		if (w == null)
-			edge.put(id, new OutEdge(id, partId));
+			edges.put(id, new OutEdge(id, partId));
 		else
 			w.weight++;
 	}
-	
 
 	public void clear() {
 		this.weight = 0;
-		edge.clear();
+		edges.clear();
+	}
+	
+	public void markMoved() {
+		moved = true;
+	}
+	
+	public boolean isMoved() {
+		return moved;
 	}
 
 	public double getVertexWeight() {
@@ -75,29 +83,29 @@ public class Vertex implements Comparable<Vertex> {
 
 	public double getEdgeWeight() {
 		double w = 0.0;
-		for (OutEdge e : edge.values())
+		for (OutEdge e : edges.values())
 			w += ((double) e.weight) / MigrationManager.MONITORING_TIME;
 		return w;
 	}
 
-	public HashMap<Integer, OutEdge> getEdge() {
-		return this.edge;
+	public HashMap<Integer, OutEdge> getOutEdges() {
+		return edges;
 	}
 	
 	public int toMetis(StringBuilder sb) {
 		sb.append(weight + "");
-		for (OutEdge o : edge.values()) {
-			sb.append(" " + (o.id+1));
+		for (OutEdge o : edges.values()) {
+			sb.append(" " + (o.vertexId+1));
 			sb.append(" " + o.weight);
 		}
 		sb.append("\n");
-		return edge.size();
+		return edges.size();
 	}
 
 	public String toString() {
 		String str = "Vertex id : " + this.id + " Weight :" + this.weight + "\n";
-		for (OutEdge e : edge.values()) {
-			str = str + e.id + " w: " + e.weight + "\n ";
+		for (OutEdge e : edges.values()) {
+			str = str + e.vertexId + " w: " + e.weight + "\n ";
 		}
 
 		return str;
