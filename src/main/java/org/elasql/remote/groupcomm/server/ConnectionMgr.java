@@ -135,6 +135,7 @@ public class ConnectionMgr
 
 			if (sequencerMode)
 				return;
+			
 			for (Tuple t : ts.getTupleSet()) {
 				if (t.rec == null) {
 					String str = "Receiver : " + p2pmsg.getReceiver() + " SinkID :" + ts.sinkId() + " Size :"

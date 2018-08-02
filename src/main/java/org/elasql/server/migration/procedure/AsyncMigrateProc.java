@@ -9,8 +9,6 @@ import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
-import org.elasql.cache.calvin.CalvinCacheMgr;
-import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
@@ -31,6 +29,9 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 	@Override
 	public void prepareKeys() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Received async pushing request");
+		
 		// Lock the pushing records
 		for (RecordKey key : paramHelper.getPushingKeys())
 			addWriteKey(key);
@@ -41,7 +42,6 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 	@Override
 	protected void executeTransactionLogic() {
-		System.out.println("I'm "+Elasql.serverId() + "I receive Asunc Migration");
 		if (Elasql.serverId() == Elasql.migrationMgr().getSourcePartition())
 			executeSourceLogic();
 		else if (Elasql.serverId() == Elasql.migrationMgr().getDestPartition())
@@ -65,8 +65,6 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 	}
 
 	private void executeSourceLogic() {
-		
-		
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Asnyc pushing tx. " + txNum + " starts in the source node");
 

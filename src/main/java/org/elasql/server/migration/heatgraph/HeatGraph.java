@@ -1,4 +1,4 @@
-package org.elasql.server.migration;
+package org.elasql.server.migration.heatgraph;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.elasql.server.migration.Partition;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class HeatGraph {
@@ -26,7 +27,7 @@ public class HeatGraph {
 		for (int i : coaccessedVertices)
 			for (int j : coaccessedVertices)
 				if (i != j)
-					vertices.get(i).addEdge(j, vertices.get(j).getPartId());
+					vertices.get(i).addEdgeTo(vertices.get(j));
 	}
 	
 	public List<Partition> splitToPartitions() {
@@ -34,10 +35,16 @@ public class HeatGraph {
 		for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
 			partitions.add(new Partition(i));
 
-		for (Vertex e : vertices.values())
-			partitions.get(e.getPartId()).addVertex(e);
+		for (Vertex v : vertices.values())
+			partitions.get(v.getPartId()).addVertex(v);
 		
 		return partitions;
+	}
+	
+	public void removeVertex(Vertex v) {
+		vertices.remove(v.getId());
+		for (OutEdge e : v.getOutEdges().values())
+			e.opposite().getOutEdges().remove(v.getId());
 	}
 	
 	public Vertex getVertex(Integer id) {

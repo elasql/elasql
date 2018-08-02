@@ -50,7 +50,6 @@ public abstract class PartitionMetaMgr {
 	 * @return the id of the partition where the record is
 	 */
 	public int getPartition(RecordKey key){
-		
 		Integer old = locationTable.get(key);
 		if (old == null)
 			return getLocation(key);
@@ -59,9 +58,11 @@ public abstract class PartitionMetaMgr {
 	}
 
 	public void setPartition(RecordKey key, int loc) {
-
 		locationTable.put(key, new Integer(loc));
-
+	}
+	
+	public int getCurrentNumOfParts() {
+		return NUM_PARTITIONS;
 	}
 
 	protected abstract int getLocation(RecordKey key);

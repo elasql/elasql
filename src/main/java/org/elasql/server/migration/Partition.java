@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.elasql.server.migration.heatgraph.Vertex;
+
 public class Partition implements Comparable<Partition> {
 	private List<Vertex> Vertexs;
 	private double load;

@@ -8,13 +8,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.heatgraph.HeatGraph;
+import org.elasql.server.migration.heatgraph.Vertex;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class ClayController {
 	private static Logger logger = Logger.getLogger(ClayController.class.getName());
 	
-	private static final int MAX_CLUMPS = 3; // # of plans to generate
+	private static final int MAX_CLUMPS = 10; // # of plans to generate
 //	private static final int LOOK_AHEAD = 5; // Recommended by the paper
 	private static final int LOOK_AHEAD = 20; // for Google-workloads
 //	private static final int LOOK_AHEAD = 2000; // for multi-tanent
@@ -36,7 +38,7 @@ public class ClayController {
 		// Since only the sequence node can get in, remoteReadKeys basically
 		// contains all the read keys of the transaction.
 		for (RecordKey k : keys) {
-			vetxId = mapToVertexId(migraMgr.getPartitioningKey(k));
+			vetxId = mapToVertexId(migraMgr.retrieveIdAsInt(k));
 			partId = Elasql.partitionMetaMgr().getPartition(k);
 
 			heatGraph.updateWeightOnVertex(vetxId, partId);
@@ -90,10 +92,7 @@ public class ClayController {
 			if (clump.hasNeighbor()) {
 				int nId = clump.getHotestNeighbor();
 				Vertex n = heatGraph.getVertex(nId);
-				if (n.isMoved())
-					clump.removeNeighbor(nId);
-				else
-					clump.expand(n);
+				clump.expand(n);
 			} else {
 				if (logger.isLoggable(Level.INFO))
 					logger.info("There is no more neighbor for the clump: " + clump);
@@ -107,6 +106,10 @@ public class ClayController {
 		
 		// Generate migration plans
 		List<MigrationPlan> plans = clump.toMigrationPlans(destPart);
+		
+		// Remove the vertices from the heat graph
+		for (Vertex v : clump.getVertices())
+			heatGraph.removeVertex(v);
 		
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info("Clay takes " + (System.currentTimeMillis() - startTime) +
@@ -129,7 +132,7 @@ public class ClayController {
 	}
 	
 	// E.g. 1~10 => 0, 11~20 => 1
-	private int mapToVertexId(int key) {
+	public int mapToVertexId(int key) {
 		return (key - 1) / MigrationManager.DATA_RANGE_SIZE;
 	}
 }

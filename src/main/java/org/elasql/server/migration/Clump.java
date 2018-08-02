@@ -1,12 +1,14 @@
 package org.elasql.server.migration;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.elasql.server.migration.Vertex.OutEdge;
+import org.elasql.server.migration.heatgraph.OutEdge;
+import org.elasql.server.migration.heatgraph.Vertex;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class Clump {
@@ -16,10 +18,10 @@ public class Clump {
 		int id;
 		int partId;
 
-		public Neighbor(int id, int partId, int weight) {
-			this.id = id;
-			this.partId = partId;
-			this.weight = weight;
+		public Neighbor(OutEdge neighborEdge) {
+			this.id = neighborEdge.opposite().getId();
+			this.partId = neighborEdge.opposite().getPartId();
+			this.weight = neighborEdge.weight();
 		}
 
 		@Override
@@ -57,10 +59,6 @@ public class Clump {
 		}
 		addVertex(neighbor);
 	}
-	
-	public boolean removeNeighbor(int neighborVertexId) {
-		return neighbors.remove(neighborVertexId) != null;
-	}
 
 	public int getHotestNeighbor() {
 		return Collections.max(neighbors.values()).id;
@@ -74,23 +72,23 @@ public class Clump {
 		return vertices.size();
 	}
 	
+	public Collection<Vertex> getVertices() {
+		return vertices.values();
+	}
+	
 	public List<MigrationPlan> toMigrationPlans(int destPart) {
 		MigrationPlan[] sources = new MigrationPlan[PartitionMetaMgr.NUM_PARTITIONS];
 		for (int i = 0; i < sources.length; i++)
 			sources[i] = new MigrationPlan(i, destPart);
 		
 		// Put the vertices to the plans
-		for (Vertex v : vertices.values()) {
-			// Mark all vertices as moved
-			v.markMoved();
-			
+		for (Vertex v : vertices.values())
 			sources[v.getPartId()].addKey(v.getId());
-		}
 		
 		List<MigrationPlan> candidatePlans = new LinkedList<MigrationPlan>();
 		
 		for (int i = 0; i < sources.length; i++)
-			if (sources[i].keyCount() > 0)
+			if (i != destPart && sources[i].keyCount() > 0)
 				candidatePlans.add(sources[i]);
 		
 		return candidatePlans;
@@ -134,18 +132,19 @@ public class Clump {
 		
 		// Correct version: consider the vertices on all partitions
 		for (OutEdge o : v.getOutEdges().values())
-			addNeighbor(o.vertexId, o.partId, o.weight);
+			addNeighbor(o);
 	}
 
-	private void addNeighbor(Integer id, int partId, int weight) {
+	private void addNeighbor(OutEdge neighborEdge) {
 		// Avoid self loop
-		if (vertices.containsKey(id))
+		if (vertices.containsKey(neighborEdge.opposite().getId()))
 			return;
 
-		Neighbor w = neighbors.get(id);
+		Neighbor w = neighbors.get(neighborEdge.opposite().getId());
 		if (w == null)
-			neighbors.put(id, new Neighbor(id, partId, weight));
+			neighbors.put(neighborEdge.opposite().getId(),
+					new Neighbor(neighborEdge));
 		else
-			w.weight += weight;
+			w.weight += neighborEdge.weight();
 	}
 }

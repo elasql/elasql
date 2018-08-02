@@ -406,8 +406,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				for (Entry<RecordKey, CachedRecord> pair : readings.entrySet()) {
 					if (pair.getValue() == null)
 						str = str + "key" + pair.getKey() + "is null!\n";
-					else if (pair.getValue().getVal("i_name") == null)
-						str = str + "key" + pair.getKey() + "no map!\n";
+//					else if (pair.getValue().getVal("i_name") == null)
+//						str = str + "key" + pair.getKey() + "no map!\n";
 
 				}
 			}
