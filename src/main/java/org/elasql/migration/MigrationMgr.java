@@ -23,9 +23,9 @@ public abstract class MigrationMgr {
 	
 	public static final int MSG_COLD_FINISH = -100;
 	
-	private static final int CHUNK_SIZE = 4000;
+	private static final int CHUNK_SIZE = 100;
 	
-	private static final long START_MIGRATION_TIME = 120_000; // in ms
+	private static final long START_MIGRATION_TIME = 180_000; // in ms
 	
 	private Deque<MigrationRange> targetRanges;
 	
@@ -54,12 +54,20 @@ public abstract class MigrationMgr {
 				RangePartitionPlan oldPlan = (RangePartitionPlan) wrapperPlan.getUnderlayerPlan();
 				RangePartitionPlan newPlan;
 				if (IS_SCALING_OUT)
-					newPlan = oldPlan.addNodeWithoutChangingDataSize();
+					newPlan = oldPlan.scaleOut();
 				else
-					newPlan = oldPlan.removeNodeWithoutChangingDataSize();
+					newPlan = oldPlan.scaleIn();
 				
 				sendMigrationStartRequest(oldPlan, newPlan, getMigrationTableName(), false);
 				initializeMigration(oldPlan, newPlan, getMigrationTableName());
+				
+				// Delay cold migration a moment to prevent a big drop caused by 
+				// both initialization and cold migrations.
+				try {
+					Thread.sleep(10_000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 				
 				// Choose a range to migrate
 				MigrationRange range = takeNextMigrationChunk();

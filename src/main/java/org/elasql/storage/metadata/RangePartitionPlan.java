@@ -26,11 +26,11 @@ public class RangePartitionPlan extends PartitionPlan implements Serializable {
 		recsPerPart = numberOfRecords / numOfParts;
 	}
 	
-	public RangePartitionPlan addNodeWithoutChangingDataSize() {
+	public RangePartitionPlan scaleOut() {
 		return new RangePartitionPlan(partField, recsPerPart * numOfParts, numOfParts + 1);
 	}
 	
-	public RangePartitionPlan removeNodeWithoutChangingDataSize() {
+	public RangePartitionPlan scaleIn() {
 		return new RangePartitionPlan(partField, recsPerPart * numOfParts, numOfParts - 1);
 	}
 
