@@ -46,7 +46,7 @@ public class SunkPlan {
 		readingInfoMap.put(key, srcTxNum);
 	}
 
-	public void addPushingInfo(RecordKey key, int targetNodeId, long srcTxNum, long destTxNum) {
+	public void addPushingInfo(RecordKey key, int targetNodeId, long destTxNum) {
 		if (pushingInfoMap == null)
 			pushingInfoMap = new HashMap<Integer, Set<PushInfo>>();
 		Set<PushInfo> pushInfos = pushingInfoMap.get(targetNodeId);
@@ -63,7 +63,7 @@ public class SunkPlan {
 		writeDestMap.get(key).add(destTxNum);
 	}
 
-	public void addSinkPushingInfo(RecordKey key, int destNodeId, long srcTxNum, long destTxNum) {
+	public void addSinkPushingInfo(RecordKey key, int destNodeId, long destTxNum) {
 		Set<PushInfo> pushInfos = sinkPushingInfoMap.get(destNodeId);
 		if (pushInfos == null) {
 			pushInfos = new HashSet<PushInfo>();

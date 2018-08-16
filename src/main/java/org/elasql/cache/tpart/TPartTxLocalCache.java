@@ -3,6 +3,7 @@ package org.elasql.cache.tpart;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.schedule.tpart.sink.SunkPlan;
@@ -44,6 +45,18 @@ public class TPartTxLocalCache {
 		recordCache.put(key, rec);
 
 		return rec;
+	}
+	
+	public Map<RecordKey, CachedRecord> batchReadFromSink(Set<RecordKey> keys) {
+		Map<RecordKey, CachedRecord> records = cacheMgr.batchReadFromSink(keys, tx);
+		
+		for (CachedRecord rec : records.values()) {
+			rec.setSrcTxNum(txNum);
+		}
+		// XXX: Comment this to speed up
+		// recordCache.putAll(records);
+		
+		return records;
 	}
 
 	/**

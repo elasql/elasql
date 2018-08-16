@@ -1,6 +1,9 @@
 package org.elasql.cache.tpart;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -128,6 +131,38 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 				+ " cannot find the record of " + key);
 		
 		return rec;
+	}
+	
+	Map<RecordKey, CachedRecord> batchReadFromSink(Set<RecordKey> keys, Transaction tx) {
+		for (RecordKey key : keys)
+			lockTable.sLock(key, tx.getTransactionNumber());
+		
+		Map<RecordKey, CachedRecord> records = new HashMap<RecordKey, CachedRecord>();
+		
+		// Check the cache first
+		Set<RecordKey> readFromLocals = new HashSet<RecordKey>();
+		for (RecordKey key : keys) {
+			CachedRecord rec = recordCache.get(key);
+			if (rec != null) {
+				// Copy the record to ensure thread-safety
+				rec = new CachedRecord(rec);
+				records.put(key, rec);
+			} else {
+				readFromLocals.add(key);
+			}
+		}
+		
+		// Read from the local storage
+		if (!readFromLocals.isEmpty()) {
+			Map<RecordKey, CachedRecord> localReads =
+					VanillaCoreCrud.batchRead(readFromLocals, tx);
+			records.putAll(localReads);
+		}
+		
+		for (RecordKey key : keys)
+			lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
+		
+		return records;
 	}
 	
 	void insertToCache(RecordKey key, CachedRecord rec, long txNum) {

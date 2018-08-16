@@ -191,16 +191,44 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 				}
 			}
 		} else if (plan.hasSinkPush()) {
+			long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
+			
 			for (Entry<Integer, Set<PushInfo>> entry : plan.getSinkPushingInfo().entrySet()) {
 				int targetServerId = entry.getKey();
 				TupleSet rs = new TupleSet(sinkId);
-				for (PushInfo pushInfo : entry.getValue()) {
-					long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
-					CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
-					// TODO deal with null value record
-					rec.setSrcTxNum(sinkTxnNum);
-					rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
-				}
+				
+				// Migration transactions
+//				if (getProcedureType() == ProcedureType.MIGRATION) {
+//					long destTxNum = -1;
+//					
+//					Set<RecordKey> keys = new HashSet<RecordKey>();
+//					for (PushInfo pushInfo : entry.getValue()) {
+//						keys.add(pushInfo.getRecord());
+//						// XXX: Not good
+//						if (destTxNum == -1)
+//							destTxNum = pushInfo.getDestTxNum();
+//					}
+//					
+//					Map<RecordKey, CachedRecord> recs = cache.batchReadFromSink(keys);
+//					
+//					for (Entry<RecordKey, CachedRecord> keyRecPair : recs.entrySet()) {
+//						RecordKey key = keyRecPair.getKey();
+//						CachedRecord rec = keyRecPair.getValue();
+//						rec.setSrcTxNum(sinkTxnNum);
+//						rs.addTuple(key, sinkTxnNum, destTxNum, rec);
+//					}
+//					
+//				} else {
+					// Normal transactions
+					for (PushInfo pushInfo : entry.getValue()) {
+						
+						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
+						// TODO deal with null value record
+						rec.setSrcTxNum(sinkTxnNum);
+						rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
+					}
+//				}
+				
 				Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
 			}
 		}
