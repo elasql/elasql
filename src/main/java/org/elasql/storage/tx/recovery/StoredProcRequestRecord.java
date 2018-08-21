@@ -75,13 +75,7 @@ public class StoredProcRequestRecord implements DdLogRecord {
 		
 		lsn = rec.getLSN();
 	}
-
-	/**
-	 * Writes a request record to the log. This log record contains the
-	 * {@link LogRecord#OP_REQUEST} operator ID, followed by the transaction ID.
-	 * 
-	 * @return the LSN of the log record
-	 */
+	
 	@Override
 	public LogSeqNum writeToLog() {
 		List<Constant> rec = buildRecord();

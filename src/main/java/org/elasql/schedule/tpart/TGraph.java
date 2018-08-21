@@ -103,7 +103,7 @@ public class TGraph {
 	/**
 	 * Get the node that produce the latest version of specified resource.
 	 * 
-	 * @param
+	 * @param res the key of the resource
 	 * @return The desired node. If the resource has not been created a new
 	 *         version since last sinking, the partition that own the resource
 	 *         will be return in a Node format.

@@ -51,8 +51,8 @@ public class LocalStorageCcMgr {
 	}
 	
 	/**
-	 * Request the shared lock of a record for reading it in the near future. <br />
-	 * <br />
+	 * Request the shared lock of a record for reading it in the near future. <br>
+	 * <br>
 	 * All requests should be issued in the same thread.
 	 * 
 	 * @param key
@@ -77,8 +77,8 @@ public class LocalStorageCcMgr {
 	/**
 	 * Request the exclusive lock of a record for reading and modifying it 
 	 * in the near future. If it had requested the shared lock of the record,
-	 * the request would be upgraded for the exclusive lock. <br />
-	 * <br />
+	 * the request would be upgraded for the exclusive lock. <br>
+	 * <br>
 	 * All requests should be issued in the same thread.
 	 * 
 	 * @param key
@@ -103,12 +103,7 @@ public class LocalStorageCcMgr {
 	
 	/**
 	 * If a transaction only requested for sink read,
-	 * the lock would be release immediately after the process got the record. 
-	 * 
-	 * @param key
-	 * @param txNum
-	 * @param tx
-	 * @return
+	 * the lock would be release immediately after the process got the record.
 	 */
 	public void beforeSinkRead(RecordKey key, long txNum) {
 		Object anchor = getAnchor(key);

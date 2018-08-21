@@ -113,17 +113,6 @@ public class SunkPlan {
 		localWriteBackInfo.add(key);
 	}
 
-	public void addRemoteWriteBackInfo(RecordKey key, Integer destServerId) {
-		if (remoteWriteBackInfo == null)
-			remoteWriteBackInfo = new HashMap<Integer, List<RecordKey>>();
-		List<RecordKey> keys = remoteWriteBackInfo.get(key);
-		if (keys == null) {
-			keys = new ArrayList<RecordKey>();
-			remoteWriteBackInfo.put(destServerId, keys);
-		}
-		keys.add(key);
-	}
-
 	public long getReadSrcTxNum(RecordKey key) {
 		return readingInfoMap.get(key);
 	}

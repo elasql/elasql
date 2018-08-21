@@ -15,11 +15,9 @@
  *******************************************************************************/
 package org.elasql.schedule.tpart.sink;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;

@@ -47,8 +47,6 @@ public class TPartTxLocalCache {
 	 * 
 	 * @param key
 	 *            the key of the record
-	 * @param mySinkId
-	 *            the id of the sink where the transaction executes
 	 * @return the specified record
 	 */
 	public CachedRecord readFromSink(RecordKey key) {

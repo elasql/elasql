@@ -94,7 +94,6 @@ public class VanillaCoreCrud {
 		// Open the scan
 		UpdateScan s = (UpdateScan) selectPlan.open();
 		s.beforeFirst();
-		int count = 0;
 		while (s.next()) {
 			
 			// Construct a mapping from field names to values
@@ -141,8 +140,6 @@ public class VanillaCoreCrud {
 				
 				index.close();
 			}
-			
-			count++;
 		}
 		
 		// Close opened indexes and the record file
@@ -210,7 +207,6 @@ public class VanillaCoreCrud {
 		
 		// Open the scan
 		UpdateScan s = (UpdateScan) selectPlan.open();
-		int count = 0;
 		s.beforeFirst();
 		while (s.next()) {
 			RecordId rid = s.getRecordId();
@@ -244,8 +240,6 @@ public class VanillaCoreCrud {
 				s = (UpdateScan) selectPlan.open();
 				s.beforeFirst();
 			}
-			
-			count++;
 		}
 		s.close();
 

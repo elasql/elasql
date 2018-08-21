@@ -44,10 +44,10 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	}
 
 	/**
-	 * Book the read lock of the specified object.
+	 * Book the read lock of the specified objects.
 	 * 
-	 * @param obj
-	 *            the object which the transaction wishes to lock on
+	 * @param keys
+	 *            the objects which the transaction intends to read
 	 */
 	public void bookReadKeys(Collection<RecordKey> keys) {
 		if (keys != null) {
@@ -65,8 +65,8 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Book the write lock of the specified object.
 	 * 
-	 * @param obj
-	 *            the object which the transaction wishes to lock on
+	 * @param keys
+	 *             the objects which the transaction intends to write
 	 */
 	public void bookWriteKeys(Collection<RecordKey> keys) {
 		if (keys != null) {
