@@ -15,9 +15,9 @@ public class StopMigrationProc extends AllExecuteProcedure<StoredProcedureParamH
 
 	public StopMigrationProc(long txNum) {
 		super(txNum, StoredProcedureParamHelper.DefaultParamHelper());
-		Elasql.migrationMgr().stopMigration();
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Migration stops with tx number: " + txNum);
+		Elasql.migrationMgr().stopMigration();
 	}
 
 	@Override

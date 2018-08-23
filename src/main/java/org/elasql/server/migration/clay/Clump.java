@@ -15,7 +15,7 @@ import org.elasql.server.migration.heatgraph.Vertex;
 public class Clump {
 
 	private class Neighbor implements Comparable<Neighbor> {
-		long weight;
+		double weight;
 		int id;
 		int partId;
 
@@ -153,13 +153,13 @@ public class Clump {
 		
 		// Simplified version: it does not consider 
 		// the vertices on other partition nodes.
-//		for (OutEdge o : v.getEdge().values())
-//			if (o.partId == v.getPartId())
-//				addNeighbor(o.id, o.partId, o.weight);
+		for (OutEdge o : v.getOutEdges().values())
+			if (o.getOpposite().getPartId() == v.getPartId())
+				addNeighbor(o);
 		
 		// Correct version: consider the vertices on all partitions
-		for (OutEdge o : v.getOutEdges().values())
-			addNeighbor(o);
+//		for (OutEdge o : v.getOutEdges().values())
+//			addNeighbor(o);
 	}
 
 	private void addNeighbor(OutEdge neighborEdge) {

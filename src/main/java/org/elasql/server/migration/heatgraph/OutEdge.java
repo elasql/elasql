@@ -1,5 +1,7 @@
 package org.elasql.server.migration.heatgraph;
 
+import org.elasql.server.migration.MigrationManager;
+
 public class OutEdge implements Comparable<OutEdge> {
 	
 	private int weight;
@@ -14,8 +16,8 @@ public class OutEdge implements Comparable<OutEdge> {
 		this.weight++;
 	}
 	
-	public int getWeight() {
-		return weight;
+	public double getWeight() {
+		return ((double) weight) / MigrationManager.MONITORING_TIME;
 	}
 	
 	public Vertex getOpposite() {

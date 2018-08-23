@@ -16,8 +16,11 @@ public class ClayPlanner {
 	
 	public static final int MULTI_PARTS_COST = 5; // term 'k' in Clay's paper
 //	public static final double OVERLOAD_THREASDHOLD = 15; // term 'theta' in Clay's paper
-	public static final double OVERLOAD_PERCENTAGE = 1.2;
-	private static final int LOOK_AHEAD_MAX = 5;
+	public static final double OVERLOAD_PERCENTAGE = 1.2; // For multi-tanents
+//	public static final double OVERLOAD_PERCENTAGE = 2.0; // For Google workloads
+	private static final int LOOK_AHEAD_MAX = 20;
+//	private static final int CLUMP_MAX_SIZE = 200; // For Google workloads
+	private static final int CLUMP_MAX_SIZE = 10000; // For multi-tanents
 	
 	private HeatGraph heatGraph;
 	private int numOfClumpsGenerated = 0;
@@ -52,7 +55,7 @@ public class ClayPlanner {
 				if (logger.isLoggable(Level.INFO)) {
 					logger.info("Clay takes " + (System.currentTimeMillis() - startTime) +
 							" ms to generate clump no." + numOfClumpsGenerated);
-//					logger.info("Generated migration plans: " + plans);
+					logger.info("Generated migration plans: " + plans);
 				}
 				
 				numOfClumpsGenerated++;
@@ -86,6 +89,7 @@ public class ClayPlanner {
 				addedVertex = overloadedPart.getHotestVertex();
 				candidateClump = new Clump(addedVertex);
 				destPart = findInitialDest(addedVertex, partitions);
+				candidateClump.setDestination(destPart.getPartId());
 				
 //				System.out.println("Init clump: " + printClump(candidateClump));
 			} else {
@@ -97,21 +101,29 @@ public class ClayPlanner {
 				addedVertex = heatGraph.getVertex(nId);
 				candidateClump.expand(addedVertex);
 				
-//				System.out.println("Expanded clump: " + printClump(candidateClump));
-//				System.out.println("Delta for sender: " + calcSendLoadDelta(candidateClump, addedVertex.getPartId()));
-				
 				destPart = updateDestination(candidateClump, destPart, partitions);
+				candidateClump.setDestination(destPart.getPartId());
+				
+//				System.out.println("Expanded clump: " + printClump(candidateClump));
+//				System.out.println(String.format("Delta for recv part %d: %f", destPart.getPartId(),
+//						calcRecvLoadDelta(candidateClump, destPart.getPartId())));
+//				System.out.println(String.format("Delta for sender part %d: %f", addedVertex.getPartId(),
+//						calcSendLoadDelta(candidateClump, addedVertex.getPartId())));
 			}
 			
 			// Examine the clump
-			if (isFeasible(candidateClump, destPart) &&
-					calcSendLoadDelta(candidateClump, addedVertex.getPartId()) < 0) {
+			if (isFeasible(candidateClump, destPart)) {
 //				System.out.println("Found a good clump: " + printClump(candidateClump));
-				
 				finalClump = new Clump(candidateClump);
-				finalClump.setDestination(destPart.getPartId());
 			} else if (finalClump != null) {
 				lookAhead--;
+			}
+			
+			if (candidateClump.size() > CLUMP_MAX_SIZE) {
+				if (finalClump != null)
+					return finalClump;
+				else
+					return candidateClump;
 			}
 			
 			if (lookAhead == 0)
@@ -154,10 +166,10 @@ public class ClayPlanner {
 	 */
 	private Partition updateDestination(Clump clump, Partition oldDest, List<Partition> partitions) {
 		if (!isFeasible(clump, oldDest)) {
-			int mostCoaccessedPart = clump.getMostCoaccessedPartition();
-			if (mostCoaccessedPart != -1 && mostCoaccessedPart != oldDest.getPartId() &&
-					isFeasible(clump, partitions.get(mostCoaccessedPart)))
-				return partitions.get(mostCoaccessedPart);
+//			int mostCoaccessedPart = clump.getMostCoaccessedPartition();
+//			if (mostCoaccessedPart != -1 && mostCoaccessedPart != oldDest.getPartId() &&
+//					isFeasible(clump, partitions.get(mostCoaccessedPart)))
+//				return partitions.get(mostCoaccessedPart);
 			
 			Partition leastLoadPart = getLeastLoadPartition(partitions);
 			if (leastLoadPart.getPartId() != oldDest.getPartId() &&
@@ -198,7 +210,7 @@ public class ClayPlanner {
 		double removedNodeLoad = 0;
 		for (Vertex v : vertices)
 			if (v.getPartId() == senderPartId)
-				removedNodeLoad = v.getVertexWeight();
+				removedNodeLoad += v.getVertexWeight();
 		
 		// Cross-partition edge loading
 		double addedCrossLoad = 0, reducedCrossLoad = 0;
@@ -230,7 +242,7 @@ public class ClayPlanner {
 		double addedNodeLoad = 0;
 		for (Vertex v : vertices)
 			if (v.getPartId() != destPartId)
-				addedNodeLoad = v.getVertexWeight();
+				addedNodeLoad += v.getVertexWeight();
 		
 		// Cross-partition edge loading
 		double addedCrossLoad = 0, reducedCrossLoad = 0;
@@ -260,12 +272,15 @@ public class ClayPlanner {
 	
 	private String printClump(Clump clump) {
 		StringBuilder sb = new StringBuilder("[");
+		int count = 0;
 		for (Vertex v : clump.getVertices()) {
-			sb.append(String.format("%d (%d), ", v.getId(), v.getPartId()));
+			sb.append(String.format("%d (%d, %f, %f), ", v.getId(), v.getPartId(),
+					v.getVertexWeight(), v.getEdgeWeight()));
+			count++;
+			if (count >= 5)
+				break;
 		}
-		sb.deleteCharAt(sb.length() - 1);
-		sb.deleteCharAt(sb.length() - 1);
-		sb.append("]");
+		sb.append(String.format("size: %d]", clump.getVertices().size()));
 		
 		return sb.toString();
 	}

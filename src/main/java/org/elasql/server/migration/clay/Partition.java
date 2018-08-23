@@ -44,7 +44,7 @@ public class Partition implements Comparable<Partition> {
 		localLoad += v.getVertexWeight();
 		for (OutEdge e : v.getOutEdges().values())
 			if (e.getOpposite().getPartId() != partId)
-				crossPartLoad += v.getEdgeWeight();
+				crossPartLoad += e.getWeight();
 		vertices.add(v);
 	}
 

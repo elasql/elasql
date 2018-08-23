@@ -49,13 +49,13 @@ public class Vertex implements Comparable<Vertex> {
 	}
 
 	public double getVertexWeight() {
-		return (double) this.weight / MigrationManager.MONITORING_TIME;
+		return (double) weight / MigrationManager.MONITORING_TIME;
 	}
 
 	public double getEdgeWeight() {
 		double w = 0.0;
 		for (OutEdge e : edges.values())
-			w += ((double) e.getWeight()) / MigrationManager.MONITORING_TIME;
+			w += e.getWeight();
 		return w;
 	}
 

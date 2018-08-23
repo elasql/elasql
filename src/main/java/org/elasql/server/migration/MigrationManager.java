@@ -207,7 +207,7 @@ public abstract class MigrationManager {
 				// XXX: Debug - perfect migration plans
 //				queuedMigrations = goodPlans();
 				
-				if (queuedMigrations != null) {
+				if (queuedMigrations != null && !queuedMigrations.isEmpty()) {
 					MigrationPlan plan = queuedMigrations.remove(0);
 					if (logger.isLoggable(Level.INFO))
 						logger.info("Broadcasting the migration plan: " + plan);
