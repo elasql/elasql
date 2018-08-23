@@ -26,7 +26,7 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
-	public static final boolean IS_SCALING_OUT = true;
+	public static final boolean IS_SCALING_OUT = false;
 	private static final boolean SCALING_FLAG = true;
 	private static boolean isScaled = false;
 	
@@ -202,7 +202,10 @@ public abstract class MigrationManager {
 		VanillaDb.taskMgr().runTask(new Task() {
 			@Override
 			public void run() {
-				queuedMigrations = clayPlanner.generateMigrationPlan();
+				if (IS_SCALING_OUT)
+					queuedMigrations = clayPlanner.generateMigrationPlan();
+				else
+					queuedMigrations = clayPlanner.generateConsolidationPlan();
 				
 				// XXX: Debug - perfect migration plans
 //				queuedMigrations = goodPlans();

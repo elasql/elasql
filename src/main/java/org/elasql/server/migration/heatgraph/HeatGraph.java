@@ -36,7 +36,8 @@ public class HeatGraph {
 			partitions.add(new Partition(i));
 
 		for (Vertex v : vertices.values())
-			partitions.get(v.getPartId()).addVertex(v);
+			if (v.getPartId() < MigrationManager.currentNumOfPartitions())
+				partitions.get(v.getPartId()).addVertex(v);
 		
 		return partitions;
 	}

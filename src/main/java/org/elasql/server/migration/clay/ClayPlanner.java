@@ -1,6 +1,7 @@
 package org.elasql.server.migration.clay;
 
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -65,6 +66,28 @@ public class ClayPlanner {
 		}
 		
 		return null;
+	}
+	
+	// XXX: Only for multi-tanents
+	public List<MigrationPlan> generateConsolidationPlan() {
+		if (numOfClumpsGenerated > 0)
+			return null;
+		
+		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
+		List<Partition> partitions = heatGraph.splitToPartitions();
+		adjustOverloadThreasdhold(partitions);
+		
+		Partition leastLoadPart = getLeastLoadPartition(partitions);
+		MigrationPlan plan = new MigrationPlan(3, leastLoadPart.getPartId());
+		int start = 300000 / MigrationManager.DATA_RANGE_SIZE;
+		int end = 400000 / MigrationManager.DATA_RANGE_SIZE;
+		for (int i = start; i < end; i++)
+			plan.addKey(i);
+		plans.add(plan);
+		
+		numOfClumpsGenerated++;
+		
+		return plans;
 	}
 	
 	private void adjustOverloadThreasdhold(List<Partition> partitions) {
