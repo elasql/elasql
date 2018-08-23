@@ -102,12 +102,15 @@ public class CalvinCacheMgr {
 
 		try {
 			// Wait for remote records
+//			Thread.currentThread().setName("Tx." +
+//					tx.getTransactionNumber() + " waits for " + key + " from network");
 			KeyRecordPair pair = inbox.take();
 			while (!pair.key.equals(key)) {
 				cachedRecords.put(pair.key, pair.record);
 				pair = inbox.take();
 			}
 			rec = pair.record;
+//			Thread.currentThread().setName("Tx." + tx.getTransactionNumber());
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

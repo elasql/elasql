@@ -55,7 +55,7 @@ public class Vertex implements Comparable<Vertex> {
 	public double getEdgeWeight() {
 		double w = 0.0;
 		for (OutEdge e : edges.values())
-			w += ((double) e.weight()) / MigrationManager.MONITORING_TIME;
+			w += ((double) e.getWeight()) / MigrationManager.MONITORING_TIME;
 		return w;
 	}
 
@@ -66,8 +66,8 @@ public class Vertex implements Comparable<Vertex> {
 	public int toMetis(StringBuilder sb) {
 		sb.append(weight + "");
 		for (OutEdge o : edges.values()) {
-			sb.append(" " + (o.opposite().id + 1));
-			sb.append(" " + o.weight());
+			sb.append(" " + (o.getOpposite().id + 1));
+			sb.append(" " + o.getWeight());
 		}
 		sb.append("\n");
 		return edges.size();
@@ -76,7 +76,7 @@ public class Vertex implements Comparable<Vertex> {
 	public String toString() {
 		String str = "Vertex id : " + this.id + " Weight :" + this.weight + "\n";
 		for (OutEdge e : edges.values()) {
-			str = str + e.opposite().id + " w: " + e.weight() + "\n ";
+			str = str + e.getOpposite().id + " w: " + e.getWeight() + "\n ";
 		}
 		return str;
 	}

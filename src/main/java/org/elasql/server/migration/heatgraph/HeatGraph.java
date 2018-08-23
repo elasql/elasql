@@ -7,8 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.elasql.server.migration.MigrationManager;
-import org.elasql.server.migration.Partition;
-import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.server.migration.clay.Partition;
 
 public class HeatGraph {
 	
@@ -45,7 +44,7 @@ public class HeatGraph {
 	public void removeVertex(Vertex v) {
 		vertices.remove(v.getId());
 		for (OutEdge e : v.getOutEdges().values())
-			e.opposite().getOutEdges().remove(v.getId());
+			e.getOpposite().getOutEdges().remove(v.getId());
 	}
 	
 	public Vertex getVertex(Integer id) {

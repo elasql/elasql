@@ -118,6 +118,8 @@ public class ConservativeOrderedLockTable {
 				Long head = lockers.requestQueue.peek();
 				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
 
+//					Thread.currentThread().setName("Tx." + txNum +
+//							" waits for sLock on " + obj);
 					anchor.wait();
 
 					// Since a transaction may delete the lockers of an object
@@ -126,6 +128,9 @@ public class ConservativeOrderedLockTable {
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
+
+//				Thread.currentThread().setName("Tx." + txNum);
+				
 				if (!sLockable(lockers, txNum))
 					throw new LockAbortException();
 

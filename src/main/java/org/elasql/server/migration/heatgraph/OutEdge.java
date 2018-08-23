@@ -14,11 +14,11 @@ public class OutEdge implements Comparable<OutEdge> {
 		this.weight++;
 	}
 	
-	public int weight() {
+	public int getWeight() {
 		return weight;
 	}
 	
-	public Vertex opposite() {
+	public Vertex getOpposite() {
 		return opposite;
 	}
 

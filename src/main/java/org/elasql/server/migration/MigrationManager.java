@@ -17,6 +17,7 @@ import java.util.logging.Logger;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.clay.ClayPlanner;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.VanillaDb;
@@ -32,8 +33,7 @@ public abstract class MigrationManager {
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
 			30 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
-	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 10; // [Schism: Clay]
-	public static final double LOADING_FACTOR = 0.5; // similar to term "k" in the paper
+	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 20; // [Schism: Clay]
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -59,7 +59,7 @@ public abstract class MigrationManager {
 	private AtomicBoolean analysisCompleted = new AtomicBoolean(false);
 
 	// Async pushing
-	private static int PUSHING_COUNT = 5000;
+	private static int PUSHING_COUNT = 100;
 	private static final int PUSHING_BYTE_COUNT = 4000000;
 	private ConcurrentLinkedQueue<RecordKey> skipRequestQueue = new ConcurrentLinkedQueue<RecordKey>();
 	private Map<String, Set<RecordKey>> bgPushCandidates = new HashMap<String, Set<RecordKey>>();
@@ -68,7 +68,7 @@ public abstract class MigrationManager {
 	private boolean backPushStarted = false;
 	//private boolean isSourceNode;
 
-	// Clay structure
+	// Migration
 	private int sourceNode, destNode;
 	private boolean isSeqNode;
 	
@@ -85,20 +85,15 @@ public abstract class MigrationManager {
 	private static AtomicBoolean isMonitoring = new AtomicBoolean(false);
 	private static AtomicBoolean isClayOperating = new AtomicBoolean(false);
 	
-	// XXX: This is not in the original design of Clay.
-	// This records how much clump have been migrated.
-	// And we give it a maximum # of epochs to limit the number.
-	// The original design is to use another metric (loading) to decide
-	// if we need to migrate more clumps. 
-//	private int clayEpoch = 0;
-	private ClayController clayControl;
+	private ClayPlanner clayPlanner;
+	private WorkloadMonitor workloadMonitor;
 	private List<MigrationPlan> queuedMigrations;
 
 	public MigrationManager(long printStatusPeriod, int nodeId) {
 		this.sourceNode = 0;
 		this.destNode = 1;
-		this.clayControl = new ClayController(this);
 		this.isSeqNode = (nodeId == ConnectionMgr.SEQ_NODE_ID);
+		this.workloadMonitor = new WorkloadMonitor(this);
 	}
 	
 	public void scheduleControllerThread() {
@@ -158,17 +153,16 @@ public abstract class MigrationManager {
 	// Caller: scheduler thread on the sequencer node
 	public void startMonitoring() {
 		if (logger.isLoggable(Level.INFO)) {
-			if (PartitionMetaMgr.USE_SCHISM)
-				logger.info("Schism Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
-			else
-				logger.info("Clay Start Monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
+			logger.info("migration manager starts monitoring at " + 
+					(System.currentTimeMillis() - startTime) / 1000);
 		}
 		
-		if (PartitionMetaMgr.USE_SCHISM) {
-			// TODO: Schism
-		} else {
-			clayControl.reset();
-		}
+		// TODO: We should not need this anymore. Check if we can remove this code.
+//		if (PartitionMetaMgr.USE_SCHISM) {
+//			// TODO: Schism
+//		} else {
+//			workloadMonitor = new WorkloadMonitor(this);
+//		}
 		isMonitoring.set(true);
 		isClayOperating.set(true);
 		MONITOR_STOP_TIME = System.currentTimeMillis() + MONITORING_TIME;
@@ -176,7 +170,7 @@ public abstract class MigrationManager {
 	
 	// Caller: scheduler thread on the sequencer node
 	public void analyzeTransactionRequest(Collection<RecordKey> keys) {
-		clayControl.addToHeatGraph(keys);
+		workloadMonitor.recordATransaction(keys);
 		
 		if (System.currentTimeMillis() > MONITOR_STOP_TIME) {
 			stopMonitoring();
@@ -185,7 +179,7 @@ public abstract class MigrationManager {
 	
 	private void stopMonitoring() {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("Migration manager stops monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
+			logger.info("migration manager stops monitoring at " + (System.currentTimeMillis() - startTime) / 1000);
 
 		isMonitoring.set(false);
 		
@@ -195,6 +189,7 @@ public abstract class MigrationManager {
 		} else {
 			if (SCALING_FLAG)
 				isScaled = true;
+			clayPlanner = new ClayPlanner(workloadMonitor.retrieveHeatGraphAndReset());
 			generateMigrationPlans();
 		}
 	}
@@ -207,13 +202,48 @@ public abstract class MigrationManager {
 		VanillaDb.taskMgr().runTask(new Task() {
 			@Override
 			public void run() {
-				queuedMigrations = clayControl.generateMigrationPlan();
-				MigrationPlan plan = queuedMigrations.remove(0);
-				if (logger.isLoggable(Level.INFO))
-					logger.info("Broadcasting the migration plan: " + plan);
-				broadcastMigrateKeys(plan.toStoredProcedureRequest());
+				queuedMigrations = clayPlanner.generateMigrationPlan();
+				
+				// XXX: Debug - perfect migration plans
+//				queuedMigrations = goodPlans();
+				
+				if (queuedMigrations != null) {
+					MigrationPlan plan = queuedMigrations.remove(0);
+					if (logger.isLoggable(Level.INFO))
+						logger.info("Broadcasting the migration plan: " + plan);
+					broadcastMigrateKeys(plan.toStoredProcedureRequest());
+				} else {
+					if (logger.isLoggable(Level.INFO))
+						logger.info("Clay finishes all its jobs at " +
+								(System.currentTimeMillis() - startTime) / 1000 + " secs");
+					isClayOperating.set(false);
+				}
 			}
 		});
+	}
+	
+	private List<MigrationPlan> goodPlans() {
+		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
+		
+		// Move tanent 0 to partition 3
+		MigrationPlan p = new MigrationPlan(0, 3);
+		for (int k = 0; k < 2500; k++)
+			p.addKey(k);
+		plans.add(p);
+		
+		// Move tanent 4 to partition 3
+		p = new MigrationPlan(1, 3);
+		for (int k = 10000; k < 12500; k++)
+			p.addKey(k);
+		plans.add(p);
+		
+		// Move tanent 8 to partition 3
+		p = new MigrationPlan(2, 3);
+		for (int k = 20000; k < 22500; k++)
+			p.addKey(k);
+		plans.add(p);
+		
+		return plans;
 	}
 	
 	private void triggerNextMigration() {
@@ -222,13 +252,8 @@ public abstract class MigrationManager {
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Broadcasting the migration plan: " + plan);
 			broadcastMigrateKeys(plan.toStoredProcedureRequest());
-		} else if (clayControl.hasMorePlans()) {
-			generateMigrationPlans();
 		} else {
-			if (logger.isLoggable(Level.INFO))
-				logger.info("Clay finishes all its jobs at " +
-						(System.currentTimeMillis() - startTime) / 1000 + " secs");
-			isClayOperating.set(false);
+			generateMigrationPlans();
 		}
 	}
 
@@ -244,7 +269,7 @@ public abstract class MigrationManager {
 	public abstract int retrieveIdAsInt(RecordKey k);
 	
 	public boolean keyIsInMigrationRange(RecordKey key) {
-		return migrateRanges.contains(clayControl.mapToVertexId(retrieveIdAsInt(key)));
+		return migrateRanges.contains(workloadMonitor.mapToVertexId(retrieveIdAsInt(key)));
 	}
 	
 	/**
