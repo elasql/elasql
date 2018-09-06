@@ -25,9 +25,10 @@ import org.vanilladb.core.server.task.Task;
 
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
-	
-	public static final boolean IS_SCALING_OUT = true;
+
 	public static final boolean SCALING_FLAG = false;
+	public static final boolean IS_SCALING_OUT = true;
+	public static final boolean ENABLE_COLD_SCALING = false;
 	private static boolean isScaled = false;
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
@@ -85,6 +86,8 @@ public abstract class MigrationManager {
 	// Current States
 	private static AtomicBoolean isMonitoring = new AtomicBoolean(false);
 	private static AtomicBoolean isClayOperating = new AtomicBoolean(false);
+	private static AtomicBoolean isColdMigrated = new AtomicBoolean(false); // for scaling-out
+	private static AtomicBoolean isConsolidated = new AtomicBoolean(false);
 	
 	private ClayPlanner clayPlanner;
 	private WorkloadMonitor workloadMonitor;
@@ -203,10 +206,17 @@ public abstract class MigrationManager {
 		VanillaDb.taskMgr().runTask(new Task() {
 			@Override
 			public void run() {
-				if (IS_SCALING_OUT)
-					queuedMigrations = clayPlanner.generateMigrationPlan();
-				else
-					queuedMigrations = clayPlanner.generateConsolidationPlan();
+				if (IS_SCALING_OUT) {
+					if (ENABLE_COLD_SCALING && !isColdMigrated.get()) {
+						queuedMigrations = generateColdMigrationPlans();
+					} else
+						queuedMigrations = clayPlanner.generateMigrationPlan();
+				} else {
+					if (isConsolidated.get())
+						queuedMigrations = clayPlanner.generateMigrationPlan();
+					else
+						queuedMigrations = clayPlanner.generateConsolidationPlan();
+				}
 				
 				// XXX: Debug - perfect migration plans
 //				queuedMigrations = goodPlans();
@@ -217,13 +227,33 @@ public abstract class MigrationManager {
 						logger.info("Broadcasting the migration plan: " + plan);
 					broadcastMigrateKeys(plan.toStoredProcedureRequest());
 				} else {
-					if (logger.isLoggable(Level.INFO))
-						logger.info("Clay finishes all its jobs at " +
-								(System.currentTimeMillis() - startTime) / 1000 + " secs");
-					isClayOperating.set(false);
+					finishClay();
 				}
 			}
 		});
+	}
+	
+	private void finishClay() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Clay finishes all its jobs at " +
+					(System.currentTimeMillis() - startTime) / 1000 + " secs");
+		isClayOperating.set(false);
+	}
+	
+	private List<MigrationPlan> generateColdMigrationPlans() {
+		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
+		
+		for (int partId = 0; partId < 3; partId++) {
+			int startId = (partId * 100000) / DATA_RANGE_SIZE;
+			int endId = (partId * 100000 + 25000 - 1) / DATA_RANGE_SIZE;
+			
+			MigrationPlan p = new MigrationPlan(partId, 3);
+			for (int k = startId; k <= endId; k++)
+				p.addKey(k);
+			plans.add(p);
+		}
+		
+		return plans;
 	}
 	
 	private List<MigrationPlan> goodPlans() {
@@ -257,6 +287,18 @@ public abstract class MigrationManager {
 				logger.info("Broadcasting the migration plan: " + plan);
 			broadcastMigrateKeys(plan.toStoredProcedureRequest());
 		} else {
+			if (IS_SCALING_OUT && ENABLE_COLD_SCALING && !isColdMigrated.get()) {
+				isColdMigrated.set(true);
+				finishClay();
+				sendLaunchClayReq(null);
+				return;
+			} else if (!IS_SCALING_OUT && !isConsolidated.get()) {
+				isConsolidated.set(true);
+				finishClay();
+				sendLaunchClayReq(null);
+				return;
+			}
+			
 			generateMigrationPlans();
 		}
 	}
@@ -485,7 +527,12 @@ public abstract class MigrationManager {
 	}
 	
 	public void onRecvNextMigrationRequest() {
-		triggerNextMigration();
+		VanillaDb.taskMgr().runTask(new Task() {
+			@Override
+			public void run() {
+				triggerNextMigration();
+			}
+		});
 	}
 
 	public boolean isAnalyzing() {
