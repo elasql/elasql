@@ -26,20 +26,21 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 	
-	public static final boolean IS_SCALING_OUT = false;
-	private static final boolean SCALING_FLAG = true;
+	public static final boolean IS_SCALING_OUT = true;
+	public static final boolean SCALING_FLAG = false;
 	private static boolean isScaled = false;
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
 			30 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
-	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 20; // [Schism: Clay]
+	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 50; // [Schism: Clay]
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
 	public static final int SINK_ID_ANALYSIS = -777;
 	public static final int SINK_ID_ASYNC_PUSHING = -888;
 	public static final int SINK_ID_STOP_MIGRATION = -999;
+	public static final int SINK_ID_NEXT_MIGRATION = -1111;
 
 	public static long startTime = System.currentTimeMillis();
 
@@ -481,9 +482,10 @@ public abstract class MigrationManager {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Migration completes at " +
 					(System.currentTimeMillis() - startTime) / 1000 + " secs");
-		
-		if (isSeqNode)
-			triggerNextMigration();
+	}
+	
+	public void onRecvNextMigrationRequest() {
+		triggerNextMigration();
 	}
 
 	public boolean isAnalyzing() {

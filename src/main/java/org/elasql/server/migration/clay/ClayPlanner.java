@@ -15,13 +15,13 @@ import org.elasql.server.migration.heatgraph.Vertex;
 public class ClayPlanner {
 	private static Logger logger = Logger.getLogger(ClayPlanner.class.getName());
 	
-	public static final int MULTI_PARTS_COST = 5; // term 'k' in Clay's paper
+	public static final int MULTI_PARTS_COST = 50; // term 'k' in Clay's paper
 //	public static final double OVERLOAD_THREASDHOLD = 15; // term 'theta' in Clay's paper
-	public static final double OVERLOAD_PERCENTAGE = 1.2; // For multi-tanents
-//	public static final double OVERLOAD_PERCENTAGE = 2.0; // For Google workloads
-	private static final int LOOK_AHEAD_MAX = 20;
-//	private static final int CLUMP_MAX_SIZE = 200; // For Google workloads
-	private static final int CLUMP_MAX_SIZE = 10000; // For multi-tanents
+//	public static final double OVERLOAD_PERCENTAGE = 1.2; // For multi-tanents
+	public static final double OVERLOAD_PERCENTAGE = 1.5; // For Google workloads
+	private static final int LOOK_AHEAD_MAX = 5;
+	private static final int CLUMP_MAX_SIZE = 20; // For Google workloads
+//	private static final int CLUMP_MAX_SIZE = 10000; // For multi-tanents
 	
 	private HeatGraph heatGraph;
 	private int numOfClumpsGenerated = 0;
@@ -128,8 +128,10 @@ public class ClayPlanner {
 				candidateClump.setDestination(destPart.getPartId());
 				
 //				System.out.println("Expanded clump: " + printClump(candidateClump));
+//				System.out.println("Expanded clump size: " + candidateClump.size());
 //				System.out.println(String.format("Delta for recv part %d: %f", destPart.getPartId(),
 //						calcRecvLoadDelta(candidateClump, destPart.getPartId())));
+//				System.out.println(String.format("Is feasible ? %s", isFeasible(candidateClump, destPart)));
 //				System.out.println(String.format("Delta for sender part %d: %f", addedVertex.getPartId(),
 //						calcSendLoadDelta(candidateClump, addedVertex.getPartId())));
 			}

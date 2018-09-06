@@ -115,6 +115,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	private boolean islog = false;
 	private Map<RecordKey, CachedRecord> readings;
+	
+	private int sourcePart, destPart;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
@@ -122,7 +124,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		this.localNodeId = Elasql.serverId();
 		// Becareful with this
 		this.isSourceNode = (localNodeId == migraMgr.getSourcePartition());
+		this.sourcePart = migraMgr.getSourcePartition();
 		this.isDestNode = (localNodeId == migraMgr.getDestPartition());
+		this.destPart = migraMgr.getDestPartition();
 		this.isSeqNode = (localNodeId == ConnectionMgr.SEQ_NODE_ID);
 		if (paramHelper == null)
 			throw new NullPointerException("paramHelper should not be null");
@@ -373,6 +377,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	@Override
 	public SpResultSet execute() {
+//		Thread.currentThread().setName("Tx." + txNum + ": " + getClass().getSimpleName());
+		
 		try {
 			// Get conservative locks it has asked before
 			getConservativeLocks();
@@ -468,6 +474,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 * this method follows the steps described by Calvin paper.
 	 */
 	protected void executeTransactionLogic() {
+		
+//		System.out.println("Tx." + txNum + " starts. Locals: " + localReadKeys +
+//				", remotes: " + remoteReadKeys + ", isSource: " + isSourceNode +
+//				", isDest: " + isDestNode + ", pulls: " + pullKeys + ", migrating: " + readKeysInMigration +
+//				", isMigraTx: " + isMigrationTx);
 
 		// Read the local records
 		// Map<RecordKey, CachedRecord>
@@ -547,6 +558,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			localReadKeys.add(readKey);
 		else
 			remoteReadKeys.add(readKey);
+		
 		// Squall part
 		if (isInMigrating) {
 			if (migraMgr.keyIsInMigrationRange(readKey)) {
@@ -700,8 +712,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 			// Push to all active participants
 			for (Integer n : activeParticipants)
-				if (n != localNodeId)
+				if (n != localNodeId) {
 					Elasql.connectionMgr().pushTupleSet(n, ts);
+				}
 		}
 	}
 
@@ -715,7 +728,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	// Only for the source node
 	private void pushMigrationData() {
-
+		
 		// System.out.println("Push data at Source");
 		// Wait for pull request
 		waitForPullRequest();
@@ -731,14 +744,14 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 
 		// Push migration data set
-		Elasql.connectionMgr().pushTupleSet(migraMgr.getDestPartition(), ts);
+		Elasql.connectionMgr().pushTupleSet(destPart, ts);
 	}
 
 	// Only for the destination node
 	private void pullMigrationData(Map<RecordKey, CachedRecord> readings) {
 		// System.out.println("Pull data at Destination");
 		// Send pull request
-		sendAPullRequest(migraMgr.getSourcePartition());
+		sendAPullRequest(sourcePart);
 
 		// Receiving migration data set
 		for (RecordKey k : pullKeys) {
@@ -756,43 +769,4 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		Collections.sort(l);
 		return l;
 	}
-
-	public static void main(String[] a) {
-
-		Set<RecordKey> set = new HashSet<RecordKey>();
-		HashMap<String, Constant> tmp = new HashMap<String, Constant>();
-		tmp.put("i_id", new IntegerConstant(1));
-		RecordKey tmpK = new RecordKey("item", tmp);
-		set.add(tmpK);
-		tmp = new HashMap<String, Constant>();
-		tmp.put("i_id", new IntegerConstant(2));
-		tmpK = new RecordKey("item", tmp);
-		set.add(tmpK);
-		tmp = new HashMap<String, Constant>();
-		tmp.put("i_id", new IntegerConstant(3));
-		tmpK = new RecordKey("item", tmp);
-		set.add(tmpK);
-		tmp = new HashMap<String, Constant>();
-		tmp.put("i_id", new IntegerConstant(4));
-		tmpK = new RecordKey("item", tmp);
-		set.add(tmpK);
-
-		Set<RecordKey> set2 = new HashSet<RecordKey>();
-		tmp = new HashMap<String, Constant>();
-		tmp.put("i_id", new IntegerConstant(3));
-		tmpK = new RecordKey("item", tmp);
-		set2.add(tmpK);
-		tmp = new HashMap<String, Constant>();
-		tmp.put("i_id", new IntegerConstant(4));
-		tmpK = new RecordKey("item", tmp);
-		set2.add(tmpK);
-		tmp = new HashMap<String, Constant>();
-		tmp.put("i_id", new IntegerConstant(5));
-		tmpK = new RecordKey("item", tmp);
-		set2.add(tmpK);
-
-		set.removeAll(set2);
-		System.out.println(set);
-	}
-
 }

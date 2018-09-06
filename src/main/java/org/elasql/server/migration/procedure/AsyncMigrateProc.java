@@ -22,6 +22,8 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 	private static Constant FALSE = new IntegerConstant(0);
 	private static Constant TRUE = new IntegerConstant(1);
+	
+	private int sourcePart, destPart;
 
 	public AsyncMigrateProc(long txNum) {
 		super(txNum, new AsyncMigrateParamHelper());
@@ -38,13 +40,15 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 		isAsyncMigrateProc = true;
 		
 		// isBgPush = true;
+		sourcePart = Elasql.migrationMgr().getSourcePartition();
+		destPart = Elasql.migrationMgr().getDestPartition();
 	}
 
 	@Override
 	protected void executeTransactionLogic() {
-		if (Elasql.serverId() == Elasql.migrationMgr().getSourcePartition())
+		if (Elasql.serverId() == sourcePart)
 			executeSourceLogic();
-		else if (Elasql.serverId() == Elasql.migrationMgr().getDestPartition())
+		else if (Elasql.serverId() == destPart)
 			executeDestLogic();
 
 		if (logger.isLoggable(Level.INFO))
@@ -53,9 +57,9 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 	@Override
 	protected void afterCommit() {
-		if (Elasql.serverId() == Elasql.migrationMgr().getDestPartition()) {
+		if (Elasql.serverId() == destPart) {
 			TupleSet ts = new TupleSet(MigrationManager.SINK_ID_ASYNC_PUSHING);
-			Elasql.connectionMgr().pushTupleSet(Elasql.migrationMgr().getSourcePartition(), ts);
+			Elasql.connectionMgr().pushTupleSet(sourcePart, ts);
 		}
 	}
 	
@@ -112,7 +116,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 					+ " records to the dest. node.\nFirst record: " + paramHelper.getPushingKeys()[0]);
 
 		// Push to the destination
-		Elasql.connectionMgr().pushTupleSet(Elasql.migrationMgr().getDestPartition(), ts);
+		Elasql.connectionMgr().pushTupleSet(destPart, ts);
 	}
 
 	private void executeDestLogic() {
@@ -121,7 +125,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 		// For Squall: Pulling-based migration
 		// Send a pull request
-		sendAPullRequest(Elasql.migrationMgr().getSourcePartition());
+		sendAPullRequest(sourcePart);
 		
 		// Receive the data from the source node and save them
 		for (RecordKey key : paramHelper.getPushingKeys()) {

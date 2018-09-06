@@ -129,6 +129,8 @@ public class ConnectionMgr
 			case MigrationManager.SINK_ID_STOP_MIGRATION:
 				Elasql.migrationMgr().onReceiveStopMigrateReq(ts.getMetadata());
 				break;
+			case MigrationManager.SINK_ID_NEXT_MIGRATION:
+				Elasql.migrationMgr().onRecvNextMigrationRequest();
 			}
 			if (ts.sinkId() == -2)
 				System.out.println("Receieve Async push data at ConnectMgr");

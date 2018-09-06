@@ -17,7 +17,11 @@ package org.elasql.procedure.calvin;
 
 import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.procedure.StoredProcedureTask;
+import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
+import org.elasql.server.migration.MigrationManager;
+import org.elasql.server.migration.procedure.StopMigrationProc;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.util.Timer;
 
@@ -54,8 +58,14 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 		}
 
 		if (csp.willResponseToClients()) {
-			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+			if (sp.getClass().equals(StopMigrationProc.class)) {
+				TupleSet ts = new TupleSet(MigrationManager.SINK_ID_NEXT_MIGRATION);
+				Elasql.connectionMgr().pushTupleSet(ConnectionMgr.SEQ_NODE_ID, ts);
+			} else
+				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 		}
+		
+//		Thread.currentThread().setName("Idle");
 
 		// For Debugging
 		// System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
