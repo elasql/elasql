@@ -19,6 +19,7 @@ import org.elasql.schedule.tpart.sink.PushInfo;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
@@ -81,12 +82,33 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// create a local cache
 		cache = new TPartTxLocalCache(tx);
+		
+		// register locks
+		bookConservativeLocks();
+	}
+
+	public void bookConservativeLocks() {
+		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
+		
+		ccMgr.bookReadKeys(plan.getSinkReadingInfo());
+		for (Set<PushInfo> infos : plan.getSinkPushingInfo().values())
+			for (PushInfo info : infos)
+				ccMgr.bookReadKey(info.getRecord());
+		ccMgr.bookWriteKeys(plan.getLocalWriteBackInfo());
+		ccMgr.bookWriteKeys(plan.getCacheDeletions());
+	}
+
+	private void getConservativeLocks() {
+		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
+		
+		ccMgr.requestLocks();
 	}
 
 	@Override
 	public SpResultSet execute() {
 		try {
-			// Execute transaction
+			getConservativeLocks();
+			
 			executeTransactionLogic();
 
 			tx.commit();

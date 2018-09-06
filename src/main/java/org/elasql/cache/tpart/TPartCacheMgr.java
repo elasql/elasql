@@ -33,7 +33,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 
 //	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
-	private static LocalStorageLockTable lockTable = new LocalStorageLockTable();
+//	private static LocalStorageLockTable lockTable = new LocalStorageLockTable();
 
 	private Map<CachedEntryKey, CachedRecord> exchange;
 	
@@ -78,12 +78,15 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		synchronized (prepareAnchor(k)) {
 			try {
 				// Debug: Tracing the waiting key
-//				Thread.currentThread().setName("Tx." + dest + " waits for " + key
+//				Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
 //						+ " from tx." + src);
 				// wait if the record has not delivered
 				while (!exchange.containsKey(k)) {
 					prepareAnchor(k).wait();
 				}
+				
+//				Thread.currentThread().setName("Tx." + dest);
+				
 				return exchange.remove(k);
 			} catch (InterruptedException e) {
 				throw new RuntimeException();
@@ -110,7 +113,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	
 	CachedRecord readFromSink(RecordKey key, Transaction tx) {
 //		localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
-		lockTable.sLock(key, tx.getTransactionNumber());
+//		lockTable.sLock(key, tx.getTransactionNumber());
 		
 		CachedRecord rec = null;
 		
@@ -124,7 +127,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			rec = VanillaCoreCrud.read(key, tx);
 		
 //		localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
-		lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
+//		lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
 		
 		if (rec == null)
 			throw new RuntimeException("Tx." + tx.getTransactionNumber()
@@ -134,8 +137,8 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 	
 	Map<RecordKey, CachedRecord> batchReadFromSink(Set<RecordKey> keys, Transaction tx) {
-		for (RecordKey key : keys)
-			lockTable.sLock(key, tx.getTransactionNumber());
+//		for (RecordKey key : keys)
+//			lockTable.sLock(key, tx.getTransactionNumber());
 		
 		Map<RecordKey, CachedRecord> records = new HashMap<RecordKey, CachedRecord>();
 		
@@ -159,36 +162,36 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			records.putAll(localReads);
 		}
 		
-		for (RecordKey key : keys)
-			lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
+//		for (RecordKey key : keys)
+//			lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
 		
 		return records;
 	}
 	
 	void insertToCache(RecordKey key, CachedRecord rec, long txNum) {
 //		localCcMgr.beforeWriteBack(key, txNum);
-		lockTable.xLock(key, txNum);
+//		lockTable.xLock(key, txNum);
 		
 		recordCache.put(key, rec);
 		
 //		localCcMgr.afterWriteback(key, txNum);
-		lockTable.release(key, txNum, LockType.X_LOCK);
+//		lockTable.release(key, txNum, LockType.X_LOCK);
 	}
 	
 	void deleteFromCache(RecordKey key, long txNum) {
 //		localCcMgr.beforeWriteBack(key, txNum);
-		lockTable.xLock(key, txNum);
+//		lockTable.xLock(key, txNum);
 		
 		if (recordCache.remove(key) == null)
 			throw new RuntimeException("There is no record for " + key + " in the cache");
 		
 //		localCcMgr.afterWriteback(key, txNum);
-		lockTable.release(key, txNum, LockType.X_LOCK);
+//		lockTable.release(key, txNum, LockType.X_LOCK);
 	}
 	
 	void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
 //		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
-		lockTable.xLock(key, tx.getTransactionNumber());
+//		lockTable.xLock(key, tx.getTransactionNumber());
 		
 		// Check if there is corresponding keys in the cache
 		if (recordCache.containsKey(key))
@@ -198,13 +201,13 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			writeToVanillaCore(key, rec, tx);
 		
 //		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
-		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
+//		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
 	}
 	
 	// This is also a type of writeback
 	void insertToLocalStorage(RecordKey key, CachedRecord rec, Transaction tx) {
 //		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
-		lockTable.xLock(key, tx.getTransactionNumber());
+//		lockTable.xLock(key, tx.getTransactionNumber());
 		
 		// Check if there is corresponding keys in the cache
 		if (recordCache.containsKey(key))
@@ -215,18 +218,18 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		VanillaCoreCrud.insert(key, rec, tx);
 		
 //		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
-		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
+//		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
 	}
 	
-	public void registerSinkReading(RecordKey key, long txNum) {
+//	public void registerSinkReading(RecordKey key, long txNum) {
 //		localCcMgr.requestSinkRead(key, txNum);
-		lockTable.requestLock(key, txNum);
-	}
+//		lockTable.requestLock(key, txNum);
+//	}
 
-	public void registerSinkWriteback(RecordKey key, long txNum) {
+//	public void registerSinkWriteback(RecordKey key, long txNum) {
 //		localCcMgr.requestWriteBack(key, txNum);
-		lockTable.requestLock(key, txNum);
-	}
+//		lockTable.requestLock(key, txNum);
+//	}
 	
 	private void writeToVanillaCore(RecordKey key, CachedRecord rec, Transaction tx) {
 		if (rec.isDeleted())

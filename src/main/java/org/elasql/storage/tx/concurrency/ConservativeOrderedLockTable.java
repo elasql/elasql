@@ -105,7 +105,7 @@ public class ConservativeOrderedLockTable {
 	 */
 	void sLock(Object obj, long txNum) {
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -116,16 +116,22 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+//				String name = Thread.currentThread().getName();
+				
 				/*
 				 * If this transaction is not the first one requesting this
 				 * object or it cannot get lock on this object, it must wait.
 				 */
 				Long head = lockers.requestQueue.peek();
-				while (!sLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
-
-					anchor.wait();
+				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
 					
+//					long target = lockers.xLocker;
+//					if (target == -1)
+//						target = head;
+//					Thread.currentThread().setName(name + " waits for slock of " + obj + " from tx." + target);
+					
+					anchor.wait();
+
 					// Since a transaction may delete the lockers of an object
 					// after releasing them, it should call prepareLockers()
 					// here, instead of using lockers it obtains earlier.
@@ -133,17 +139,22 @@ public class ConservativeOrderedLockTable {
 					head = lockers.requestQueue.peek();
 				}
 
+//				Thread.currentThread().setName(name);
+				
+				if (!sLockable(lockers, txNum))
+					throw new LockAbortException();
+
 				// get the s lock
 				lockers.requestQueue.poll();
 				lockers.sLockers.add(txNum);
 
-				// Wake up other waiting transactions (on this object) to let them
+				// Wake up other waiting transactions (on this object) to let
+				// them
 				// fight for the lockers on this object.
 				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}
@@ -161,9 +172,9 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void xLock(Object obj, long txNum) {
-		// See the comments in sLock(..) for the explanation of the algorithm 
+		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -173,23 +184,37 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+//				String name = Thread.currentThread().getName();
+				
+				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
-				while (!xLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
+				/* && !waitingTooLong(timestamp) */) {
+					
+//					long target = lockers.xLocker;
+//					if (target == -1 && !lockers.sLockers.isEmpty())
+//						target = lockers.sLockers.get(0);
+//					if (target == -1)
+//						target = head;
+//					Thread.currentThread().setName(name + " waits for xlock of " + obj + " from tx." + target);
+					
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
 
+//				Thread.currentThread().setName(name);
+				
+				// if (!xLockable(lockers, txNum))
+				// throw new LockAbortException();
 				// get the x lock
 				lockers.requestQueue.poll();
 				lockers.xLocker = txNum;
-				
+
 				// An X lock blocks all other lockers, so it don't need to
 				// wake up anyone.
 			} catch (InterruptedException e) {
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}

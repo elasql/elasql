@@ -116,6 +116,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 		
 		// Debug
 //		printGraphStatistics();
+//		System.out.println(graph);
 		
 		// Add the migration txs to the end of the batch
 		while (!migrationTasks.isEmpty()) {

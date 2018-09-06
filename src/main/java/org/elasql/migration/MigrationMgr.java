@@ -17,7 +17,8 @@ import org.elasql.storage.metadata.ScalingOutPartitionPlan;
 public abstract class MigrationMgr {
 	private static Logger logger = Logger.getLogger(MigrationMgr.class.getName());
 	
-	public static final boolean IS_SCALING_OUT = true;
+	public static final boolean IS_SCALING_OUT = false;
+	public static final boolean ENABLE_PARTITION_CHANGE = false;
 	
 	public static final int SP_MIGRATION_START = -101;
 	public static final int SP_COLD_MIGRATION = -102;
@@ -36,6 +37,10 @@ public abstract class MigrationMgr {
 	public void startMigrationTrigger() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Starts migration trigger thread.");
+		
+		if (!ENABLE_PARTITION_CHANGE)
+			return;
+		
 		new Thread(new Runnable() {
 
 			@Override

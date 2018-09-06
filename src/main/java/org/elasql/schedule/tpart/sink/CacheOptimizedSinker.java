@@ -89,14 +89,14 @@ public class CacheOptimizedSinker extends Sinker {
 					plan.addReadingInfo(e.getResourceKey(), srcTxn);
 
 					if (isLocalResource && e.getTarget().isSinkNode()) {
-						cm.registerSinkReading(e.getResourceKey(), txNum);
+//						cm.registerSinkReading(e.getResourceKey(), txNum);
 						plan.addSinkReadingInfo(e.getResourceKey());
 					}
 
 				} else if (isLocalResource && e.getTarget().isSinkNode()) {
 					// if is not local task and the source of the edge is sink
 					// node add the push tag to sinkPushTask
-					cm.registerSinkReading(e.getResourceKey(), txNum);
+//					cm.registerSinkReading(e.getResourceKey(), txNum);
 					plan.addSinkPushingInfo(e.getResourceKey(), node.getPartId(), node.getTxNum());
 				}
 			}
@@ -134,7 +134,7 @@ public class CacheOptimizedSinker extends Sinker {
 						if (sp.getMigrationRange().getDestPartId() == myId) {
 							plan.addStorageInsertion(k);
 							plan.addLocalWriteBackInfo(k);
-							cm.registerSinkWriteback(k, txNum);
+//							cm.registerSinkWriteback(k, txNum);
 						}
 					}
 					
@@ -167,9 +167,11 @@ public class CacheOptimizedSinker extends Sinker {
 							if(dataCurrentPos != dataOriginalPos &&
 									dataCurrentPos == myId) {
 								plan.addCacheDeletion(k);
+								
 								// Since the node does not have the write-back edge,
 								// we need to register the lock here.
-								cm.registerSinkWriteback(k, txNum);
+								// TODO: Think if we need a "write back deletion"
+//								cm.registerSinkWriteback(k, txNum);
 							}
 							
 							parMeta.setCurrentLocation(k, dataWriteBackPos);
@@ -178,7 +180,7 @@ public class CacheOptimizedSinker extends Sinker {
 						if (dataWriteBackPos == myId) {
 							// tell the task to write back local
 							plan.addLocalWriteBackInfo(k);
-							cm.registerSinkWriteback(k, txNum);
+//							cm.registerSinkWriteback(k, txNum);
 						} else {
 							// push the data if write back to remote
 							plan.addPushingInfo(k, dataWriteBackPos, TPartCacheMgr.toSinkId(dataWriteBackPos));
