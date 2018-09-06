@@ -11,6 +11,7 @@ import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.elasql.storage.metadata.RangePartitionPlan;
+import org.elasql.storage.metadata.ScalingInPartitionPlan;
 import org.elasql.storage.metadata.ScalingOutPartitionPlan;
 
 public abstract class MigrationMgr {
@@ -137,8 +138,9 @@ public abstract class MigrationMgr {
 			ScalingOutPartitionPlan scalingOutPlan = (ScalingOutPartitionPlan) newPartPlan;
 			targetRanges = scalingOutPlan.generateMigrationRanges(originalPlan, targetTable);
 		} else {
-			// FIXME
-//			targetRanges = newPartPlan.generateMigrationRanges(oldPartPlan, targetTable);
+			RangePartitionPlan originalPlan = (RangePartitionPlan) oldPartPlan;
+			ScalingInPartitionPlan scalingInPlan = (ScalingInPartitionPlan) newPartPlan;
+			targetRanges = scalingInPlan.generateMigrationRanges(originalPlan, targetTable);
 		}
 		
 		System.out.println("Ranges: " + targetRanges);
