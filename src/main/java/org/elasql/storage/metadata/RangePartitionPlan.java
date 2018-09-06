@@ -1,7 +1,10 @@
 package org.elasql.storage.metadata;
 
 import java.io.Serializable;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
+import org.elasql.migration.MigrationRange;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 
@@ -26,8 +29,9 @@ public class RangePartitionPlan extends PartitionPlan implements Serializable {
 		recsPerPart = numberOfRecords / numOfParts;
 	}
 	
-	public RangePartitionPlan scaleOut() {
-		return new RangePartitionPlan(partField, recsPerPart * numOfParts, numOfParts + 1);
+	public ScalingOutPartitionPlan scaleOut() {
+//		return new RangePartitionPlan(partField, recsPerPart * numOfParts, numOfParts + 1);
+		return new ScalingOutPartitionPlan(partField, recsPerPart * numOfParts, numOfParts);
 	}
 	
 	public RangePartitionPlan scaleIn() {
@@ -44,6 +48,7 @@ public class RangePartitionPlan extends PartitionPlan implements Serializable {
 		// Partitions each item id through mod.
 		Constant idCon = key.getKeyVal(partField);
 		if (idCon != null) {
+			// XXX: This parsing only works for YCSB
 			int id = Integer.parseInt((String) idCon.asJavaVal());
 			return (id - 1) / recsPerPart;
 		}
@@ -62,6 +67,38 @@ public class RangePartitionPlan extends PartitionPlan implements Serializable {
 	@Override
 	public int numberOfPartitions() {
 		return numOfParts;
+	}
+	
+	public Deque<MigrationRange> generateMigrationRanges(
+			RangePartitionPlan oldPartPlan, String targetTable) {
+		Deque<MigrationRange> ranges = new ArrayDeque<MigrationRange>();
+		
+		for (int oldPart = 0; oldPart < oldPartPlan.numOfParts; oldPart++) {
+			int oldStartId = oldPart * oldPartPlan.recsPerPart + 1;
+			int oldEndId = (oldPart + 1) * oldPartPlan.recsPerPart;
+			
+			for (int newPart = 0; newPart < numOfParts; newPart++) {
+				// We do not need to migrate the data on the same partition
+				if (oldPart == newPart)
+					continue;
+				
+				int newStartId = newPart * recsPerPart + 1;
+				int newEndId = (newPart + 1) * recsPerPart;
+				
+				// If there is no overlap, there would be nothing to be migrated.
+				if (oldStartId > newEndId || oldEndId < newStartId)
+					continue;
+				
+				// Take the overlapping range
+				int migrateStartId = Math.max(oldStartId, newStartId);
+				int migrateEndId = Math.min(oldEndId, newEndId);
+				
+				ranges.add(new MigrationRange(targetTable, partField, 
+						migrateStartId, migrateEndId, oldPart, newPart));
+			}
+		}
+		
+		return ranges;
 	}
 	
 	@Override

@@ -1,6 +1,5 @@
 package org.elasql.migration;
 
-import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.logging.Level;
@@ -10,7 +9,9 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
+import org.elasql.storage.metadata.PartitionPlan;
 import org.elasql.storage.metadata.RangePartitionPlan;
+import org.elasql.storage.metadata.ScalingOutPartitionPlan;
 
 public abstract class MigrationMgr {
 	private static Logger logger = Logger.getLogger(MigrationMgr.class.getName());
@@ -25,7 +26,7 @@ public abstract class MigrationMgr {
 	
 	private static final int CHUNK_SIZE = 100;
 	
-	private static final long START_MIGRATION_TIME = 180_000; // in ms
+	private static final long START_MIGRATION_TIME = 120_000; // in ms
 	
 	private Deque<MigrationRange> targetRanges;
 	
@@ -52,7 +53,7 @@ public abstract class MigrationMgr {
 				NotificationPartitionPlan wrapperPlan = (NotificationPartitionPlan)
 						Elasql.partitionMetaMgr().getPartitionPlan();
 				RangePartitionPlan oldPlan = (RangePartitionPlan) wrapperPlan.getUnderlayerPlan();
-				RangePartitionPlan newPlan;
+				PartitionPlan newPlan;
 				if (IS_SCALING_OUT)
 					newPlan = oldPlan.scaleOut();
 				else
@@ -88,8 +89,8 @@ public abstract class MigrationMgr {
 		}
 	}
 	
-	public void sendMigrationStartRequest(RangePartitionPlan oldPlan,
-			RangePartitionPlan newPlan, String targetTable, boolean isAppiaThread) {
+	public void sendMigrationStartRequest(PartitionPlan oldPlan,
+			PartitionPlan newPlan, String targetTable, boolean isAppiaThread) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Send a MigrationStart request.");
 		
@@ -122,8 +123,8 @@ public abstract class MigrationMgr {
 	// ======== Functions for Scheduler on Each Node =========
 	
 	// Currently, it can only handle range partitioning
-	public void initializeMigration(RangePartitionPlan oldPartPlan,
-			RangePartitionPlan newPartPlan, String targetTable) {
+	public void initializeMigration(PartitionPlan oldPartPlan,
+			PartitionPlan newPartPlan, String targetTable) {
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
 			logger.info(String.format("a new migration starts at %d. Old: %s, New: %s"
@@ -131,7 +132,16 @@ public abstract class MigrationMgr {
 		}
 		
 		// Analyze the migration plans to find out which ranges to migrate
-		targetRanges = generateMigrationRanges(oldPartPlan, newPartPlan, targetTable);
+		if (IS_SCALING_OUT) {
+			RangePartitionPlan originalPlan = (RangePartitionPlan) oldPartPlan;
+			ScalingOutPartitionPlan scalingOutPlan = (ScalingOutPartitionPlan) newPartPlan;
+			targetRanges = scalingOutPlan.generateMigrationRanges(originalPlan, targetTable);
+		} else {
+			// FIXME
+//			targetRanges = newPartPlan.generateMigrationRanges(oldPartPlan, targetTable);
+		}
+		
+		System.out.println("Ranges: " + targetRanges);
 		
 		// Change the current partition plan of the system
 		Elasql.partitionMetaMgr().startMigration(newPartPlan);
@@ -190,37 +200,5 @@ public abstract class MigrationMgr {
 		if (chunkRange == null)
 			chunkRange = targetRanges.removeFirst();
 		return chunkRange;
-	}
-	
-	private Deque<MigrationRange> generateMigrationRanges(
-			RangePartitionPlan oldPartPlan, RangePartitionPlan newPartPlan, String targetTable) {
-		Deque<MigrationRange> ranges = new ArrayDeque<MigrationRange>();
-		
-		for (int oldPart = 0; oldPart < oldPartPlan.numberOfPartitions(); oldPart++) {
-			int oldStartId = oldPart * oldPartPlan.getRecsPerPart() + 1;
-			int oldEndId = (oldPart + 1) * oldPartPlan.getRecsPerPart();
-			
-			for (int newPart = 0; newPart < newPartPlan.numberOfPartitions(); newPart++) {
-				// We do not need to migrate the data on the same partition
-				if (oldPart == newPart)
-					continue;
-				
-				int newStartId = newPart * newPartPlan.getRecsPerPart() + 1;
-				int newEndId = (newPart + 1) * newPartPlan.getRecsPerPart();
-				
-				// If there is no overlap, there would be nothing to be migrated.
-				if (oldStartId > newEndId || oldEndId < newStartId)
-					continue;
-				
-				// Take the overlapping range
-				int migrateStartId = Math.max(oldStartId, newStartId);
-				int migrateEndId = Math.min(oldEndId, newEndId);
-				
-				ranges.add(new MigrationRange(targetTable, newPartPlan.getPartField(), 
-						migrateStartId, migrateEndId, oldPart, newPart));
-			}
-		}
-		
-		return ranges;
 	}
 }

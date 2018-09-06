@@ -1,5 +1,6 @@
 package org.elasql.migration.tpart.sp;
 
+import org.elasql.storage.metadata.PartitionPlan;
 import org.elasql.storage.metadata.RangePartitionPlan;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Schema;
@@ -10,13 +11,13 @@ import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
 public class MigrationStartParamHelper extends StoredProcedureParamHelper {
 	
-	private RangePartitionPlan oldPlan, newPlan;
+	private PartitionPlan oldPlan, newPlan;
 	private String tableName;
 	
 	@Override
 	public void prepareParameters(Object... pars) {
-		oldPlan = (RangePartitionPlan) pars[0];
-		newPlan = (RangePartitionPlan) pars[1];
+		oldPlan = (PartitionPlan) pars[0];
+		newPlan = (PartitionPlan) pars[1];
 		tableName = (String) pars[2];
 	}
 	
@@ -25,11 +26,11 @@ public class MigrationStartParamHelper extends StoredProcedureParamHelper {
 		return false;
 	}
 	
-	public RangePartitionPlan getOldPartitionPlan() {
+	public PartitionPlan getOldPartitionPlan() {
 		return oldPlan;
 	}
 	
-	public RangePartitionPlan getNewPartitionPlan() {
+	public PartitionPlan getNewPartitionPlan() {
 		return newPlan;
 	}
 	
