@@ -26,10 +26,11 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 
-	public static final boolean SCALING_FLAG = false;
-	public static final boolean IS_SCALING_OUT = true;
-	public static final boolean ENABLE_COLD_SCALING = false;
-	private static boolean isScaled = false;
+	public static final boolean ENABLE_NODE_SCALING = true;
+	public static final boolean IS_SCALING_OUT = true; // only works when 'ENABLE_NODE_SCALING' = true
+	public static final boolean ENABLE_COLD_SCALING = false; // only works when 'ENABLE_NODE_SCALING' 
+	                                                         // && 'IS_SCALING_OUT' = true
+	private static AtomicBoolean isScaled = new AtomicBoolean(false);
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
 			30 * 1000: 10 * 1000; // [Schism: Clay]
@@ -112,7 +113,7 @@ public abstract class MigrationManager {
 				
 				long startTime = System.currentTimeMillis();
 				
-				if (SCALING_FLAG) {
+				if (ENABLE_NODE_SCALING) {
 					sendLaunchClayReq(null);
 				} else {
 					while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
@@ -134,8 +135,8 @@ public abstract class MigrationManager {
 	}
 	
 	public static int currentNumOfPartitions() {
-		if (SCALING_FLAG) {
-			if (isScaled) {
+		if (ENABLE_NODE_SCALING) {
+			if (isScaled.get()) {
 				if (IS_SCALING_OUT)
 					return PartitionMetaMgr.NUM_PARTITIONS;
 				else
@@ -191,8 +192,8 @@ public abstract class MigrationManager {
 			// TODO: Schism
 //			migraMgr.outputMetis(txNum);
 		} else {
-			if (SCALING_FLAG)
-				isScaled = true;
+			if (ENABLE_NODE_SCALING)
+				isScaled.set(true);
 			clayPlanner = new ClayPlanner(workloadMonitor.retrieveHeatGraphAndReset());
 			generateMigrationPlans();
 		}
