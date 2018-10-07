@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
@@ -34,6 +35,7 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 	
 	private double[] loadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
 	private Map<RecordKey, UseCount> useCounts = new HashMap<RecordKey, UseCount>();
+	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 
 	/**
 	 * Insert this node to the partition that will result in minimal cost.
@@ -48,7 +50,7 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 		}
 		
 		// Reset the statistics
-		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++)
+		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++)
 			loadPerPart[partId] = 0.0;
 		useCounts.clear();
 	}
@@ -85,7 +87,7 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 		double minCost = Double.MAX_VALUE;
 		int minCostPart = 0;
 		
-		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++) {
+		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++) {
 			// for scaling-out experiments
 //			if (!isScalingOut && partId > 2) 
 //				break;

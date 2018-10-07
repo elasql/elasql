@@ -17,8 +17,9 @@ import org.elasql.storage.metadata.ScalingOutPartitionPlan;
 public abstract class MigrationMgr {
 	private static Logger logger = Logger.getLogger(MigrationMgr.class.getName());
 	
-	public static final boolean IS_SCALING_OUT = false;
-	public static final boolean ENABLE_PARTITION_CHANGE = false;
+	public static final boolean ENABLE_NODE_SCALING = true;
+	public static final boolean IS_SCALING_OUT = true;
+	public static final boolean ENABLE_COLD_MIGRATION = true;
 	
 	public static final int SP_MIGRATION_START = -101;
 	public static final int SP_COLD_MIGRATION = -102;
@@ -29,6 +30,7 @@ public abstract class MigrationMgr {
 	private static final int CHUNK_SIZE = 100;
 	
 	private static final long START_MIGRATION_TIME = 120_000; // in ms
+	private static final long COLD_MIGRATION_DELAY = 0_000; // in ms
 	
 	private Deque<MigrationRange> targetRanges;
 	
@@ -38,7 +40,7 @@ public abstract class MigrationMgr {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Starts migration trigger thread.");
 		
-		if (!ENABLE_PARTITION_CHANGE)
+		if (!ENABLE_NODE_SCALING)
 			return;
 		
 		new Thread(new Runnable() {
@@ -68,10 +70,14 @@ public abstract class MigrationMgr {
 				sendMigrationStartRequest(oldPlan, newPlan, getMigrationTableName(), false);
 				initializeMigration(oldPlan, newPlan, getMigrationTableName());
 				
+				// Postpone the cold migration forever
+				if (!ENABLE_COLD_MIGRATION)
+					return;
+				
 				// Delay cold migration a moment to prevent a big drop caused by 
 				// both initialization and cold migrations.
 				try {
-					Thread.sleep(10_000);
+					Thread.sleep(COLD_MIGRATION_DELAY);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
