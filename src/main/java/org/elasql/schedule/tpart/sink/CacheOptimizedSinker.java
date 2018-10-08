@@ -5,6 +5,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.MigrationRange;
 import org.elasql.migration.tpart.sp.ColdMigrationProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
@@ -127,11 +129,14 @@ public class CacheOptimizedSinker extends Sinker {
 					// 1. The master node must be at the destination node
 					// 2. All write backs are insertions to local storage
 					ColdMigrationProcedure sp = (ColdMigrationProcedure) node.getTask().getProcedure();
+					MigrationMgr migraMgr = Elasql.migrationMgr();
+					MigrationRange range = sp.getMigrationRange();
 					
 					for (Edge e : node.getWriteBackEdges()) {
 						RecordKey k = e.getResourceKey();
+						int id = migraMgr.toNumericId(k);
 						
-						if (sp.getMigrationRange().getDestPartId() == myId) {
+						if (range.getDestPartId() == myId && range.contains(id)) {
 							plan.addStorageInsertion(k);
 							plan.addLocalWriteBackInfo(k);
 //							cm.registerSinkWriteback(k, txNum);
@@ -139,7 +144,7 @@ public class CacheOptimizedSinker extends Sinker {
 					}
 					
 					// Update the migration status
-					Elasql.migrationMgr().markMigrationRangeMoved(sp.getMigrationRange());
+					migraMgr.markMigrationRangeMoved(sp.getMigrationRange());
 					
 					// Update location information
 					for (RecordKey key : sp.getLocalCacheToStorage()) {
