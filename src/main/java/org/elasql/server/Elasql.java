@@ -137,6 +137,7 @@ public class Elasql extends VanillaDb {
 			initScheduler(factory);
 			initConnectionMgr(myNodeId, true);
 			initMigration(migraMgr);
+			migrateMgr.scheduleControllerThread();
 			initDdLogMgr();
 			// initialize core modules
 			return;

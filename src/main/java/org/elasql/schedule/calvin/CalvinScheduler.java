@@ -24,9 +24,7 @@ import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
-import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.schedule.Scheduler;
-import org.elasql.server.Elasql;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
@@ -36,15 +34,10 @@ public class CalvinScheduler extends Task implements Scheduler {
 	private CalvinStoredProcedureFactory factory;
 	private CalvinPostOffice postOffice;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-	
-	private boolean isSeqNode = false;
-	private boolean isMigraConScheduled = false;
 
 	public CalvinScheduler(CalvinStoredProcedureFactory factory, RemoteRecordReceiver postOffice) {
 		this.factory = factory;
 		this.postOffice = (CalvinPostOffice) postOffice;
-		
-		isSeqNode = (Elasql.serverId() == ConnectionMgr.SEQ_NODE_ID);
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -65,11 +58,6 @@ public class CalvinScheduler extends Task implements Scheduler {
 				StoredProcedureCall call = spcQueue.take();
 				if (call.isNoOpStoredProcCall())
 					continue;
-				
-				if (isSeqNode && !isMigraConScheduled) {
-					isMigraConScheduled = true;
-					Elasql.migrationMgr().scheduleControllerThread();
-				}
 
 				// create store procedure and prepare
 				CalvinStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
