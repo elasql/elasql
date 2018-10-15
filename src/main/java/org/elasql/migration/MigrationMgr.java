@@ -17,9 +17,10 @@ import org.elasql.storage.metadata.ScalingOutPartitionPlan;
 public abstract class MigrationMgr {
 	private static Logger logger = Logger.getLogger(MigrationMgr.class.getName());
 	
-	public static final boolean ENABLE_NODE_SCALING = true;
-	public static final boolean IS_SCALING_OUT = true;
-	public static final boolean ENABLE_COLD_MIGRATION = true;
+	public static final boolean ENABLE_NODE_SCALING = false;
+	public static final boolean IS_SCALING_OUT = false;
+	public static final boolean ENABLE_COLD_MIGRATION = false;
+	public static final boolean USE_RANGE_SCALING_OUT = false; // only works when ENABLE_NODE_SCALING && IS_SCALING_OUT = true
 	
 	public static final int SP_MIGRATION_START = -101;
 	public static final int SP_COLD_MIGRATION = -102;
@@ -62,9 +63,12 @@ public abstract class MigrationMgr {
 						Elasql.partitionMetaMgr().getPartitionPlan();
 				RangePartitionPlan oldPlan = (RangePartitionPlan) wrapperPlan.getUnderlayerPlan();
 				PartitionPlan newPlan;
-				if (IS_SCALING_OUT)
-					newPlan = oldPlan.scaleOut();
-				else
+				if (IS_SCALING_OUT) {
+					if (USE_RANGE_SCALING_OUT)
+						newPlan = oldPlan.scaleOutRangePartition();
+					else
+						newPlan = oldPlan.scaleOut();
+				} else
 					newPlan = oldPlan.scaleIn();
 				
 				sendMigrationStartRequest(oldPlan, newPlan, getMigrationTableName(), false);
@@ -146,8 +150,13 @@ public abstract class MigrationMgr {
 		// Analyze the migration plans to find out which ranges to migrate
 		if (IS_SCALING_OUT) {
 			RangePartitionPlan originalPlan = (RangePartitionPlan) oldPartPlan;
-			ScalingOutPartitionPlan scalingOutPlan = (ScalingOutPartitionPlan) newPartPlan;
-			targetRanges = scalingOutPlan.generateMigrationRanges(originalPlan, targetTable);
+			if (USE_RANGE_SCALING_OUT) {
+				RangePartitionPlan scalingOutPlan = (RangePartitionPlan) newPartPlan;
+				targetRanges = scalingOutPlan.generateMigrationRanges(originalPlan, targetTable);
+			} else {
+				ScalingOutPartitionPlan scalingOutPlan = (ScalingOutPartitionPlan) newPartPlan;
+				targetRanges = scalingOutPlan.generateMigrationRanges(originalPlan, targetTable);
+			}
 		} else {
 			RangePartitionPlan originalPlan = (RangePartitionPlan) oldPartPlan;
 			ScalingInPartitionPlan scalingInPlan = (ScalingInPartitionPlan) newPartPlan;

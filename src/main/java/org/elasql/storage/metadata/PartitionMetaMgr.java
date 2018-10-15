@@ -17,16 +17,20 @@ package org.elasql.storage.metadata;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
+import org.elasql.util.PeriodicalJob;
 
 public class PartitionMetaMgr {
 
@@ -65,6 +69,7 @@ public class PartitionMetaMgr {
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".LOC_TABLE_MAX_SIZE", -1);
 		if (LOC_TABLE_MAX_SIZE == -1)
 			locationTable = new HashMap<RecordKey, Integer>();
+//			locationTable = new ConcurrentHashMap<RecordKey, Integer>();
 		else
 			locationTable = new HashMap<RecordKey, Integer>(LOC_TABLE_MAX_SIZE + 1000);
 		
@@ -79,20 +84,20 @@ public class PartitionMetaMgr {
 		
 		// Only for 4 nodes with micro-benchmarks
 		// Note: Remember to use ConcurrentHashMap
-//		new PeriodicalJob(3000, 500000, new Runnable() {
+//		new PeriodicalJob(5000, 500000, new Runnable() {
 //			@Override
 //			public void run() {
 //				int[] counts = new int[4];
 //				for (int i = 0; i < counts.length; i++)
-//					counts[i] = 25_000;
+//					counts[i] = 6250;
 //				
 //				for (Entry<RecordKey, Integer> entry : locationTable.entrySet()) {
-////					int id = Integer.parseInt((String) entry.getKey().getKeyVal("ycsb_id").asJavaVal());
-//					int id = (Integer) entry.getKey().getKeyVal("i_id").asJavaVal();
-//					int sourcePart = entry.getKey().hashCode() % 4;
+//					int id = Integer.parseInt((String) entry.getKey().getKeyVal("ycsb_id").asJavaVal());
+////					int id = (Integer) entry.getKey().getKeyVal("i_id").asJavaVal();
+//					int sourcePart = id % 4;
 //					int newPart = entry.getValue();
 //					
-//					if (id <= 100_000) {
+//					if (id <= 25_000) {
 //						counts[sourcePart]--;
 //						counts[newPart]++;
 //					}

@@ -145,6 +145,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public long getTxNum() {
 		return txNum;
 	}
+	
+	public SunkPlan getSunkPlan() {
+		return plan;
+	}
 
 	protected void addReadKey(RecordKey readKey) {
 		readKeys.add(readKey);

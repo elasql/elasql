@@ -18,8 +18,10 @@ import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
+import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.GraphDumper;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.server.Elasql;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
@@ -117,6 +119,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 		// Debug
 //		printGraphStatistics();
 //		System.out.println(graph);
+//		printStatistics();
+//		printImbalStatistics();
 		
 		// Add the migration txs to the end of the batch
 		while (!migrationTasks.isEmpty()) {
@@ -197,5 +201,57 @@ public class TPartPartitioner extends Task implements Scheduler {
 			}
 		}
 		batchId++;
+	}
+	
+	private int numberOfDistTxns = 0;
+	private int numberOfTxns = 0;
+	
+	private void printDistTxStatistics() {
+		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
+		
+		numberOfTxns += graph.getTxNodes().size();
+		for (TxNode node : graph.getTxNodes()) {
+			int masterId = node.getPartId();
+			for (Edge e : node.getReadEdges()) {
+				int resId = e.getTarget().getPartId();
+				if (masterId != resId) {
+					numberOfDistTxns++;
+					break;
+				}	
+			}
+		}
+		
+		if (time >= nextReportTime) {
+			double percentageOfDist = numberOfDistTxns;
+			percentageOfDist /= numberOfTxns;
+			percentageOfDist *= 100;
+			System.out.println(String.format("Number of distributed transactions: %d (%f %%) at time %d.",
+					numberOfDistTxns, percentageOfDist, time));
+			
+			numberOfTxns = 0;
+			numberOfDistTxns = 0;
+			nextReportTime = time + 3;
+		}
+	}
+	
+	private int totalImbalanced = 0;
+	private int numOfBatches = 0;
+	
+	private void printImbalStatistics() {
+		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
+		
+		numOfBatches++;
+		totalImbalanced += graph.getImbalancedDis();
+		
+		if (time >= nextReportTime) {
+			double averageImb = totalImbalanced;
+			averageImb /= numOfBatches;
+			System.out.println(String.format("Average imbalanced: %f at time %d.",
+					averageImb, time));
+			
+			numOfBatches = 0;
+			totalImbalanced = 0;
+			nextReportTime = time + 3;
+		}
 	}
 }

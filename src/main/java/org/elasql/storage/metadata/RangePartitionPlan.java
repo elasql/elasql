@@ -30,8 +30,11 @@ public class RangePartitionPlan extends PartitionPlan implements Serializable {
 	}
 	
 	public ScalingOutPartitionPlan scaleOut() {
-//		return new RangePartitionPlan(partField, recsPerPart * numOfParts, numOfParts + 1);
 		return new ScalingOutPartitionPlan(partField, recsPerPart * numOfParts, numOfParts);
+	}
+	
+	public RangePartitionPlan scaleOutRangePartition() {
+		return new RangePartitionPlan(partField, recsPerPart * numOfParts, numOfParts + 1);
 	}
 	
 	public ScalingInPartitionPlan scaleIn() {
