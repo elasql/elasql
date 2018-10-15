@@ -26,7 +26,7 @@ import org.vanilladb.core.server.task.Task;
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 
-	public static final boolean ENABLE_NODE_SCALING = true;
+	public static final boolean ENABLE_NODE_SCALING = false;
 	public static final boolean IS_SCALING_OUT = false; // only works when 'ENABLE_NODE_SCALING' = true
 	public static final boolean FORCE_COLD_MIGRATION = false; // only works when 'ENABLE_NODE_SCALING' 
 	                                                         // && 'IS_SCALING_OUT' = true
@@ -207,19 +207,22 @@ public abstract class MigrationManager {
 		VanillaDb.taskMgr().runTask(new Task() {
 			@Override
 			public void run() {
-				if (IS_SCALING_OUT) {
-					if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
-						queuedMigrations = generateScalingOutColdMigrationPlans();
-					} else
-						queuedMigrations = clayPlanner.generateMigrationPlan();
-				} else {
-					if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
-						queuedMigrations = generateConsolidationColdMigrationPlans();
-					} else if (!FORCE_COLD_MIGRATION && !isConsolidated.get()) {
-						queuedMigrations = clayPlanner.generateConsolidationPlan();
-					} else 
-						queuedMigrations = clayPlanner.generateMigrationPlan();
-				}
+				if (ENABLE_NODE_SCALING) {
+					if (IS_SCALING_OUT) {
+						if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+							queuedMigrations = generateScalingOutColdMigrationPlans();
+						} else
+							queuedMigrations = clayPlanner.generateMigrationPlan();
+					} else {
+						if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+							queuedMigrations = generateConsolidationColdMigrationPlans();
+						} else if (!FORCE_COLD_MIGRATION && !isConsolidated.get()) {
+							queuedMigrations = clayPlanner.generateConsolidationPlan();
+						} else 
+							queuedMigrations = clayPlanner.generateMigrationPlan();
+					}
+				} else
+					queuedMigrations = clayPlanner.generateMigrationPlan();
 				
 				if (queuedMigrations != null && !queuedMigrations.isEmpty()) {
 					MigrationPlan plan = queuedMigrations.remove(0);
@@ -288,24 +291,26 @@ public abstract class MigrationManager {
 				logger.info("Broadcasting the migration plan: " + plan);
 			broadcastMigrateKeys(plan.toStoredProcedureRequest());
 		} else {
-			if (IS_SCALING_OUT) {
-				if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
-					isColdMigrated.set(true);
-					finishClay();
-					sendLaunchClayReq(null);
-					return;
-				}
-			} else if (!IS_SCALING_OUT) {
-				if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
-					isColdMigrated.set(true);
-					finishClay();
-					sendLaunchClayReq(null);
-					return;
-				} else if (!FORCE_COLD_MIGRATION && !isConsolidated.get()) {
-					isConsolidated.set(true);
-					finishClay();
-					sendLaunchClayReq(null);
-					return;
+			if (ENABLE_NODE_SCALING) {
+				if (IS_SCALING_OUT) {
+					if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+						isColdMigrated.set(true);
+						finishClay();
+						sendLaunchClayReq(null);
+						return;
+					}
+				} else if (!IS_SCALING_OUT) {
+					if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+						isColdMigrated.set(true);
+						finishClay();
+						sendLaunchClayReq(null);
+						return;
+					} else if (!FORCE_COLD_MIGRATION && !isConsolidated.get()) {
+						isConsolidated.set(true);
+						finishClay();
+						sendLaunchClayReq(null);
+						return;
+					}
 				}
 			}
 			

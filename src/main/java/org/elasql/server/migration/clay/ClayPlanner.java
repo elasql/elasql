@@ -17,11 +17,11 @@ public class ClayPlanner {
 	
 	public static final int MULTI_PARTS_COST = 50; // term 'k' in Clay's paper
 //	public static final double OVERLOAD_THREASDHOLD = 15; // term 'theta' in Clay's paper
-	public static final double OVERLOAD_PERCENTAGE = 1.25; // For multi-tanents
-//	public static final double OVERLOAD_PERCENTAGE = 1.5; // For Google workloads
+//	public static final double OVERLOAD_PERCENTAGE = 1.25; // For multi-tanents
+	public static final double OVERLOAD_PERCENTAGE = 1.5; // For Google workloads
 	private static final int LOOK_AHEAD_MAX = 5;
-//	private static final int CLUMP_MAX_SIZE = 20; // For Google workloads
-	private static final int CLUMP_MAX_SIZE = 10000; // For multi-tanents
+	private static final int CLUMP_MAX_SIZE = 20; // For Google workloads
+//	private static final int CLUMP_MAX_SIZE = 10000; // For multi-tanents
 	
 	private HeatGraph heatGraph;
 	private int numOfClumpsGenerated = 0;
