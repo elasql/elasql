@@ -52,17 +52,7 @@ public class PartitionMetaMgr {
 	private boolean isInMigration;
 
 	static {
-
-//		LOGDIR = new File(".");
-//		LOGFILE = new File(LOGDIR, "loc_log.txt");
-//		try {
-//			WRLOGFILE = new FileWriter(LOGFILE);
-//			BWRLOGFILE = new BufferedWriter(WRLOGFILE);
-//		} catch (IOException e1) {
-//			e1.printStackTrace();
-//		}
-
-//		BENCH_START_TIME = System.currentTimeMillis();
+		
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 		LOC_TABLE_MAX_SIZE = ElasqlProperties.getLoader()
@@ -82,11 +72,17 @@ public class PartitionMetaMgr {
 //			}
 //		).start();
 		
-		// Only for 4 nodes with micro-benchmarks
 		// Note: Remember to use ConcurrentHashMap
-//		new PeriodicalJob(5000, 500000, new Runnable() {
+//		new PeriodicalJob(5000, 660000, new Runnable() {
 //			@Override
 //			public void run() {
+//				count(0);
+//				count(1);
+//			}
+//			
+//			void count(int tenantId) {
+//				int startId = tenantId * 25_000 + 1;
+//				int endId = (tenantId + 1) * 25_000;
 //				int[] counts = new int[4];
 //				for (int i = 0; i < counts.length; i++)
 //					counts[i] = 6250;
@@ -97,13 +93,13 @@ public class PartitionMetaMgr {
 //					int sourcePart = id % 4;
 //					int newPart = entry.getValue();
 //					
-//					if (id <= 25_000) {
+//					if (startId <= id && id <= endId) {
 //						counts[sourcePart]--;
 //						counts[newPart]++;
 //					}
 //				}
 //				
-//				System.out.println(Arrays.toString(counts));
+//				System.out.println(String.format("Tenant %d: %s", tenantId, Arrays.toString(counts)));
 //			}
 //		}).start();
 		
