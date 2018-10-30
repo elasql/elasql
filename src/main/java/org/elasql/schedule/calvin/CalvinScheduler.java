@@ -70,7 +70,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 					continue;
 				}
 
-				// perform conservative locking
+				// serialize conservative locking
 				sp.bookConservativeLocks();
 
 				// create a new task for multi-thread

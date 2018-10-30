@@ -24,6 +24,7 @@ import java.util.logging.Logger;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
@@ -40,8 +41,9 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	private static final String KEY_FINISH = "finish";
 	
 	private static final int MASTER_NODE = 0;
-	
-	private int numOfParts; 
+
+	private int localNodeId = Elasql.serverId();
+	private int numOfParts;
 
 	public AllExecuteProcedure(long txNum, H paramHelper) {
 		super(txNum, paramHelper);
@@ -59,7 +61,10 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 		// prepare keys
 		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
-		prepareKeys();
+		ReadWriteSetAnalyzer analyzer = new ReadWriteSetAnalyzer();
+		prepareKeys(analyzer);
+		
+		// XXX: We does not use the analyzer
 		
 		// for the cache layer
 		// NOTE: always creates a CacheMgr that can accept remote records
@@ -75,6 +80,11 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	public boolean willResponseToClients() {
 		// The master node is the only one that will response to the clients.
 		return localNodeId == MASTER_NODE;
+	}
+
+	@Override
+	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
+		// default: do nothing
 	}
 
 	protected void executeTransactionLogic() {

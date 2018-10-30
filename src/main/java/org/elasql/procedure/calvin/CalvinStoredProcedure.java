@@ -17,16 +17,17 @@ package org.elasql.procedure.calvin;
 
 import java.sql.Connection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.schedule.calvin.ExecutionPlan;
+import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
+import org.elasql.schedule.calvin.ExecutionPlan.PushSet;
+import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
@@ -43,32 +44,13 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected Transaction tx;
 	protected long txNum;
 	protected H paramHelper;
-	protected int localNodeId;
 	protected CalvinCacheMgr cacheMgr;
-
-	// Participants
-	// Active Participants: Nodes that need to write records locally
-	// Passive Participants: Nodes that only need to read records and push
-	private Set<Integer> activeParticipants = new HashSet<Integer>();
-	private boolean isActiveParticipant, isPassiveParticipant;
 	
-	// For read-only transactions to choose one node as a active participant
-	private int mostReadsNode = 0;
-	private int[] readsPerNodes;
-
-	// Record keys
-	// XXX: Do we need table-level locks ?
-	// XXX: We assume the fully replicated keys are read-only
-	private Set<RecordKey> localReadKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> fullyRepKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> localWriteKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> remoteReadKeys = new HashSet<RecordKey>();
+	private ExecutionPlan execPlan;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
-		this.localNodeId = Elasql.serverId();
 
 		if (paramHelper == null)
 			throw new NullPointerException("paramHelper should not be null");
@@ -83,7 +65,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 * procedure. Use the {@link #addReadKey(RecordKey)},
 	 * {@link #addWriteKey(RecordKey)} method to add keys.
 	 */
-	protected abstract void prepareKeys();
+	protected abstract void prepareKeys(ReadWriteSetAnalyzer analyzer);
 
 	protected abstract void executeSql(Map<RecordKey, CachedRecord> readings);
 
@@ -95,35 +77,23 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
+		// analyze read-write set
+		ReadWriteSetAnalyzer analyzer = new ReadWriteSetAnalyzer();
+		prepareKeys(analyzer);
+		
+		// generate execution plan
+		execPlan = analyzer.generatePlan();
+		
 		// create a transaction
-		boolean isReadOnly = paramHelper.isReadOnly();
 		tx = Elasql.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
+				Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
 		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
-
-		// prepare keys
-		readsPerNodes = new int[Elasql.partitionMetaMgr().getCurrentNumOfParts()];
-		prepareKeys();
-		
-		// if there is no active participant (e.g. read-only transaction),
-		// choose the one with most readings as the only active participant.
-		if (activeParticipants.isEmpty())
-			activeParticipants.add(mostReadsNode);
-		
-		// Decide the role
-		if (activeParticipants.contains(localNodeId))
-			isActiveParticipant = true;
-		else if (!localReadKeys.isEmpty())
-			isPassiveParticipant = true;
 		
 		// for the cache layer
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		if (isParticipated()) {
 			// create a cache manager
-			if (remoteReadKeys.isEmpty())
-				cacheMgr = postOffice.createCacheMgr(tx, false);
-			else
-				cacheMgr = postOffice.createCacheMgr(tx, true);
+			cacheMgr = postOffice.createCacheMgr(tx, execPlan.hasRemoteReads());
 		} else {
 			postOffice.skipTransaction(txNum);
 		}
@@ -131,15 +101,14 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	public void bookConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		
-		ccMgr.bookReadKeys(localReadKeys);
-		ccMgr.bookWriteKeys(localWriteKeys);
-		ccMgr.bookWriteKeys(localInsertKeys);
+		ccMgr.bookReadKeys(execPlan.getLocalReadKeys());
+		ccMgr.bookWriteKeys(execPlan.getLocalUpdateKeys());
+		ccMgr.bookWriteKeys(execPlan.getLocalInsertKeys());
+		ccMgr.bookWriteKeys(execPlan.getLocalDeleteKeys());
 	}
 
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		
 		ccMgr.requestLocks();
 	}
 
@@ -172,16 +141,16 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	}
 
 	public boolean isParticipated() {
-		return isActiveParticipant || isPassiveParticipant;
+		return execPlan.getParticipantRole() != ParticipantRole.IGNORE;
 	}
 	
 	public boolean willResponseToClients() {
-		return isActiveParticipant;
+		return execPlan.getParticipantRole() == ParticipantRole.ACTIVE;
 	}
 
 	@Override
 	public boolean isReadOnly() {
-		return paramHelper.isReadOnly();
+		return execPlan.isReadOnly();
 	}
 
 	/**
@@ -196,7 +165,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		pushReadingsToRemotes(readings);
 		
 		// Passive participants stops here
-		if (isPassiveParticipant)
+		if (execPlan.getParticipantRole() != ParticipantRole.ACTIVE)
 			return;
 
 		// Read the remote records
@@ -205,56 +174,19 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Write the local records
 		executeSql(readings);
 	}
-
-	protected void addReadKey(RecordKey readKey) {
-		// Check if it is a fully replicated key
-		if (Elasql.partitionMetaMgr().isFullyReplicated(readKey)) {
-			fullyRepKeys.add(readKey);
-			return;
-		}
-		
-		// Check which node has the corresponding record
-		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
-		if (nodeId == localNodeId)
-			localReadKeys.add(readKey);
-		else
-			remoteReadKeys.add(readKey);
-		
-		// Record who is the node with most readings
-		readsPerNodes[nodeId]++;
-		if (readsPerNodes[nodeId] > readsPerNodes[mostReadsNode])
-			mostReadsNode = nodeId;
-	}
-
-	protected void addWriteKey(RecordKey writeKey) {
-		// Check which node has the corresponding record
-		int nodeId = Elasql.partitionMetaMgr().getPartition(writeKey);
-		if (nodeId == localNodeId)
-			localWriteKeys.add(writeKey);
-		activeParticipants.add(nodeId);
-	}
-	
-	protected void addInsertKey(RecordKey insertKey) {
-		// Check which node has the corresponding record
-		int nodeId = Elasql.partitionMetaMgr().getPartition(insertKey);
-		if (nodeId == localNodeId)
-			localInsertKeys.add(insertKey);
-		activeParticipants.add(nodeId);
-	}
 	
 	protected void update(RecordKey key, CachedRecord rec) {
-		if (localWriteKeys.contains(key))
+		if (execPlan.isLocalUpdate(key))
 			cacheMgr.update(key, rec);
 	}
 	
 	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
-		if (localInsertKeys.contains(key))
+		if (execPlan.isLocalInsert(key))
 			cacheMgr.insert(key, fldVals);
 	}
 	
 	protected void delete(RecordKey key) {
-		// XXX: Do we need a 'localDeleteKeys' for this ?
-		if (localWriteKeys.contains(key))
+		if (execPlan.isLocalDelete(key))
 			cacheMgr.delete(key);
 	}
 
@@ -262,46 +194,32 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		Map<RecordKey, CachedRecord> localReadings = new HashMap<RecordKey, CachedRecord>();
 		
 		// Read local records (for both active or passive participants)
-		for (RecordKey k : localReadKeys) {
+		for (RecordKey k : execPlan.getLocalReadKeys()) {
 			CachedRecord rec = cacheMgr.readFromLocal(k);
 			localReadings.put(k, rec);
-		}
-		
-		// Read the fully replicated records (for only active participants)
-		if (isActiveParticipant) {
-			for (RecordKey k : fullyRepKeys) {
-				CachedRecord rec = cacheMgr.readFromLocal(k);
-				localReadings.put(k, rec);
-			}
 		}
 		
 		return localReadings;
 	}
 
 	private void pushReadingsToRemotes(Map<RecordKey, CachedRecord> readings) {
-		// If there is only one active participant, and you are that one,
-		// return immediately.
-		if (activeParticipants.size() < 2 && isActiveParticipant)
-			return;
-		
-		TupleSet ts = new TupleSet(-1);
-		if (!readings.isEmpty()) {
+		for (PushSet pushSet : execPlan.getPushSets()) {
+			TupleSet ts = new TupleSet(-1);
+			
 			// Construct pushing tuple set
-			for (Entry<RecordKey, CachedRecord> e : readings.entrySet()) {
-				if (!fullyRepKeys.contains(e.getKey()))
-					ts.addTuple(e.getKey(), txNum, txNum, e.getValue());
+			for (RecordKey key : pushSet.getPushKeys()) {
+				ts.addTuple(key, txNum, txNum, readings.get(key));
 			}
-
-			// Push to all active participants
-			for (Integer n : activeParticipants)
-				if (n != localNodeId)
-					Elasql.connectionMgr().pushTupleSet(n, ts);
+			
+			// Push to all targets
+			for (Integer n : pushSet.getPushNodeIds())
+				Elasql.connectionMgr().pushTupleSet(n, ts);
 		}
 	}
 
 	private void collectRemoteReadings(Map<RecordKey, CachedRecord> readingCache) {
 		// Read remote records
-		for (RecordKey k : remoteReadKeys) {
+		for (RecordKey k : execPlan.getRemoteReadKeys()) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			readingCache.put(k, rec);
 		}
