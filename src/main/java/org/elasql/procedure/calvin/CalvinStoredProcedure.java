@@ -29,7 +29,6 @@ import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
@@ -55,7 +54,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	
 	// For read-only transactions to choose one node as a active participant
 	private int mostReadsNode = 0;
-	private int[] readsPerNodes = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	private int[] readsPerNodes;
 
 	// Record keys
 	// XXX: Do we need table-level locks ?
@@ -103,6 +102,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 
 		// prepare keys
+		readsPerNodes = new int[Elasql.partitionMetaMgr().getCurrentNumOfParts()];
 		prepareKeys();
 		
 		// if there is no active participant (e.g. read-only transaction),

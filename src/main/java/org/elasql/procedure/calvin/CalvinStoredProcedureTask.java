@@ -37,6 +37,8 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 	}
 
 	public void run() {
+		Thread.currentThread().setName("Tx." + txNum);
+		
 		Timer timer = Timer.getLocalTimer();
 		SpResultSet rs = null;
 		
@@ -56,9 +58,5 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 		// For Debugging
 //		System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
 //		timer.addToGlobalStatistics();
-	}
-
-	public void bookConservativeLocks() {
-		csp.bookConservativeLocks();
 	}
 }

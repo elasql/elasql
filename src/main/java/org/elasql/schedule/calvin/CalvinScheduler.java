@@ -70,13 +70,13 @@ public class CalvinScheduler extends Task implements Scheduler {
 					continue;
 				}
 
+				// perform conservative locking
+				sp.bookConservativeLocks();
+
 				// create a new task for multi-thread
 				CalvinStoredProcedureTask spt = new CalvinStoredProcedureTask(
 						call.getClientId(), call.getConnectionId(), call.getTxNum(),
 						sp);
-
-				// perform conservative locking
-				spt.bookConservativeLocks();
 
 				// hand over to a thread to run the task
 				VanillaDb.taskMgr().runTask(spt);

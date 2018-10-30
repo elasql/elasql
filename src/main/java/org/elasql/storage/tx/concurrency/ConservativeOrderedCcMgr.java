@@ -31,7 +31,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	
 	// For normal operations - using conservative locking 
 	private Set<Object> bookedObjs, readObjs, writeObjs;
-	
+
 	// For Indexes - using crabbing locking
 	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
 	private Set<BlockId> writtenIndexBlks = new HashSet<BlockId>();
@@ -106,7 +106,12 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	}
 
 	public void onTxEndStatement(Transaction tx) {
-		// do nothing
+		// Next-key lock algorithm is non-deterministic. It may
+		// cause deadlocks during the execution. Therefore,
+		// we release the locks earlier to prevent deadlocks.
+		// However, phantoms due to update may happen.
+		// TODO: We need a deterministic algorithm to handle this.
+		releaseIndexLocks();
 	}
 
 	@Override

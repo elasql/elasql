@@ -18,13 +18,19 @@ package org.elasql.storage.metadata;
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
-public abstract class PartitionMetaMgr {
+public class PartitionMetaMgr {
 
 	public final static int NUM_PARTITIONS;
 
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
+	}
+
+	private PartitionPlan partPlan;
+	
+	public PartitionMetaMgr(PartitionPlan plan) {
+		partPlan = plan;
 	}
 
 	/**
@@ -34,14 +40,25 @@ public abstract class PartitionMetaMgr {
 	 *            the key of the record
 	 * @return if the record is fully replicated
 	 */
-	public abstract boolean isFullyReplicated(RecordKey key);
-
+	public boolean isFullyReplicated(RecordKey key) {
+		return partPlan.isFullyReplicated(key);
+	}
+	
 	/**
-	 * Decides the partition of each record.
+	 * Get the original location (may not be the current location)
 	 * 
 	 * @param key
-	 *            the key of the record
-	 * @return the id of the partition where the record is
+	 * @return
 	 */
-	public abstract int getPartition(RecordKey key);
+	public int getPartition(RecordKey key) {
+		return partPlan.getPartition(key);
+	}
+	
+	public PartitionPlan getPartitionPlan() {
+		return partPlan;
+	}
+	
+	public int getCurrentNumOfParts() {
+		return partPlan.numberOfPartitions();
+	}
 }

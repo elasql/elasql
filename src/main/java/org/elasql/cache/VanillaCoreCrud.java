@@ -67,6 +67,8 @@ public class VanillaCoreCrud {
 			rec = new CachedRecord(fldVals);
 		}
 		s.close();
+		
+		tx.endStatement();
 
 		return rec;
 	}
@@ -146,6 +148,8 @@ public class VanillaCoreCrud {
 		for (Index index : modifiedIndexes)
 			index.close();
 		s.close();
+		
+		tx.endStatement();
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
@@ -176,6 +180,8 @@ public class VanillaCoreCrud {
 			idx.insert(new SearchKey(ii.fieldNames(), rec.getFldValMap()), rid, true);
 			idx.close();
 		}
+		
+		tx.endStatement();
 		
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
@@ -242,6 +248,8 @@ public class VanillaCoreCrud {
 			}
 		}
 		s.close();
+		
+		tx.endStatement();
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
