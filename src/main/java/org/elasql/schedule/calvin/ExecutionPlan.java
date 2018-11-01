@@ -37,6 +37,7 @@ public class ExecutionPlan {
 	private Set<RecordKey> localUpdateKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> localDeleteKeys = new HashSet<RecordKey>();
+	private Set<RecordKey> insertsForMigration = new HashSet<RecordKey>();
 	private List<PushSet> pushSets = new ArrayList<PushSet>();
 
 	public void addLocalReadKey(RecordKey key) {
@@ -59,9 +60,12 @@ public class ExecutionPlan {
 		localDeleteKeys.add(key);
 	}
 	
+	public void addInsertForMigration(RecordKey key) {
+		insertsForMigration.add(key);
+	}
+	
 	public void addPushSet(Set<RecordKey> keys, Set<Integer> nodeIds) {
-		pushSets.add(new PushSet(new HashSet<RecordKey>(keys),
-				new HashSet<Integer>(nodeIds)));
+		pushSets.add(new PushSet(new HashSet<RecordKey>(keys), nodeIds));
 	}
 	
 	public Set<RecordKey> getLocalReadKeys() {
@@ -94,6 +98,10 @@ public class ExecutionPlan {
 	
 	public Set<RecordKey> getLocalDeleteKeys() {
 		return localDeleteKeys;
+	}
+	
+	public Set<RecordKey> getInsertsForMigration() {
+		return insertsForMigration;
 	}
 	
 	public List<PushSet> getPushSets() {

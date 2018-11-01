@@ -28,6 +28,7 @@ import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ExecutionPlan.PushSet;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
+import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
@@ -78,7 +79,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		paramHelper.prepareParameters(pars);
 
 		// analyze read-write set
-		ReadWriteSetAnalyzer analyzer = new ReadWriteSetAnalyzer();
+		ReadWriteSetAnalyzer analyzer;
+		if (Elasql.migrationMgr().isInMigration())
+			analyzer = Elasql.migrationMgr().newAnalyzer();
+		else
+			analyzer = new StandardAnalyzer();
 		prepareKeys(analyzer);
 		
 		// generate execution plan
@@ -173,6 +178,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// Write the local records
 		executeSql(readings);
+		
+		// perform insertions for migrations (if there is any)
+		performInsertionForMigrations(readings);
 	}
 	
 	protected void update(RecordKey key, CachedRecord rec) {
@@ -222,6 +230,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		for (RecordKey k : execPlan.getRemoteReadKeys()) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			readingCache.put(k, rec);
+		}
+	}
+	
+	private void performInsertionForMigrations(Map<RecordKey, CachedRecord> readings) {
+		for (RecordKey key : execPlan.getInsertsForMigration()) {
+			cacheMgr.insert(key, readings.get(key).getFldValMap());
 		}
 	}
 }

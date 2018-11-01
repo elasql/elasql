@@ -25,6 +25,7 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
+import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
@@ -61,7 +62,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 		// prepare keys
 		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
-		ReadWriteSetAnalyzer analyzer = new ReadWriteSetAnalyzer();
+		StandardAnalyzer analyzer = new StandardAnalyzer();
 		prepareKeys(analyzer);
 		
 		// XXX: We does not use the analyzer

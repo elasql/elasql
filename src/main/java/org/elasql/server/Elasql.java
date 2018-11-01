@@ -22,6 +22,8 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.MigrationSystemController;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -85,6 +87,10 @@ public class Elasql extends VanillaDb {
 	private static RemoteRecordReceiver remoteRecReceiver;
 	private static Scheduler scheduler;
 	private static DdLogMgr ddLogMgr;
+	private static MigrationMgr migraMgr;
+	
+	// Only for the sequencer
+	private static MigrationSystemController migraSysControl;
 
 	// connection information
 	private static int myNodeId;
@@ -115,11 +121,11 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 		
-		init(dirName, id, isSequencer, factory, partitionPlan);
+		init(dirName, id, isSequencer, factory, partitionPlan, null, null);
 	}
 	
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
-			PartitionPlan partitionPlan) {
+			PartitionPlan partitionPlan, MigrationMgr migrationMgr, MigrationSystemController migrationSystemController) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
@@ -131,6 +137,7 @@ public class Elasql extends VanillaDb {
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
 			initConnectionMgr(myNodeId, true);
+			migraSysControl = migrationSystemController;
 			return;
 		}
 
@@ -143,6 +150,7 @@ public class Elasql extends VanillaDb {
 		initScheduler(factory);
 		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
+		migraMgr = migrationMgr;
 	}
 
 	// ================
@@ -250,6 +258,10 @@ public class Elasql extends VanillaDb {
 
 	public static DdLogMgr DdLogMgr() {
 		return ddLogMgr;
+	}
+	
+	public static MigrationMgr migrationMgr() {
+		return migraMgr;
 	}
 
 	// ===============

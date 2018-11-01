@@ -1,18 +1,18 @@
 /*******************************************************************************
- * Copyright 2016, 2018 elasql.org contributors
- *
+ * Copyright 2016 vanilladb.org
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *******************************************************************************/
+ ******************************************************************************/
 package org.elasql.remote.groupcomm.server;
 
 import java.util.concurrent.BlockingQueue;
@@ -91,6 +91,10 @@ public class ConnectionMgr
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
 
+	public void sendBroadcastRequest(Object[] objs, boolean isAppiaThread) {
+		serverAppl.sendBroadcastRequest(objs, isAppiaThread);
+	}
+
 	public void callStoredProc(int pid, Object... pars) {
 		StoredProcedureCall[] spcs = { new StoredProcedureCall(myId, pid, pars) };
 		serverAppl.sendTotalOrderRequest(spcs);
@@ -103,12 +107,15 @@ public class ConnectionMgr
 
 	@Override
 	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
-		if (sequencerMode)
-			return;
-
 		Object msg = p2pmsg.getMessage();
 		if (msg.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) msg;
+			
+//			if (ts.sinkId() == MigrationMgr.MSG_COLD_FINISH) {
+//				Elasql.migrationMgr().onReceiveColdMigrationFinish();
+//				return;
+//			}
+			
 			for (Tuple t : ts.getTupleSet())
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
 		} else
@@ -130,5 +137,10 @@ public class ConnectionMgr
 	@Override
 	public void onNodeFail(int id, ChannelType ct) {
 		// do nothing
+	}
+
+	@Override
+	public String mkClientResponse(Object o) {
+		return null;
 	}
 }
