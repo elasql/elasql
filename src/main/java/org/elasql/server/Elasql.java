@@ -138,6 +138,7 @@ public class Elasql extends VanillaDb {
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
 			initConnectionMgr(myNodeId, true);
+			migraMgr = migrationMgr;
 			try {
 				migraSysControl = (MigrationSystemController) migrationSystemControllerCls.newInstance();
 			} catch (InstantiationException | IllegalAccessException e) {
@@ -267,6 +268,10 @@ public class Elasql extends VanillaDb {
 	
 	public static MigrationMgr migrationMgr() {
 		return migraMgr;
+	}
+	
+	public static MigrationSystemController migraSysControl() {
+		return migraSysControl;
 	}
 
 	// ===============

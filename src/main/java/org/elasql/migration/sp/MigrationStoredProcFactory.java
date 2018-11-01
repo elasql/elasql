@@ -25,6 +25,9 @@ public class MigrationStoredProcFactory implements CalvinStoredProcedureFactory 
 			case SP_BG_PUSH:
 				sp = new BgPushProcedure(txNum);
 				break;
+			case SP_MIGRATION_END:
+				sp = new MigrationEndProcedure(txNum);
+				break;
 			default:
 				sp = underlayerFactory.getStoredProcedure(pid, txNum);
 		}

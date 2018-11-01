@@ -1,6 +1,8 @@
 package org.elasql.migration;
 
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
@@ -8,6 +10,7 @@ import java.util.logging.Logger;
 
 import org.elasql.migration.sp.MigrationStoredProcFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.migration.CrabbingAnalyzer;
 import org.elasql.server.Elasql;
@@ -69,6 +72,14 @@ public abstract class MigrationMgr {
 					}
 				}
 				
+				if (lastChunk != null) {
+					sendBGPushRequest(new HashSet<RecordKey>(), lastUpdate.getSourcePartId(),
+							lastUpdate.getDestPartId());
+					lastChunk = null;
+					lastUpdate = null;
+					return;
+				}	
+				
 				// If it reach here, it means that there is no more chunk
 				sendRangeFinishNotification();
 			}
@@ -122,14 +133,25 @@ public abstract class MigrationMgr {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a range finish notification to the system controller");
 		
-		// TODO
+		TupleSet ts = new TupleSet(MigrationSystemController.MSG_RANGE_FINISH);
+		ts.setMetadata(new Serializable[] {pushRanges.size()}); // notify how many ranges are migrated
+		Elasql.connectionMgr().pushTupleSet(MigrationSystemController.CONTROLLER_NODE_ID, ts);
 	}
 	
 	public void finishMigration() {
-		// TODO
+		if (logger.isLoggable(Level.INFO)) {
+			long time = System.currentTimeMillis() - Elasql.SYSTEM_INIT_TIME_MS;
+			logger.info(String.format("the migration finishes at %d."
+					, time / 1000));
+		}
 		
 		// Change the current partition plan of the system
-//		Elasql.partitionMetaMgr().startMigration(newPartitionPlan);
+		Elasql.partitionMetaMgr().setNewPartitionPlan(newPartitionPlan);
+		
+		// Clear the migration states
+		currentPhase = Phase.NORMAL;
+		migrationRanges.clear();
+		pushRanges.clear();
 	}
 	
 	public boolean isMigratingRecord(RecordKey key) {

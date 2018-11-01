@@ -145,7 +145,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.SEVERE))
-				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan + paramHelper.getClass().getSimpleName());
+				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan);
 			e.printStackTrace();
 			tx.rollback();
 			paramHelper.setCommitted(false);

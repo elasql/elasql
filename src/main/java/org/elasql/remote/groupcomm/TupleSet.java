@@ -29,10 +29,19 @@ public class TupleSet implements Serializable {
 	private static final long serialVersionUID = 3191495851408477607L;
 	private List<Tuple> tuples;
 	private int sinkId;
+	private Serializable[] metadata;
 
 	public TupleSet(int sinkId) {
 		this.tuples = new ArrayList<Tuple>();
 		this.sinkId = sinkId;
+	}
+	
+	public void setMetadata(Serializable[] array){
+		metadata = array;
+	}
+	
+	public Serializable[] getMetadata(){
+		return metadata;
 	}
 
 	public List<Tuple> getTupleSet() {

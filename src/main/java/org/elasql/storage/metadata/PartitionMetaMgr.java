@@ -54,6 +54,10 @@ public class PartitionMetaMgr {
 		return partPlan.getPartition(key);
 	}
 	
+	public void setNewPartitionPlan(PartitionPlan newPlan) {
+		partPlan = newPlan;
+	}
+	
 	public PartitionPlan getPartitionPlan() {
 		return partPlan;
 	}
