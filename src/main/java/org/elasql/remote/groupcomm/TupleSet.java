@@ -47,4 +47,8 @@ public class TupleSet implements Serializable {
 	public int sinkId() {
 		return sinkId;
 	}
+	
+	public int size() {
+		return tuples.size();
+	}
 }

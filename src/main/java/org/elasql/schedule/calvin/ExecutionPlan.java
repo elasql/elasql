@@ -138,7 +138,7 @@ public class ExecutionPlan {
 	
 	public boolean isReadOnly() {
 		return localUpdateKeys.isEmpty() && localInsertKeys.isEmpty() &&
-				localDeleteKeys.isEmpty();
+				localDeleteKeys.isEmpty() && insertsForMigration.isEmpty();
 	}
 	
 	public boolean hasLocalReads() {

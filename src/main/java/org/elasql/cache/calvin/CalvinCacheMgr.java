@@ -16,7 +16,9 @@
 package org.elasql.cache.calvin;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -45,6 +47,7 @@ public class CalvinCacheMgr {
 	// For single thread
 	private Transaction tx;
 	private Map<RecordKey, CachedRecord> cachedRecords;
+	private Set<RecordKey> writeKeys;
 	
 	// For multi-threading
 	private BlockingQueue<KeyRecordPair> inbox;
@@ -52,6 +55,7 @@ public class CalvinCacheMgr {
 	CalvinCacheMgr(CalvinPostOffice postOffice, Transaction tx) {
 		this.tx = tx;
 		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
+		this.writeKeys = new HashSet<RecordKey>();
 	}
 	
 	/**
@@ -121,6 +125,7 @@ public class CalvinCacheMgr {
 	public void update(RecordKey key, CachedRecord rec) {
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		cachedRecords.put(key, rec);
+		writeKeys.add(key);
 	}
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
@@ -128,6 +133,7 @@ public class CalvinCacheMgr {
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		rec.setNewInserted(true);
 		cachedRecords.put(key, rec);
+		writeKeys.add(key);
 	}
 
 	public void delete(RecordKey key) {
@@ -135,12 +141,12 @@ public class CalvinCacheMgr {
 		dummyRec.setSrcTxNum(tx.getTransactionNumber());
 		dummyRec.delete();
 		cachedRecords.put(key, dummyRec);
+		writeKeys.add(key);
 	}
 	
 	public void flush() {
-		for (Map.Entry<RecordKey, CachedRecord> entry : cachedRecords.entrySet()) {
-			RecordKey key = entry.getKey();
-			CachedRecord rec = entry.getValue();
+		for (RecordKey key : writeKeys) {
+			CachedRecord rec = cachedRecords.get(key);
 			
 			if (rec.isDeleted())
 				VanillaCoreCrud.delete(key, tx);

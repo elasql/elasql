@@ -141,9 +141,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			tx.commit();
 			paramHelper.setCommitted(true);
 			
+			afterCommit();
+			
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.SEVERE))
-				logger.severe("Execution plan: " + execPlan);
+				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan + paramHelper.getClass().getSimpleName());
 			e.printStackTrace();
 			tx.rollback();
 			paramHelper.setCommitted(false);
@@ -191,6 +193,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		
 		// perform insertions for migrations (if there is any)
 		performInsertionForMigrations(readings);
+	}
+	
+	protected void afterCommit() {
+		// Used for clean up or notification.
 	}
 	
 	protected void update(RecordKey key, CachedRecord rec) {

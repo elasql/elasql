@@ -1,9 +1,13 @@
 package org.elasql.migration;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.migration.sp.MigrationStoredProcFactory;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.migration.CrabbingAnalyzer;
 import org.elasql.server.Elasql;
@@ -19,8 +23,13 @@ import org.elasql.storage.metadata.PartitionPlan;
 public abstract class MigrationMgr {
 	private static Logger logger = Logger.getLogger(MigrationMgr.class.getName());
 	
+	private static final int CHUNK_SIZE = 1_000_000; // 1MB
+	
 	private Phase currentPhase = Phase.NORMAL;
 	private List<MigrationRange> migrationRanges;
+	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
+	private Set<RecordKey> lastChunk;
+	private MigrationRangeUpdate lastUpdate;
 	private PartitionPlan newPartitionPlan;
 	
 	public void initializeMigration(PartitionPlan newPartPlan, Phase initialPhase) {
@@ -32,11 +41,88 @@ public abstract class MigrationMgr {
 		
 		currentPhase = initialPhase;
 		migrationRanges = generateMigrationRanges(newPartPlan);
+		for (MigrationRange range : migrationRanges)
+			if (range.getDestPartId() == Elasql.serverId())
+				pushRanges.add(range);
 		newPartitionPlan = newPartPlan;
+		
+		if (!pushRanges.isEmpty())
+			scheduleNextBGPushRequest();
 		
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("migration ranges: %s", migrationRanges.toString()));
 		}
+	}
+	
+	public void scheduleNextBGPushRequest() {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				for (MigrationRange range : pushRanges) {
+					Set<RecordKey> chunk = range.generateNextMigrationChunk(CHUNK_SIZE);
+					if (chunk.size() > 0) {
+						sendBGPushRequest(chunk, range.getSourcePartId(), 
+								range.getDestPartId());
+						lastChunk = chunk;
+						lastUpdate = range.generateStatusUpdate();
+						return;
+					}
+				}
+				
+				// If it reach here, it means that there is no more chunk
+				sendRangeFinishNotification();
+			}
+		}).start();
+	}
+	
+	public void sendBGPushRequest(Set<RecordKey> chunk, int sourceNodeId, int destNodeId) {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("send a background push request with " + chunk.size() + " keys.");
+		
+		// Prepare the parameters
+		Object[] params;
+		if (lastChunk == null) {
+			params = new Object[5 + chunk.size()];
+		} else {
+			params = new Object[5 + chunk.size() + lastChunk.size()];
+		}
+		
+		params[0] = lastUpdate;
+		params[1] = sourceNodeId;
+		params[2] = destNodeId;
+		
+		params[3] = chunk.size();
+		
+		int i = 4;
+		for (RecordKey key : chunk)
+			params[i++] = key;
+		
+		if (lastChunk == null) {
+			params[i++] = 0;
+		} else {
+			params[i++] = lastChunk.size();
+			for (RecordKey key : lastChunk)
+				params[i++] = key;
+		}
+		
+		// Send a store procedure call
+		Object[] call = { new StoredProcedureCall(-1, -1, 
+				MigrationStoredProcFactory.SP_BG_PUSH, params)};
+		Elasql.connectionMgr().sendBroadcastRequest(call, false);
+	}
+	
+	public void updateMigrationRange(MigrationRangeUpdate update) {
+		for (MigrationRange range : migrationRanges)
+			if (range.updateMigrationStatus(update))
+				return;
+		throw new RuntimeException(String.format("This is no match for the update", update));
+	}
+	
+	public void sendRangeFinishNotification() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("send a range finish notification to the system controller");
+		
+		// TODO
 	}
 	
 	public void finishMigration() {

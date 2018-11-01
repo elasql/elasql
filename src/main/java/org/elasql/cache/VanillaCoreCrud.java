@@ -15,7 +15,9 @@
  *******************************************************************************/
 package org.elasql.cache;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.query.algebra.Plan;
 import org.vanilladb.core.query.algebra.SelectPlan;
@@ -33,9 +36,13 @@ import org.vanilladb.core.query.algebra.index.IndexSelectPlan;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.ConstantRange;
+import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.storage.index.Index;
 import org.vanilladb.core.storage.index.SearchKey;
+import org.vanilladb.core.storage.index.SearchRange;
+import org.vanilladb.core.storage.metadata.TableInfo;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
+import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -71,6 +78,104 @@ public class VanillaCoreCrud {
 		tx.endStatement();
 
 		return rec;
+	}
+	
+	public static Map<RecordKey, CachedRecord> batchRead(Set<RecordKey> keys, Transaction tx) {
+		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
+
+		// Check if all record keys are in the same table
+		RecordKey representative = null;
+		String tblName = null;
+		for (RecordKey key : keys) {
+			if (representative == null) {
+				representative = key;
+				tblName = representative.getTableName();
+			} else if (!tblName.equals(key.getTableName()))
+				throw new RuntimeException("request keys are not in the same table");
+		}
+
+		// Open an index
+		IndexInfo ii = null;
+		Index index = null;
+
+		// We only need one index
+		for (String fldName : representative.getKeyFldSet()) {
+			List<IndexInfo> iis = Elasql.catalogMgr().getIndexInfo(tblName, fldName, tx);
+			if (iis != null && iis.size() > 0) {
+				ii = iis.get(0);
+				index = ii.open(tx);
+				break;
+			}
+		}
+		
+		if (ii == null)
+			throw new RuntimeException("cannot find a index for " + representative);
+
+		// Search record ids for record keys
+		// Map<RecordId, Set<RecordKey>> ridToSearchKey = new HashMap<RecordId,
+		// Set<RecordKey>>();
+		Set<RecordId> searchRidSet = new HashSet<RecordId>(50000);
+		List<RecordId> searchRids = new ArrayList<RecordId>();
+		RecordId rid = null;
+
+		for (RecordKey key : keys) {
+			SearchKey searchKey = new SearchKey(ii.fieldNames(), key.getKeyEntryMap());
+			index.beforeFirst(new SearchRange(searchKey));
+
+			while (index.next()) {
+				rid = index.getDataRecordId();
+				searchRidSet.add(rid);
+			}
+		}
+		searchRids.addAll(searchRidSet);
+		index.close();
+
+		// Sort the record ids
+		Collections.sort(searchRids);
+
+		// Open a record file
+		TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		Schema sch = ti.schema();
+		RecordFile recordFile = ti.open(tx, false);
+		CachedRecord record = null;
+
+		for (RecordId id : searchRids) {
+
+			// Skip the record that has been found
+			// if (recordMap.containsKey(searchKey))
+			// continue;
+
+			// Move to the record
+			recordFile.moveToRecordId(id);
+			Map<String, Constant> tmpFldVals = new HashMap<String, Constant>();
+			for (String fld : representative.getKeyFldSet()) {
+				tmpFldVals.put(fld, recordFile.getVal(fld));
+			}
+			RecordKey targetKey = new RecordKey(representative.getTableName(), tmpFldVals);
+			if (keys.contains(targetKey) && !recordMap.containsKey(targetKey)) {
+
+				// Construct a CachedRecord
+				Map<String, Constant> fldVals = new HashMap<String, Constant>();
+				for (String fld : sch.fields()) {
+					if (targetKey.getKeyFldSet().contains(fld)) {
+						fldVals.put(fld, targetKey.getKeyVal(fld));
+					} else {
+						fldVals.put(fld, recordFile.getVal(fld));
+					}
+				}
+				record = new CachedRecord(fldVals);
+				record.setSrcTxNum(tx.getTransactionNumber());
+
+				// Put the record to the map
+				recordMap.put(targetKey, record);
+
+			}
+		}
+		recordFile.close();
+		
+		tx.endStatement();
+
+		return recordMap;
 	}
 
 	public static void update(RecordKey key, CachedRecord rec, Transaction tx) {

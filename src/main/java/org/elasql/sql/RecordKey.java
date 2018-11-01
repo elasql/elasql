@@ -82,6 +82,10 @@ public class RecordKey implements Serializable {
 		return keyEntryMap.keySet();
 	}
 
+	public Map<String, Constant> getKeyEntryMap() {
+		return keyEntryMap;
+	}
+
 	public Constant getKeyVal(String fld) {
 		return keyEntryMap.get(fld);
 	}

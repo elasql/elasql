@@ -17,4 +17,8 @@ public interface MigrationRange {
 	int getSourcePartId();
 	
 	int getDestPartId();
+	
+	MigrationRangeUpdate generateStatusUpdate();
+	
+	boolean updateMigrationStatus(MigrationRangeUpdate update);
 }
