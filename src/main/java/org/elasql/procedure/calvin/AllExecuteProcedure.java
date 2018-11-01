@@ -24,6 +24,7 @@ import java.util.logging.Logger;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
@@ -65,7 +66,11 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		StandardAnalyzer analyzer = new StandardAnalyzer();
 		prepareKeys(analyzer);
 		
-		// XXX: We does not use the analyzer
+		// generate execution plan
+		execPlan = analyzer.generatePlan();
+		
+		// Force active participant
+		execPlan.setParticipantRole(ParticipantRole.ACTIVE);
 		
 		// for the cache layer
 		// NOTE: always creates a CacheMgr that can accept remote records
@@ -73,14 +78,14 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		cacheMgr = postOffice.createCacheMgr(tx, true);
 	}
 	
-	public boolean isParticipated() {
-		// Only return true in order to force all nodes to participate.
-		return true;
-	}
-	
 	public boolean willResponseToClients() {
 		// The master node is the only one that will response to the clients.
 		return localNodeId == MASTER_NODE;
+	}
+
+	@Override
+	public boolean isReadOnly() {
+		return false;
 	}
 
 	@Override

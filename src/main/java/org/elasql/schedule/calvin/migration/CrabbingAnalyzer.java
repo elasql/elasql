@@ -1,6 +1,8 @@
 package org.elasql.schedule.calvin.migration;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.elasql.migration.MigrationMgr;
@@ -28,6 +30,11 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 	private Set<Integer> activeParticipants = new HashSet<Integer>();
 	private Set<RecordKey> fullyRepReadKeys = new HashSet<RecordKey>();
 	
+	// To avoid the source and the dest node push migrated records to each other
+	private Map<RecordKey, Integer> ignoreMigratedKeys = new HashMap<RecordKey, Integer>();
+	// To update the migrating records in the end for all the nodes
+	private Set<RecordKey> migratingRecords = new HashSet<RecordKey>();
+	
 	public CrabbingAnalyzer() {
 		execPlan = new ExecutionPlan();
 		readsPerNodes = new int[Elasql.partitionMetaMgr().getCurrentNumOfParts()];
@@ -47,6 +54,8 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 			activePartReadFullyReps();
 		}
 		
+		updateMigrationStatus();
+		
 		return execPlan;
 	}
 
@@ -60,25 +69,34 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 				int sourceNode = migraMgr.checkSourceNode(readKey);
 				int destNode = migraMgr.checkDestNode(readKey);
 				
-				if (localNodeId == sourceNode) {
-					execPlan.addLocalReadKey(readKey);
-					if (!migraMgr.isMigrated(readKey)) {
+				if (migraMgr.isMigrated(readKey)) {
+					if (localNodeId == sourceNode || localNodeId == destNode) {
+						execPlan.addLocalReadKey(readKey);
+						
+						if (localNodeId == sourceNode)
+							ignoreMigratedKeys.put(readKey, destNode);
+						else if (localNodeId == destNode)
+							ignoreMigratedKeys.put(readKey, sourceNode);
+					} else
+						execPlan.addRemoteReadKey(readKey);
+				} else {
+					
+					if (localNodeId == sourceNode) {
+						execPlan.addLocalReadKey(readKey);
 						// Force it to push
 						activeParticipants.add(sourceNode);
 						activeParticipants.add(destNode);
-					}
-				} else if (localNodeId == destNode) {
-					if (migraMgr.isMigrated(readKey)) {
-						execPlan.addLocalReadKey(readKey);
-					} else {
+					} else if (localNodeId == destNode) {
 						execPlan.addRemoteReadKey(readKey);
 						execPlan.addInsertForMigration(readKey);
 						// Force it to push
 						activeParticipants.add(sourceNode);
 						activeParticipants.add(destNode);
+					} else {
+						execPlan.addRemoteReadKey(readKey);
 					}
-				} else {
-					execPlan.addRemoteReadKey(readKey);
+
+					migratingRecords.add(readKey);
 				}
 				
 				readsPerNodes[sourceNode]++;
@@ -105,17 +123,18 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 				int sourceNode = migraMgr.checkSourceNode(updateKey);
 				int destNode = migraMgr.checkDestNode(updateKey);
 				
-				if (localNodeId == sourceNode || localNodeId == destNode) {
+				if (localNodeId == sourceNode || localNodeId == destNode)
 					execPlan.addLocalUpdateKey(updateKey);
 					
-					if (!migraMgr.isMigrated(updateKey)) {
-						if (localNodeId == sourceNode) {
-							execPlan.addLocalReadKey(updateKey);
-						} else if (localNodeId == destNode) {
-							execPlan.addRemoteReadKey(updateKey);
-							execPlan.addInsertForMigration(updateKey);
-						}
+				if (!migraMgr.isMigrated(updateKey)) {
+					if (localNodeId == sourceNode) {
+						execPlan.addLocalReadKey(updateKey);
+					} else if (localNodeId == destNode) {
+						execPlan.addRemoteReadKey(updateKey);
+						execPlan.addInsertForMigration(updateKey);
 					}
+					
+					migratingRecords.add(updateKey);
 				}
 				
 				activeParticipants.add(sourceNode);
@@ -204,16 +223,28 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	private void generatePushSets() {
-		Set<Integer> targets = new HashSet<Integer>(activeParticipants);
-		targets.remove(localNodeId);
+		for (Integer target : activeParticipants) {
+			if (target != localNodeId) {
+				for (RecordKey key : execPlan.getLocalReadKeys())
+					execPlan.addPushSet(target, key);
+			}
+		}
 		
-		if (!targets.isEmpty()) {
-			execPlan.addPushSet(execPlan.getLocalReadKeys(), targets);
+		// Ignore the migrated records for the source and the destinations
+		for (Map.Entry<RecordKey, Integer> entry : ignoreMigratedKeys.entrySet()) {
+			RecordKey k = entry.getKey();
+			Integer target = entry.getValue();
+			execPlan.removeFromPushSet(target, k);
 		}
 	}
 	
 	private void activePartReadFullyReps() {
 		for (RecordKey key : fullyRepReadKeys)
 			execPlan.addLocalReadKey(key);
+	}
+	
+	private void updateMigrationStatus() {
+		for (RecordKey key : migratingRecords)
+			migraMgr.setMigrated(key);
 	}
 }

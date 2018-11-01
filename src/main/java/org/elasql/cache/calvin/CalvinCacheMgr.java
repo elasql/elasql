@@ -69,7 +69,6 @@ public class CalvinCacheMgr {
 	 */
 	public void notifyTxCommitted() {
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		inbox = null;
 		
 		// Notify the post office the transaction has committed
 		postOffice.notifyTxCommitted(tx.getTransactionNumber());
@@ -99,6 +98,9 @@ public class CalvinCacheMgr {
 					+ " call prepareForRemotes() before receiving remote records.");
 		
 		try {
+			String name = Thread.currentThread().getName();
+			Thread.currentThread().setName(name + " waits for " + key + " from remote.");
+			
 			// Wait for remote records
 			KeyRecordPair pair = inbox.take();
 			while (!pair.key.equals(key)) {
@@ -106,6 +108,9 @@ public class CalvinCacheMgr {
 				pair = inbox.take();
 			}
 			rec = pair.record;
+			
+			Thread.currentThread().setName(name);
+			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -147,6 +152,8 @@ public class CalvinCacheMgr {
 	}
 	
 	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
+		if (inbox == null)
+			throw new RuntimeException("No inbox for " + key + " on Tx." + tx.getTransactionNumber());
 		inbox.add(new KeyRecordPair(key, rec));
 	}
 }

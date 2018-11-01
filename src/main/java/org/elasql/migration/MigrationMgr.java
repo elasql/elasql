@@ -60,6 +60,15 @@ public abstract class MigrationMgr {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
+	public void setMigrated(RecordKey key) {
+		for (MigrationRange range : migrationRanges)
+			if (range.contains(key)) {
+				range.setMigrated(key);
+				return;
+			}
+		throw new RuntimeException(String.format("%s is not a migrating record", key));
+	}
+	
 	public int checkSourceNode(RecordKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))

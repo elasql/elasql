@@ -24,6 +24,7 @@ import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.migration.sp.MigrationStoredProcFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -125,7 +126,7 @@ public class Elasql extends VanillaDb {
 	}
 	
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
-			PartitionPlan partitionPlan, MigrationMgr migrationMgr, MigrationSystemController migrationSystemController) {
+			PartitionPlan partitionPlan, MigrationMgr migrationMgr, Class<?> migrationSystemControllerCls) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
@@ -137,7 +138,11 @@ public class Elasql extends VanillaDb {
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
 			initConnectionMgr(myNodeId, true);
-			migraSysControl = migrationSystemController;
+			try {
+				migraSysControl = (MigrationSystemController) migrationSystemControllerCls.newInstance();
+			} catch (InstantiationException | IllegalAccessException e) {
+				e.printStackTrace();
+			}
 			return;
 		}
 
@@ -203,7 +208,7 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static Scheduler initCalvinScheduler(CalvinStoredProcedureFactory factory) {
-		CalvinScheduler scheduler = new CalvinScheduler(factory);
+		CalvinScheduler scheduler = new CalvinScheduler(new MigrationStoredProcFactory(factory));
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}

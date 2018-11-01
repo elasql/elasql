@@ -27,7 +27,6 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	
 	@Override
 	public ExecutionPlan generatePlan() {
-		
 		decideRole();
 		
 		if (execPlan.getParticipantRole() != ParticipantRole.IGNORE) {
@@ -114,11 +113,11 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	private void generatePushSets() {
-		Set<Integer> targets = new HashSet<Integer>(activeParticipants);
-		targets.remove(localNodeId);
-		
-		if (!targets.isEmpty()) {
-			execPlan.addPushSet(execPlan.getLocalReadKeys(), targets);
+		for (Integer target : activeParticipants) {
+			if (target != localNodeId) {
+				for (RecordKey key : execPlan.getLocalReadKeys())
+					execPlan.addPushSet(target, key);
+			}
 		}
 	}
 	

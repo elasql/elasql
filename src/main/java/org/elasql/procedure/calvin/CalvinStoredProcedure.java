@@ -18,6 +18,9 @@ package org.elasql.procedure.calvin;
 import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
@@ -26,7 +29,6 @@ import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
-import org.elasql.schedule.calvin.ExecutionPlan.PushSet;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
@@ -40,14 +42,14 @@ import org.vanilladb.core.storage.tx.Transaction;
 
 public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper>
 		implements DdStoredProcedure {
+	private static Logger logger = Logger.getLogger(CalvinStoredProcedure.class.getName());
 
 	// Protected resource
 	protected Transaction tx;
 	protected long txNum;
 	protected H paramHelper;
 	protected CalvinCacheMgr cacheMgr;
-	
-	private ExecutionPlan execPlan;
+	protected ExecutionPlan execPlan;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
@@ -89,6 +91,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// generate execution plan
 		execPlan = analyzer.generatePlan();
 		
+		// Debug
+//		if (Elasql.migrationMgr().isInMigration()) {
+//			System.out.println("Tx." + txNum + "'s execution plan:\n" + execPlan);
+//		}
+		
 		// create a transaction
 		tx = Elasql.txMgr().newTransaction(
 				Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
@@ -110,6 +117,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		ccMgr.bookWriteKeys(execPlan.getLocalUpdateKeys());
 		ccMgr.bookWriteKeys(execPlan.getLocalInsertKeys());
 		ccMgr.bookWriteKeys(execPlan.getLocalDeleteKeys());
+		ccMgr.bookWriteKeys(execPlan.getInsertsForMigration());
 	}
 
 	private void getConservativeLocks() {
@@ -134,6 +142,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			paramHelper.setCommitted(true);
 			
 		} catch (Exception e) {
+			if (logger.isLoggable(Level.SEVERE))
+				logger.severe("Execution plan: " + execPlan);
 			e.printStackTrace();
 			tx.rollback();
 			paramHelper.setCommitted(false);
@@ -204,6 +214,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Read local records (for both active or passive participants)
 		for (RecordKey k : execPlan.getLocalReadKeys()) {
 			CachedRecord rec = cacheMgr.readFromLocal(k);
+			if (rec == null)
+				throw new RuntimeException("cannot find the record for " + k + " in the local stroage");
 			localReadings.put(k, rec);
 		}
 		
@@ -211,17 +223,21 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	}
 
 	private void pushReadingsToRemotes(Map<RecordKey, CachedRecord> readings) {
-		for (PushSet pushSet : execPlan.getPushSets()) {
-			TupleSet ts = new TupleSet(-1);
+		for (Map.Entry<Integer, Set<RecordKey>> entry : execPlan.getPushSets().entrySet()) {
+			Integer targetNodeId = entry.getKey();
+			Set<RecordKey> keys = entry.getValue();
 			
 			// Construct pushing tuple set
-			for (RecordKey key : pushSet.getPushKeys()) {
+			TupleSet ts = new TupleSet(-1);
+			for (RecordKey key : keys) {
+				CachedRecord rec = readings.get(key);
+				if (rec == null)
+					throw new RuntimeException("cannot find the record for " + key);
 				ts.addTuple(key, txNum, txNum, readings.get(key));
 			}
 			
-			// Push to all targets
-			for (Integer n : pushSet.getPushNodeIds())
-				Elasql.connectionMgr().pushTupleSet(n, ts);
+			// Push to the target
+			Elasql.connectionMgr().pushTupleSet(targetNodeId, ts);
 		}
 	}
 

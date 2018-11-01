@@ -17,6 +17,8 @@ package org.elasql.schedule.calvin;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
@@ -28,6 +30,7 @@ import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public class CalvinScheduler extends Task implements Scheduler {
+	private static Logger logger = Logger.getLogger(CalvinScheduler.class.getName());
 	
 	private CalvinStoredProcedureFactory factory;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
@@ -48,10 +51,11 @@ public class CalvinScheduler extends Task implements Scheduler {
 
 	@Override
 	public void run() {
+		StoredProcedureCall call = null;
 		while (true) {
 			try {
 				// retrieve stored procedure call
-				StoredProcedureCall call = spcQueue.take();
+				call = spcQueue.take();
 				if (call.isNoOpStoredProcCall())
 					continue;
 
@@ -82,6 +86,10 @@ public class CalvinScheduler extends Task implements Scheduler {
 				VanillaDb.taskMgr().runTask(spt);
 
 			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} catch (Exception e) {
+				if (logger.isLoggable(Level.SEVERE))
+					logger.severe("detect Exception in the scheduler, current sp call: " + call);
 				e.printStackTrace();
 			}
 

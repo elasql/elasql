@@ -19,7 +19,8 @@ public abstract class MigrationSystemController {
 	
 	private static final Phase INIT_PHASE = Phase.CRABBING;
 	
-	private static final long START_MIGRATION_TIME = 180_000;
+	private static final long START_MIGRATION_TIME = 60_000;
+//	private static final long START_MIGRATION_TIME = 1000_000;
 	
 	public MigrationSystemController() {
 		if (logger.isLoggable(Level.INFO))

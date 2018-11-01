@@ -24,4 +24,8 @@ public class MigrationStartProcedure extends CalvinStoredProcedure<MigrationStar
 	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
 		
 	}
+	
+	public boolean willResponseToClients() {
+		return false;
+	}
 }

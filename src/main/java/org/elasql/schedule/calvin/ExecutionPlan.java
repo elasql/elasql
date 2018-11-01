@@ -1,8 +1,8 @@
 package org.elasql.schedule.calvin;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.elasql.sql.RecordKey;
@@ -27,6 +27,11 @@ public class ExecutionPlan {
 		public Set<Integer> getPushNodeIds() {
 			return nodeIds;
 		}
+		
+		@Override
+		public String toString() {
+			return "Keys: " + keys + ", targets: " + nodeIds;
+		}
 	}
 	
 	private ParticipantRole role = ParticipantRole.IGNORE;
@@ -38,7 +43,7 @@ public class ExecutionPlan {
 	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> localDeleteKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> insertsForMigration = new HashSet<RecordKey>();
-	private List<PushSet> pushSets = new ArrayList<PushSet>();
+	private Map<Integer, Set<RecordKey>> pushSets = new HashMap<Integer, Set<RecordKey>>();
 
 	public void addLocalReadKey(RecordKey key) {
 		localReadKeys.add(key);
@@ -64,8 +69,23 @@ public class ExecutionPlan {
 		insertsForMigration.add(key);
 	}
 	
-	public void addPushSet(Set<RecordKey> keys, Set<Integer> nodeIds) {
-		pushSets.add(new PushSet(new HashSet<RecordKey>(keys), nodeIds));
+	public void addPushSet(Integer targetNodeId, RecordKey key) {
+		Set<RecordKey> keys = pushSets.get(targetNodeId);
+		if (keys == null) {
+			keys = new HashSet<RecordKey>();
+			pushSets.put(targetNodeId, keys);
+		}
+		keys.add(key);
+	}
+	
+	public void removeFromPushSet(Integer targetNodeId, RecordKey key) {
+		Set<RecordKey> keys = pushSets.get(targetNodeId);
+		if (keys != null) {
+			keys.remove(key);
+			
+			if (keys.size() == 0)
+				pushSets.remove(targetNodeId);
+		}
 	}
 	
 	public Set<RecordKey> getLocalReadKeys() {
@@ -104,7 +124,7 @@ public class ExecutionPlan {
 		return insertsForMigration;
 	}
 	
-	public List<PushSet> getPushSets() {
+	public Map<Integer, Set<RecordKey>> getPushSets() {
 		return pushSets;
 	}
 	
@@ -127,5 +147,29 @@ public class ExecutionPlan {
 	
 	public boolean hasRemoteReads() {
 		return !remoteReadKeys.isEmpty();
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		
+		sb.append("Role: " + role);
+		sb.append('\n');
+		sb.append("Local Reads: " + localReadKeys);
+		sb.append('\n');
+		sb.append("Remote Reads: " + remoteReadKeys);
+		sb.append('\n');
+		sb.append("Local Updates: " + localUpdateKeys);
+		sb.append('\n');
+		sb.append("Local Inserts: " + localInsertKeys);
+		sb.append('\n');
+		sb.append("Local Deletes: " + localDeleteKeys);
+		sb.append('\n');
+		sb.append("Inserts for migrations: " + insertsForMigration);
+		sb.append('\n');
+		sb.append("Push Sets: " + pushSets);
+		sb.append('\n');
+		
+		return sb.toString();
 	}
 }

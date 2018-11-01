@@ -116,7 +116,7 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
-//				String name = Thread.currentThread().getName();
+				String name = Thread.currentThread().getName();
 				
 				/*
 				 * If this transaction is not the first one requesting this
@@ -125,10 +125,10 @@ public class ConservativeOrderedLockTable {
 				Long head = lockers.requestQueue.peek();
 				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
 					
-//					long target = lockers.xLocker;
-//					if (target == -1)
-//						target = head;
-//					Thread.currentThread().setName(name + " waits for slock of " + obj + " from tx." + target);
+					long target = lockers.xLocker;
+					if (target == -1)
+						target = head;
+					Thread.currentThread().setName(name + " waits for slock of " + obj + " from tx." + target);
 					
 					anchor.wait();
 
@@ -139,7 +139,7 @@ public class ConservativeOrderedLockTable {
 					head = lockers.requestQueue.peek();
 				}
 
-//				Thread.currentThread().setName(name);
+				Thread.currentThread().setName(name);
 				
 				if (!sLockable(lockers, txNum))
 					throw new LockAbortException();
@@ -184,26 +184,26 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
-//				String name = Thread.currentThread().getName();
+				String name = Thread.currentThread().getName();
 				
 				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
 				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
 				/* && !waitingTooLong(timestamp) */) {
 					
-//					long target = lockers.xLocker;
-//					if (target == -1 && !lockers.sLockers.isEmpty())
-//						target = lockers.sLockers.get(0);
-//					if (target == -1)
-//						target = head;
-//					Thread.currentThread().setName(name + " waits for xlock of " + obj + " from tx." + target);
+					long target = lockers.xLocker;
+					if (target == -1 && !lockers.sLockers.isEmpty())
+						target = lockers.sLockers.get(0);
+					if (target == -1)
+						target = head;
+					Thread.currentThread().setName(name + " waits for xlock of " + obj + " from tx." + target);
 					
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
 
-//				Thread.currentThread().setName(name);
+				Thread.currentThread().setName(name);
 				
 				// if (!xLockable(lockers, txNum))
 				// throw new LockAbortException();

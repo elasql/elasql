@@ -96,16 +96,24 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 			if (!writeObjs.contains(obj))
 				lockTbl.sLock(obj, txNum);
 	}
-
+	
+	@Override
 	public void onTxCommit(Transaction tx) {
 		releaseLocks();
 	}
-
+	
+	@Override
 	public void onTxRollback(Transaction tx) {
 		releaseLocks();
 	}
 
+	@Override
 	public void onTxEndStatement(Transaction tx) {
+		
+	}
+	
+	@Override
+	public void onIndexClosed() {
 		// Next-key lock algorithm is non-deterministic. It may
 		// cause deadlocks during the execution. Therefore,
 		// we release the locks earlier to prevent deadlocks.

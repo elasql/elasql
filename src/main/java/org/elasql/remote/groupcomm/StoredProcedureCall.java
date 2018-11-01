@@ -16,6 +16,7 @@
 package org.elasql.remote.groupcomm;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 /**
  * 
@@ -81,5 +82,11 @@ public class StoredProcedureCall implements Serializable {
 
 	public boolean isNoOpStoredProcCall() {
 		return pid == PID_NO_OPERATION;
+	}
+	
+	@Override
+	public String toString() {
+		return "{Tx." + txNum + ", pars: " + Arrays.toString(objs) + ", issued client " +
+					clientId + " on connection " + connectionId + "}";
 	}
 }
