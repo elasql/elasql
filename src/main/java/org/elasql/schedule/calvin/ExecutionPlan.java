@@ -36,14 +36,18 @@ public class ExecutionPlan {
 	
 	private ParticipantRole role = ParticipantRole.IGNORE;
 	
-	// Record keys
+	// Record keys for normal operations
 	private Set<RecordKey> localReadKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> remoteReadKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> localUpdateKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> localDeleteKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> insertsForMigration = new HashSet<RecordKey>();
 	private Map<Integer, Set<RecordKey>> pushSets = new HashMap<Integer, Set<RecordKey>>();
+	
+	// For foreground migrations
+	private Set<RecordKey> localReadsForMigration = new HashSet<RecordKey>();
+	private Map<Integer, Set<RecordKey>> migrationPushSets = new HashMap<Integer, Set<RecordKey>>();
+	private Set<RecordKey> incomingMigratingKeys = new HashSet<RecordKey>();
 
 	public void addLocalReadKey(RecordKey key) {
 		localReadKeys.add(key);
@@ -65,10 +69,6 @@ public class ExecutionPlan {
 		localDeleteKeys.add(key);
 	}
 	
-	public void addInsertForMigration(RecordKey key) {
-		insertsForMigration.add(key);
-	}
-	
 	public void addPushSet(Integer targetNodeId, RecordKey key) {
 		Set<RecordKey> keys = pushSets.get(targetNodeId);
 		if (keys == null) {
@@ -76,6 +76,23 @@ public class ExecutionPlan {
 			pushSets.put(targetNodeId, keys);
 		}
 		keys.add(key);
+	}
+	
+	public void addReadsForMigration(RecordKey key) {
+		localReadsForMigration.add(key);
+	}
+	
+	public void addMigrationPushSet(Integer targetNodeId, RecordKey key) {
+		Set<RecordKey> keys = migrationPushSets.get(targetNodeId);
+		if (keys == null) {
+			keys = new HashSet<RecordKey>();
+			migrationPushSets.put(targetNodeId, keys);
+		}
+		keys.add(key);
+	}
+	
+	public void addImcomingMigratingKeys(RecordKey key) {
+		incomingMigratingKeys.add(key);
 	}
 	
 	public void removeFromPushSet(Integer targetNodeId, RecordKey key) {
@@ -120,12 +137,25 @@ public class ExecutionPlan {
 		return localDeleteKeys;
 	}
 	
-	public Set<RecordKey> getInsertsForMigration() {
-		return insertsForMigration;
-	}
-	
 	public Map<Integer, Set<RecordKey>> getPushSets() {
 		return pushSets;
+	}
+	
+	public boolean hasMigrations() {
+		return !localReadsForMigration.isEmpty() || !migrationPushSets.isEmpty()
+				|| !incomingMigratingKeys.isEmpty();
+	}
+	
+	public Set<RecordKey> getLocalReadsForMigration() {
+		return localReadsForMigration;
+	}
+	
+	public Map<Integer, Set<RecordKey>> getMigrationPushSets() {
+		return migrationPushSets;
+	}
+	
+	public Set<RecordKey> getIncomingMigratingKeys() {
+		return incomingMigratingKeys;
 	}
 	
 	public void setParticipantRole(ParticipantRole role) {
@@ -138,7 +168,7 @@ public class ExecutionPlan {
 	
 	public boolean isReadOnly() {
 		return localUpdateKeys.isEmpty() && localInsertKeys.isEmpty() &&
-				localDeleteKeys.isEmpty() && insertsForMigration.isEmpty();
+				localDeleteKeys.isEmpty() && incomingMigratingKeys.isEmpty();
 	}
 	
 	public boolean hasLocalReads() {
@@ -146,7 +176,7 @@ public class ExecutionPlan {
 	}
 	
 	public boolean hasRemoteReads() {
-		return !remoteReadKeys.isEmpty();
+		return !remoteReadKeys.isEmpty() || !incomingMigratingKeys.isEmpty();
 	}
 	
 	@Override
@@ -165,9 +195,13 @@ public class ExecutionPlan {
 		sb.append('\n');
 		sb.append("Local Deletes: " + localDeleteKeys);
 		sb.append('\n');
-		sb.append("Inserts for migrations: " + insertsForMigration);
-		sb.append('\n');
 		sb.append("Push Sets: " + pushSets);
+		sb.append('\n');
+		sb.append("Local Reads for Migration: " + localReadsForMigration);
+		sb.append('\n');
+		sb.append("Migration Push Sets: " + migrationPushSets);
+		sb.append('\n');
+		sb.append("Imcoming Migrating Keys: " + incomingMigratingKeys);
 		sb.append('\n');
 		
 		return sb.toString();

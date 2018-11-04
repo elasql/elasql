@@ -1,8 +1,6 @@
 package org.elasql.schedule.calvin.migration;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 import org.elasql.migration.MigrationMgr;
@@ -12,13 +10,7 @@ import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 
-/**
- * XXX: it seems like we didn't read a record for update.
- * XXX: a source node may push a migrated record to the dest node even if it
- * does not need to do it. However, the logic to fix this it's too complicated.
- * So, I decide to leave it alone.
- */
-public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
+public class CaughtUpAnalyzer implements ReadWriteSetAnalyzer {
 	
 	private int localNodeId = Elasql.serverId();
 	private ExecutionPlan execPlan;
@@ -30,12 +22,10 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 	private Set<Integer> activeParticipants = new HashSet<Integer>();
 	private Set<RecordKey> fullyRepReadKeys = new HashSet<RecordKey>();
 	
-	// To avoid the source and the dest node push migrated records to each other
-	private Map<RecordKey, Integer> ignoreMigratedKeys = new HashMap<RecordKey, Integer>();
 	// To update the migrating records in the end for all the nodes
 	private Set<RecordKey> migratingRecords = new HashSet<RecordKey>();
 	
-	public CrabbingAnalyzer() {
+	public CaughtUpAnalyzer() {
 		execPlan = new ExecutionPlan();
 		readsPerNodes = new int[Elasql.partitionMetaMgr().getCurrentNumOfParts()];
 		migraMgr = Elasql.migrationMgr();
@@ -82,17 +72,18 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 				}
 				
 				// For normal operations
-				if (localNodeId == sourceNode || localNodeId == destNode) {
+				if (localNodeId == sourceNode) {
+					if (migraMgr.isMigrated(readKey)) {
+						execPlan.addRemoteReadKey(readKey);
+					} else {
+						execPlan.addLocalReadKey(readKey);
+					}
+				} else if (localNodeId == destNode) {
 					execPlan.addLocalReadKey(readKey);
-					
-					if (localNodeId == sourceNode)
-						ignoreMigratedKeys.put(readKey, destNode);
-					else if (localNodeId == destNode)
-						ignoreMigratedKeys.put(readKey, sourceNode);
-				} else
+				} else {
 					execPlan.addRemoteReadKey(readKey);
+				}
 				
-				readsPerNodes[sourceNode]++;
 				readsPerNodes[destNode]++;
 			} else {
 				int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
@@ -129,10 +120,9 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 				}
 				
 				// For normal operations
-				if (localNodeId == sourceNode || localNodeId == destNode)
+				if (localNodeId == destNode)
 					execPlan.addLocalUpdateKey(updateKey);
 				
-				activeParticipants.add(sourceNode);
 				activeParticipants.add(destNode);
 			} else {
 				int nodeId = Elasql.partitionMetaMgr().getPartition(updateKey);
@@ -150,13 +140,11 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 			execPlan.addLocalInsertKey(insertKey);
 		} else {
 			if (migraMgr.isMigratingRecord(insertKey)) {
-				int sourceNode = migraMgr.checkSourceNode(insertKey);
 				int destNode = migraMgr.checkDestNode(insertKey);
 				
-				if (localNodeId == sourceNode || localNodeId == destNode)
+				if (localNodeId == destNode)
 					execPlan.addLocalInsertKey(insertKey);
 				
-				activeParticipants.add(sourceNode);
 				activeParticipants.add(destNode);
 			} else {
 				int nodeId = Elasql.partitionMetaMgr().getPartition(insertKey);
@@ -174,13 +162,11 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 			execPlan.addLocalDeleteKey(deleteKey);
 		} else {
 			if (migraMgr.isMigratingRecord(deleteKey)) {
-				int sourceNode = migraMgr.checkSourceNode(deleteKey);
 				int destNode = migraMgr.checkDestNode(deleteKey);
 				
-				if (localNodeId == sourceNode || localNodeId == destNode)
+				if (localNodeId == destNode)
 					execPlan.addLocalDeleteKey(deleteKey);
 				
-				activeParticipants.add(sourceNode);
 				activeParticipants.add(destNode);
 			} else {
 				int nodeId = Elasql.partitionMetaMgr().getPartition(deleteKey);
@@ -221,13 +207,6 @@ public class CrabbingAnalyzer implements ReadWriteSetAnalyzer {
 				for (RecordKey key : execPlan.getLocalReadKeys())
 					execPlan.addPushSet(target, key);
 			}
-		}
-		
-		// Ignore the migrated records for the source and the destinations
-		for (Map.Entry<RecordKey, Integer> entry : ignoreMigratedKeys.entrySet()) {
-			RecordKey k = entry.getKey();
-			Integer target = entry.getValue();
-			execPlan.removeFromPushSet(target, k);
 		}
 	}
 	

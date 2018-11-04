@@ -96,8 +96,14 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	private ExecutionPlan generateExecutionPlan() {
 		ExecutionPlan plan = new ExecutionPlan();
 		
-		for (RecordKey key : storingKeys)
-			plan.addInsertForMigration(key);
+		// XXX: Should we lock the push keys on the source nodes?
+		
+		for (RecordKey key : storingKeys) {
+			if (localNodeId == paramHelper.getSourceNodeId())
+				plan.addLocalReadKey(key);
+			else if (localNodeId == paramHelper.getDestNodeId())
+				plan.addLocalInsertKey(key);
+		}
 		
 		if (localNodeId == paramHelper.getSourceNodeId())
 			plan.setParticipantRole(ParticipantRole.PASSIVE);

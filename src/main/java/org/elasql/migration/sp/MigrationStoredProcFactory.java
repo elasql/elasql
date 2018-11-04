@@ -7,7 +7,8 @@ public class MigrationStoredProcFactory implements CalvinStoredProcedureFactory 
 	
 	public static final int SP_MIGRATION_START = -101;
 	public static final int SP_BG_PUSH = -102;
-	public static final int SP_MIGRATION_END = -103;
+	public static final int SP_PHASE_CHANGE = -103;
+	public static final int SP_MIGRATION_END = -104;
 	
 	private CalvinStoredProcedureFactory underlayerFactory;
 	
@@ -24,6 +25,9 @@ public class MigrationStoredProcFactory implements CalvinStoredProcedureFactory 
 				break;
 			case SP_BG_PUSH:
 				sp = new BgPushProcedure(txNum);
+				break;
+			case SP_PHASE_CHANGE:
+				sp = new PhaseChangeProcedure(txNum);
 				break;
 			case SP_MIGRATION_END:
 				sp = new MigrationEndProcedure(txNum);

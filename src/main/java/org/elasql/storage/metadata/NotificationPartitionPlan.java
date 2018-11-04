@@ -67,6 +67,6 @@ public class NotificationPartitionPlan extends PartitionPlan {
 	
 	@Override
 	public String toString() {
-		return String.format("NotificationPlan: [%s]", underlayerPlan.toString());
+		return String.format("Notification Partition Plan (underlayer: %s)", underlayerPlan.toString());
 	}
 }

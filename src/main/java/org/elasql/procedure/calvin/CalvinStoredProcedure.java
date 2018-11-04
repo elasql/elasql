@@ -92,9 +92,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		execPlan = analyzer.generatePlan();
 		
 		// Debug
-//		if (Elasql.migrationMgr().isInMigration()) {
+//		if (Elasql.migrationMgr().isInMigration())
 //			System.out.println("Tx." + txNum + "'s execution plan:\n" + execPlan);
-//		}
 		
 		// create a transaction
 		tx = Elasql.txMgr().newTransaction(
@@ -114,10 +113,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	public void bookConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 		ccMgr.bookReadKeys(execPlan.getLocalReadKeys());
+		ccMgr.bookReadKeys(execPlan.getLocalReadsForMigration());
 		ccMgr.bookWriteKeys(execPlan.getLocalUpdateKeys());
 		ccMgr.bookWriteKeys(execPlan.getLocalInsertKeys());
 		ccMgr.bookWriteKeys(execPlan.getLocalDeleteKeys());
-		ccMgr.bookWriteKeys(execPlan.getInsertsForMigration());
+		ccMgr.bookWriteKeys(execPlan.getIncomingMigratingKeys());
 	}
 
 	private void getConservativeLocks() {
@@ -130,6 +130,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		try {
 			// Get conservative locks it has asked before
 			getConservativeLocks();
+			
+			// Perform foreground migration
+			performForegroundMigration();
 			
 			// Execute transaction
 			executeTransactionLogic();
@@ -170,29 +173,40 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		return execPlan.isReadOnly();
 	}
 
+	protected void performForegroundMigration() {
+		// Read the migrating records
+		Map<RecordKey, CachedRecord> migratingRecs = performLocalRead(execPlan.getLocalReadsForMigration());
+		
+		// Push migrating records
+		pushRecordsToRemotes(execPlan.getMigrationPushSets(), migratingRecs);
+		
+		// Wait for migrating records
+		collectRemoteReadings(execPlan.getIncomingMigratingKeys(), migratingRecs);
+		
+		// Inserts the migrating records to the local storage
+		performInsertionForMigrations(execPlan.getIncomingMigratingKeys(), migratingRecs);
+	}
+
 	/**
 	 * This method will be called by execute(). The default implementation of
 	 * this method follows the steps described by Calvin paper.
 	 */
 	protected void executeTransactionLogic() {
 		// Read the local records
-		Map<RecordKey, CachedRecord> readings = performLocalRead();
+		Map<RecordKey, CachedRecord> readings = performLocalRead(execPlan.getLocalReadKeys());
 
 		// Push local records to the needed remote nodes
-		pushReadingsToRemotes(readings);
+		pushRecordsToRemotes(execPlan.getPushSets(), readings);
 		
 		// Passive participants stops here
 		if (execPlan.getParticipantRole() != ParticipantRole.ACTIVE)
 			return;
 
 		// Read the remote records
-		collectRemoteReadings(readings);
+		collectRemoteReadings(execPlan.getRemoteReadKeys(), readings);
 
 		// Write the local records
 		executeSql(readings);
-		
-		// perform insertions for migrations (if there is any)
-		performInsertionForMigrations(readings);
 	}
 	
 	protected void afterCommit() {
@@ -214,11 +228,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			cacheMgr.delete(key);
 	}
 
-	private Map<RecordKey, CachedRecord> performLocalRead() {
+	private Map<RecordKey, CachedRecord> performLocalRead(Set<RecordKey> readKeys) {
 		Map<RecordKey, CachedRecord> localReadings = new HashMap<RecordKey, CachedRecord>();
 		
 		// Read local records (for both active or passive participants)
-		for (RecordKey k : execPlan.getLocalReadKeys()) {
+		for (RecordKey k : readKeys) {
 			CachedRecord rec = cacheMgr.readFromLocal(k);
 			if (rec == null)
 				throw new RuntimeException("cannot find the record for " + k + " in the local stroage");
@@ -228,18 +242,18 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		return localReadings;
 	}
 
-	private void pushReadingsToRemotes(Map<RecordKey, CachedRecord> readings) {
-		for (Map.Entry<Integer, Set<RecordKey>> entry : execPlan.getPushSets().entrySet()) {
+	private void pushRecordsToRemotes(Map<Integer, Set<RecordKey>> pushKeys, Map<RecordKey, CachedRecord> records) {
+		for (Map.Entry<Integer, Set<RecordKey>> entry : pushKeys.entrySet()) {
 			Integer targetNodeId = entry.getKey();
 			Set<RecordKey> keys = entry.getValue();
 			
 			// Construct pushing tuple set
 			TupleSet ts = new TupleSet(-1);
 			for (RecordKey key : keys) {
-				CachedRecord rec = readings.get(key);
+				CachedRecord rec = records.get(key);
 				if (rec == null)
 					throw new RuntimeException("cannot find the record for " + key);
-				ts.addTuple(key, txNum, txNum, readings.get(key));
+				ts.addTuple(key, txNum, txNum, records.get(key));
 			}
 			
 			// Push to the target
@@ -247,17 +261,17 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 	}
 
-	private void collectRemoteReadings(Map<RecordKey, CachedRecord> readingCache) {
+	private void collectRemoteReadings(Set<RecordKey> keys, Map<RecordKey, CachedRecord> readingCache) {
 		// Read remote records
-		for (RecordKey k : execPlan.getRemoteReadKeys()) {
+		for (RecordKey k : keys) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			readingCache.put(k, rec);
 		}
 	}
 	
-	private void performInsertionForMigrations(Map<RecordKey, CachedRecord> readings) {
-		for (RecordKey key : execPlan.getInsertsForMigration()) {
-			cacheMgr.insert(key, readings.get(key).getFldValMap());
+	private void performInsertionForMigrations(Set<RecordKey> migratingKeys, Map<RecordKey, CachedRecord> migratingRecords) {
+		for (RecordKey key : migratingKeys) {
+			cacheMgr.insert(key, migratingRecords.get(key).getFldValMap());
 		}
 	}
 }

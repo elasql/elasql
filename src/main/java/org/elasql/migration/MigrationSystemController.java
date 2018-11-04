@@ -22,9 +22,12 @@ public abstract class MigrationSystemController {
 	private static Logger logger = Logger.getLogger(MigrationSystemController.class.getName());
 	
 	private static final Phase INIT_PHASE = Phase.CRABBING;
-	
-	private static final long START_MIGRATION_TIME = 180_000;
+
+	private static final long START_MIGRATION_TIME = 120_000;
+//	private static final long START_MIGRATION_TIME = 180_000;
 //	private static final long START_MIGRATION_TIME = 5000_000;
+	private static final long START_CAUGHT_UP_TIME = 360_000;
+//	private static final long START_CAUGHT_UP_TIME = 5000_000;
 	
 	public static final int MSG_RANGE_FINISH = -8787;
 	public static final int CONTROLLER_NODE_ID = PartitionMetaMgr.NUM_PARTITIONS;
@@ -62,6 +65,15 @@ public abstract class MigrationSystemController {
 				// Determine how many ranges should be migrated
 				List<MigrationRange> ranges = Elasql.migrationMgr().generateMigrationRanges(newPartPlan);
 				numOfRangesToBeMigrated.set(ranges.size());
+				
+				// Wait for some time
+				try {
+					Thread.sleep(START_CAUGHT_UP_TIME);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				sendCaughtUpModeRequest();
 			}
 			
 		}).start();
@@ -75,6 +87,17 @@ public abstract class MigrationSystemController {
 		Object[] params = new Object[] {newPartPlan, INIT_PHASE};
 		Object[] call = { new StoredProcedureCall(-1, -1, 
 				MigrationStoredProcFactory.SP_MIGRATION_START, params)};
+		Elasql.connectionMgr().sendBroadcastRequest(call, false);
+	}
+	
+	public void sendCaughtUpModeRequest() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("send a caught-up phase request.");
+		
+		// Send a store procedure call
+		Object[] params = new Object[] {Phase.CAUGHT_UP};
+		Object[] call = { new StoredProcedureCall(-1, -1, 
+				MigrationStoredProcFactory.SP_PHASE_CHANGE, params)};
 		Elasql.connectionMgr().sendBroadcastRequest(call, false);
 	}
 	

@@ -12,6 +12,7 @@ import org.elasql.migration.sp.MigrationStoredProcFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
+import org.elasql.schedule.calvin.migration.CaughtUpAnalyzer;
 import org.elasql.schedule.calvin.migration.CrabbingAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -38,8 +39,9 @@ public abstract class MigrationMgr {
 	public void initializeMigration(PartitionPlan newPartPlan, Phase initialPhase) {
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - Elasql.SYSTEM_INIT_TIME_MS;
-			logger.info(String.format("a new migration starts at %d. New Plan: %s"
-					, time / 1000, newPartPlan));
+			PartitionPlan currentPartPlan = Elasql.partitionMetaMgr().getPartitionPlan();
+			logger.info(String.format("a new migration starts at %d. Current Plan: %s, New Plan: %s"
+					, time / 1000, currentPartPlan, newPartPlan));
 		}
 		
 		currentPhase = initialPhase;
@@ -122,6 +124,13 @@ public abstract class MigrationMgr {
 		Elasql.connectionMgr().sendBroadcastRequest(call, false);
 	}
 	
+	public void changePhase(Phase newPhase) {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("the migration changes to " + newPhase + " phase.");
+		
+		currentPhase = newPhase;
+	}
+	
 	public void updateMigrationRange(MigrationRangeUpdate update) {
 		for (MigrationRange range : migrationRanges)
 			if (range.updateMigrationStatus(update))
@@ -200,7 +209,13 @@ public abstract class MigrationMgr {
 	}
 	
 	public ReadWriteSetAnalyzer newAnalyzer() {
-		return new CrabbingAnalyzer();
+		if (currentPhase == Phase.CRABBING)
+			return new CrabbingAnalyzer();
+		else if (currentPhase == Phase.CAUGHT_UP)
+			return new CaughtUpAnalyzer();
+		else
+			throw new RuntimeException(
+					String.format("We haven't implement %s phase yet.", currentPhase));
 	}
 	
 	public abstract List<MigrationRange> generateMigrationRanges(PartitionPlan newPlan);
