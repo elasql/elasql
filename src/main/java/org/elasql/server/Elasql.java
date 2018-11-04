@@ -22,9 +22,9 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
-import org.elasql.migration.sp.MigrationStoredProcFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -122,11 +122,11 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 		
-		init(dirName, id, isSequencer, factory, partitionPlan, null, null);
+		init(dirName, id, isSequencer, factory, partitionPlan, null);
 	}
 	
 	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
-			PartitionPlan partitionPlan, MigrationMgr migrationMgr, Class<?> migrationSystemControllerCls) {
+			PartitionPlan partitionPlan, MigrationComponentFactory migraComsFactory) {
 		myNodeId = id;
 
 		if (logger.isLoggable(Level.INFO))
@@ -138,12 +138,8 @@ public class Elasql extends VanillaDb {
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
 			initConnectionMgr(myNodeId, true);
-			migraMgr = migrationMgr;
-			try {
-				migraSysControl = (MigrationSystemController) migrationSystemControllerCls.newInstance();
-			} catch (InstantiationException | IllegalAccessException e) {
-				e.printStackTrace();
-			}
+			if (migraComsFactory != null)
+				migraSysControl = migraComsFactory.newSystemController();
 			return;
 		}
 
@@ -153,10 +149,11 @@ public class Elasql extends VanillaDb {
 		// initialize DD modules
 		initCacheMgr();
 		initPartitionMetaMgr(partitionPlan);
-		initScheduler(factory);
+		initScheduler(factory, migraComsFactory);
 		initConnectionMgr(myNodeId, false);
 		initDdLogMgr();
-		migraMgr = migrationMgr;
+		if (migraComsFactory != null)
+			migraMgr = migraComsFactory.newMigrationMgr();
 	}
 
 	// ================
@@ -180,7 +177,7 @@ public class Elasql extends VanillaDb {
 		}
 	}
 
-	public static void initScheduler(DdStoredProcedureFactory factory) {
+	public static void initScheduler(DdStoredProcedureFactory factory, MigrationComponentFactory migraComsFactory) {
 		switch (SERVICE_TYPE) {
 		case NAIVE:
 			if (!NaiveStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
@@ -190,7 +187,10 @@ public class Elasql extends VanillaDb {
 		case CALVIN:
 			if (!CalvinStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a CalvinStoredProcedureFactory");
-			scheduler = initCalvinScheduler((CalvinStoredProcedureFactory) factory);
+			CalvinStoredProcedureFactory calvinFactory = (CalvinStoredProcedureFactory) factory;
+			if (migraComsFactory != null)
+				calvinFactory = migraComsFactory.newMigrationSpFactory(calvinFactory);
+			scheduler = initCalvinScheduler(calvinFactory);
 			break;
 		case TPART:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
@@ -209,7 +209,7 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static Scheduler initCalvinScheduler(CalvinStoredProcedureFactory factory) {
-		CalvinScheduler scheduler = new CalvinScheduler(new MigrationStoredProcFactory(factory));
+		CalvinScheduler scheduler = new CalvinScheduler(factory);
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}

@@ -1,4 +1,4 @@
-package org.elasql.migration.sp;
+package org.elasql.migration.mgcrab;
 
 import java.util.Map;
 
@@ -16,7 +16,8 @@ public class PhaseChangeProcedure extends CalvinStoredProcedure<PhaseChangeParam
 	
 	@Override
 	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
-		Elasql.migrationMgr().changePhase(paramHelper.getNextPhase());
+		MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
+		migraMgr.changePhase(paramHelper.getNextPhase());
 	}
 
 	@Override

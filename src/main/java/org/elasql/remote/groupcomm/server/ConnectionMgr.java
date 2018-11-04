@@ -20,6 +20,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -113,7 +114,8 @@ public class ConnectionMgr
 			TupleSet ts = (TupleSet) msg;
 			
 			if (ts.sinkId() == MigrationSystemController.MSG_RANGE_FINISH) {
-				Elasql.migraSysControl().onReceiveMigrationRangeFinishMsg(ts.getMetadata());
+				Elasql.migraSysControl().onReceiveMigrationRangeFinishMsg(
+						(MigrationRangeFinishMessage) ts.getMetadata());
 				return;
 			}
 			

@@ -1,4 +1,4 @@
-package org.elasql.migration.sp;
+package org.elasql.migration.mgcrab;
 
 import java.sql.Connection;
 import java.util.HashMap;
@@ -11,7 +11,6 @@ import java.util.logging.Logger;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.cache.calvin.CalvinPostOffice;
-import org.elasql.migration.MigrationMgr;
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ExecutionPlan;
@@ -31,7 +30,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	
 	private static Map<RecordKey, CachedRecord> pushingCacheInDest;
 
-	private MigrationMgr migraMgr = Elasql.migrationMgr();
+	private MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
 	
 	private RecordKey[] pushingKeys = null;
@@ -143,7 +142,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	@Override
 	protected void afterCommit() {
 		if (localNodeId == paramHelper.getDestNodeId()) {
-			Elasql.migrationMgr().scheduleNextBGPushRequest();
+			migraMgr.scheduleNextBGPushRequest();
 		}
 	}
 	

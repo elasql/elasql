@@ -1,7 +1,5 @@
-package org.elasql.migration.sp;
+package org.elasql.migration.mgcrab;
 
-import org.elasql.migration.Phase;
-import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.sql.Type;
@@ -9,15 +7,13 @@ import org.vanilladb.core.sql.VarcharConstant;
 import org.vanilladb.core.sql.storedprocedure.SpResultRecord;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
-public class MigrationStartParamHelper extends StoredProcedureParamHelper {
+public class PhaseChangeParamHelper extends StoredProcedureParamHelper {
 	
-	private PartitionPlan newPlan;
-	private Phase initialPhase;
+	private Phase nextPhase;
 	
 	@Override
 	public void prepareParameters(Object... pars) {
-		newPlan = (PartitionPlan) pars[0];
-		initialPhase = (Phase) pars[1];
+		nextPhase = (Phase) pars[0];
 	}
 	
 	@Override
@@ -25,12 +21,8 @@ public class MigrationStartParamHelper extends StoredProcedureParamHelper {
 		return false;
 	}
 	
-	public PartitionPlan getNewPartitionPlan() {
-		return newPlan;
-	}
-	
-	public Phase getInitialPhase() {
-		return initialPhase;
+	public Phase getNextPhase() {
+		return nextPhase;
 	}
 	
 	@Override

@@ -1,4 +1,4 @@
-package org.elasql.schedule.calvin.migration;
+package org.elasql.schedule.calvin.mgcrab;
 
 import java.util.HashSet;
 import java.util.Set;

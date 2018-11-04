@@ -1,14 +1,12 @@
-package org.elasql.migration.sp;
+package org.elasql.migration;
 
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 
-public class MigrationStoredProcFactory implements CalvinStoredProcedureFactory {
+public abstract class MigrationStoredProcFactory implements CalvinStoredProcedureFactory {
 	
 	public static final int SP_MIGRATION_START = -101;
-	public static final int SP_BG_PUSH = -102;
-	public static final int SP_PHASE_CHANGE = -103;
-	public static final int SP_MIGRATION_END = -104;
+	public static final int SP_MIGRATION_END = -102;
 	
 	private CalvinStoredProcedureFactory underlayerFactory;
 	
@@ -23,18 +21,16 @@ public class MigrationStoredProcFactory implements CalvinStoredProcedureFactory 
 			case SP_MIGRATION_START:
 				sp = new MigrationStartProcedure(txNum);
 				break;
-			case SP_BG_PUSH:
-				sp = new BgPushProcedure(txNum);
-				break;
-			case SP_PHASE_CHANGE:
-				sp = new PhaseChangeProcedure(txNum);
-				break;
 			case SP_MIGRATION_END:
 				sp = new MigrationEndProcedure(txNum);
 				break;
 			default:
-				sp = underlayerFactory.getStoredProcedure(pid, txNum);
+				sp = getMigrationStoredProcedure(pid, txNum);
+				if (sp == null)
+					sp = underlayerFactory.getStoredProcedure(pid, txNum);
 		}
 		return sp;
 	}
+	
+	protected abstract CalvinStoredProcedure<?> getMigrationStoredProcedure(int pid, long txNum);
 }

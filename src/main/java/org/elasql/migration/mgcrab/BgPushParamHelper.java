@@ -1,4 +1,4 @@
-package org.elasql.migration.sp;
+package org.elasql.migration.mgcrab;
 
 import org.elasql.migration.MigrationRangeUpdate;
 import org.elasql.sql.RecordKey;

@@ -1,4 +1,4 @@
-package org.elasql.migration;
+package org.elasql.migration.mgcrab;
 
 import java.io.Serializable;
 
