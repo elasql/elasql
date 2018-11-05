@@ -17,6 +17,7 @@ package org.elasql.schedule.calvin;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +32,8 @@ import org.vanilladb.core.server.task.Task;
 
 public class CalvinScheduler extends Task implements Scheduler {
 	private static Logger logger = Logger.getLogger(CalvinScheduler.class.getName());
+	
+	public static final AtomicLong FIRST_TX_ARRIVAL_TIME = new AtomicLong(-1L);
 	
 	private CalvinStoredProcedureFactory factory;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
@@ -58,6 +61,9 @@ public class CalvinScheduler extends Task implements Scheduler {
 				call = spcQueue.take();
 				if (call.isNoOpStoredProcCall())
 					continue;
+				
+				if (FIRST_TX_ARRIVAL_TIME.get() == -1L)
+					FIRST_TX_ARRIVAL_TIME.set(System.currentTimeMillis());
 
 				// create store procedure and prepare
 				CalvinStoredProcedure<?> sp = factory.getStoredProcedure(

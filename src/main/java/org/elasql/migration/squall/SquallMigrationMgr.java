@@ -14,6 +14,7 @@ import org.elasql.migration.MigrationRangeUpdate;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.squall.SquallAnalyzer;
 import org.elasql.server.Elasql;
@@ -40,7 +41,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 		PartitionPlan newPartPlan = (PartitionPlan) params[0];
 		
 		if (logger.isLoggable(Level.INFO)) {
-			long time = System.currentTimeMillis() - Elasql.SYSTEM_INIT_TIME_MS;
+			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
 			PartitionPlan currentPartPlan = Elasql.partitionMetaMgr().getPartitionPlan();
 			logger.info(String.format("a new migration starts at %d. Current Plan: %s, New Plan: %s"
 					, time / 1000, currentPartPlan, newPartPlan));
@@ -121,7 +122,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 	
 	public void finishMigration(Object[] params) {
 		if (logger.isLoggable(Level.INFO)) {
-			long time = System.currentTimeMillis() - Elasql.SYSTEM_INIT_TIME_MS;
+			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
 			logger.info(String.format("the migration finishes at %d."
 					, time / 1000));
 		}

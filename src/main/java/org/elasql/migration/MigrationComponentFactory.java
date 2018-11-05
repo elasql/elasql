@@ -1,23 +1,34 @@
 package org.elasql.migration;
 
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.elasql.migration.mgcrab.MgCrabMigrationMgr;
 import org.elasql.migration.mgcrab.MgCrabStoredProcFactory;
 import org.elasql.migration.mgcrab.MgCrabSystemController;
+import org.elasql.migration.squall.SquallMigrationMgr;
+import org.elasql.migration.squall.SquallStoredProcFactory;
+import org.elasql.migration.squall.SquallSystemController;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.storage.metadata.PartitionPlan;
 
 public abstract class MigrationComponentFactory {
+	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
 	
-	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.MGCRAB;
+	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.SQUALL;
+	
+	public MigrationComponentFactory() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("using " + CURRENT_ALGO + " as migration algorithm.");
+	}
 	
 	public MigrationMgr newMigrationMgr() {
 		switch (CURRENT_ALGO) {
 		case MGCRAB:
 			return new MgCrabMigrationMgr(this);
 		case SQUALL:
-			throw new RuntimeException("haven't implement for Squall yet");
+			return new SquallMigrationMgr(this);
 		case STOP_COPY:
 			throw new RuntimeException("haven't implement for Squall yet");
 		}
@@ -29,7 +40,7 @@ public abstract class MigrationComponentFactory {
 		case MGCRAB:
 			return new MgCrabSystemController(this);
 		case SQUALL:
-			throw new RuntimeException("haven't implement for Squall yet");
+			return new SquallSystemController(this);
 		case STOP_COPY:
 			throw new RuntimeException("haven't implement for Squall yet");
 		}
@@ -42,7 +53,7 @@ public abstract class MigrationComponentFactory {
 		case MGCRAB:
 			return new MgCrabStoredProcFactory(underlayerFactory);
 		case SQUALL:
-			throw new RuntimeException("haven't implement for Squall yet");
+			return new SquallStoredProcFactory(underlayerFactory);
 		case STOP_COPY:
 			throw new RuntimeException("haven't implement for Squall yet");
 		}

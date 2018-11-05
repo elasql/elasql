@@ -55,6 +55,8 @@ public class PartitionMetaMgr {
 	}
 	
 	public void setNewPartitionPlan(PartitionPlan newPlan) {
+		// XXX: Bug: If there is a plan warping another plan,
+		// this may make the warping plan disappear.
 		partPlan = newPlan;
 	}
 	

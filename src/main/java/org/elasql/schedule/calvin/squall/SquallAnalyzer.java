@@ -229,21 +229,27 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	
 	private void putMigratingKeysTo(MigrationPath p, int executionNodeId) {
 		if (localNodeId == executionNodeId) {
-			for (RecordKey k : migratingReadKeys.get(p))
-				execPlan.addLocalReadKey(k);
-			for (RecordKey k : migratingUpdateKeys.get(p))
-				execPlan.addLocalUpdateKey(k);
-			for (RecordKey k : migratingInsertKeys.get(p))
-				execPlan.addLocalInsertKey(k);
-			for (RecordKey k : migratingDeleteKeys.get(p))
-				execPlan.addLocalDeleteKey(k);
+			if (migratingReadKeys.get(p) != null)
+				for (RecordKey k : migratingReadKeys.get(p))
+					execPlan.addLocalReadKey(k);
+			if (migratingUpdateKeys.get(p) != null)
+				for (RecordKey k : migratingUpdateKeys.get(p))
+					execPlan.addLocalUpdateKey(k);
+			if (migratingInsertKeys.get(p) != null)
+				for (RecordKey k : migratingInsertKeys.get(p))
+					execPlan.addLocalInsertKey(k);
+			if (migratingDeleteKeys.get(p) != null)
+				for (RecordKey k : migratingDeleteKeys.get(p))
+					execPlan.addLocalDeleteKey(k);
 		} else {
-			for (RecordKey k : migratingReadKeys.get(p))
-				execPlan.addRemoteReadKey(k);
+			if (migratingReadKeys.get(p) != null)
+				for (RecordKey k : migratingReadKeys.get(p))
+					execPlan.addRemoteReadKey(k);
 		}
-		readsPerNodes[executionNodeId] += migratingReadKeys.get(p).size();
-		if (!migratingUpdateKeys.get(p).isEmpty() || !migratingInsertKeys.get(p).isEmpty() ||
-				!migratingDeleteKeys.get(p).isEmpty())
+		if (migratingReadKeys.get(p) != null)
+			readsPerNodes[executionNodeId] += migratingReadKeys.get(p).size();
+		if (migratingUpdateKeys.get(p) != null || migratingInsertKeys.get(p) != null ||
+				migratingDeleteKeys.get(p) != null)
 			activeParticipants.add(executionNodeId);
 	}
 
