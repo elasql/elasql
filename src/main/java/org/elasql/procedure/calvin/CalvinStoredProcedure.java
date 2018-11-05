@@ -33,6 +33,7 @@ import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
@@ -174,6 +175,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	}
 
 	protected void performForegroundMigration() {
+		// Sends/Handles the pull requests
+		if (execPlan.isPullingMigration()) {
+			sendMigrationPullRequests(execPlan.getPullingSources());
+			waitForMigrationPullRequests(execPlan.getMigrationPushSets().keySet());
+		}
+		
 		// Read the migrating records
 		Map<RecordKey, CachedRecord> migratingRecs = performLocalRead(execPlan.getLocalReadsForMigration());
 		
@@ -272,6 +279,31 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private void performInsertionForMigrations(Set<RecordKey> migratingKeys, Map<RecordKey, CachedRecord> migratingRecords) {
 		for (RecordKey key : migratingKeys) {
 			cacheMgr.insert(key, migratingRecords.get(key).getFldValMap());
+		}
+	}
+
+	private void sendMigrationPullRequests(Set<Integer> targetNodes) {
+		for (Integer nodeId : targetNodes) {
+			// Construct pushing tuple set
+			TupleSet ts = new TupleSet(-1);
+			RecordKey key = NotificationPartitionPlan.createRecordKey(
+					Elasql.serverId(), nodeId);
+			CachedRecord dummyRec = NotificationPartitionPlan.createRecord(
+					Elasql.serverId(), nodeId, txNum);
+			ts.addTuple(key, txNum, txNum, dummyRec);
+			
+			// Push to the target
+			Elasql.connectionMgr().pushTupleSet(nodeId, ts);
+		}
+	}
+
+	private void waitForMigrationPullRequests(Set<Integer> targetNodes) {
+		for (Integer nodeId : targetNodes) {
+			RecordKey key = NotificationPartitionPlan.createRecordKey(
+					nodeId, Elasql.serverId());
+			CachedRecord rec = cacheMgr.readFromRemote(key);
+			if (rec.getSrcTxNum() != txNum || rec == null)
+				throw new RuntimeException("something wrong with the pull request: " + key);
 		}
 	}
 }

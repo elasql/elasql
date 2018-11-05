@@ -9,7 +9,7 @@ import org.vanilladb.core.sql.VarcharConstant;
 import org.vanilladb.core.sql.storedprocedure.SpResultRecord;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
-public class BgPushParamHelper extends StoredProcedureParamHelper {
+public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 	
 	private MigrationRangeUpdate update;
 	private int sourceNodeId;

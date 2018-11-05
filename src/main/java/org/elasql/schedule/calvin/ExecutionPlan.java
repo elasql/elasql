@@ -48,6 +48,9 @@ public class ExecutionPlan {
 	private Set<RecordKey> localReadsForMigration = new HashSet<RecordKey>();
 	private Map<Integer, Set<RecordKey>> migrationPushSets = new HashMap<Integer, Set<RecordKey>>();
 	private Set<RecordKey> incomingMigratingKeys = new HashSet<RecordKey>();
+	
+	// only for pulling migrations (Squall)
+	private Set<Integer> pullingSources = new HashSet<Integer>();
 
 	public void addLocalReadKey(RecordKey key) {
 		localReadKeys.add(key);
@@ -105,6 +108,10 @@ public class ExecutionPlan {
 		}
 	}
 	
+	public void addPullingSource(Integer nodeId) {
+		pullingSources.add(nodeId);
+	}
+	
 	public Set<RecordKey> getLocalReadKeys() {
 		return localReadKeys;
 	}
@@ -156,6 +163,14 @@ public class ExecutionPlan {
 	
 	public Set<RecordKey> getIncomingMigratingKeys() {
 		return incomingMigratingKeys;
+	}
+	
+	public boolean isPullingMigration() {
+		return !pullingSources.isEmpty();
+	}
+	
+	public Set<Integer> getPullingSources() {
+		return pullingSources;
 	}
 	
 	public void setParticipantRole(ParticipantRole role) {

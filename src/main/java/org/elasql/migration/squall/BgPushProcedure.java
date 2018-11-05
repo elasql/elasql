@@ -1,4 +1,4 @@
-package org.elasql.migration.mgcrab;
+package org.elasql.migration.squall;
 
 import java.sql.Connection;
 import java.util.HashMap;
@@ -27,14 +27,9 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 	private static Constant FALSE = new IntegerConstant(0);
 	private static Constant TRUE = new IntegerConstant(1);
-	
-	private static Map<RecordKey, CachedRecord> pushingCacheInDest;
 
-	private MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
+	private SquallMigrationMgr migraMgr = (SquallMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
-	
-	private RecordKey[] pushingKeys = null;
-	private Set<RecordKey> storingKeys = new HashSet<RecordKey>();
 
 	public BgPushProcedure(long txNum) {
 		super(txNum, new BgPushParamHelper());
@@ -72,19 +67,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 	@Override
 	public void prepareKeys(ReadWriteSetAnalyzer analyzer) {
-		// For phase One: The source node reads a set of records, then pushes to the
-		// dest node.
-		pushingKeys = paramHelper.getPushingKeys();
 		
-		// For phase Two: The dest node acquire the locks, then storing them to the 
-		// local storage.
-		for (RecordKey key : paramHelper.getStoringKeys())
-			// Important: We only insert the un-migrated records in the dest
-			if (!migraMgr.isMigrated(key))
-				storingKeys.add(key);
-		
-		// Note that we will do this in pipeline. The phase two of a BG will be
-		// performed with the phase one of the next BG in the same time.
 	}
 	
 	@Override
@@ -95,9 +78,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	private ExecutionPlan generateExecutionPlan() {
 		ExecutionPlan plan = new ExecutionPlan();
 		
-		// XXX: Should we lock the push keys on the source nodes?
-		
-		for (RecordKey key : storingKeys) {
+		for (RecordKey key : paramHelper.getPushingKeys()) {
 			if (localNodeId == paramHelper.getSourceNodeId())
 				plan.addLocalReadKey(key);
 			else if (localNodeId == paramHelper.getDestNodeId())
@@ -114,27 +95,19 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 	@Override
 	protected void executeTransactionLogic() {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("BG pushing tx." + txNum + " will pushes " +
-					pushingKeys.length + " records from node." +
-					paramHelper.getSourceNodeId() + " to node." +
-					paramHelper.getDestNodeId() + " and stores " +
-					storingKeys.size() + " records at node." +
-					paramHelper.getDestNodeId());
-		
-		// The source node
 		if (localNodeId == paramHelper.getSourceNodeId()) {
-			// XXX: I'm not sure if we should do this
-			// Quick fix: Release the locks immediately to prevent blocking the records in the source node
-//			ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-//			ccMgr.onTxCommit(tx);
+			if (logger.isLoggable(Level.INFO))
+				logger.info("BG pushing tx." + txNum + " will pushes " +
+						paramHelper.getPushingKeys().length + " records from node." +
+						paramHelper.getSourceNodeId() + " to node." +
+						paramHelper.getDestNodeId() + ".");
 			
 			readAndPushInSource();
 		} else if (localNodeId == paramHelper.getDestNodeId()) {
-			insertInDest(pushingCacheInDest);
-			pushingCacheInDest = receiveInDest();
+			Map<RecordKey, CachedRecord> readCache = receiveInDest();
+			insertInDest(readCache);
 		}
-
+		
 		if (logger.isLoggable(Level.INFO))
 			logger.info("BG pushing tx." + txNum + " ends");
 	}
@@ -152,7 +125,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 		// Construct key sets
 		Map<String, Set<RecordKey>> keysPerTables = new HashMap<String, Set<RecordKey>>();
-		for (RecordKey key : pushingKeys) {
+		for (RecordKey key : paramHelper.getPushingKeys()) {
 			Set<RecordKey> keys = keysPerTables.get(key.getTableName());
 			if (keys == null) {
 				keys = new HashSet<RecordKey>();
@@ -192,13 +165,13 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	
 	private Map<RecordKey, CachedRecord> receiveInDest() {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("BG pushing tx. " + txNum + " is receiving " + pushingKeys.length
+			logger.info("BG pushing tx. " + txNum + " is receiving " + paramHelper.getPushingKeys().length
 					+ " records from the source node. (Node." + paramHelper.getSourceNodeId() + ")");
 		
 		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
 
 		// Receive the data from the source node and save them
-		for (RecordKey k : pushingKeys) {
+		for (RecordKey k : paramHelper.getPushingKeys()) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			recordMap.put(k, rec);
 		}
@@ -208,11 +181,11 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	
 	private void insertInDest(Map<RecordKey, CachedRecord> cachedRecords) {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("BG pushing tx. " + txNum + " is storing " + storingKeys.size()
+			logger.info("BG pushing tx. " + txNum + " is storing " + paramHelper.getPushingKeys().length
 					+ " records to the local storage.");
 
 		// Store the cached records
-		for (RecordKey key : storingKeys) {
+		for (RecordKey key : paramHelper.getPushingKeys()) {
 			CachedRecord rec = cachedRecords.get(key);
 			
 			if (rec == null)
@@ -233,3 +206,4 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 		// do nothing
 	}
 }
+
