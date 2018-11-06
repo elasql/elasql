@@ -10,13 +10,16 @@ import org.elasql.migration.mgcrab.MgCrabSystemController;
 import org.elasql.migration.squall.SquallMigrationMgr;
 import org.elasql.migration.squall.SquallStoredProcFactory;
 import org.elasql.migration.squall.SquallSystemController;
+import org.elasql.migration.stopcopy.StopCopyMigrationMgr;
+import org.elasql.migration.stopcopy.StopCopyStoredProcFactory;
+import org.elasql.migration.stopcopy.StopCopySystemController;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.storage.metadata.PartitionPlan;
 
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
 	
-	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.SQUALL;
+	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.MGCRAB;
 	
 	public MigrationComponentFactory() {
 		if (logger.isLoggable(Level.INFO))
@@ -30,7 +33,7 @@ public abstract class MigrationComponentFactory {
 		case SQUALL:
 			return new SquallMigrationMgr(this);
 		case STOP_COPY:
-			throw new RuntimeException("haven't implement for Squall yet");
+			return new StopCopyMigrationMgr(this);
 		}
 		throw new RuntimeException("it should not be here.");
 	}
@@ -42,7 +45,7 @@ public abstract class MigrationComponentFactory {
 		case SQUALL:
 			return new SquallSystemController(this);
 		case STOP_COPY:
-			throw new RuntimeException("haven't implement for Squall yet");
+			return new StopCopySystemController(this);
 		}
 		throw new RuntimeException("it should not be here.");
 	}
@@ -55,7 +58,7 @@ public abstract class MigrationComponentFactory {
 		case SQUALL:
 			return new SquallStoredProcFactory(underlayerFactory);
 		case STOP_COPY:
-			throw new RuntimeException("haven't implement for Squall yet");
+			return new StopCopyStoredProcFactory(underlayerFactory);
 		}
 		throw new RuntimeException("it should not be here.");
 	}

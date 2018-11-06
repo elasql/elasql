@@ -15,22 +15,20 @@
  *******************************************************************************/
 package org.elasql.procedure.calvin;
 
-import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
-import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
@@ -49,33 +47,21 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	public AllExecuteProcedure(long txNum, H paramHelper) {
 		super(txNum, paramHelper);
+		
+		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
 	}
 	
 	public void prepare(Object... pars) {
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
-		// create a transaction
-		boolean isReadOnly = paramHelper.isReadOnly();
-		tx = Elasql.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
-		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
-
 		// prepare keys
-		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
 		StandardAnalyzer analyzer = new StandardAnalyzer();
 		prepareKeys(analyzer);
 		
 		// generate execution plan
 		execPlan = analyzer.generatePlan();
-		
-		// Force active participant
-		execPlan.setParticipantRole(ParticipantRole.ACTIVE);
-		
-		// for the cache layer
-		// NOTE: always creates a CacheMgr that can accept remote records
-		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		cacheMgr = postOffice.createCacheMgr(tx, true);
+		alterExecutionPlan(execPlan);
 	}
 	
 	public boolean willResponseToClients() {
@@ -91,6 +77,14 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	@Override
 	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
 		// default: do nothing
+	}
+	
+	private void alterExecutionPlan(ExecutionPlan plan) {
+		if (localNodeId == MASTER_NODE) {
+			for (int nodeId = 0; nodeId < numOfParts; nodeId++)
+				plan.addRemoteReadKey(NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE));
+		}
+		plan.setParticipantRole(ParticipantRole.ACTIVE);
 	}
 
 	protected void executeTransactionLogic() {

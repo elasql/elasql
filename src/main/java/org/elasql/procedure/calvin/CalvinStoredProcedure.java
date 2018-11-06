@@ -92,23 +92,26 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// generate execution plan
 		execPlan = analyzer.generatePlan();
 		
+		prepareForParticipant();
+		
 		// Debug
 //		if (Elasql.migrationMgr().isInMigration())
 //			System.out.println("Tx." + txNum + "'s execution plan:\n" + execPlan);
-		
+	}
+	
+	public void prepareForParticipant() {
 		// create a transaction
 		tx = Elasql.txMgr().newTransaction(
 				Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
 		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 		
-		// for the cache layer
+		// create a cache manager
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		if (isParticipated()) {
-			// create a cache manager
-			cacheMgr = postOffice.createCacheMgr(tx, execPlan.hasRemoteReads());
-		} else {
-			postOffice.skipTransaction(txNum);
-		}
+		cacheMgr = postOffice.createCacheMgr(tx, execPlan.hasRemoteReads());
+	}
+	
+	public void executeLogicInScheduler() {
+		// Prepare for some special transactions (e.g. migration transactions)
 	}
 
 	public void bookConservativeLocks() {

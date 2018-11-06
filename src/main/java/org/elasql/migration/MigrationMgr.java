@@ -2,14 +2,15 @@ package org.elasql.migration;
 
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.sql.RecordKey;
+import org.vanilladb.core.storage.tx.Transaction;
 
 public interface MigrationMgr {
 	
 	int CHUNK_SIZE = 1_000_000; // 1MB
 	
-	void initializeMigration(Object[] params);
+	void initializeMigration(Transaction tx, Object[] params);
 	
-	void finishMigration(Object[] params);
+	void finishMigration(Transaction tx, Object[] params);
 	
 	boolean isMigratingRecord(RecordKey key);
 	

@@ -155,6 +155,12 @@ public class CalvinCacheMgr {
 			else if (rec.isDirty())
 				VanillaCoreCrud.update(key, rec, tx);
 		}
+		
+		writeKeys.clear();
+	}
+	
+	public void clearCachedRecords() {
+		cachedRecords.clear();
 	}
 	
 	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {

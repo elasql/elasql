@@ -51,6 +51,8 @@ public class ExecutionPlan {
 	
 	// only for pulling migrations (Squall)
 	private Set<Integer> pullingSources = new HashSet<Integer>();
+	
+	private boolean forceReadWriteTx = false;
 
 	public void addLocalReadKey(RecordKey key) {
 		localReadKeys.add(key);
@@ -110,6 +112,10 @@ public class ExecutionPlan {
 	
 	public void addPullingSource(Integer nodeId) {
 		pullingSources.add(nodeId);
+	}
+	
+	public void setForceReadWriteTx() {
+		forceReadWriteTx = true;
 	}
 	
 	public Set<RecordKey> getLocalReadKeys() {
@@ -182,6 +188,9 @@ public class ExecutionPlan {
 	}
 	
 	public boolean isReadOnly() {
+		if (forceReadWriteTx)
+			return false;
+		
 		return localUpdateKeys.isEmpty() && localInsertKeys.isEmpty() &&
 				localDeleteKeys.isEmpty() && incomingMigratingKeys.isEmpty();
 	}

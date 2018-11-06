@@ -22,6 +22,7 @@ import org.elasql.schedule.calvin.mgcrab.CrabbingAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionPlan;
+import org.vanilladb.core.storage.tx.Transaction;
 
 /**
  * The migration manager that exists in each node. Job: 
@@ -31,8 +32,6 @@ import org.elasql.storage.metadata.PartitionPlan;
  */
 public class MgCrabMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(MgCrabMigrationMgr.class.getName());
-	
-	private static final int CHUNK_SIZE = 1_000_000; // 1MB
 	
 	private Phase currentPhase = Phase.NORMAL;
 	private List<MigrationRange> migrationRanges;
@@ -46,7 +45,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		this.comsFactory = comsFactory;
 	}
 	
-	public void initializeMigration(Object[] params) {
+	public void initializeMigration(Transaction tx, Object[] params) {
 		// Parse parameters
 		PartitionPlan newPartPlan = (PartitionPlan) params[0];
 		Phase initialPhase = (Phase) params[1];
@@ -140,8 +139,11 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 	}
 	
 	public void changePhase(Phase newPhase) {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("the migration changes to " + newPhase + " phase.");
+		if (logger.isLoggable(Level.INFO)) {
+			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
+			logger.info(String.format("the migration changes to %s phase at %d ms."
+					, newPhase, time / 1000));
+		}
 		
 		currentPhase = newPhase;
 	}
@@ -162,7 +164,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		Elasql.connectionMgr().pushTupleSet(MigrationSystemController.CONTROLLER_NODE_ID, ts);
 	}
 	
-	public void finishMigration(Object[] params) {
+	public void finishMigration(Transaction tx, Object[] params) {
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
 			logger.info(String.format("the migration finishes at %d."

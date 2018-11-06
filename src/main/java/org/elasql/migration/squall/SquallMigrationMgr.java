@@ -20,11 +20,10 @@ import org.elasql.schedule.calvin.squall.SquallAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionPlan;
+import org.vanilladb.core.storage.tx.Transaction;
 
 public class SquallMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(SquallMigrationMgr.class.getName());
-	
-	private static final int CHUNK_SIZE = 1_000_000; // 1MB
 	
 	private List<MigrationRange> migrationRanges;
 	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
@@ -36,7 +35,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 		this.comsFactory = comsFactory;
 	}
 	
-	public void initializeMigration(Object[] params) {
+	public void initializeMigration(Transaction tx, Object[] params) {
 		// Parse parameters
 		PartitionPlan newPartPlan = (PartitionPlan) params[0];
 		
@@ -120,7 +119,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 		Elasql.connectionMgr().pushTupleSet(MigrationSystemController.CONTROLLER_NODE_ID, ts);
 	}
 	
-	public void finishMigration(Object[] params) {
+	public void finishMigration(Transaction tx, Object[] params) {
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
 			logger.info(String.format("the migration finishes at %d."

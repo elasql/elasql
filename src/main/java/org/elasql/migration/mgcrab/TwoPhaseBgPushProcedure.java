@@ -1,6 +1,5 @@
 package org.elasql.migration.mgcrab;
 
-import java.sql.Connection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -10,7 +9,6 @@ import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
-import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ExecutionPlan;
@@ -18,7 +16,6 @@ import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
@@ -55,20 +52,6 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		// update migration range
 		if (paramHelper.getMigrationRangeUpdate() != null)
 			migraMgr.updateMigrationRange(paramHelper.getMigrationRangeUpdate());
-		
-		// create a transaction
-		tx = Elasql.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
-		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
-		
-		// for the cache layer
-		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		if (isParticipated()) {
-			// create a cache manager
-			cacheMgr = postOffice.createCacheMgr(tx, true);
-		} else {
-			postOffice.skipTransaction(txNum);
-		}
 	}
 
 	@Override
@@ -101,8 +84,10 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		for (RecordKey key : storingKeys) {
 			if (localNodeId == paramHelper.getSourceNodeId())
 				plan.addLocalReadKey(key);
-			else if (localNodeId == paramHelper.getDestNodeId())
+			else if (localNodeId == paramHelper.getDestNodeId()) {
+				plan.addRemoteReadKey(key);
 				plan.addLocalInsertKey(key);
+			}
 		}
 		
 		if (localNodeId == paramHelper.getSourceNodeId())

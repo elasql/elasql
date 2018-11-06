@@ -25,8 +25,8 @@ public class MgCrabSystemController implements MigrationSystemController {
 	
 	private static final Phase INIT_PHASE = Phase.CRABBING;
 	
-	private static final long START_CAUGHT_UP_TIME = 360_000;
-//	private static final long START_CAUGHT_UP_TIME = 5000_000;
+	private static final long START_CAUGHT_UP_DELAY = 120_000;
+//	private static final long START_CAUGHT_UP_DELAY = 5000_000;
 	
 	private AtomicInteger numOfRangesToBeMigrated = new AtomicInteger(0);
 	
@@ -67,7 +67,7 @@ public class MgCrabSystemController implements MigrationSystemController {
 				
 				// Wait for some time
 				try {
-					Thread.sleep(START_CAUGHT_UP_TIME);
+					Thread.sleep(START_CAUGHT_UP_DELAY);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
