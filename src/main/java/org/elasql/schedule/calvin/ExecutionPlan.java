@@ -53,6 +53,7 @@ public class ExecutionPlan {
 	private Set<Integer> pullingSources = new HashSet<Integer>();
 	
 	private boolean forceReadWriteTx = false;
+	private boolean forceRemoteReadEnabled = false;
 
 	public void addLocalReadKey(RecordKey key) {
 		localReadKeys.add(key);
@@ -116,6 +117,10 @@ public class ExecutionPlan {
 	
 	public void setForceReadWriteTx() {
 		forceReadWriteTx = true;
+	}
+	
+	public void setRemoteReadEnabled() {
+		forceRemoteReadEnabled = true;
 	}
 	
 	public Set<RecordKey> getLocalReadKeys() {
@@ -200,6 +205,9 @@ public class ExecutionPlan {
 	}
 	
 	public boolean hasRemoteReads() {
+		if (forceRemoteReadEnabled)
+			return true;
+		
 		return !remoteReadKeys.isEmpty() || !incomingMigratingKeys.isEmpty();
 	}
 	

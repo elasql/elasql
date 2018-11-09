@@ -46,11 +46,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private static Logger logger = Logger.getLogger(CalvinStoredProcedure.class.getName());
 
 	// Protected resource
-	protected Transaction tx;
 	protected long txNum;
 	protected H paramHelper;
 	protected CalvinCacheMgr cacheMgr;
-	protected ExecutionPlan execPlan;
+	
+	private ExecutionPlan execPlan;
+	private Transaction tx;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
 		this.txNum = txNum;
@@ -78,6 +79,32 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 **********************/
 
 	public void prepare(Object... pars) {
+		
+		execPlan = analyzeParameters(pars);
+		
+		// Prepare a transaction and a cache
+		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
+		if (isParticipating()) {
+			// create a transaction
+			tx = Elasql.txMgr().newTransaction(
+					Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
+			tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
+			
+			// create a cache manager
+			cacheMgr = postOffice.createCacheMgr(tx, execPlan.hasRemoteReads());
+			
+			// For special transactions
+			executeLogicInScheduler(tx);
+		} else {
+			postOffice.skipTransaction(txNum);
+		}
+		
+		// Debug
+//		if (Elasql.migrationMgr().isInMigration())
+//			System.out.println("Tx." + txNum + "'s execution plan:\n" + execPlan);
+	}
+	
+	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
@@ -90,27 +117,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		prepareKeys(analyzer);
 		
 		// generate execution plan
-		execPlan = analyzer.generatePlan();
-		
-		prepareForParticipant();
-		
-		// Debug
-//		if (Elasql.migrationMgr().isInMigration())
-//			System.out.println("Tx." + txNum + "'s execution plan:\n" + execPlan);
+		return analyzer.generatePlan();
 	}
 	
-	public void prepareForParticipant() {
-		// create a transaction
-		tx = Elasql.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
-		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
-		
-		// create a cache manager
-		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		cacheMgr = postOffice.createCacheMgr(tx, execPlan.hasRemoteReads());
-	}
-	
-	public void executeLogicInScheduler() {
+	protected void executeLogicInScheduler(Transaction tx) {
 		// Prepare for some special transactions (e.g. migration transactions)
 	}
 
@@ -133,19 +143,27 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	public SpResultSet execute() {
 		try {
 			// Get conservative locks it has asked before
+//			Timer.getLocalTimer().startComponentTimer("get lock");
 			getConservativeLocks();
+//			Timer.getLocalTimer().stopComponentTimer("get lock");
 			
 			// Perform foreground migration
+//			Timer.getLocalTimer().startComponentTimer("perform fg push");
 			performForegroundMigration();
+//			Timer.getLocalTimer().stopComponentTimer("perform fg push");
 			
 			// Execute transaction
 			executeTransactionLogic();
 			
 			// Flush the cached records
+//			Timer.getLocalTimer().startComponentTimer("flush");
 			cacheMgr.flush();
+//			Timer.getLocalTimer().stopComponentTimer("flush");
 			
 			// The transaction finishes normally
+//			Timer.getLocalTimer().startComponentTimer("commit");
 			tx.commit();
+//			Timer.getLocalTimer().stopComponentTimer("commit");
 			paramHelper.setCommitted(true);
 			
 			afterCommit();
@@ -164,7 +182,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		return paramHelper.createResultSet();
 	}
 
-	public boolean isParticipated() {
+	public boolean isParticipating() {
 		return execPlan.getParticipantRole() != ParticipantRole.IGNORE;
 	}
 	
@@ -203,20 +221,28 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 */
 	protected void executeTransactionLogic() {
 		// Read the local records
+//		Timer.getLocalTimer().startComponentTimer("read local");
 		Map<RecordKey, CachedRecord> readings = performLocalRead(execPlan.getLocalReadKeys());
+//		Timer.getLocalTimer().stopComponentTimer("read local");
 
 		// Push local records to the needed remote nodes
+//		Timer.getLocalTimer().startComponentTimer("push reads");
 		pushRecordsToRemotes(execPlan.getPushSets(), readings);
+//		Timer.getLocalTimer().stopComponentTimer("push reads");
 		
 		// Passive participants stops here
 		if (execPlan.getParticipantRole() != ParticipantRole.ACTIVE)
 			return;
 
 		// Read the remote records
+//		Timer.getLocalTimer().startComponentTimer("read remote");
 		collectRemoteReadings(execPlan.getRemoteReadKeys(), readings);
+//		Timer.getLocalTimer().stopComponentTimer("read remote");
 
 		// Write the local records
+//		Timer.getLocalTimer().startComponentTimer("write local");
 		executeSql(readings);
+//		Timer.getLocalTimer().stopComponentTimer("write local");
 	}
 	
 	protected void afterCommit() {
@@ -236,6 +262,35 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected void delete(RecordKey key) {
 		if (execPlan.isLocalDelete(key))
 			cacheMgr.delete(key);
+	}
+	
+	protected Transaction getTransaction() {
+		return tx;
+	}
+
+	protected void sendMigrationPullRequests(Set<Integer> targetNodes) {
+		for (Integer nodeId : targetNodes) {
+			// Construct pushing tuple set
+			TupleSet ts = new TupleSet(-1);
+			RecordKey key = NotificationPartitionPlan.createRecordKey(
+					Elasql.serverId(), nodeId);
+			CachedRecord dummyRec = NotificationPartitionPlan.createRecord(
+					Elasql.serverId(), nodeId, txNum);
+			ts.addTuple(key, txNum, txNum, dummyRec);
+			
+			// Push to the target
+			Elasql.connectionMgr().pushTupleSet(nodeId, ts);
+		}
+	}
+
+	protected void waitForMigrationPullRequests(Set<Integer> targetNodes) {
+		for (Integer nodeId : targetNodes) {
+			RecordKey key = NotificationPartitionPlan.createRecordKey(
+					nodeId, Elasql.serverId());
+			CachedRecord rec = cacheMgr.readFromRemote(key);
+			if (rec.getSrcTxNum() != txNum || rec == null)
+				throw new RuntimeException("something wrong with the pull request: " + key);
+		}
 	}
 
 	private Map<RecordKey, CachedRecord> performLocalRead(Set<RecordKey> readKeys) {
@@ -282,31 +337,6 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	private void performInsertionForMigrations(Set<RecordKey> migratingKeys, Map<RecordKey, CachedRecord> migratingRecords) {
 		for (RecordKey key : migratingKeys) {
 			cacheMgr.insert(key, migratingRecords.get(key).getFldValMap());
-		}
-	}
-
-	private void sendMigrationPullRequests(Set<Integer> targetNodes) {
-		for (Integer nodeId : targetNodes) {
-			// Construct pushing tuple set
-			TupleSet ts = new TupleSet(-1);
-			RecordKey key = NotificationPartitionPlan.createRecordKey(
-					Elasql.serverId(), nodeId);
-			CachedRecord dummyRec = NotificationPartitionPlan.createRecord(
-					Elasql.serverId(), nodeId, txNum);
-			ts.addTuple(key, txNum, txNum, dummyRec);
-			
-			// Push to the target
-			Elasql.connectionMgr().pushTupleSet(nodeId, ts);
-		}
-	}
-
-	private void waitForMigrationPullRequests(Set<Integer> targetNodes) {
-		for (Integer nodeId : targetNodes) {
-			RecordKey key = NotificationPartitionPlan.createRecordKey(
-					nodeId, Elasql.serverId());
-			CachedRecord rec = cacheMgr.readFromRemote(key);
-			if (rec.getSrcTxNum() != txNum || rec == null)
-				throw new RuntimeException("something wrong with the pull request: " + key);
 		}
 	}
 }

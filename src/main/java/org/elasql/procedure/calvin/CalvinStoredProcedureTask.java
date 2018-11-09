@@ -19,7 +19,6 @@ import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.util.Timer;
 
 public class CalvinStoredProcedureTask extends StoredProcedureTask {
 	
@@ -39,24 +38,30 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 	public void run() {
 		Thread.currentThread().setName("Tx." + txNum);
 		
-		Timer timer = Timer.getLocalTimer();
+//		Timer timer = Timer.getLocalTimer();
 		SpResultSet rs = null;
 		
-		timer.reset();
-		timer.startExecution();
+//		timer.reset();
+//		timer.startExecution();
 
-		try {
+//		try {
 			rs = sp.execute();
-		} finally {
-			timer.stopExecution();
-		}
+//		} finally {
+//			timer.stopExecution();
+//		}
+		
+//		if (txNum % 100 == 0) {
+//			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
+//			System.out.println(String.format("Tx.%d commits at %d ms.", txNum, time));
+//		}
 
 		if (csp.willResponseToClients()) {
 			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 		}
 		
 		// For Debugging
-//		System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
+//		if (timer.getExecutionTime() > 1000_000)
+//			System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
 //		timer.addToGlobalStatistics();
 	}
 }

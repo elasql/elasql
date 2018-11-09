@@ -12,6 +12,7 @@ import org.elasql.migration.MigrationStoredProcFactory;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.server.Elasql;
+import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
 
 /**
@@ -25,8 +26,9 @@ public class MgCrabSystemController implements MigrationSystemController {
 	
 	private static final Phase INIT_PHASE = Phase.CRABBING;
 	
-	private static final long START_CAUGHT_UP_DELAY = 120_000;
-//	private static final long START_CAUGHT_UP_DELAY = 5000_000;
+	private static final long START_CAUGHT_UP_DELAY = 90_000; // multi-indices
+//	private static final long START_CAUGHT_UP_DELAY = 500_000; // normal
+//	private static final long START_CAUGHT_UP_DELAY = 5000_000; // long enough to disable
 	
 	private AtomicInteger numOfRangesToBeMigrated = new AtomicInteger(0);
 	
@@ -37,7 +39,8 @@ public class MgCrabSystemController implements MigrationSystemController {
 			logger.info("the system controller is ready");
 		
 		this.comsFactory = comsFactory;
-		startMigrationTrigger();
+		if (ENABLE_MIGRATION)
+			startMigrationTrigger();
 	}
 
 	public void startMigrationTrigger() {
@@ -62,7 +65,10 @@ public class MgCrabSystemController implements MigrationSystemController {
 				sendMigrationStartRequest(newPartPlan);
 				
 				// Determine how many ranges should be migrated
-				List<MigrationRange> ranges = comsFactory.generateMigrationRanges(newPartPlan);
+				PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
+				if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
+					currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
+				List<MigrationRange> ranges = comsFactory.generateMigrationRanges(currentPlan, newPartPlan);
 				numOfRangesToBeMigrated.set(ranges.size());
 				
 				// Wait for some time

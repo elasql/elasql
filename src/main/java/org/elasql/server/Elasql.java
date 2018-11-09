@@ -138,6 +138,7 @@ public class Elasql extends VanillaDb {
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
 			initConnectionMgr(myNodeId, true);
+			initPartitionMetaMgr(partitionPlan);
 			if (migraComsFactory != null)
 				migraSysControl = migraComsFactory.newSystemController();
 			return;

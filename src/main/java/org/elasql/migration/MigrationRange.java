@@ -12,7 +12,7 @@ public interface MigrationRange {
 	
 	void setMigrated(RecordKey key);
 	
-	Set<RecordKey> generateNextMigrationChunk(int maxChunkSize);
+	Set<RecordKey> generateNextMigrationChunk(boolean useBytesForSize, int maxChunkSize);
 	
 	int getSourcePartId();
 	

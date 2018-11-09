@@ -51,17 +51,20 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
 	}
 	
-	public void prepare(Object... pars) {
+	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
-		// prepare keys
-		StandardAnalyzer analyzer = new StandardAnalyzer();
+		// analyze read-write set
+		ReadWriteSetAnalyzer analyzer;
+		if (Elasql.migrationMgr().isInMigration())
+			analyzer = Elasql.migrationMgr().newAnalyzer();
+		else
+			analyzer = new StandardAnalyzer();
 		prepareKeys(analyzer);
 		
 		// generate execution plan
-		execPlan = analyzer.generatePlan();
-		alterExecutionPlan(execPlan);
+		return alterExecutionPlan(analyzer.generatePlan());
 	}
 	
 	public boolean willResponseToClients() {
@@ -79,12 +82,15 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		// default: do nothing
 	}
 	
-	private void alterExecutionPlan(ExecutionPlan plan) {
+	private ExecutionPlan alterExecutionPlan(ExecutionPlan plan) {
 		if (localNodeId == MASTER_NODE) {
 			for (int nodeId = 0; nodeId < numOfParts; nodeId++)
 				plan.addRemoteReadKey(NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE));
 		}
 		plan.setParticipantRole(ParticipantRole.ACTIVE);
+		plan.setForceReadWriteTx();
+		
+		return plan;
 	}
 
 	protected void executeTransactionLogic() {

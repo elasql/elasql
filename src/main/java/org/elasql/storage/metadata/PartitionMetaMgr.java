@@ -24,7 +24,7 @@ public class PartitionMetaMgr {
 
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
+				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 18);
 	}
 
 	private PartitionPlan partPlan;

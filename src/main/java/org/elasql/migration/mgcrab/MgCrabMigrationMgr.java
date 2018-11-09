@@ -21,6 +21,7 @@ import org.elasql.schedule.calvin.mgcrab.CaughtUpAnalyzer;
 import org.elasql.schedule.calvin.mgcrab.CrabbingAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -59,7 +60,10 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		
 		// Initialize states
 		currentPhase = initialPhase;
-		migrationRanges = comsFactory.generateMigrationRanges(newPartPlan);
+		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
+		if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
+			currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
+		migrationRanges = comsFactory.generateMigrationRanges(currentPlan, newPartPlan);
 		for (MigrationRange range : migrationRanges)
 			if (range.getDestPartId() == Elasql.serverId())
 				pushRanges.add(range);
@@ -78,7 +82,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 			@Override
 			public void run() {
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(CHUNK_SIZE);
+					Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						sendBGPushRequest(chunk, range.getSourcePartId(), 
 								range.getDestPartId());

@@ -32,7 +32,9 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class StopCopyMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(StopCopyMigrationMgr.class.getName());
 	
-	private static final int LARGE_CHUNK_SIZE = 32_000_000;
+	private static final int LARGE_CHUNK_SIZE_IN_BYTES = 16_000_000; // 1MB
+	private static final int LARGE_CHUNK_SIZE_IN_COUNT = 640000;
+	private static final int LARGE_CHUNK_SIZE = USE_BYTES_FOR_CHUNK_SIZE? LARGE_CHUNK_SIZE_IN_BYTES : LARGE_CHUNK_SIZE_IN_COUNT;
 	
 	private static final Constant FALSE = new IntegerConstant(0);
 	private static final Constant TRUE = new IntegerConstant(1);
@@ -90,8 +92,11 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		}
 	}
 	
-	private void analyzeResponsibleRanges(PartitionPlan plan) {
-		List<MigrationRange> ranges = comsFactory.generateMigrationRanges(plan);
+	private void analyzeResponsibleRanges(PartitionPlan newPlan) {
+		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
+		if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
+			currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
+		List<MigrationRange> ranges = comsFactory.generateMigrationRanges(currentPlan, newPlan);
 		
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("migration ranges: %s", ranges));
@@ -131,7 +136,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 			finishDests = 0;
 			
 			for (MigrationRange range : sourceRanges) {
-				Set<RecordKey> chunk = range.generateNextMigrationChunk(LARGE_CHUNK_SIZE);
+				Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
 				if (chunk.size() > 0) {
 					readAndPushADataChunk(tx, chunk, range.getDestPartId());
 					waitForDests.add(range.getDestPartId());
@@ -141,7 +146,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 			}
 			
 			for (MigrationRange range : destRanges) {
-				Set<RecordKey> chunk = range.generateNextMigrationChunk(LARGE_CHUNK_SIZE);
+				Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
 				if (chunk.size() > 0) {
 					receiveAndInsertDataChunk(tx, cacheMgr, chunk);
 					sendAnAck(tx, range.getSourcePartId());

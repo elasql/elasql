@@ -16,8 +16,10 @@ import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
+import org.vanilladb.core.storage.tx.Transaction;
 
 public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPushParamHelper> {
 	private static Logger logger = Logger.getLogger(TwoPhaseBgPushProcedure.class.getName());
@@ -31,7 +33,7 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	private MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
 	
-	private RecordKey[] pushingKeys = null;
+	private Set<RecordKey> pushingKeys = new HashSet<RecordKey>();
 	private Set<RecordKey> storingKeys = new HashSet<RecordKey>();
 
 	public TwoPhaseBgPushProcedure(long txNum) {
@@ -39,7 +41,7 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	}
 
 	@Override
-	public void prepare(Object... pars) {
+	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
@@ -47,18 +49,27 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		prepareKeys(null);
 		
 		// generate an execution plan for locking storing keys
-		execPlan = generateExecutionPlan();
+		ExecutionPlan plan = generateExecutionPlan();
 		
 		// update migration range
 		if (paramHelper.getMigrationRangeUpdate() != null)
 			migraMgr.updateMigrationRange(paramHelper.getMigrationRangeUpdate());
+		
+		return plan;
 	}
-
+	
 	@Override
-	public void prepareKeys(ReadWriteSetAnalyzer analyzer) {
+	public boolean willResponseToClients() {
+		return false;
+	}
+	
+	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
 		// For phase One: The source node reads a set of records, then pushes to the
 		// dest node.
-		pushingKeys = paramHelper.getPushingKeys();
+		for (RecordKey key : paramHelper.getPushingKeys())
+			// Important: We only push the un-migrated records in the dest
+			if (!migraMgr.isMigrated(key))
+				pushingKeys.add(key);
 		
 		// For phase Two: The dest node acquire the locks, then storing them to the 
 		// local storage.
@@ -71,21 +82,20 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		// performed with the phase one of the next BG in the same time.
 	}
 	
-	@Override
-	public boolean willResponseToClients() {
-		return false;
-	}
-	
 	private ExecutionPlan generateExecutionPlan() {
 		ExecutionPlan plan = new ExecutionPlan();
 		
 		// XXX: Should we lock the push keys on the source nodes?
+		if (localNodeId == paramHelper.getDestNodeId()) {
+			plan.setRemoteReadEnabled();
+		}
 		
-		for (RecordKey key : storingKeys) {
-			if (localNodeId == paramHelper.getSourceNodeId())
+		if (localNodeId == paramHelper.getSourceNodeId()) {
+			for (RecordKey key : storingKeys) {
 				plan.addLocalReadKey(key);
-			else if (localNodeId == paramHelper.getDestNodeId()) {
-				plan.addRemoteReadKey(key);
+			}
+		} else if (localNodeId == paramHelper.getDestNodeId()) {
+			for (RecordKey key : storingKeys) {
 				plan.addLocalInsertKey(key);
 			}
 		}
@@ -102,18 +112,22 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	protected void executeTransactionLogic() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("BG pushing tx." + txNum + " will pushes " +
-					pushingKeys.length + " records from node." +
+					pushingKeys.size() + " records from node." +
 					paramHelper.getSourceNodeId() + " to node." +
 					paramHelper.getDestNodeId() + " and stores " +
 					storingKeys.size() + " records at node." +
 					paramHelper.getDestNodeId());
 		
+//		System.out.println("Push Keys: " + pushingKeys);
+//		System.out.println("Store Keys: " + storingKeys);
+		
 		// The source node
 		if (localNodeId == paramHelper.getSourceNodeId()) {
 			// XXX: I'm not sure if we should do this
 			// Quick fix: Release the locks immediately to prevent blocking the records in the source node
-//			ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-//			ccMgr.onTxCommit(tx);
+			Transaction tx = getTransaction();
+			ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
+			ccMgr.onTxCommit(tx);
 			
 			readAndPushInSource();
 		} else if (localNodeId == paramHelper.getDestNodeId()) {
@@ -133,6 +147,10 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	}
 	
 	private void readAndPushInSource() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("BG pushing tx." + txNum + " reads " + pushingKeys.size()
+					+ " records.");
+		
 		// Construct pushing tuple set
 		TupleSet ts = new TupleSet(-1);
 
@@ -149,7 +167,7 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 
 		// Batch read the records per table
 		for (Map.Entry<String, Set<RecordKey>> entry : keysPerTables.entrySet()) {
-			Map<RecordKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), tx);
+			Map<RecordKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), getTransaction());
 
 			for (RecordKey key : entry.getValue()) {
 				// System.out.println(key);
@@ -168,7 +186,7 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		}
 
 		if (logger.isLoggable(Level.INFO))
-			logger.info("BG pushing tx. " + txNum + " pushes " + ts.size()
+			logger.info("BG pushing tx." + txNum + " pushes " + ts.size()
 					+ " records to the dest. node. (Node." + paramHelper.getDestNodeId() + ")");
 
 		// Push to the destination
@@ -178,7 +196,7 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	
 	private Map<RecordKey, CachedRecord> receiveInDest() {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("BG pushing tx. " + txNum + " is receiving " + pushingKeys.length
+			logger.info("BG pushing tx. " + txNum + " is receiving " + pushingKeys.size()
 					+ " records from the source node. (Node." + paramHelper.getSourceNodeId() + ")");
 		
 		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();

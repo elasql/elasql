@@ -10,6 +10,7 @@ import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
+import org.vanilladb.core.storage.tx.Transaction;
 
 public class MigrationEndProcedure extends CalvinStoredProcedure<StoredProcedureParamHelper> {
 
@@ -20,17 +21,19 @@ public class MigrationEndProcedure extends CalvinStoredProcedure<StoredProcedure
 	}
 	
 	@Override
-	public void prepare(Object... pars) {
+	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		// generate an empty execution plan
-		execPlan = new ExecutionPlan();
-		execPlan.setParticipantRole(ParticipantRole.PASSIVE);
-		execPlan.setForceReadWriteTx();
+		ExecutionPlan plan = new ExecutionPlan();
+		plan.setParticipantRole(ParticipantRole.PASSIVE);
+		plan.setForceReadWriteTx(); // for stop-and-copy
 		
 		params = pars;
+		
+		return plan;
 	}
 	
 	@Override
-	public void executeLogicInScheduler() {
+	public void executeLogicInScheduler(Transaction tx) {
 		Elasql.migrationMgr().finishMigration(tx, params);
 	}
 	

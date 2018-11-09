@@ -19,7 +19,7 @@ import org.elasql.storage.metadata.PartitionPlan;
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
 	
-	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.MGCRAB;
+	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.STOP_COPY;
 	
 	public MigrationComponentFactory() {
 		if (logger.isLoggable(Level.INFO))
@@ -63,7 +63,7 @@ public abstract class MigrationComponentFactory {
 		throw new RuntimeException("it should not be here.");
 	}
 	
-	public abstract List<MigrationRange> generateMigrationRanges(PartitionPlan newPlan);
+	public abstract List<MigrationRange> generateMigrationRanges(PartitionPlan oldPlan, PartitionPlan newPlan);
 	
 	public abstract PartitionPlan newPartitionPlan();
 }
