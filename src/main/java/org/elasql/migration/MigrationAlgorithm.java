@@ -1,5 +1,5 @@
 package org.elasql.migration;
 
 public enum MigrationAlgorithm {
-	MGCRAB, SQUALL, STOP_COPY
+	MGCRAB, SQUALL, ALBATROSS, STOP_COPY
 }
