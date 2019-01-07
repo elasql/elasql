@@ -18,6 +18,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
+import org.vanilladb.core.util.Timer;
 
 public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	private static Logger logger = Logger.getLogger(BgPushProcedure.class.getName());
@@ -27,6 +28,8 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 	private SquallMigrationMgr migraMgr = (SquallMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
+	
+	private Set<RecordKey> pushingKeys = new HashSet<RecordKey>();
 
 	public BgPushProcedure(long txNum) {
 		super(txNum, new BgPushParamHelper());
@@ -34,14 +37,25 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	
 	@Override
 	protected ExecutionPlan analyzeParameters(Object[] pars) {
+		ExecutionPlan plan;
+		
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
-		// analyze read-write set
-		prepareKeys(null);
-		
-		// generate an execution plan for locking storing keys
-		ExecutionPlan plan = generateExecutionPlan();
+		// Due to the high cost of pre-process,
+		// we only require the source and the destination node to prepare the keys.
+		if (localNodeId == paramHelper.getSourceNodeId() ||
+				localNodeId == paramHelper.getDestNodeId()) {
+			
+			// analyze read-write set
+			prepareKeys(null);
+			
+			// generate an execution plan for locking storing keys
+			plan = generateExecutionPlan();
+		} else {
+			// create an empty plan for other nodes
+			plan = new ExecutionPlan();
+		}
 		
 		// update migration range
 		if (paramHelper.getMigrationRangeUpdate() != null)
@@ -52,7 +66,8 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 	@Override
 	public void prepareKeys(ReadWriteSetAnalyzer analyzer) {
-		
+		for (int i = 0; i < paramHelper.getPushingKeyCount(); i++)
+			pushingKeys.add(paramHelper.getPushingKey(i));
 	}
 	
 	@Override
@@ -63,11 +78,13 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	private ExecutionPlan generateExecutionPlan() {
 		ExecutionPlan plan = new ExecutionPlan();
 		
-		for (RecordKey key : paramHelper.getPushingKeys()) {
-			if (localNodeId == paramHelper.getSourceNodeId()) {
+		if (localNodeId == paramHelper.getSourceNodeId()) {
+			for (RecordKey key : pushingKeys) {
 				plan.setRemoteReadEnabled();
 				plan.addLocalReadKey(key);
-			} else if (localNodeId == paramHelper.getDestNodeId()) {
+			}
+		} else if (localNodeId == paramHelper.getDestNodeId()) {
+			for (RecordKey key : pushingKeys) {
 				plan.setRemoteReadEnabled();
 				plan.addLocalInsertKey(key);
 			}
@@ -86,7 +103,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 		if (localNodeId == paramHelper.getSourceNodeId()) {
 			if (logger.isLoggable(Level.INFO))
 				logger.info("BG pushing tx." + txNum + " will pushes " +
-						paramHelper.getPushingKeys().length + " records from node." +
+						pushingKeys.size() + " records from node." +
 						paramHelper.getSourceNodeId() + " to node." +
 						paramHelper.getDestNodeId() + ".");
 			
@@ -118,7 +135,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 		// Construct key sets
 		Map<String, Set<RecordKey>> keysPerTables = new HashMap<String, Set<RecordKey>>();
-		for (RecordKey key : paramHelper.getPushingKeys()) {
+		for (RecordKey key : pushingKeys) {
 			Set<RecordKey> keys = keysPerTables.get(key.getTableName());
 			if (keys == null) {
 				keys = new HashSet<RecordKey>();
@@ -158,7 +175,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	
 	private Map<RecordKey, CachedRecord> receiveInDest() {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("BG pushing tx. " + txNum + " is receiving " + paramHelper.getPushingKeys().length
+			logger.info("BG pushing tx. " + txNum + " is receiving " + pushingKeys.size()
 					+ " records from the source node. (Node." + paramHelper.getSourceNodeId() + ")");
 
 		// Send a pull request
@@ -169,7 +186,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
 
 		// Receive the data from the source node and save them
-		for (RecordKey k : paramHelper.getPushingKeys()) {
+		for (RecordKey k : pushingKeys) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			recordMap.put(k, rec);
 		}
@@ -179,11 +196,11 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	
 	private void insertInDest(Map<RecordKey, CachedRecord> cachedRecords) {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("BG pushing tx. " + txNum + " is storing " + paramHelper.getPushingKeys().length
+			logger.info("BG pushing tx. " + txNum + " is storing " + pushingKeys.size()
 					+ " records to the local storage.");
 
 		// Store the cached records
-		for (RecordKey key : paramHelper.getPushingKeys()) {
+		for (RecordKey key : pushingKeys) {
 			CachedRecord rec = cachedRecords.get(key);
 			
 			if (rec == null)

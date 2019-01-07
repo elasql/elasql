@@ -14,19 +14,19 @@ public class BgPushParamHelper extends StoredProcedureParamHelper {
 	private MigrationRangeUpdate update;
 	private int sourceNodeId;
 	private int destNodeId;
-	private RecordKey[] pushingKeys;
+	private int pushingKeyCount;
+	
+	// We cache the raw parameters and translate them on-the-fly
+	// since it is too costly to copy them.
+	private Object[] rawParameters;
 	
 	@Override
 	public void prepareParameters(Object... pars) {
 		update = (MigrationRangeUpdate) pars[0];
 		sourceNodeId = (Integer) pars[1];
 		destNodeId = (Integer) pars[2];
-		
-		// Read pushing keys
-		int pushingCount = (Integer) pars[3];
-		pushingKeys = new RecordKey[pushingCount];
-		for (int i = 0; i < pushingCount; i++)
-			pushingKeys[i] = (RecordKey) pars[i + 4];
+		pushingKeyCount = (Integer) pars[3];
+		rawParameters = pars;
 	}
 	
 	public int getSourceNodeId() {
@@ -41,8 +41,12 @@ public class BgPushParamHelper extends StoredProcedureParamHelper {
 		return update;
 	}
 	
-	public RecordKey[] getPushingKeys() {
-		return pushingKeys;
+	public int getPushingKeyCount() {
+		return pushingKeyCount;
+	}
+	
+	public RecordKey getPushingKey(int index) {
+		return (RecordKey) rawParameters[index + 4];
 	}
 	
 	@Override

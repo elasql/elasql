@@ -14,8 +14,12 @@ public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 	private MigrationRangeUpdate update;
 	private int sourceNodeId;
 	private int destNodeId;
-	private RecordKey[] pushingKeys;
-	private RecordKey[] storingKeys;
+	private int pushingKeyCount;
+	private long lastTxNum;
+	
+	// We cache the raw parameters and translate them on-the-fly
+	// since it is too costly to copy them.
+	private Object[] rawParameters;
 	
 	@Override
 	public void prepareParameters(Object... pars) {
@@ -23,18 +27,9 @@ public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 			update = (MigrationRangeUpdate) pars[0];
 		sourceNodeId = (Integer) pars[1];
 		destNodeId = (Integer) pars[2];
-		
-		// Read pushing keys
-		int pushingCount = (Integer) pars[3];
-		pushingKeys = new RecordKey[pushingCount];
-		for (int i = 0; i < pushingCount; i++)
-			pushingKeys[i] = (RecordKey) pars[i + 4];
-		
-		// Read storing keys
-		int storingCount = (Integer) pars[pushingCount + 4];
-		storingKeys = new RecordKey[storingCount];
-		for (int i = 0; i < storingCount; i++)
-			storingKeys[i] = (RecordKey) pars[i + 5 + pushingCount];
+		lastTxNum = (Long) pars[3];
+		pushingKeyCount = (Integer) pars[4];
+		rawParameters = pars;
 	}
 	
 	public int getSourceNodeId() {
@@ -49,12 +44,16 @@ public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 		return update;
 	}
 	
-	public RecordKey[] getPushingKeys() {
-		return pushingKeys;
+	public long getLastPushTxNum() {
+		return lastTxNum;
 	}
 	
-	public RecordKey[] getStoringKeys() {
-		return storingKeys;
+	public int getPushingKeyCount() {
+		return pushingKeyCount;
+	}
+	
+	public RecordKey getPushingKey(int index) {
+		return (RecordKey) rawParameters[index + 5];
 	}
 	
 	@Override

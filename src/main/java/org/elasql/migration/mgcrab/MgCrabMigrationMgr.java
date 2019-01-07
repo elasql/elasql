@@ -3,10 +3,13 @@ package org.elasql.migration.mgcrab;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.cache.CachedRecord;
 import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationRange;
@@ -37,10 +40,21 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 	private Phase currentPhase = Phase.NORMAL;
 	private List<MigrationRange> migrationRanges;
 	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
-	private Set<RecordKey> lastChunk;
-	private MigrationRangeUpdate lastUpdate;
 	private PartitionPlan newPartitionPlan;
 	private MigrationComponentFactory comsFactory;
+	
+	// XXX: We assume that the destination only has one range to receive at a time. 
+	private MigrationRangeUpdate lastUpdate;
+	
+	// For the source node to record the last pushed keys in the two phase
+	// background pushing.
+	private Map<Long, Set<RecordKey>> txNumToPushKeys = 
+			new ConcurrentHashMap<Long, Set<RecordKey>>();
+	
+	// Two phase background pushing stores the pushed records on the
+	// destination node.
+	private Map<Long, Map<RecordKey, CachedRecord>> txNumToPushedRecords = 
+			new ConcurrentHashMap<Long, Map<RecordKey, CachedRecord>>();
 	
 	public MgCrabMigrationMgr(MigrationComponentFactory comsFactory) {
 		this.comsFactory = comsFactory;
@@ -70,76 +84,73 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		newPartitionPlan = newPartPlan;
 		
 		if (!pushRanges.isEmpty())
-			scheduleNextBGPushRequest();
+			scheduleNextBGPushRequest(-1);
 		
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("migration ranges: %s", migrationRanges.toString()));
 		}
 	}
 	
-	public void scheduleNextBGPushRequest() {
+	public void scheduleNextBGPushRequest(long lastPushedTxNum) {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
+				// XXX: If there is multiple ranges to this destinations
+				// we should know which range pairs to this transaction number
 				for (MigrationRange range : pushRanges) {
 					Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						sendBGPushRequest(chunk, range.getSourcePartId(), 
-								range.getDestPartId());
-						lastChunk = chunk;
+								range.getDestPartId(), lastPushedTxNum);
 						lastUpdate = range.generateStatusUpdate();
 						return;
 					}
 				}
 				
-				if (lastChunk != null) {
-					sendBGPushRequest(new HashSet<RecordKey>(), lastUpdate.getSourcePartId(),
-							lastUpdate.getDestPartId());
-					lastChunk = null;
-					lastUpdate = null;
-					return;
-				}	
-				
-				// If it reach here, it means that there is no more chunk
-				sendRangeFinishNotification();
+				// If it reach here, this should the last push
+				sendBGPushRequest(new HashSet<RecordKey>(), lastUpdate.getSourcePartId(),
+							lastUpdate.getDestPartId(), lastPushedTxNum);
 			}
 		}).start();
 	}
 	
-	public void sendBGPushRequest(Set<RecordKey> chunk, int sourceNodeId, int destNodeId) {
+	public void sendBGPushRequest(Set<RecordKey> chunk, int sourceNodeId, int destNodeId, long lastPushedTxNum) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a background push request with " + chunk.size() + " keys.");
 		
 		// Prepare the parameters
-		Object[] params;
-		if (lastChunk == null) {
-			params = new Object[5 + chunk.size()];
-		} else {
-			params = new Object[5 + chunk.size() + lastChunk.size()];
-		}
+		Object[] params = new Object[5 + chunk.size()];
 		
 		params[0] = lastUpdate;
 		params[1] = sourceNodeId;
 		params[2] = destNodeId;
+		params[3] = lastPushedTxNum;
+		params[4] = chunk.size();
 		
-		params[3] = chunk.size();
-		
-		int i = 4;
+		int i = 5;
 		for (RecordKey key : chunk)
 			params[i++] = key;
-		
-		if (lastChunk == null) {
-			params[i++] = 0;
-		} else {
-			params[i++] = lastChunk.size();
-			for (RecordKey key : lastChunk)
-				params[i++] = key;
-		}
 		
 		// Send a store procedure call
 		Object[] call = { new StoredProcedureCall(-1, -1, 
 				MgCrabStoredProcFactory.SP_BG_PUSH, params)};
 		Elasql.connectionMgr().sendBroadcastRequest(call, false);
+	}
+	
+	public void cachePushKeys(long pushTxNum, Set<RecordKey> pushKeys) {
+		txNumToPushKeys.put(pushTxNum, pushKeys);
+	}
+	
+	public void cachePushedRecords(long pushTxNum, Map<RecordKey, CachedRecord> pushedRecords) {
+		txNumToPushedRecords.put(pushTxNum, pushedRecords);
+	}
+	
+	public Set<RecordKey> retrievePushKeys(long pushTxNum) {
+		return txNumToPushKeys.remove(pushTxNum);
+	}
+	
+	public Map<RecordKey, CachedRecord> retrievePushedRecords(long pushTxNum) {
+		return txNumToPushedRecords.remove(pushTxNum);
 	}
 	
 	public void changePhase(Phase newPhase) {
@@ -159,6 +170,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		throw new RuntimeException(String.format("This is no match for the update", update));
 	}
 	
+	// XXX: Currently, we do not identify which range finished.
 	public void sendRangeFinishNotification() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a range finish notification to the system controller");
@@ -180,6 +192,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		
 		// Clear the migration states
 		currentPhase = Phase.NORMAL;
+		lastUpdate = null;
 		migrationRanges.clear();
 		pushRanges.clear();
 	}
