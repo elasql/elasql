@@ -6,6 +6,8 @@ import org.elasql.sql.RecordKey;
 
 public interface MigrationRange {
 	
+	boolean addKey(RecordKey key);
+	
 	boolean contains(RecordKey key);
 	
 	boolean isMigrated(RecordKey key);

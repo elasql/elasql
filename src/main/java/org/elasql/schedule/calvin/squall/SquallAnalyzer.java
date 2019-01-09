@@ -5,7 +5,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.squall.SquallMigrationMgr;
 import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
@@ -56,7 +56,7 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	
 	private int localNodeId = Elasql.serverId();
 	private ExecutionPlan execPlan;
-	private MigrationMgr migraMgr;
+	private SquallMigrationMgr migraMgr;
 	
 	// For read-only transactions to choose one node as a active participant
 	private int[] readsPerNodes;
@@ -80,7 +80,7 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	public SquallAnalyzer() {
 		execPlan = new ExecutionPlan();
 		readsPerNodes = new int[Elasql.partitionMetaMgr().getCurrentNumOfParts()];
-		migraMgr = Elasql.migrationMgr();
+		migraMgr = (SquallMigrationMgr) Elasql.migrationMgr();
 	}
 	
 	@Override
@@ -223,6 +223,12 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 				addToForegourndMigration(p, migratingUpdateKeys.get(p));
 			} else {
 				putMigratingKeysTo(p, p.sourceId);
+				
+				// New inserted data should be also migrated to the destination node
+				Set<RecordKey> insertKeys = migratingInsertKeys.get(p);
+				if (insertKeys != null)
+					for (RecordKey key : insertKeys)
+						migraMgr.addNewInsertKeyOnSource(key);
 			}
 		}
 	}

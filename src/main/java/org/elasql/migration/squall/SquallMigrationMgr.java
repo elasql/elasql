@@ -107,11 +107,18 @@ public class SquallMigrationMgr implements MigrationMgr {
 		Elasql.connectionMgr().sendBroadcastRequest(call, false);
 	}
 	
+	public void addNewInsertKeyOnSource(RecordKey key) {
+		for (MigrationRange range : migrationRanges)
+			if (range.addKey(key))
+				return;
+		throw new RuntimeException(String.format("This is no match for the key: %s", key));
+	}
+	
 	public void updateMigrationRange(MigrationRangeUpdate update) {
 		for (MigrationRange range : migrationRanges)
 			if (range.updateMigrationStatus(update))
 				return;
-		throw new RuntimeException(String.format("This is no match for the update", update));
+		throw new RuntimeException(String.format("This is no match for the update: %s", update));
 	}
 	
 	public void sendRangeFinishNotification() {

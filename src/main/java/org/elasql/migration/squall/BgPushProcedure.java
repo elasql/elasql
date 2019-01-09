@@ -18,7 +18,6 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
-import org.vanilladb.core.util.Timer;
 
 public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	private static Logger logger = Logger.getLogger(BgPushProcedure.class.getName());
@@ -66,8 +65,11 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 	@Override
 	public void prepareKeys(ReadWriteSetAnalyzer analyzer) {
-		for (int i = 0; i < paramHelper.getPushingKeyCount(); i++)
-			pushingKeys.add(paramHelper.getPushingKey(i));
+		for (int i = 0; i < paramHelper.getPushingKeyCount(); i++) {
+			RecordKey key = paramHelper.getPushingKey(i);
+			if (!migraMgr.isMigrated(key))
+				pushingKeys.add(key);
+		}
 	}
 	
 	@Override
