@@ -235,7 +235,7 @@ public class ClayPlanner {
 		double removedNodeLoad = 0;
 		for (Vertex v : vertices)
 			if (v.getPartId() == senderPartId)
-				removedNodeLoad += v.getVertexWeight();
+				removedNodeLoad += v.getNormalizedVertexWeight();
 		
 		// Cross-partition edge loading
 		double addedCrossLoad = 0, reducedCrossLoad = 0;
@@ -245,9 +245,9 @@ public class ClayPlanner {
 					Vertex u = e.getOpposite();
 					if (u.getPartId() == senderPartId) {
 						if (!vertices.contains(u))
-							addedCrossLoad += e.getWeight();
+							addedCrossLoad += e.getNormalizedWeight();
 					} else {
-						reducedCrossLoad += e.getWeight();
+						reducedCrossLoad += e.getNormalizedWeight();
 					}
 				}
 			}
@@ -267,7 +267,7 @@ public class ClayPlanner {
 		double addedNodeLoad = 0;
 		for (Vertex v : vertices)
 			if (v.getPartId() != destPartId)
-				addedNodeLoad += v.getVertexWeight();
+				addedNodeLoad += v.getNormalizedVertexWeight();
 		
 		// Cross-partition edge loading
 		double addedCrossLoad = 0, reducedCrossLoad = 0;
@@ -276,10 +276,10 @@ public class ClayPlanner {
 				for (OutEdge e : v.getOutEdges().values()) {
 					Vertex u = e.getOpposite();
 					if (u.getPartId() == destPartId) {
-						reducedCrossLoad += e.getWeight();
+						reducedCrossLoad += e.getNormalizedWeight();
 					} else {
 						if (!vertices.contains(u))
-							addedCrossLoad += e.getWeight();
+							addedCrossLoad += e.getNormalizedWeight();
 					}
 				}
 			}
@@ -300,7 +300,7 @@ public class ClayPlanner {
 		int count = 0;
 		for (Vertex v : clump.getVertices()) {
 			sb.append(String.format("%d (%d, %f, %f), ", v.getId(), v.getPartId(),
-					v.getVertexWeight(), v.getEdgeWeight()));
+					v.getNormalizedVertexWeight(), v.getNormalizedEdgeWeight()));
 			count++;
 			if (count >= 5)
 				break;

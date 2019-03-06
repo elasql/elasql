@@ -1,5 +1,9 @@
 package org.elasql.server.migration;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -18,6 +22,8 @@ import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
 import org.elasql.server.migration.clay.ClayPlanner;
+import org.elasql.server.migration.heatgraph.HeatGraph;
+import org.elasql.server.migration.heatgraph.Vertex;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.VanillaDb;
@@ -189,8 +195,8 @@ public abstract class MigrationManager {
 		isMonitoring.set(false);
 		
 		if (PartitionMetaMgr.USE_SCHISM) {
-			// TODO: Schism
-//			migraMgr.outputMetis(txNum);
+			outputMetis(workloadMonitor.retrieveHeatGraphAndReset());
+			isClayOperating.set(false);
 		} else {
 			if (ENABLE_NODE_SCALING)
 				isScaled.set(true);
@@ -399,33 +405,34 @@ public abstract class MigrationManager {
 	}
 	
 	// For Schism
-//	public void outputMetis(long txNum) {
-//		File metisDir = new File(".");
-//		File metidFile = new File(metisDir, "metis_mesh_DR_new_"+MigrationManager.DATA_RANGE_SIZE+"_"+txNum+".txt");
-//		FileWriter wmetidFile;
-//		BufferedWriter bwmetidFile;
-//		try {
-//			wmetidFile = new FileWriter(metidFile);
-//			bwmetidFile = new BufferedWriter(wmetidFile);
-//			int vertexCount = getRecordCount() / MigrationManager.DATA_RANGE_SIZE;
-//			StringBuilder sb = new StringBuilder();
-//			long numEdge = 0;
-//			for (int i = 0; i < vertexCount; i++) {
-//				Vertex v = vertexKeys.get(i);
-//				if (v != null) {
-//					numEdge += v.toMetis(sb);
-//				} else {
-//					sb.append("0\n");
-//				}
-//			}
-//				
-//			bwmetidFile.write(String.format("%d %d 011\n", vertexCount, numEdge / 2));
-//			bwmetidFile.append(sb);
-//			bwmetidFile.close();
-//		} catch (IOException e1) {
-//			e1.printStackTrace();
-//		}
-//	}
+	public void outputMetis(HeatGraph graph) {
+		File metisDir = new File(".");
+		File metidFile = new File(metisDir, "metis_mesh_" + 
+				((System.currentTimeMillis() - startTime) / 1000) + ".txt");
+		FileWriter wmetidFile;
+		BufferedWriter bwmetidFile;
+		try {
+			wmetidFile = new FileWriter(metidFile);
+			bwmetidFile = new BufferedWriter(wmetidFile);
+			int vertexCount = getRecordCount() / MigrationManager.DATA_RANGE_SIZE;
+			StringBuilder sb = new StringBuilder();
+			long numEdge = 0;
+			for (int i = 0; i < vertexCount; i++) {
+				Vertex v = graph.getVertex(i);
+				if (v != null) {
+					numEdge += v.toMetis(sb);
+				} else {
+					sb.append("0\n");
+				}
+			}
+				
+			bwmetidFile.write(String.format("%d %d 011\n", vertexCount, numEdge / 2));
+			bwmetidFile.append(sb);
+			bwmetidFile.close();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+	}
 
 	// NOTE: This can only be called by the scheduler
 	public void setRecordMigrated(Collection<RecordKey> keys) {

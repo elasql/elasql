@@ -16,8 +16,12 @@ public class OutEdge implements Comparable<OutEdge> {
 		this.weight++;
 	}
 	
-	public double getWeight() {
-		return ((double) weight) / MigrationManager.MONITORING_TIME;
+	public int getWeight() {
+		return weight;
+	}
+	
+	public double getNormalizedWeight() {
+		return (double) weight / MigrationManager.MONITORING_TIME;
 	}
 	
 	public Vertex getOpposite() {

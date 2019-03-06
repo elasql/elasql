@@ -22,7 +22,7 @@ public class Clump {
 		public Neighbor(OutEdge neighborEdge) {
 			this.id = neighborEdge.getOpposite().getId();
 			this.partId = neighborEdge.getOpposite().getPartId();
-			this.weight = neighborEdge.getWeight();
+			this.weight = neighborEdge.getNormalizedWeight();
 		}
 
 		@Override
@@ -172,6 +172,6 @@ public class Clump {
 			neighbors.put(neighborEdge.getOpposite().getId(),
 					new Neighbor(neighborEdge));
 		else
-			w.weight += neighborEdge.getWeight();
+			w.weight += neighborEdge.getNormalizedWeight();
 	}
 }
