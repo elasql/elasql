@@ -11,17 +11,34 @@ import org.elasql.server.migration.MigrationPlan;
 import org.elasql.server.migration.heatgraph.HeatGraph;
 import org.elasql.server.migration.heatgraph.OutEdge;
 import org.elasql.server.migration.heatgraph.Vertex;
+import org.elasql.util.ElasqlProperties;
 
 public class ClayPlanner {
 	private static Logger logger = Logger.getLogger(ClayPlanner.class.getName());
 	
-	public static final int MULTI_PARTS_COST = 50; // term 'k' in Clay's paper
+//	public static final int MULTI_PARTS_COST = 1; // term 'k' in Clay's paper
 //	public static final double OVERLOAD_THREASDHOLD = 15; // term 'theta' in Clay's paper
 //	public static final double OVERLOAD_PERCENTAGE = 1.25; // For multi-tanents
-	public static final double OVERLOAD_PERCENTAGE = 1.5; // For Google workloads
-	private static final int LOOK_AHEAD_MAX = 5;
-	private static final int CLUMP_MAX_SIZE = 20; // For Google workloads
+//	public static final double OVERLOAD_PERCENTAGE = 1.3; // For Google workloads
+//	private static final int LOOK_AHEAD_MAX = 5;
+//	private static final int CLUMP_MAX_SIZE = 20; // For Google workloads
 //	private static final int CLUMP_MAX_SIZE = 10000; // For multi-tanents
+	
+	public static final int MULTI_PARTS_COST;
+	public static final double OVERLOAD_PERCENTAGE;
+	private static final int LOOK_AHEAD_MAX;
+	private static final int CLUMP_MAX_SIZE;
+	
+	static {
+		MULTI_PARTS_COST = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(ClayPlanner.class.getName() + ".MULTI_PARTS_COST", 1);
+		OVERLOAD_PERCENTAGE = ElasqlProperties.getLoader()
+				.getPropertyAsDouble(ClayPlanner.class.getName() + ".OVERLOAD_PERCENTAGE", 1.3);
+		LOOK_AHEAD_MAX = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(ClayPlanner.class.getName() + ".LOOK_AHEAD_MAX", 5);
+		CLUMP_MAX_SIZE = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(ClayPlanner.class.getName() + ".CLUMP_MAX_SIZE", 20);
+	}
 	
 	private HeatGraph heatGraph;
 	private int numOfClumpsGenerated = 0;
