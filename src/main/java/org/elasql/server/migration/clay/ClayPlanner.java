@@ -1,8 +1,11 @@
 package org.elasql.server.migration.clay;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,39 +53,52 @@ public class ClayPlanner {
 	
 	public List<MigrationPlan> generateMigrationPlan() {
 		long startTime = System.currentTimeMillis();
+		List<MigrationPlan> plans = new ArrayList<MigrationPlan>();
 		
-		List<Partition> partitions = heatGraph.splitToPartitions();
-		adjustOverloadThreasdhold(partitions);
-		
-		// Debug
-		System.out.println(printPartitionLoading(partitions));
-		System.out.println("Threasdhold: " + overloadThreasdhold);
-		
-		for (Partition targetPartition : partitions) {
-			if (targetPartition.getTotalLoad() > overloadThreasdhold) {
-				Clump clump = generateClump(targetPartition, partitions);
-				
-				if (clump == null)
-					continue;
-				
-				// Generate migration plans
-				List<MigrationPlan> plans = clump.toMigrationPlans();
-				
-				updateMigratedVertices(clump);
-				
-				if (logger.isLoggable(Level.INFO)) {
-					logger.info("Clay takes " + (System.currentTimeMillis() - startTime) +
-							" ms to generate clump no." + numOfClumpsGenerated);
-					logger.info("Generated migration plans: " + plans);
-				}
-				
-				numOfClumpsGenerated++;
-				
-				return plans;
+		while (true) {
+			List<Partition> partitions = heatGraph.splitToPartitions();
+			adjustOverloadThreasdhold(partitions);
+			
+			// Debug
+			System.out.println(printPartitionLoading(partitions));
+			System.out.println("Threasdhold: " + overloadThreasdhold);
+			
+			// Find a overloaded partition
+			Partition overloadedPart = null;
+			for (Partition p : partitions) {
+				if (p.getTotalLoad() > overloadThreasdhold)
+					overloadedPart = p;
 			}
+			
+			if (overloadedPart == null)
+				break;
+			
+			// Generate a clump
+			Clump clump = generateClump(overloadedPart, partitions);
+			
+			if (clump == null)
+				break;
+			
+			numOfClumpsGenerated++;
+			
+			// Generate migration plans from the clump
+			plans.addAll(clump.toMigrationPlans());
+			
+			updateMigratedVertices(clump);
 		}
 		
-		return null;
+		if (plans.isEmpty())
+			return null;
+		
+		plans = mergePlans(plans);
+		
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info(String.format("Clay takes %d ms to generate %d clumps",
+					(System.currentTimeMillis() - startTime), numOfClumpsGenerated));
+			logger.info("Generated migration plans: " + plans);
+		}
+		
+		return plans;
 	}
 	
 	// XXX: Only for multi-tanents
@@ -310,6 +326,37 @@ public class ClayPlanner {
 		int destPartId = migratedClump.getDestination();
 		for (Vertex v : migratedClump.getVertices())
 			v.setPartId(destPartId);
+	}
+	
+	private List<MigrationPlan> mergePlans(List<MigrationPlan> plans) {
+		Map<Integer, Map<Integer, MigrationPlan>> mergedPlans
+			= new HashMap<Integer, Map<Integer, MigrationPlan>>();
+		
+		for (MigrationPlan p : plans) {
+			Map<Integer, MigrationPlan> dests = mergedPlans.get(p.getSourcePart());
+			
+			if (dests == null) {
+				dests = new HashMap<Integer, MigrationPlan>();
+				dests.put(p.getDestPart(), p);
+				mergedPlans.put(p.getSourcePart(), dests);
+			} else {
+				MigrationPlan dest = dests.get(p.getDestPart());
+				
+				if (dest == null) {
+					dests.put(p.getDestPart(), p);
+				} else {
+					dest.mergePlan(p);
+				}
+			}
+		}
+		
+		List<MigrationPlan> newPlans = new ArrayList<MigrationPlan>();
+		for (Map<Integer, MigrationPlan> dests : mergedPlans.values()) {
+			for (MigrationPlan dest : dests.values())
+				newPlans.add(dest);
+		}
+		
+		return newPlans;
 	}
 	
 	private String printClump(Clump clump) {

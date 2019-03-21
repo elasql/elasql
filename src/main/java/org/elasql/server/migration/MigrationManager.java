@@ -122,19 +122,22 @@ public abstract class MigrationManager {
 				if (ENABLE_NODE_SCALING) {
 					sendLaunchClayReq(null);
 				} else {
-					while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
-						if (!isClayOperating.get())
-							sendLaunchClayReq(null);
-						else
-							if (logger.isLoggable(Level.WARNING))
-								logger.warning("Clay is still operating. Stop initialization of next run.");
-						
-						try {
-							Thread.sleep(getMigrationPreiod());
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
+					sendLaunchClayReq(null);
+					
+					// TODO: We start next Clay directly from the finishClay()
+//					while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
+//						if (!isClayOperating.get())
+//							sendLaunchClayReq(null);
+//						else
+//							if (logger.isLoggable(Level.WARNING))
+//								logger.warning("Clay is still operating. Stop initialization of next run.");
+//						
+//						try {
+//							Thread.sleep(getMigrationPreiod());
+//						} catch (InterruptedException e) {
+//							e.printStackTrace();
+//						}
+//					}
 				}
 			}
 		});
@@ -247,6 +250,10 @@ public abstract class MigrationManager {
 			logger.info("Clay finishes all its jobs at " +
 					(System.currentTimeMillis() - startTime) / 1000 + " secs");
 		isClayOperating.set(false);
+		
+		if ((System.currentTimeMillis() - startTime) < getWaitingTime() + getMigrationStopTime()) {
+			sendLaunchClayReq(null);
+		}
 	}
 	
 	private List<MigrationPlan> generateScalingOutColdMigrationPlans() {
@@ -318,9 +325,12 @@ public abstract class MigrationManager {
 						return;
 					}
 				}
+			} else {
+				finishClay();
 			}
 			
-			generateMigrationPlans();
+			// TODO: Check if we can remove this
+			//generateMigrationPlans();
 		}
 	}
 

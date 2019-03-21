@@ -16,9 +16,25 @@ public class MigrationPlan {
 		destPart = dest;
 		keys = new HashSet<Integer>();
 	}
+	
+	public int getSourcePart() {
+		return sourcePart;
+	}
+	
+	public int getDestPart() {
+		return destPart;
+	}
 	 
 	public void addKey(Integer key) {
 		keys.add(key);
+	}
+	
+	public void mergePlan(MigrationPlan plan) {
+		if (sourcePart != plan.sourcePart ||
+				destPart != plan.destPart)
+			throw new RuntimeException("The plan does not match.");
+		
+		keys.addAll(plan.keys);
 	}
 	
 	public int keyCount() {
