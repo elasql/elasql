@@ -39,7 +39,7 @@ public abstract class MigrationManager {
 	private static AtomicBoolean isScaled = new AtomicBoolean(false);
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
-			30 * 1000: 10 * 1000; // [Schism: Clay]
+			120 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
 	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 50; // [Schism: Clay]
 
