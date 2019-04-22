@@ -39,14 +39,9 @@ public class PartitionMetaMgr {
 //	public final static File LOGFILE;
 	public static FileWriter WRLOGFILE;
 	public static BufferedWriter BWRLOGFILE;
-//	private static final long BENCH_START_TIME;
 	
-	private static Map<RecordKey, Integer> locationTable;
-	private static enum PickingMethods { NO, FIFO, LRU, CLOCK };
-	private static final PickingMethods PICKING_METHOD = PickingMethods.FIFO;
 	public static final int LOC_TABLE_MAX_SIZE;
-	// TODO: Maybe we could limit the size of the queue by 2 x LOC_TABLE_MAX_SIZE
-	private static Queue<RecordKey> fifoQueue = new LinkedList<RecordKey>();
+	private static FusionTable fusionTable;
 	
 	private PartitionPlan partPlan;
 	private boolean isInMigration;
@@ -57,17 +52,19 @@ public class PartitionMetaMgr {
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 		LOC_TABLE_MAX_SIZE = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".LOC_TABLE_MAX_SIZE", -1);
-		if (LOC_TABLE_MAX_SIZE == -1)
-			locationTable = new HashMap<RecordKey, Integer>();
+//		if (LOC_TABLE_MAX_SIZE == -1)
+//			locationTable = new HashMap<RecordKey, Integer>();
 //			locationTable = new ConcurrentHashMap<RecordKey, Integer>();
-		else
-			locationTable = new HashMap<RecordKey, Integer>(LOC_TABLE_MAX_SIZE + 1000);
+//		else
+//			locationTable = new HashMap<RecordKey, Integer>(LOC_TABLE_MAX_SIZE + 1000);
+		fusionTable = new FusionTable(LOC_TABLE_MAX_SIZE);
 		
-//		new PeriodicalJob(3000, 500000, new Runnable() {
+//		new PeriodicalJob(5000, 1500_000, new Runnable() {
 //			@Override
 //			public void run() {
-//				System.out.println("Location Table : " + locationTable.size() +
+//					System.out.println("Location Table : " + locationTable.size() +
 //						", Queue: " + fifoQueue.size());
+//					System.out.println("Fusion Table : " + fusionTable.size());
 //				}
 //			}
 //		).start();
@@ -223,12 +220,12 @@ public class PartitionMetaMgr {
 	 * @return the id of the partition where the record is
 	 */
 	public int getCurrentLocation(RecordKey key) {
-		Integer partId = locationTable.get(key);
-		if (partId != null)
-			return partId;
+		int location = fusionTable.getLocation(key);
+		if (location != -1)
+			return location;
 		
 		if (isInMigration) {
-			partId = Elasql.migrationMgr().getSourcePart(key);
+			Integer partId = Elasql.migrationMgr().getSourcePart(key);
 			if (partId != null)
 				return partId;
 		}
@@ -237,36 +234,18 @@ public class PartitionMetaMgr {
 	}
 
 	public void setCurrentLocation(RecordKey key, int loc) {
-//		try {
-//			BWRLOGFILE.write((System.currentTimeMillis() - BENCH_START_TIME) + "," + key.getKeyVal("i_id") + "," + loc);
-//			BWRLOGFILE.newLine();
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//		}
-		
-		// If the new location matches the original partition, remove it from location table.
-		boolean isInLocTable = locationTable.containsKey(key);
-		if (isInLocTable && getPartition(key) == loc)
-			locationTable.remove(key);
-		else {
-			if (LOC_TABLE_MAX_SIZE != -1) {
-				if (PICKING_METHOD == PickingMethods.FIFO) {
-					if (!isInLocTable) {
-						fifoQueue.add(key);
-					}
-				}
-			}
-			
-			locationTable.put(key, new Integer(loc));
-		}
+		if (getPartition(key) == loc && fusionTable.containsKey(key))
+			fusionTable.remove(key);
+		else
+			fusionTable.setLocation(key, loc);
 	}
 	
 	public Integer queryLocationTable(RecordKey key) {
-		return locationTable.get(key);
+		return fusionTable.getLocation(key);
 	}
 	
 	public boolean removeFromLocationTable(RecordKey key) {
-		return locationTable.remove(key) != null;
+		return fusionTable.remove(key) != -1;
 	}
 	
 	/**
@@ -275,21 +254,6 @@ public class PartitionMetaMgr {
 	 * @return
 	 */
 	public Set<RecordKey> chooseOverflowedKeys() {
-		Set<RecordKey> removedKeys = new HashSet<RecordKey>();
-		
-		// If the limit is -1 (unlimited), return immediately.
-		if (LOC_TABLE_MAX_SIZE == -1)
-			return removedKeys;
-		
-		// Pick the keys that will be removed
-		if (PICKING_METHOD == PickingMethods.FIFO) {
-			while (locationTable.size() - removedKeys.size() > LOC_TABLE_MAX_SIZE) {
-				RecordKey key = fifoQueue.remove();
-				if (locationTable.containsKey(key))
-					removedKeys.add(key);
-			}
-		}
-		
-		return removedKeys;
+		return fusionTable.getOverflowKeys();
 	}
 }
