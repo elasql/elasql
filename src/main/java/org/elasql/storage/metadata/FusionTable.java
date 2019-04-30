@@ -5,11 +5,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.util.PeriodicalJob;
 
 public class FusionTable {
+	
+	private static final int DEFAULT_SIZE = 100_000;
 	
 	class LocationRecord {
 		RecordKey key; // null => not used
@@ -33,18 +33,21 @@ public class FusionTable {
 	 * @param expectedMaxSize
 	 */
 	public FusionTable(int expectedMaxSize) {
-		expMaxSize = expectedMaxSize;
+		if (expectedMaxSize == -1)
+			expMaxSize = DEFAULT_SIZE;
+		else
+			expMaxSize = expectedMaxSize;
 		size = 0;
 		firstFreeSlot = 0;
-		locations = new LocationRecord[expectedMaxSize];
-		for (int i = 0; i < expectedMaxSize; i++) {
+		locations = new LocationRecord[expMaxSize];
+		for (int i = 0; i < expMaxSize; i++) {
 			locations[i] = new LocationRecord();
-			if (i != expectedMaxSize - 1)
+			if (i != expMaxSize - 1)
 				locations[i].nextFreeSlotId = i + 1;
 			else
 				locations[i].nextFreeSlotId = -1;
 		}
-		keyToSlotIds = new HashMap<RecordKey, Integer>(expectedMaxSize);
+		keyToSlotIds = new HashMap<RecordKey, Integer>(expMaxSize);
 		overflowedKeys = new HashMap<RecordKey, Integer>();
 		lastReplacedSlot = 0;
 		
