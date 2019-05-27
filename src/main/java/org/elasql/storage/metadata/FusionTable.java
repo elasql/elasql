@@ -24,6 +24,7 @@ public class FusionTable {
 	private Map<RecordKey, Integer> keyToSlotIds;
 	private Map<RecordKey, Integer> overflowedKeys;
 	private int lastReplacedSlot;
+	private int[] countsPerParts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 	
 	/**
 	 * Create a fusion table with the expected maximum capacity.
@@ -60,19 +61,39 @@ public class FusionTable {
 //						time, size, overflowedKeys.size()));
 //			}
 //		}).start();
+		
+//		new PeriodicalJob(5_000, 2400_000, new Runnable() {
+//			@Override
+//			public void run() {
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				
+//				StringBuffer sb = new StringBuffer();
+//				sb.append(String.format("Time: %d seconds - ", time));
+//				for (int i = 0; i < countsPerParts.length; i++)
+//					sb.append(String.format("%d, ", countsPerParts[i]));
+//				sb.delete(sb.length() - 2, sb.length());
+//				
+//				System.out.println(sb.toString());
+//			}
+//		}).start();
 	}
 	
 	public void setLocation(RecordKey key, int partId) {
 		Integer slotId = keyToSlotIds.get(key);
 		
-		if (slotId != null)
+		if (slotId != null) {
+			countsPerParts[locations[slotId].partId]--;
 			locations[slotId].partId = partId;
-		else {
-			if (overflowedKeys.containsKey(key))
+		} else {
+			if (overflowedKeys.containsKey(key)) {
+				countsPerParts[overflowedKeys.get(key)]--;
 				overflowedKeys.put(key, partId);
-			else
+			} else
 				insertNewRecord(key, partId);
 		}
+		
+		countsPerParts[partId]++;
 	}
 	
 	public int getLocation(RecordKey key) {
@@ -105,6 +126,7 @@ public class FusionTable {
 		if (slotId != null) {
 			locations[slotId].key = null;
 			size--;
+			countsPerParts[locations[slotId].partId]--;
 			
 			// add to the free slots
 			locations[slotId].nextFreeSlotId = firstFreeSlot;
@@ -115,6 +137,7 @@ public class FusionTable {
 			Integer partId = overflowedKeys.remove(key);
 			if (partId != null) {
 				size--;
+				countsPerParts[partId]--;
 				return partId;
 			} else
 				return -1;
