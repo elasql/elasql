@@ -669,7 +669,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		Map<String, Constant> fldVals = new HashMap<String, Constant>();
 		fldVals.put(DUMMY_FIELD1, new IntegerConstant(0));
 		fldVals.put(DUMMY_FIELD2, new IntegerConstant(0));
-		CachedRecord rec = new CachedRecord(fldVals);
+		CachedRecord rec = new CachedRecord(PULL_REQUEST_KEY, fldVals);
 		rec.setSrcTxNum(txNum);
 
 		TupleSet ts = new TupleSet(-4);

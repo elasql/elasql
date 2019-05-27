@@ -1,9 +1,7 @@
 package org.elasql.storage.metadata;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
 
-import org.elasql.cache.CachedRecord;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
@@ -15,23 +13,15 @@ public class NotificationPartMetaMgr extends PartitionMetaMgr {
 	public static final String KEY_DEST_NAME = "dest_server_id";
 	
 	public static RecordKey createRecordKey(int srcNodeId, int destNodeId) {
-		Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
-		keyEntryMap.put(KEY_SOURCE_NAME, new IntegerConstant(srcNodeId));
-		keyEntryMap.put(KEY_DEST_NAME, new IntegerConstant(destNodeId));
-		return new RecordKey(TABLE_NAME, keyEntryMap);
-	}
-	
-	public static CachedRecord createRecord(int srcNodeId, int destNodeId,
-			long txNum, Map<String, Constant> fldVals) {
-		// Create key value sets
-		Map<String, Constant> newFldVals = new HashMap<String, Constant>(fldVals);
-		newFldVals.put(KEY_SOURCE_NAME, new IntegerConstant(srcNodeId));
-		newFldVals.put(KEY_DEST_NAME, new IntegerConstant(destNodeId));
-
-		// Create a record
-		CachedRecord rec = new CachedRecord(newFldVals);
-		rec.setSrcTxNum(txNum);
-		return rec;
+		ArrayList<String> fields = new ArrayList<String>();
+		fields.add(KEY_SOURCE_NAME);
+		fields.add(KEY_DEST_NAME);
+		
+		ArrayList<Constant> vals = new ArrayList<Constant>();
+		vals.add(new IntegerConstant(srcNodeId));
+		vals.add(new IntegerConstant(destNodeId));
+		
+		return new RecordKey(TABLE_NAME, fields, vals);
 	}
 	
 	private PartitionMetaMgr underliedPartMetaMgr;

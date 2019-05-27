@@ -15,13 +15,13 @@
  ******************************************************************************/
 package org.elasql.cache;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.elasql.server.Elasql;
@@ -55,7 +55,7 @@ public class VanillaCoreCrud {
 		Map<String, IndexInfo> indexInfoMap = Elasql.catalogMgr()
 				.getIndexInfo(key.getTableName(), tx);
 		Plan p = tp;
-		for (String fld : key.getKeyFldSet()) {
+		for (String fld : key.getFields()) {
 			IndexInfo ii = indexInfoMap.get(fld);
 			if (ii != null) {
 				p = new IndexSelectPlan(tp, ii, ConstantRange.newInstance(key
@@ -70,15 +70,17 @@ public class VanillaCoreCrud {
 		CachedRecord rec = null;
 
 		if (s.next()) {
-			Map<String, Constant> fldVals = new HashMap<String, Constant>();
-			for (String fld : sch.fields())
-				fldVals.put(fld, s.getVal(fld));
-			rec = new CachedRecord(fldVals);
+			rec = new CachedRecord(key);
+			for (String fld : sch.fields()) {
+				if (!key.containsField(fld))
+					rec.setVal(fld, s.getVal(fld));
+			}
 		}
 		s.close();
 
 		return rec;
 	}
+	
 	public static Map<RecordKey, CachedRecord> batchRead(Set<RecordKey> keys, Transaction tx) {
 		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
 
@@ -99,7 +101,7 @@ public class VanillaCoreCrud {
 		String indexedField = null;
 
 		// We only need one index
-		for (String fldName : representative.getKeyFldSet()) {
+		for (String fldName : representative.getFields()) {
 			if (indexes.containsKey(fldName)) {
 				indexedField = fldName;
 				index = indexes.get(fldName).open(tx);
@@ -133,6 +135,16 @@ public class VanillaCoreCrud {
 		Schema sch = ti.schema();
 		RecordFile recordFile = ti.open(tx, false);
 		CachedRecord record = null;
+		
+		// Build a non-key field list
+		ArrayList<String> keyFields = new ArrayList<String>();
+		ArrayList<String> nonKeyFields = new ArrayList<String>();
+		for (String fld : sch.fields()) {
+			if (representative.containsField(fld))
+				keyFields.add(fld);
+			else
+				nonKeyFields.add(fld);
+		}
 
 		for (RecordId id : searchRids) {
 
@@ -142,79 +154,32 @@ public class VanillaCoreCrud {
 
 			// Move to the record
 			recordFile.moveToRecordId(id);
-			Map<String, Constant> tmpFldVals = new HashMap<String, Constant>();
-			for (String fld : representative.getKeyFldSet()) {
-				tmpFldVals.put(fld, recordFile.getVal(fld));
-			}
-			RecordKey targetKey = new RecordKey(representative.getTableName(), tmpFldVals);
+			
+			// Construct the key
+			ArrayList<Constant> keyFieldVals = new ArrayList<Constant>();
+			for (String fld : keyFields)
+				keyFieldVals.add(recordFile.getVal(fld));
+			RecordKey targetKey = new RecordKey(representative.getTableName(), keyFields, keyFieldVals);
+			
 			if (keys.contains(targetKey) && !recordMap.containsKey(targetKey)) {
 
 				// Construct a CachedRecord
-				Map<String, Constant> fldVals = new HashMap<String, Constant>();
-				for (String fld : sch.fields()) {
-					if (targetKey.getKeyFldSet().contains(fld)) {
-						fldVals.put(fld, targetKey.getKeyVal(fld));
-					} else {
-						fldVals.put(fld, recordFile.getVal(fld));
-					}
-				}
-				record = new CachedRecord(fldVals);
+				record = new CachedRecord(targetKey);
+				for (String fld : nonKeyFields)
+					record.setVal(fld, recordFile.getVal(fld));
 				record.setSrcTxNum(tx.getTransactionNumber());
 
 				// Put the record to the map
 				recordMap.put(targetKey, record);
-
 			}
 		}
 		recordFile.close();
 
-		// TODO: Debug
-		// if (representative.getTableName().equals("customer") ||
-		// representative.getTableName().equals("history"))
-		//
-		// {
-		// for (RecordKey key : keys) {
-		//
-		// if (!recordMap.containsKey(key)) {
-		// LinkedList<RecordId> rids = new LinkedList<RecordId>();
-		//
-		// // Check index
-		// index.beforeFirst(ConstantRange.newInstance(key.getKeyVal(indexedField)));
-		//
-		// while (index.next()) {
-		// rid = index.getDataRecordId();
-		// System.out.println("Rid: " + rid);
-		// rids.add(rid);
-		// }
-		//
-		// if (rids.isEmpty())
-		// throw new RuntimeException("Cannot find " + key + " in the index");
-		//
-		// // Check each record
-		// for (RecordId id : rids) {
-		// recordFile.moveToRecordId(id);
-		//
-		// Map<String, Constant> fldVals = new HashMap<String, Constant>();
-		// for (String fld : sch.fields())
-		// fldVals.put(fld, recordFile.getVal(fld));
-		// System.out.println(fldVals);
-		//
-		// for (String fld : key.getKeyFldSet())
-		// if (!key.getKeyVal(fld).equals(recordFile.getVal(fld)))
-		// System.out.println("The values of field '" + fld + "' are not the
-		// same" + "(Ex: "
-		// + key.getKeyVal(fld) + ", act: " + recordFile.getVal(fld) + ")");
-		// }
-		//
-		// throw new RuntimeException("Cannot find: " + key);
-		// }
-		// }
-		// }
-		// index.close();
-		// recordFile.close();
 		return recordMap;
 	}
-	public static void update(RecordKey key, CachedRecord rec, Transaction tx) {
+
+	// True: Found match record, False: Cannot find match record
+	public static boolean update(RecordKey key, CachedRecord rec, Transaction tx) {
 		TablePlan tp = new TablePlan(key.getTableName(), tx);
 		Map<String, IndexInfo> indexInfoMap = Elasql.catalogMgr()
 				.getIndexInfo(key.getTableName(), tx);
@@ -224,7 +189,7 @@ public class VanillaCoreCrud {
 
 		// XXX: Remove search key from target fields if they existed
 		// for Constraint C1 below
-		for (String searchFld : key.getKeyFldSet())
+		for (String searchFld : key.getFields())
 			targetflds.remove(searchFld);
 
 		// open all indexes associate with target fields
@@ -270,7 +235,9 @@ public class VanillaCoreCrud {
 				}
 				s.setVal(fld, newval);
 			}
-		}
+		} else
+			return false;
+		
 		// close opened indexes
 		for (String fld : targetflds) {
 			Index idx = targetIdxMap.get(fld);
@@ -281,6 +248,8 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
+		
+		return true;
 	}
 
 	public static void insert(RecordKey key, CachedRecord rec, Transaction tx) {
@@ -288,7 +257,6 @@ public class VanillaCoreCrud {
 		Plan p = new TablePlan(tblname, tx);
 		Map<String, IndexInfo> indexes = Elasql.catalogMgr().getIndexInfo(
 				tblname, tx);
-		Map<String, Constant> m = rec.getFldValMap();
 
 		// first, insert the record
 		UpdateScan s = (UpdateScan) p.open();
@@ -296,19 +264,19 @@ public class VanillaCoreCrud {
 		RecordId rid = s.getRecordId();
 
 		// then modify each field, inserting an index record if appropriate
-		for (Entry<String, Constant> e : m.entrySet()) {
-			Constant val = e.getValue();
+		for (String fldName : rec.getFldNames()) {
+			Constant val = rec.getVal(fldName);
 			if (val == null)
 				continue;
 			// first, insert into index
-			IndexInfo ii = indexes.get(e.getKey());
+			IndexInfo ii = indexes.get(fldName);
 			if (ii != null) {
 				Index idx = ii.open(tx);
 				idx.insert(val, rid, true);
 				idx.close();
 			}
 			// insert into record file
-			s.setVal(e.getKey(), val);
+			s.setVal(fldName, val);
 		}
 		s.close();
 
@@ -323,7 +291,7 @@ public class VanillaCoreCrud {
 				.getIndexInfo(tblname, tx);
 
 		Plan p = tp;
-		for (String fld : key.getKeyFldSet()) {
+		for (String fld : key.getFields()) {
 			IndexInfo ii = indexInfoMap.get(fld);
 			if (ii != null) {
 				p = new IndexSelectPlan(tp, ii, ConstantRange.newInstance(key

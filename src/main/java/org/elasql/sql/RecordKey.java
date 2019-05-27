@@ -19,12 +19,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 
-import org.elasql.server.Elasql;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.Type;
 import org.vanilladb.core.sql.predicate.ConstantExpression;
@@ -33,67 +31,129 @@ import org.vanilladb.core.sql.predicate.FieldNameExpression;
 import org.vanilladb.core.sql.predicate.Predicate;
 import org.vanilladb.core.sql.predicate.Term;
 
-public class RecordKey implements Serializable {
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -958208157248894658L;
-	private String tableName;
-	private transient Map<String, Constant> keyEntryMap;
-	private int hashCode;
-	private int partition = -1;
+public class RecordKey implements Serializable, Comparable<RecordKey> {
 
+	private static final long serialVersionUID = 20190517001L;
+	
+	private String tableName;
+	private transient String[] fields;
+	private transient Constant[] values;
+	private int hashCode;
+	
+	// TODO: Ensure that almost no one use this method
 	public RecordKey(String tableName, Map<String, Constant> keyEntryMap) {
 		this.tableName = tableName;
-		this.keyEntryMap = keyEntryMap;
-		genHashCode();
-	}
-
-	public RecordKey(String tableName, String[] flds, Constant[] vals) {
-		this.tableName = tableName;
-		if (flds.length != vals.length)
-			throw new IllegalArgumentException();
-		HashMap<String, Constant> map = new HashMap<String, Constant>();
-		for (int i = 0; i < flds.length; i++)
-			map.put(flds[i], vals[i]);
-		this.keyEntryMap = map;
+		this.fields = new String[keyEntryMap.size()];
+		this.values = new Constant[keyEntryMap.size()];
+		
+		int i = 0;
+		for (Map.Entry<String, Constant> entry : keyEntryMap.entrySet()) {
+			fields[i] = entry.getKey();
+			values[i] = entry.getValue();
+			i++;
+		}
+		
 		genHashCode();
 	}
 	
-	private void genHashCode(){
-		int x = tableName.hashCode();
-		int y = keyEntryMap.hashCode();
-		hashCode = (x+y)*(x+y+1)/2+y;
-//		hashCode = 17;
-//		hashCode = 31 * hashCode + tableName.hashCode();
-//		hashCode = 31 * hashCode + keyEntryMap.hashCode();
+	public RecordKey(String tableName, String fld, Constant val) {
+		this.tableName = tableName;
+		this.fields = new String[1];
+		this.values = new Constant[1];
+		fields[0] = fld;
+		values[0] = val;
+		genHashCode();
+	}
+
+	public RecordKey(String tableName, List<String> flds, List<Constant> vals) {
+		this.tableName = tableName;
+		if (flds.size() != vals.size())
+			throw new IllegalArgumentException();
+		
+		this.fields = new String[flds.size()];
+		this.values = new Constant[flds.size()];
+		for (int i = 0; i < fields.length; i++) {
+			fields[i] = flds.get(i);
+			values[i] = vals.get(i);
+		}
+		
+		genHashCode();
+	}
+
+	private void genHashCode() {
+		hashCode = 17;
+		hashCode = 31 * hashCode + tableName.hashCode();
+		for (int i = 0; i < fields.length; i++) {
+			hashCode = 31 * hashCode + fields[i].hashCode();
+			hashCode = 31 * hashCode + values[i].hashCode();
+		}
 	}
 
 	public String getTableName() {
 		return tableName;
 	}
-
-	public Set<String> getKeyFldSet() {
-		return keyEntryMap.keySet();
+	
+	// FIXME: Not immutable
+	public String[] getFields() {
+		return fields;
+	}
+	
+	public boolean containsField(String fld) {
+		for (int i = 0; i < fields.length; i++) {
+			if (fields[i].equals(fld))
+				return true;
+		}
+		return false;
 	}
 
 	public Constant getKeyVal(String fld) {
-		return keyEntryMap.get(fld);
+		for (int i = 0; i < fields.length; i++) {
+			if (fields[i].equals(fld))
+				return values[i];
+		}
+		return null;
 	}
 
 	public Predicate getPredicate() {
 		Predicate pred = new Predicate();
-		for (Entry<String, Constant> e : keyEntryMap.entrySet()) {
-			Expression k = new FieldNameExpression(e.getKey());
-			Expression v = new ConstantExpression(e.getValue());
+		for (int i = 0; i < fields.length; i++) {
+			Expression k = new FieldNameExpression(fields[i]);
+			Expression v = new ConstantExpression(values[i]);
 			pred.conjunctWith(new Term(k, Term.OP_EQ, v));
 		}
 		return pred;
 	}
-
+	
+	@Override
+	public int compareTo(RecordKey rk) {
+		if (tableName.compareTo("item") == 0) {
+			if ((int)getKeyVal("i_id").asJavaVal() < (int)rk.getKeyVal("i_id").asJavaVal())
+				return -1;
+			else if ((int)getKeyVal("i_id").asJavaVal() > (int)rk.getKeyVal("i_id").asJavaVal())
+				return 1;
+		}
+//		else if (tableName.compareTo("ycsb") == 0) {
+//			if ((String)getKeyVal("i_id").asJavaVal() < (int)rk.getKeyVal("i_id").asJavaVal())
+//				return -1;
+//			else if ((int)getKeyVal("i_id").asJavaVal() > (int)rk.getKeyVal("i_id").asJavaVal())
+//				return 1;
+//		}
+		return 0;
+	}
+	
 	@Override
 	public String toString() {
-		return tableName + ":" + keyEntryMap.toString();
+		StringBuilder sb = new StringBuilder();
+		sb.append(tableName);
+		sb.append(": ");
+		for (int i = 0; i < fields.length; i++) {
+			sb.append(fields[i]);
+			sb.append(" -> ");
+			sb.append(values[i]);
+			sb.append(", ");
+		}
+		sb.delete(sb.length() - 2, sb.length());
+		return sb.toString();
 	}
 
 	@Override
@@ -105,8 +165,8 @@ public class RecordKey implements Serializable {
 		if (obj.getClass() != RecordKey.class)
 			return false;
 		RecordKey k = (RecordKey) obj;
-		return k.tableName.equals(this.tableName)
-				&& k.keyEntryMap.equals(this.keyEntryMap);
+		return k.tableName.equals(this.tableName) && Arrays.equals(k.fields, this.fields)
+				&& Arrays.equals(k.values, this.values);
 	}
 
 	@Override
@@ -119,13 +179,13 @@ public class RecordKey implements Serializable {
 	 * 
 	 */
 	private void writeObject(ObjectOutputStream out) throws IOException {
-		Set<String> fldsSet = keyEntryMap.keySet();
 		out.defaultWriteObject();
-		out.writeInt(fldsSet.size());
+		out.writeInt(fields.length);
 
 		// Write out all elements in the proper order
-		for (String fld : fldsSet) {
-			Constant val = keyEntryMap.get(fld);
+		for (int i = 0; i < fields.length; i++) {
+			String fld = fields[i];
+			Constant val = values[i];
 			byte[] bytes = val.asBytes();
 			out.writeObject(fld);
 			out.writeInt(val.getType().getSqlType());
@@ -134,11 +194,11 @@ public class RecordKey implements Serializable {
 		}
 	}
 
-	private void readObject(ObjectInputStream in) throws IOException,
-			ClassNotFoundException {
+	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 		in.defaultReadObject();
-		keyEntryMap = new HashMap<String, Constant>();
 		int numFlds = in.readInt();
+		this.fields = new String[numFlds];
+		this.values = new Constant[numFlds];
 
 		// Read in all elements and rebuild the map
 		for (int i = 0; i < numFlds; i++) {
@@ -146,9 +206,9 @@ public class RecordKey implements Serializable {
 			int sqlType = in.readInt();
 			byte[] bytes = new byte[in.readInt()];
 			in.read(bytes);
-			Constant val = Constant.newInstance(Type.newInstance(sqlType),
-					bytes);
-			keyEntryMap.put(fld, val);
+			Constant val = Constant.newInstance(Type.newInstance(sqlType), bytes);
+			fields[i] = fld;
+			values[i] = val;
 		}
 	}
 }

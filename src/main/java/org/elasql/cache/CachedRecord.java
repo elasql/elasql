@@ -19,32 +19,38 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
+import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.Record;
 import org.vanilladb.core.sql.Type;
 
 public class CachedRecord implements Record, Serializable {
 
-	private static final long serialVersionUID = 245365697121L;
-
-	private transient Map<String, Constant> fldValueMap;
+	private static final long serialVersionUID = 20190517001L;
 
 	private boolean isDirty, isDeleted, isNewInserted;
 	private long srcTxNum;
-	private transient Set<String> dirtyFlds = new HashSet<String>();
+	
+	private RecordKey primaryKey;
+	private transient ArrayList<String> fields = new ArrayList<String>();
+	private transient ArrayList<Constant> values = new ArrayList<Constant>();
+	private transient ArrayList<String> dirtyFlds = new ArrayList<String>();
 
-	public CachedRecord() {
-		fldValueMap = new HashMap<String, Constant>();
+	public CachedRecord(RecordKey primaryKey) {
+		this.primaryKey = primaryKey;
 	}
 
-	public CachedRecord(Map<String, Constant> fldVals) {
-		fldValueMap = fldVals;
+	public CachedRecord(RecordKey primaryKey, Map<String, Constant> fldVals) {
+		for (Map.Entry<String, Constant> entry : fldVals.entrySet()) {
+			if (!primaryKey.containsField(entry.getKey())) {
+				fields.add(entry.getKey());
+				values.add(entry.getValue());
+			}
+		}
 	}
 	
 	/**
@@ -52,8 +58,10 @@ public class CachedRecord implements Record, Serializable {
 	 * and the same meta-data as the given CachedRecord.
 	 */
 	public CachedRecord(CachedRecord rec) {
-		fldValueMap = new HashMap<String, Constant>(rec.fldValueMap);
-		dirtyFlds = new HashSet<String>(rec.dirtyFlds);
+		primaryKey = rec.primaryKey;
+		fields = new ArrayList<String>(rec.fields);
+		values = new ArrayList<Constant>(rec.values);
+		dirtyFlds = new ArrayList<String>(rec.dirtyFlds);
 		isDirty = rec.isDirty;
 		isDeleted = rec.isDeleted;
 		isNewInserted = rec.isNewInserted;
@@ -61,25 +69,50 @@ public class CachedRecord implements Record, Serializable {
 	}
 
 	public Constant getVal(String fldName) {
-		return isDeleted ? null : fldValueMap.get(fldName);
+		if (isDeleted) {
+			return null;
+		} else {
+			// Check the key first
+			Constant val = primaryKey.getKeyVal(fldName);
+			if (val != null)
+				return val;
+			
+			// Check the array
+			int index = fields.indexOf(fldName);
+			if (index != -1)
+				return values.get(index);
+			return null;
+		}
 	}
 
 	public boolean setVal(String fldName, Constant val) {
 		if (isDeleted)
 			return false;
+		
+		if (primaryKey.containsField(fldName))
+			return false;
+		
 		isDirty = true;
-		dirtyFlds.add(fldName);
-		fldValueMap.put(fldName, val);
+		if (!dirtyFlds.contains(fldName))
+			dirtyFlds.add(fldName);
+		
+		int index = fields.indexOf(fldName);
+		if (index == -1) {
+			fields.add(fldName);
+			values.add(val);
+		} else {
+			values.set(index, val);
+		}
 		return true;
 	}
-
-	public boolean setVals(Map<String, Constant> fldVals) {
-		if (isDeleted)
+	
+	public boolean removeField(String fldName) {
+		int index = fields.indexOf(fldName);
+		if (index == -1)
 			return false;
-		isDirty = true;
-
-		dirtyFlds.addAll(fldVals.keySet());
-		fldValueMap.putAll(fldVals);
+		fields.remove(index);
+		values.remove(index);
+		dirtyFlds.remove(fldName);
 		return true;
 	}
 
@@ -90,14 +123,6 @@ public class CachedRecord implements Record, Serializable {
 
 	public void setNewInserted(boolean isNewInserted) {
 		this.isNewInserted = isNewInserted;
-	}
-
-	public void setDirty(boolean isDirty) {
-		this.isDirty = isDirty;
-	}
-
-	public void setDeleted(boolean isDeleted) {
-		this.isDeleted = isDeleted;
 	}
 
 	public boolean isDirty() {
@@ -111,16 +136,12 @@ public class CachedRecord implements Record, Serializable {
 	public boolean isNewInserted() {
 		return isNewInserted;
 	}
-
-	public Set<String> getFldNames() {
-		return fldValueMap.keySet();
+	
+	public List<String> getFldNames() {
+		return fields;
 	}
-
-	public Map<String, Constant> getFldValMap() {
-		return fldValueMap;
-	}
-
-	public Set<String> getDirtyFldNames() {
+	
+	public List<String> getDirtyFldNames() {
 		return dirtyFlds;
 	}
 
@@ -134,15 +155,28 @@ public class CachedRecord implements Record, Serializable {
 
 	@Override
 	public String toString() {
-		StringBuilder sb = new StringBuilder("[");
-		Set<String> flds = new TreeSet<String>(fldValueMap.keySet());
-		for (String fld : flds)
-			sb.append(fld).append("=").append(fldValueMap.get(fld))
-					.append(", ");
-		if (flds.size() > 0) {
-			int end = sb.length();
-			sb.replace(end - 2, end, "] ");
+		StringBuilder sb = new StringBuilder();
+		sb.append(primaryKey.getTableName());
+		sb.append(": {");
+		
+		// Key fields
+		for (String field : primaryKey.getFields()) {
+			sb.append("*");
+			sb.append(field);
+			sb.append(": ");
+			sb.append(primaryKey.getKeyVal(field));
+			sb.append(", ");
 		}
+		
+		// Other fields
+		for (int i = 0; i < fields.size(); i++) {
+			sb.append(fields.get(i));
+			sb.append(": ");
+			sb.append(values.get(i));
+			sb.append(", ");
+		}
+		sb.delete(sb.length() - 2, sb.length());
+		sb.append("}");
 		return sb.toString();
 	}
 
@@ -152,15 +186,21 @@ public class CachedRecord implements Record, Serializable {
 			return true;
 		if (obj == null || !(obj instanceof CachedRecord))
 			return false;
-		CachedRecord s = (CachedRecord) obj;
-		return s.fldValueMap.equals(this.fldValueMap)
-				&& s.srcTxNum == this.srcTxNum;
+		CachedRecord rec = (CachedRecord) obj;
+		return rec.primaryKey.equals(this.primaryKey) &&
+				rec.fields.equals(this.fields) &&
+				rec.values.equals(this.values) &&
+				rec.srcTxNum == this.srcTxNum;
 	}
 
 	@Override
 	public int hashCode() {
 		int hashCode = 17;
-		hashCode = 31 * hashCode + fldValueMap.hashCode();
+		hashCode = 31 * hashCode + primaryKey.hashCode();
+		for (int i = 0; i < fields.size(); i++) {
+			hashCode = 31 * hashCode + fields.get(i).hashCode();
+			hashCode = 31 * hashCode + values.get(i).hashCode();
+		}
 		hashCode = 31 * hashCode + (int) (srcTxNum ^ (srcTxNum >>> 32));
 		return hashCode;
 	}
@@ -170,13 +210,13 @@ public class CachedRecord implements Record, Serializable {
 	 * 
 	 */
 	private void writeObject(ObjectOutputStream out) throws IOException {
-		Set<String> fldsSet = fldValueMap.keySet();
 		out.defaultWriteObject();
-		out.writeInt(fldsSet.size());
+		out.writeInt(fields.size());
 
 		// Write out all elements in the proper order
-		for (String fld : fldsSet) {
-			Constant val = fldValueMap.get(fld);
+		for (int i = 0; i < fields.size(); i++) {
+			String fld = fields.get(i);
+			Constant val = values.get(i);
 			byte[] bytes = val.asBytes();
 			out.writeObject(fld);
 			out.writeInt(val.getType().getSqlType());
@@ -192,8 +232,9 @@ public class CachedRecord implements Record, Serializable {
 	private void readObject(ObjectInputStream in) throws IOException,
 			ClassNotFoundException {
 		in.defaultReadObject();
-		fldValueMap = new HashMap<String, Constant>();
 		int numFlds = in.readInt();
+		this.fields = new ArrayList<String>(numFlds);
+		this.values = new ArrayList<Constant>(numFlds);
 
 		// Read in all elements and rebuild the map
 		for (int i = 0; i < numFlds; i++) {
@@ -203,10 +244,11 @@ public class CachedRecord implements Record, Serializable {
 			in.read(bytes);
 			Constant val = Constant.newInstance(Type.newInstance(sqlType),
 					bytes);
-			fldValueMap.put(fld, val);
+			fields.add(fld);
+			values.add(val);
 		}
 
-		dirtyFlds = new HashSet<String>();
+		dirtyFlds = new ArrayList<String>();
 		int dirtyNum = in.readInt();
 		for (int i = 0; i < dirtyNum; ++i) {
 			dirtyFlds.add((String) in.readObject());
