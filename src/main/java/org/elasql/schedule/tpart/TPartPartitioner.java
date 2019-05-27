@@ -1,6 +1,7 @@
 package org.elasql.schedule.tpart;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -24,6 +25,7 @@ import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.server.Elasql;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
@@ -121,6 +123,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 //		System.out.println(graph);
 //		printStatistics();
 //		printImbalStatistics();
+//		collectGraphStatistics();
 		
 		// Add the migration txs to the end of the batch
 		while (!migrationTasks.isEmpty()) {
@@ -203,34 +206,69 @@ public class TPartPartitioner extends Task implements Scheduler {
 		batchId++;
 	}
 	
-	private int numberOfDistTxns = 0;
-	private int numberOfTxns = 0;
+	private int[] numberOfRemoteReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	private int[] numberOfTxns = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	private int[] numberOfDistTxns = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	private double[] ratioOfDistTxns = new double[PartitionMetaMgr.NUM_PARTITIONS];
 	
-	private void printDistTxStatistics() {
+	private void collectGraphStatistics() {
 		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
 		
-		numberOfTxns += graph.getTxNodes().size();
+		// collects
 		for (TxNode node : graph.getTxNodes()) {
 			int masterId = node.getPartId();
+			boolean distTx = false;
+			
+			// count remote reads
 			for (Edge e : node.getReadEdges()) {
-				int resId = e.getTarget().getPartId();
-				if (masterId != resId) {
-					numberOfDistTxns++;
-					break;
-				}	
+				int resPartId = e.getTarget().getPartId();
+				if (masterId != resPartId) {
+					numberOfRemoteReads[masterId]++;
+					distTx = true;
+				}
+			}
+			
+			// count transactions
+			numberOfTxns[masterId]++;
+			if (distTx) {
+				numberOfDistTxns[masterId]++;
 			}
 		}
 		
+		// prints every period of time
 		if (time >= nextReportTime) {
-			double percentageOfDist = numberOfDistTxns;
-			percentageOfDist /= numberOfTxns;
-			percentageOfDist *= 100;
-			System.out.println(String.format("Number of distributed transactions: %d (%f %%) at time %d.",
-					numberOfDistTxns, percentageOfDist, time));
+			System.out.println(String.format("Time: %d", time));
 			
-			numberOfTxns = 0;
-			numberOfDistTxns = 0;
-			nextReportTime = time + 3;
+			// Count the % of dist. transactions
+			for (int i = 0; i < ratioOfDistTxns.length; i++) {
+				if (numberOfTxns[i] == 0) {
+					ratioOfDistTxns[i] = 0.0;
+				} else {
+					ratioOfDistTxns[i] = numberOfDistTxns[i];
+					ratioOfDistTxns[i] /= numberOfTxns[i];
+				}
+			}
+			
+			// # of transactions
+			System.out.println(String.format("Number of transactions: %s.",
+					Arrays.toString(numberOfTxns)));
+			Arrays.fill(numberOfTxns, 0);
+			
+			// # of dist transactions
+			System.out.println(String.format("Number of dist. transactions: %s.",
+					Arrays.toString(numberOfDistTxns)));
+			Arrays.fill(numberOfDistTxns, 0);
+			
+			// % of dist transactions
+			System.out.println(String.format("Ratio of dist. transactions: %s.",
+					Arrays.toString(ratioOfDistTxns)));
+			
+			// # of remote reads
+			System.out.println(String.format("Number of remote reads: %s.",
+					Arrays.toString(numberOfRemoteReads)));
+			Arrays.fill(numberOfRemoteReads, 0);
+			
+			nextReportTime = time + 15;
 		}
 	}
 	

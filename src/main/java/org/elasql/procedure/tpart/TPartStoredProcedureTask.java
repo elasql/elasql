@@ -13,6 +13,12 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class TPartStoredProcedureTask extends StoredProcedureTask {
+	
+	static {
+		// For Debugging
+//		TimerStatistics.startRecording();
+//		TimerStatistics.startAutoReporting();
+	}
 
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
@@ -28,36 +34,31 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 	@Override
 	public void run() {
-		Thread.currentThread().setName("Tx." + txNum);
-		
-		//Timers.createTimer(txNum);
 		SpResultSet rs = null;
-		//Timers.getTimer().startExecution();
+		
+		Thread.currentThread().setName("Tx." + txNum);
+//		Timer timer = Timer.getLocalTimer();
+//		timer.reset();
+//		timer.startExecution();
 
-		// try {
-		// long start = System.nanoTime();
-		rs = tsp.execute();
-		// long time = System.nanoTime() - start;
-		// System.out.println(time / 1000);
-		// } finally {
-		//Timers.getTimer().stopExecution();
-		// }
+//		try {
+			rs = tsp.execute();
+//		} finally {
+//			timer.stopExecution();
+//		}
 
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
-			
+
 			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
 				// Send a notification to the sequencer
 				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
 				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
 			}
-				
-			// System.out.println("Commit: " + (System.nanoTime() - startTime));
+//			timer.addToGlobalStatistics();
 		}
-		// System.out.println("task time:" + (System.nanoTime() -
-		// taskStartTime));
-		//Timers.addToStatstics();
+//		timer.addToGlobalStatistics();
 	}
 
 	public long getTxNum() {
@@ -87,7 +88,7 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 	public void decideExceutionPlan(SunkPlan plan) {
 		tsp.decideExceutionPlan(plan);
 	}
-	
+
 	public TPartStoredProcedure<?> getProcedure() {
 		return tsp;
 	}

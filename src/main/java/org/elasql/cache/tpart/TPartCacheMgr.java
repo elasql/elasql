@@ -14,8 +14,6 @@ import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.storage.tx.concurrency.tpart.LocalStorageLockTable;
-import org.elasql.storage.tx.concurrency.tpart.LocalStorageLockTable.LockType;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
@@ -55,12 +53,24 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			recordCache = new ConcurrentHashMap<RecordKey, CachedRecord>(PartitionMetaMgr.LOC_TABLE_MAX_SIZE + 1000);
 			exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>(PartitionMetaMgr.LOC_TABLE_MAX_SIZE + 1000);
 		}
-			
 		
-//		new PeriodicalJob(3000, 500000, new Runnable() {
+//		new PeriodicalJob(5000, 600000, new Runnable() {
 //			@Override
 //			public void run() {
-//				System.out.println("Cache Size : " + recordCache.size());
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				System.out.println(String.format("Time: %d seconds, Cache Size: %d, Exchange Size: %d",
+//						time, recordCache.size(), exchange.size()));
+//			}
+//		}).start();
+		
+//		new PeriodicalJob(60_000, 800_000, new Runnable() {
+//			@Override
+//			public void run() {
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				System.out.println(String.format("Time: %d seconds, suggest to GC.", time));
+//				System.gc();
 //			}
 //		}).start();
 	}
@@ -74,24 +84,29 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 
 	CachedRecord takeFromTx(RecordKey key, long src, long dest) {
-		CachedEntryKey k = new CachedEntryKey(key, src, dest);
-		synchronized (prepareAnchor(k)) {
-			try {
-				// Debug: Tracing the waiting key
-//				Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
-//						+ " from tx." + src);
-				// wait if the record has not delivered
-				while (!exchange.containsKey(k)) {
-					prepareAnchor(k).wait();
+//		Timer.getLocalTimer().startComponentTimer("Read from Tx");
+//		try {
+			CachedEntryKey k = new CachedEntryKey(key, src, dest);
+			synchronized (prepareAnchor(k)) {
+				try {
+					// Debug: Tracing the waiting key
+	//				Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
+	//						+ " from tx." + src);
+					// wait if the record has not delivered
+					while (!exchange.containsKey(k)) {
+						prepareAnchor(k).wait();
+					}
+					
+	//				Thread.currentThread().setName("Tx." + dest);
+					
+					return exchange.remove(k);
+				} catch (InterruptedException e) {
+					throw new RuntimeException();
 				}
-				
-//				Thread.currentThread().setName("Tx." + dest);
-				
-				return exchange.remove(k);
-			} catch (InterruptedException e) {
-				throw new RuntimeException();
 			}
-		}
+//		} finally {
+//			Timer.getLocalTimer().stopComponentTimer("Read from Tx");
+//		}
 	}
 
 	void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
@@ -171,7 +186,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	void insertToCache(RecordKey key, CachedRecord rec, long txNum) {
 //		localCcMgr.beforeWriteBack(key, txNum);
 //		lockTable.xLock(key, txNum);
-		
+
 		recordCache.put(key, rec);
 		
 //		localCcMgr.afterWriteback(key, txNum);
@@ -181,7 +196,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	void deleteFromCache(RecordKey key, long txNum) {
 //		localCcMgr.beforeWriteBack(key, txNum);
 //		lockTable.xLock(key, txNum);
-		
+
 		if (recordCache.remove(key) == null)
 			throw new RuntimeException("There is no record for " + key + " in the cache");
 		
