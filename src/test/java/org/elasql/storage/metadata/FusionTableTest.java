@@ -21,9 +21,7 @@ public class FusionTableTest {
 		RecordKey[] keys = new RecordKey[10];
 		
 		for (int i = 0; i < 10; i++) {
-			Map<String, Constant> keyVals = new HashMap<String, Constant>();
-			keyVals.put(TEST_FIELD, new IntegerConstant(i));
-			keys[i] = new RecordKey(TEST_TABLE, keyVals);
+			keys[i] = new RecordKey(TEST_TABLE, TEST_FIELD, new IntegerConstant(i));
 			ft.setLocation(keys[i], i);
 		}
 		
@@ -38,9 +36,7 @@ public class FusionTableTest {
 		RecordKey[] keys = new RecordKey[10];
 		
 		for (int i = 0; i < 10; i++) {
-			Map<String, Constant> keyVals = new HashMap<String, Constant>();
-			keyVals.put(TEST_FIELD, new IntegerConstant(i));
-			keys[i] = new RecordKey(TEST_TABLE, keyVals);
+			keys[i] = new RecordKey(TEST_TABLE, TEST_FIELD, new IntegerConstant(i));
 			ft.setLocation(keys[i], i);
 		}
 		
@@ -59,9 +55,7 @@ public class FusionTableTest {
 		RecordKey[] keys = new RecordKey[10];
 		
 		for (int i = 0; i < 10; i++) {
-			Map<String, Constant> keyVals = new HashMap<String, Constant>();
-			keyVals.put(TEST_FIELD, new IntegerConstant(i));
-			keys[i] = new RecordKey(TEST_TABLE, keyVals);
+			keys[i] = new RecordKey(TEST_TABLE, TEST_FIELD, new IntegerConstant(i));
 			ft.setLocation(keys[i], i);
 		}
 		
@@ -82,9 +76,7 @@ public class FusionTableTest {
 		RecordKey[] keys = new RecordKey[15];
 		
 		for (int i = 0; i < 10; i++) {
-			Map<String, Constant> keyVals = new HashMap<String, Constant>();
-			keyVals.put(TEST_FIELD, new IntegerConstant(i));
-			keys[i] = new RecordKey(TEST_TABLE, keyVals);
+			keys[i] = new RecordKey(TEST_TABLE, TEST_FIELD, new IntegerConstant(i));
 			ft.setLocation(keys[i], i);
 		}
 		
@@ -92,9 +84,7 @@ public class FusionTableTest {
 			ft.remove(keys[i]);
 		
 		for (int i = 10; i < 15; i++) {
-			Map<String, Constant> keyVals = new HashMap<String, Constant>();
-			keyVals.put(TEST_FIELD, new IntegerConstant(i));
-			keys[i] = new RecordKey(TEST_TABLE, keyVals);
+			keys[i] = new RecordKey(TEST_TABLE, TEST_FIELD, new IntegerConstant(i));
 			ft.setLocation(keys[i], i);
 		}
 		
@@ -116,9 +106,7 @@ public class FusionTableTest {
 		RecordKey[] keys = new RecordKey[20];
 		
 		for (int i = 0; i < 20; i++) {
-			Map<String, Constant> keyVals = new HashMap<String, Constant>();
-			keyVals.put(TEST_FIELD, new IntegerConstant(i));
-			keys[i] = new RecordKey(TEST_TABLE, keyVals);
+			keys[i] = new RecordKey(TEST_TABLE, TEST_FIELD, new IntegerConstant(i));
 			ft.setLocation(keys[i], i);
 		}
 		

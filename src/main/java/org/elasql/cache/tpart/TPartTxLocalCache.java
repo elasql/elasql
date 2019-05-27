@@ -89,21 +89,24 @@ public class TPartTxLocalCache {
 	}
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
-		CachedRecord rec = new CachedRecord(fldVals);
+		CachedRecord rec = new CachedRecord(key, fldVals);
 		rec.setSrcTxNum(txNum);
 		rec.setNewInserted(true);
 		recordCache.put(key, rec);
 	}
 
 	public void delete(RecordKey key) {
-		CachedRecord dummyRec = new CachedRecord();
+		CachedRecord dummyRec = new CachedRecord(key);
 		dummyRec.setSrcTxNum(txNum);
 		dummyRec.delete();
 		recordCache.put(key, dummyRec);
 	}
 
 	public void flush(SunkPlan plan, List<CachedEntryKey> cachedEntrySet) {
+//		Timer timer = Timer.getLocalTimer();
+		
 		// Pass to the transactions
+//		timer.startComponentTimer("Pass to next Tx");
 		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
 			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
 			if (dests != null) {
@@ -116,8 +119,9 @@ public class TPartTxLocalCache {
 				}
 			}
 		}
-		//Timers.getTimer().startComponentTimer("Writeback");
-		 
+//		timer.stopComponentTimer("Pass to next Tx");
+
+//		timer.startComponentTimer("Writeback");
 		if (plan.isLocalTask()) {
 			// Flush to the local storage (write back)
 			for (RecordKey key : plan.getLocalWriteBackInfo()) {
@@ -154,12 +158,12 @@ public class TPartTxLocalCache {
 			}
 
 		}
+//		timer.stopComponentTimer("Writeback");
 		
 		// Clean up migrated rec
+//		timer.startComponentTimer("Delete cached records");
 		for (RecordKey key : plan.getCacheDeletions())
 			cacheMgr.deleteFromCache(key, txNum);
-		
-		//Timers.getTimer().stopComponentTimer("Writeback");
-
+//		timer.stopComponentTimer("Delete cached records");
 	}
 }

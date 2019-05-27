@@ -16,8 +16,6 @@
 package org.elasql.procedure.calvin;
 
 import java.sql.Connection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -116,13 +114,10 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	}
 
 	private void sendNotification() {
-		// Create a key value set
-		Map<String, Constant> fldVals = new HashMap<String, Constant>();
-		fldVals.put(KEY_FINISH, new IntegerConstant(1));
-		
 		RecordKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
-		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE,
-				txNum, fldVals);
+		CachedRecord notVal = new CachedRecord(notKey);
+		notVal.setSrcTxNum(txNum);
+		notVal.setVal(KEY_FINISH, new IntegerConstant(1));
 
 		TupleSet ts = new TupleSet(-1);
 		// Use node id as source tx number
