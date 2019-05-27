@@ -1,5 +1,6 @@
 package org.elasql.schedule.tpart;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,8 @@ import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class LapNodeInserter extends CostAwareNodeInserter {
+	
+	private static final double EQUALITY_THRESHOLD = .0001;
 	
 	private static class UseCount {
 		
@@ -84,6 +87,8 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 //		}
 		
 		// Evaluate the cost on each part
+		double[] costs = new double[partMgr.getCurrentNumOfParts()];
+		Arrays.fill(costs, Double.MAX_VALUE);
 		double minCost = Double.MAX_VALUE;
 		int minCostPart = 0;
 		
@@ -95,12 +100,38 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 //			if (isConsolidating && partId > 2)
 //				break;
 			
-			double cost = estimateCost(graph, task, partId);
-			if (cost < minCost) {
-				minCost = cost;
+			costs[partId] = estimateCost(graph, task, partId);
+			if (costs[partId] < minCost) {
+				minCost = costs[partId];
 				minCostPart = partId;
 			}
 		}
+		
+		// Handle ties
+		int tieCount = 0; 
+		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++) {
+			if (Math.abs(costs[partId] - minCost) < EQUALITY_THRESHOLD) {
+				tieCount++;
+			} 
+		}
+		
+		if (tieCount > 1) {
+			int chooseTiePart = (int) (task.getTxNum() % tieCount);
+			tieCount = 0;
+			for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++) {
+				if (Math.abs(costs[partId] - minCost) < EQUALITY_THRESHOLD) {
+					if (chooseTiePart == tieCount) {
+						minCostPart = partId;
+						break;
+					} else {
+						tieCount++;
+					}
+				}
+			}
+		}
+		
+		// Debug: Find the tie
+//		printTieStatistics(graph, task, minCostPart, minCost);
 		
 //		if (task.getTxNum() % 10000 == 0)
 //			System.out.println("Tx." + task.getTxNum() + " select " + minCostPart);
@@ -117,6 +148,42 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 			count.decrement();
 		}
 		loadPerPart[minCostPart] += task.getWeight();
+	}
+	
+	private long nextReportTime = 0;
+	private int[] tieCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	
+	private void printTieStatistics(TGraph graph, TPartStoredProcedureTask task, int finalPart, double finalCost) {
+		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
+		boolean hasTie = false;
+		
+		// Find the tie
+		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++) {
+			double cost = estimateCost(graph, task, partId);
+			if (Math.abs(cost - finalCost) < EQUALITY_THRESHOLD) {
+				if (partId != finalPart) {
+					hasTie = true;
+//					int mod = (int) (task.getTxNum() % partMgr.getCurrentNumOfParts());
+//					System.out.println(String.format(
+//							"Tx.%d chooses node.%d (%f) instead of node.%d (%f) since it's close to %d",
+//							task.getTxNum(), finalPart, finalCost, partId, cost, mod));
+				}
+			}
+		}
+		
+		if (hasTie)
+			tieCounts[finalPart]++;
+		
+		// prints every period of time
+		if (time >= nextReportTime) {
+			System.out.println(String.format("Time: %d", time));
+			
+			System.out.println(String.format("Number of ties: %s.",
+					Arrays.toString(tieCounts)));
+			Arrays.fill(tieCounts, 0);
+			
+			nextReportTime = time + 5;
+		}
 	}
 	
 	private double estimateCost(TGraph graph, TPartStoredProcedureTask task, int targetPart) {
