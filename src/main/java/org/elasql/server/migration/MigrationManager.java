@@ -39,7 +39,7 @@ public abstract class MigrationManager {
 	private static AtomicBoolean isScaled = new AtomicBoolean(false);
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
-			120 * 1000: 10 * 1000; // [Schism: Clay]
+			2100 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
 	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 50; // [Schism: Clay]
 
@@ -502,9 +502,11 @@ public abstract class MigrationManager {
 			// the record must have been foreground pushed.
 			return true;
 		} else {
-			if (Elasql.partitionMetaMgr().getPartition(key) != sourceNode) {
-				if (Elasql.partitionMetaMgr().getPartition(key) != destNode)
-					throw new RuntimeException("Something wrong : " + key + " Not at Dest");
+			int partId = Elasql.partitionMetaMgr().getPartition(key);
+			if (partId != sourceNode) {
+				if (partId != destNode)
+					throw new RuntimeException("Something wrong : " + key + " is not in the dest."
+							+ " It's in part." + partId + ".");
 				return true;
 			} else
 				return false;

@@ -118,8 +118,9 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		CachedRecord notVal = new CachedRecord(notKey);
 		notVal.setSrcTxNum(txNum);
 		notVal.setVal(KEY_FINISH, new IntegerConstant(1));
+		notVal.setTemp(true);
 
-		TupleSet ts = new TupleSet(-1);
+		TupleSet ts = new TupleSet(-5);
 		// Use node id as source tx number
 		ts.addTuple(notKey, txNum, txNum, notVal);
 		Elasql.connectionMgr().pushTupleSet(0, ts);

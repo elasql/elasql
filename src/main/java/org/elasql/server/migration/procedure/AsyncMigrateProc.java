@@ -20,8 +20,8 @@ import org.vanilladb.core.sql.IntegerConstant;
 public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHelper> {
 	private static Logger logger = Logger.getLogger(AsyncMigrateProc.class.getName());
 
-	private static Constant FALSE = new IntegerConstant(0);
-	private static Constant TRUE = new IntegerConstant(1);
+	private static final Constant FALSE = new IntegerConstant(0);
+	private static final Constant TRUE = new IntegerConstant(1);
 	
 	private int sourcePart, destPart;
 
@@ -134,7 +134,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 			// Flush them to the local storage engine
 			if (rec.getVal("exists").equals(TRUE)) {
-				rec.removeField("exists");
+				rec.removeNonKeyField("exists");
 				cacheMgr.insert(key, rec);
 			}
 		}

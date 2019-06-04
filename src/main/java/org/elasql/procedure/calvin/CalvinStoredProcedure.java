@@ -46,7 +46,7 @@ import org.vanilladb.core.storage.tx.Transaction;
 
 public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper> implements DdStoredProcedure {
 
-	// All New Design of Squll
+	// All New Design of Squall
 	// Assumption :
 	// 1) no blind write tx
 	// 2) not supported insert
@@ -403,9 +403,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		} catch (Exception e) {
 			StringWriter errors = new StringWriter();
 			e.printStackTrace(new PrintWriter(errors));
-			String str = "TX : " + txNum + "Abort cause Exception!\n";
+			String str = "TX : " + txNum + " aborts due to an exception!\n";
 			if (readings != null) {
-				str = str + "\n Readings : ";
+				str = str + "\n Readings: ";
 				for (Integer k : recordKeyToSortArray(readings.keySet()))
 					str = str + " , " + k;
 				str = str + "\n Error check : \n";
@@ -682,6 +682,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Read local records (for both active or passive participants)
 		for (RecordKey k : localReadKeys) {
 			CachedRecord rec = cacheMgr.readFromLocal(k);
+			if (rec == null)
+				throw new NullPointerException("Cannot find a record for " + k + "in local");
 			localReadings.put(k, rec);
 		}
 
@@ -689,6 +691,8 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		if (isActiveParticipant) {
 			for (RecordKey k : fullyRepKeys) {
 				CachedRecord rec = cacheMgr.readFromLocal(k);
+				if (rec == null)
+					throw new NullPointerException("Cannot find a record for " + k + "in local");
 				localReadings.put(k, rec);
 			}
 		}

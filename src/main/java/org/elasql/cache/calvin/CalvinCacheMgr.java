@@ -149,6 +149,10 @@ public class CalvinCacheMgr {
 		for (Map.Entry<RecordKey, CachedRecord> entry : cachedRecords.entrySet()) {
 			RecordKey key = entry.getKey();
 			CachedRecord rec = entry.getValue();
+			
+			// Skip the temporary record
+			if (rec.isTemp())
+				continue;
 
 			if (rec.isDeleted())
 				VanillaCoreCrud.delete(key, tx);
