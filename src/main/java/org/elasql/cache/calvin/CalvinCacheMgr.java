@@ -21,6 +21,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.CachedRecordBuilder;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -114,11 +115,17 @@ public class CalvinCacheMgr {
 	}
 
 	public void update(RecordKey key, CachedRecord rec) {
+		if (tx.isReadOnly())
+			throw new RuntimeException("Tx." + tx.getTransactionNumber() + " is read-only.");
+		
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		cachedRecords.put(key, rec);
 	}
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
+		if (tx.isReadOnly())
+			throw new RuntimeException("Tx." + tx.getTransactionNumber() + " is read-only.");
+		
 		CachedRecord rec = new CachedRecord(key, fldVals);
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		rec.setNewInserted(true);
@@ -126,7 +133,10 @@ public class CalvinCacheMgr {
 	}
 
 	public void delete(RecordKey key) {
-		CachedRecord dummyRec = new CachedRecord(key);
+		if (tx.isReadOnly())
+			throw new RuntimeException("Tx." + tx.getTransactionNumber() + " is read-only.");
+		
+		CachedRecord dummyRec = new CachedRecordBuilder(key).build();
 		dummyRec.setSrcTxNum(tx.getTransactionNumber());
 		dummyRec.delete();
 		cachedRecords.put(key, dummyRec);
@@ -136,6 +146,10 @@ public class CalvinCacheMgr {
 		for (Map.Entry<RecordKey, CachedRecord> entry : cachedRecords.entrySet()) {
 			RecordKey key = entry.getKey();
 			CachedRecord rec = entry.getValue();
+			
+			// Skip the temporary record
+			if (rec.isTemp())
+				continue;
 			
 			if (rec.isDeleted())
 				VanillaCoreCrud.delete(key, tx);

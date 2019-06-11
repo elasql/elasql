@@ -70,11 +70,13 @@ public class VanillaCoreCrud {
 		CachedRecord rec = null;
 
 		if (s.next()) {
-			rec = new CachedRecord(key);
+			CachedRecordBuilder builder = new CachedRecordBuilder(key);
 			for (String fld : sch.fields()) {
-				if (!key.containsField(fld))
-					rec.setVal(fld, s.getVal(fld));
+				if (!key.containsField(fld)) {
+					builder.addField(fld, s.getVal(fld));
+				}
 			}
+			rec = builder.build();
 		}
 		s.close();
 
@@ -164,9 +166,10 @@ public class VanillaCoreCrud {
 			if (keys.contains(targetKey) && !recordMap.containsKey(targetKey)) {
 
 				// Construct a CachedRecord
-				record = new CachedRecord(targetKey);
+				CachedRecordBuilder builder = new CachedRecordBuilder(targetKey);
 				for (String fld : nonKeyFields)
-					record.setVal(fld, recordFile.getVal(fld));
+					builder.addField(fld, recordFile.getVal(fld));
+				record = builder.build();
 				record.setSrcTxNum(tx.getTransactionNumber());
 
 				// Put the record to the map

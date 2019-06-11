@@ -34,17 +34,21 @@ public class CachedRecord implements Record, Serializable {
 
 	private boolean isDirty, isDeleted, isNewInserted;
 	private long srcTxNum;
+	private boolean isTemp; // the temporary record will not be flushed.
 	
 	private RecordKey primaryKey;
 	private transient ArrayList<String> fields = new ArrayList<String>();
 	private transient ArrayList<Constant> values = new ArrayList<Constant>();
 	private transient ArrayList<String> dirtyFlds = new ArrayList<String>();
 
-	public CachedRecord(RecordKey primaryKey) {
+	public CachedRecord(RecordKey primaryKey, ArrayList<String> fields, ArrayList<Constant> values) {
 		this.primaryKey = primaryKey;
+		this.fields = fields;
+		this.values = values;
 	}
 
 	public CachedRecord(RecordKey primaryKey, Map<String, Constant> fldVals) {
+		this.primaryKey = primaryKey;
 		for (Map.Entry<String, Constant> entry : fldVals.entrySet()) {
 			if (!primaryKey.containsField(entry.getKey())) {
 				fields.add(entry.getKey());
@@ -105,6 +109,16 @@ public class CachedRecord implements Record, Serializable {
 		}
 		return true;
 	}
+	
+	public boolean removeNonKeyField(String fldName) {
+		int index = fields.indexOf(fldName);
+		if (index == -1)
+			return false;
+		fields.remove(index);
+		values.remove(index);
+		dirtyFlds.remove(fldName);
+		return true;
+	}
 
 	public void delete() {
 		isDeleted = true;
@@ -128,7 +142,10 @@ public class CachedRecord implements Record, Serializable {
 	}
 	
 	public List<String> getFldNames() {
-		return fields;
+		ArrayList<String> allFields = new ArrayList<String>(fields);
+		for (String keyField : primaryKey.getFields())
+			allFields.add(keyField);
+		return allFields;
 	}
 	
 	public List<String> getDirtyFldNames() {
@@ -141,6 +158,14 @@ public class CachedRecord implements Record, Serializable {
 
 	public void setSrcTxNum(long srcTxNum) {
 		this.srcTxNum = srcTxNum;
+	}
+
+	public boolean isTemp() {
+		return isTemp;
+	}
+
+	public void setTemp(boolean isTemp) {
+		this.isTemp = isTemp;
 	}
 
 	@Override
