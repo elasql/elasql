@@ -20,6 +20,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.CachedRecordBuilder;
 import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
@@ -115,9 +116,10 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	private void sendNotification() {
 		RecordKey notKey = NotificationPartMetaMgr.createRecordKey(Elasql.serverId(), MASTER_NODE);
-		CachedRecord notVal = new CachedRecord(notKey);
+		CachedRecordBuilder builder = new CachedRecordBuilder(notKey);
+		builder.addField(KEY_FINISH, new IntegerConstant(1));
+		CachedRecord notVal = builder.build();
 		notVal.setSrcTxNum(txNum);
-		notVal.setVal(KEY_FINISH, new IntegerConstant(1));
 		notVal.setTemp(true);
 
 		TupleSet ts = new TupleSet(-5);

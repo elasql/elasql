@@ -8,6 +8,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.CachedRecordBuilder;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.procedure.calvin.CalvinStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
@@ -101,7 +102,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 
 				// Prevent null pointer exceptions in the destination node
 				if (rec == null) {
-					rec = new CachedRecord(key);
+					rec = new CachedRecordBuilder(key).build();
 					rec.setSrcTxNum(txNum);
 					rec.setVal("exists", FALSE);
 				} else

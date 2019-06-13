@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.cache.CachedRecordBuilder;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -81,7 +82,7 @@ public class TPartTxLocalCache {
 	}
 
 	public void delete(RecordKey key) {
-		CachedRecord dummyRec = new CachedRecord(key);
+		CachedRecord dummyRec = new CachedRecordBuilder(key).build();
 		dummyRec.setSrcTxNum(txNum);
 		dummyRec.delete();
 		recordCache.put(key, dummyRec);

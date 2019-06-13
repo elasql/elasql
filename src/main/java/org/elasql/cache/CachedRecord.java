@@ -41,8 +41,10 @@ public class CachedRecord implements Record, Serializable {
 	private transient ArrayList<Constant> values = new ArrayList<Constant>();
 	private transient ArrayList<String> dirtyFlds = new ArrayList<String>();
 
-	public CachedRecord(RecordKey primaryKey) {
+	public CachedRecord(RecordKey primaryKey, ArrayList<String> fields, ArrayList<Constant> values) {
 		this.primaryKey = primaryKey;
+		this.fields = fields;
+		this.values = values;
 	}
 
 	public CachedRecord(RecordKey primaryKey, Map<String, Constant> fldVals) {
