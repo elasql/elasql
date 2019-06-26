@@ -28,6 +28,10 @@ public class MigrationPlan {
 	public void addKey(Integer key) {
 		keys.add(key);
 	}
+	 
+	public Set<Integer> getKeys() {
+		return keys;
+	}
 	
 	public void mergePlan(MigrationPlan plan) {
 		if (sourcePart != plan.sourcePart ||

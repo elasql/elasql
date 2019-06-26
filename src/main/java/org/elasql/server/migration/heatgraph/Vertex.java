@@ -5,15 +5,19 @@ import java.util.HashMap;
 import org.elasql.server.migration.MigrationManager;
 
 public class Vertex implements Comparable<Vertex> {
-
+	
 	private HashMap<Integer, OutEdge> edges;
 	private int weight;
 	private int id;
 	private int partId;
 
 	public Vertex(int id, int partId) {
+		this(id, partId, 1);
+	}
+
+	Vertex(int id, int partId, int weight) {
 		this.id = id;
-		this.weight = 1;
+		this.weight = weight;
 		this.partId = partId;
 		edges = new HashMap<Integer, OutEdge>();
 	}
@@ -41,6 +45,10 @@ public class Vertex implements Comparable<Vertex> {
 			edges.put(opposite.getId(), new OutEdge(opposite));
 		else
 			e.incrementWeight();
+	}
+
+	void addEdgeWithWeight(Vertex opposite, int weight) {
+		edges.put(opposite.getId(), new OutEdge(opposite, weight));
 	}
 
 	public void clear() {
@@ -74,15 +82,18 @@ public class Vertex implements Comparable<Vertex> {
 		return edges;
 	}
 	
-	public int toMetis(StringBuilder sb) {
-		sb.append(weight + " ");
+	public int getOutEdgeCount() {
+		return edges.size();
+	}
+	
+	public String toMetisFormat() {
+		StringBuilder sb = new StringBuilder(weight + " ");
 		for (OutEdge o : edges.values()) {
 			sb.append(String.format("%d %d ", 
 					o.getOpposite().id + 1,
 					o.getWeight()));
 		}
-		sb.append("\n");
-		return edges.size();
+		return sb.toString();
 	}
 
 	public String toString() {
@@ -100,6 +111,25 @@ public class Vertex implements Comparable<Vertex> {
 		else if (this.weight < other.weight)
 			return -1;
 		return 0;
+	}
+
+	public boolean excatlyEquals(Vertex v) {
+		if (this.id != v.id)
+			return false;
+		
+		if (this.weight != v.weight)
+			return false;
+		
+		if (this.partId != v.partId)
+			return false;
+		
+		for (OutEdge edge : edges.values()) {
+			OutEdge itsEdge = v.edges.get(edge.getOpposite().id);
+			if (!edge.equals(itsEdge))
+				return false;
+		}
+			
+		return true;
 	}
 
 	@Override

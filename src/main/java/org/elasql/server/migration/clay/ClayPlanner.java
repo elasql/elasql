@@ -3,6 +3,7 @@ package org.elasql.server.migration.clay;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -63,11 +64,13 @@ public class ClayPlanner {
 			System.out.println(printPartitionLoading(partitions));
 			System.out.println("Threasdhold: " + overloadThreasdhold);
 			
-			// Find a overloaded partition
+			// Find an overloaded partition
 			Partition overloadedPart = null;
 			for (Partition p : partitions) {
-				if (p.getTotalLoad() > overloadThreasdhold)
+				if (p.getTotalLoad() > overloadThreasdhold) {
 					overloadedPart = p;
+					break;
+				}
 			}
 			
 			if (overloadedPart == null)
@@ -79,6 +82,13 @@ public class ClayPlanner {
 			if (clump == null)
 				break;
 			
+			// Some cases will come out a clump that does not have to be migrated.
+			// Since it is hard to come out other plan when this case happends,
+			// we will stop right here.
+			if (!clump.needMigration())
+				break;
+
+			System.out.println("Clump #" + numOfClumpsGenerated + ": " + printClump(clump));
 			numOfClumpsGenerated++;
 			
 			// Generate migration plans from the clump
@@ -95,7 +105,7 @@ public class ClayPlanner {
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("Clay takes %d ms to generate %d clumps",
 					(System.currentTimeMillis() - startTime), numOfClumpsGenerated));
-			logger.info("Generated migration plans: " + plans);
+//			logger.info("Generated migration plans: " + plans);
 		}
 		
 		return plans;
@@ -135,57 +145,56 @@ public class ClayPlanner {
 	 * Algorithm 1 on Clay's paper.
 	 */
 	private Clump generateClump(Partition overloadedPart, List<Partition> partitions) {
-		Clump candidateClump = null, finalClump = null;
+		Clump currentClump = null, candidateClump = null;
 		Partition destPart = null;
 		int lookAhead = LOOK_AHEAD_MAX;
 		Vertex addedVertex = null;
 		
 		while (true) {
-			if (candidateClump == null) {
+			if (currentClump == null) {
 				addedVertex = overloadedPart.getHotestVertex();
-				candidateClump = new Clump(addedVertex);
+				currentClump = new Clump(addedVertex);
 				destPart = findInitialDest(addedVertex, partitions);
-				candidateClump.setDestination(destPart.getPartId());
+				currentClump.setDestination(destPart.getPartId());
 				
 //				System.out.println("Init clump: " + printClump(candidateClump));
 			} else {
-				if (!candidateClump.hasNeighbor())
-					return finalClump;
+				if (!currentClump.hasNeighbor())
+					return candidateClump;
 				
 				// Expand the clump
-				int nId = candidateClump.getHotestNeighbor();
+				int nId = currentClump.getHotestNeighbor();
 				addedVertex = heatGraph.getVertex(nId);
-				candidateClump.expand(addedVertex);
+				currentClump.expand(addedVertex);
 				
-				destPart = updateDestination(candidateClump, destPart, partitions);
-				candidateClump.setDestination(destPart.getPartId());
+				destPart = updateDestination(currentClump, destPart, partitions);
+				currentClump.setDestination(destPart.getPartId());
 				
-//				System.out.println("Expanded clump: " + printClump(candidateClump));
-//				System.out.println("Expanded clump size: " + candidateClump.size());
+//				System.out.println("Expanded clump: " + printClump(currentClump));
+//				System.out.println("Expanded clump size: " + currentClump.size());
 //				System.out.println(String.format("Delta for recv part %d: %f", destPart.getPartId(),
-//						calcRecvLoadDelta(candidateClump, destPart.getPartId())));
-//				System.out.println(String.format("Is feasible ? %s", isFeasible(candidateClump, destPart)));
+//						calcRecvLoadDelta(currentClump, destPart.getPartId())));
+//				System.out.println(String.format("Is feasible ? %s", isFeasible(currentClump, destPart)));
 //				System.out.println(String.format("Delta for sender part %d: %f", addedVertex.getPartId(),
-//						calcSendLoadDelta(candidateClump, addedVertex.getPartId())));
+//						calcSendLoadDelta(currentClump, addedVertex.getPartId())));
 			}
 			
 			// Examine the clump
-			if (isFeasible(candidateClump, destPart)) {
-//				System.out.println("Found a good clump: " + printClump(candidateClump));
-				finalClump = new Clump(candidateClump);
-			} else if (finalClump != null) {
+			if (isFeasible(currentClump, destPart)) {
+				candidateClump = new Clump(currentClump);
+			} else if (candidateClump != null) {
 				lookAhead--;
 			}
 			
-			if (candidateClump.size() > CLUMP_MAX_SIZE) {
-				if (finalClump != null)
-					return finalClump;
-				else
+			if (currentClump.size() > CLUMP_MAX_SIZE) {
+				if (candidateClump != null)
 					return candidateClump;
+				else
+					return currentClump;
 			}
 			
 			if (lookAhead == 0)
-				return finalClump;
+				return candidateClump;
 		}
 	}
 	
@@ -328,35 +337,70 @@ public class ClayPlanner {
 			v.setPartId(destPartId);
 	}
 	
-	private List<MigrationPlan> mergePlans(List<MigrationPlan> plans) {
-		Map<Integer, Map<Integer, MigrationPlan>> mergedPlans
-			= new HashMap<Integer, Map<Integer, MigrationPlan>>();
+	/**
+	 * Merge the plans into a new set of plans such that:<br>
+	 * <ul>
+	 * <li>There is no tow plans having the same source and destination.</li>
+	 * <li>There is no tuple showing up in two separate plans.</li>
+	 * </ul>
+	 * 
+	 * @param planList
+	 * @return
+	 */
+	private List<MigrationPlan> mergePlans(List<MigrationPlan> planList) {
+		// (tuple id -> part id)
+		Map<Integer, Integer> sources = new HashMap<Integer, Integer>();
+		Map<Integer, Integer> dests = new HashMap<Integer, Integer>();
 		
-		for (MigrationPlan p : plans) {
-			Map<Integer, MigrationPlan> dests = mergedPlans.get(p.getSourcePart());
-			
-			if (dests == null) {
-				dests = new HashMap<Integer, MigrationPlan>();
-				dests.put(p.getDestPart(), p);
-				mergedPlans.put(p.getSourcePart(), dests);
-			} else {
-				MigrationPlan dest = dests.get(p.getDestPart());
-				
-				if (dest == null) {
-					dests.put(p.getDestPart(), p);
-				} else {
-					dest.mergePlan(p);
-				}
+		// Record the (first) source node of each tuple
+		for (MigrationPlan p : planList) {
+			for (Integer tupleId: p.getKeys()) {
+				sources.putIfAbsent(tupleId, p.getSourcePart());
 			}
 		}
 		
-		List<MigrationPlan> newPlans = new ArrayList<MigrationPlan>();
-		for (Map<Integer, MigrationPlan> dests : mergedPlans.values()) {
-			for (MigrationPlan dest : dests.values())
-				newPlans.add(dest);
+		// Record the (last) destination node of each tuple
+		for (MigrationPlan p : planList) {
+			for (Integer tupleId: p.getKeys()) {
+				dests.put(tupleId, p.getDestPart());
+			}
 		}
 		
-		return newPlans;
+		// Output the results as plans
+		// (source part id -> (dest part id -> plan))
+		Map<Integer, Map<Integer, MigrationPlan>> mergedPlans =
+				new HashMap<Integer, Map<Integer, MigrationPlan>>();
+		for (Integer tupleId : sources.keySet()) {
+			int sourcePart = sources.get(tupleId);
+			int destPart = dests.get(tupleId);
+			
+			if (sourcePart == destPart)
+				continue;
+			
+			Map<Integer, MigrationPlan> plans = mergedPlans.get(sourcePart);
+			if (plans == null) {
+				plans = new HashMap<Integer, MigrationPlan>();
+				mergedPlans.put(sourcePart, plans);
+			}
+			
+			MigrationPlan plan = plans.get(destPart);
+			if (plan == null) {
+				plan = new MigrationPlan(sourcePart, destPart);
+				plans.put(destPart, plan);
+			}
+			
+			plan.addKey(tupleId);
+		}
+		
+		// Convert the map to a list
+		planList = new ArrayList<MigrationPlan>();
+		for (Map<Integer, MigrationPlan> map : mergedPlans.values()) {
+			for (MigrationPlan plan : map.values()) {
+				planList.add(plan);
+			}
+		}
+		
+		return planList;
 	}
 	
 	private String printClump(Clump clump) {
@@ -369,7 +413,8 @@ public class ClayPlanner {
 			if (count >= 5)
 				break;
 		}
-		sb.append(String.format("size: %d]", clump.getVertices().size()));
+		sb.append(String.format("size: %d] ", clump.getVertices().size()));
+		sb.append(String.format("to part.%d.", clump.getDestination()));
 		
 		return sb.toString();
 	}

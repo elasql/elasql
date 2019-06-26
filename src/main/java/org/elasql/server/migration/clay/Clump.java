@@ -93,6 +93,14 @@ public class Clump {
 		return destPartitionId;
 	}
 	
+	// Check if any vertex has to be migrated
+	public boolean needMigration() {
+		for (Vertex v : vertices.values())
+			if (v.getPartId() != destPartitionId)
+				return true;
+		return false;
+	}
+	
 	public List<MigrationPlan> toMigrationPlans() {
 		if (destPartitionId == -1)
 			throw new RuntimeException("The destination has not been decided yet.");

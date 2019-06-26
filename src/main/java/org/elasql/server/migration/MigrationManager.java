@@ -23,7 +23,6 @@ import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.server.Elasql;
 import org.elasql.server.migration.clay.ClayPlanner;
 import org.elasql.server.migration.heatgraph.HeatGraph;
-import org.elasql.server.migration.heatgraph.Vertex;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.VanillaDb;
@@ -122,22 +121,19 @@ public abstract class MigrationManager {
 				if (ENABLE_NODE_SCALING) {
 					sendLaunchClayReq(null);
 				} else {
-					sendLaunchClayReq(null);
-					
-					// TODO: We start next Clay directly from the finishClay()
-//					while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
-//						if (!isClayOperating.get())
-//							sendLaunchClayReq(null);
-//						else
-//							if (logger.isLoggable(Level.WARNING))
-//								logger.warning("Clay is still operating. Stop initialization of next run.");
-//						
-//						try {
-//							Thread.sleep(getMigrationPreiod());
-//						} catch (InterruptedException e) {
-//							e.printStackTrace();
-//						}
-//					}
+					while((System.currentTimeMillis() - startTime) < getMigrationStopTime()) {
+						if (!isClayOperating.get())
+							sendLaunchClayReq(null);
+						else
+							if (logger.isLoggable(Level.WARNING))
+								logger.warning("Clay is still operating. Stop initialization of next run.");
+						
+						try {
+							Thread.sleep(getMigrationPreiod());
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					}
 				}
 			}
 		});
@@ -203,7 +199,14 @@ public abstract class MigrationManager {
 		} else {
 			if (ENABLE_NODE_SCALING)
 				isScaled.set(true);
-			clayPlanner = new ClayPlanner(workloadMonitor.retrieveHeatGraphAndReset());
+			HeatGraph graph = workloadMonitor.retrieveHeatGraphAndReset();
+			
+			// Serialize the heat graph as a file for debugging
+//			String filename = "heatgraph_" + 
+//			((System.currentTimeMillis() - startTime) / 1000) + ".bin";
+//			graph.serializeToFile(new File(filename));
+			
+			clayPlanner = new ClayPlanner(graph);
 			generateMigrationPlans();
 		}
 	}
@@ -250,10 +253,6 @@ public abstract class MigrationManager {
 			logger.info("Clay finishes all its jobs at " +
 					(System.currentTimeMillis() - startTime) / 1000 + " secs");
 		isClayOperating.set(false);
-		
-		if ((System.currentTimeMillis() - startTime) < getWaitingTime() + getMigrationStopTime()) {
-			sendLaunchClayReq(null);
-		}
 	}
 	
 	private List<MigrationPlan> generateScalingOutColdMigrationPlans() {
@@ -425,19 +424,7 @@ public abstract class MigrationManager {
 			wmetidFile = new FileWriter(metidFile);
 			bwmetidFile = new BufferedWriter(wmetidFile);
 			int vertexCount = getRecordCount() / MigrationManager.DATA_RANGE_SIZE;
-			StringBuilder sb = new StringBuilder();
-			long numEdge = 0;
-			for (int i = 0; i < vertexCount; i++) {
-				Vertex v = graph.getVertex(i);
-				if (v != null) {
-					numEdge += v.toMetis(sb);
-				} else {
-					sb.append("0\n");
-				}
-			}
-				
-			bwmetidFile.write(String.format("%d %d 011\n", vertexCount, numEdge / 2));
-			bwmetidFile.append(sb);
+			graph.writeInMetisFormat(bwmetidFile, vertexCount);
 			bwmetidFile.close();
 		} catch (IOException e1) {
 			e1.printStackTrace();

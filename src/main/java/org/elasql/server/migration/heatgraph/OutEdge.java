@@ -8,8 +8,12 @@ public class OutEdge implements Comparable<OutEdge> {
 	private Vertex opposite;
 
 	public OutEdge(Vertex opposite) {
+		this(opposite, 1);
+	}
+
+	OutEdge(Vertex opposite, int weight) {
 		this.opposite = opposite;
-		this.weight = 1;
+		this.weight = weight;
 	}
 	
 	public void incrementWeight() {
@@ -35,5 +39,19 @@ public class OutEdge implements Comparable<OutEdge> {
 		else if (this.weight < other.weight)
 			return -1;
 		return 0;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		
+		if (!this.getClass().equals(obj.getClass()))
+			return false;
+		
+		OutEdge e = (OutEdge) obj;
+		
+		return this.weight == e.weight &&
+				this.opposite.getId() == e.opposite.getId();
 	}
 }
