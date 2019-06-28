@@ -241,7 +241,11 @@ public class PartitionMetaMgr {
 	}
 	
 	public Integer queryLocationTable(RecordKey key) {
-		return fusionTable.getLocation(key);
+		int partId = fusionTable.getLocation(key);
+		if (partId == -1)
+			return null;
+		else
+			return partId;
 	}
 	
 	public boolean removeFromLocationTable(RecordKey key) {

@@ -31,6 +31,7 @@ public abstract class MigrationMgr {
 	private static final int CHUNK_SIZE = 100;
 	
 	private static final long START_MIGRATION_TIME = 120_000; // in ms
+//	private static final long START_MIGRATION_TIME = 100_000_000; // in ms
 	private static final long COLD_MIGRATION_DELAY = 0_000; // in ms
 	
 	private Deque<MigrationRange> targetRanges;
@@ -163,7 +164,9 @@ public abstract class MigrationMgr {
 			targetRanges = scalingInPlan.generateMigrationRanges(originalPlan, targetTable);
 		}
 		
-		System.out.println("Ranges: " + targetRanges);
+
+		if (logger.isLoggable(Level.INFO))
+			logger.info(String.format("migration ranges: %s", targetRanges));
 		
 		// Change the current partition plan of the system
 		Elasql.partitionMetaMgr().startMigration(newPartPlan);
