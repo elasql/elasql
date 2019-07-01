@@ -33,14 +33,15 @@ public abstract class MigrationManager {
 
 	public static final boolean ENABLE_NODE_SCALING = false;
 	public static final boolean IS_SCALING_OUT = false; // only works when 'ENABLE_NODE_SCALING' = true
-	public static final boolean FORCE_COLD_MIGRATION = false; // only works when 'ENABLE_NODE_SCALING' 
-	                                                         // && 'IS_SCALING_OUT' = true
+	public static final boolean USE_PREDEFINED_PLAN = false; // only works when 'ENABLE_NODE_SCALING' = true
+	
 	private static AtomicBoolean isScaled = new AtomicBoolean(false);
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
 			2100 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
-	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: 50; // [Schism: Clay]
+	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: // [Schism: Clay]
+		(ENABLE_NODE_SCALING? 100 : 50);
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -221,14 +222,14 @@ public abstract class MigrationManager {
 			public void run() {
 				if (ENABLE_NODE_SCALING) {
 					if (IS_SCALING_OUT) {
-						if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+						if (USE_PREDEFINED_PLAN && !isColdMigrated.get()) {
 							queuedMigrations = generateScalingOutColdMigrationPlans();
 						} else
 							queuedMigrations = clayPlanner.generateMigrationPlan();
 					} else {
-						if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+						if (USE_PREDEFINED_PLAN && !isColdMigrated.get()) {
 							queuedMigrations = generateConsolidationColdMigrationPlans();
-						} else if (!FORCE_COLD_MIGRATION && !isConsolidated.get()) {
+						} else if (!USE_PREDEFINED_PLAN && !isConsolidated.get()) {
 							queuedMigrations = clayPlanner.generateConsolidationPlan();
 						} else 
 							queuedMigrations = clayPlanner.generateMigrationPlan();
@@ -259,8 +260,8 @@ public abstract class MigrationManager {
 		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
 		
 		for (int partId = 0; partId < 3; partId++) {
-			int startId = (partId * 100000) / DATA_RANGE_SIZE;
-			int endId = (partId * 100000 + 25000 - 1) / DATA_RANGE_SIZE;
+			int startId = (partId * 1000000) / DATA_RANGE_SIZE;
+			int endId = (partId * 1000000 + 250000 - 1) / DATA_RANGE_SIZE;
 			
 			MigrationPlan p = new MigrationPlan(partId, 3);
 			for (int k = startId; k <= endId; k++)
@@ -274,9 +275,9 @@ public abstract class MigrationManager {
 	private List<MigrationPlan> generateConsolidationColdMigrationPlans() {
 		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
 		
-		int dataPerPart = 100000 / DATA_RANGE_SIZE / 3;
-		int startId = 300000 / DATA_RANGE_SIZE;
-		int endId = 399999 / DATA_RANGE_SIZE;
+		int dataPerPart = 1000000 / DATA_RANGE_SIZE / 3;
+		int startId = 3000000 / DATA_RANGE_SIZE;
+		int endId = 3999999 / DATA_RANGE_SIZE;
 		
 		MigrationPlan p = new MigrationPlan(3, 0);
 		for (int k = startId; k < startId + dataPerPart; k++)
@@ -305,19 +306,19 @@ public abstract class MigrationManager {
 		} else {
 			if (ENABLE_NODE_SCALING) {
 				if (IS_SCALING_OUT) {
-					if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+					if (USE_PREDEFINED_PLAN && !isColdMigrated.get()) {
 						isColdMigrated.set(true);
 						finishClay();
-						sendLaunchClayReq(null);
+//						sendLaunchClayReq(null);
 						return;
 					}
 				} else if (!IS_SCALING_OUT) {
-					if (FORCE_COLD_MIGRATION && !isColdMigrated.get()) {
+					if (USE_PREDEFINED_PLAN && !isColdMigrated.get()) {
 						isColdMigrated.set(true);
 						finishClay();
-						sendLaunchClayReq(null);
+//						sendLaunchClayReq(null);
 						return;
-					} else if (!FORCE_COLD_MIGRATION && !isConsolidated.get()) {
+					} else if (!USE_PREDEFINED_PLAN && !isConsolidated.get()) {
 						isConsolidated.set(true);
 						finishClay();
 						sendLaunchClayReq(null);
