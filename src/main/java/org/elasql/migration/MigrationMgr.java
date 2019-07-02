@@ -18,8 +18,8 @@ public abstract class MigrationMgr {
 	private static Logger logger = Logger.getLogger(MigrationMgr.class.getName());
 	
 	public static final boolean ENABLE_NODE_SCALING = false;
-	public static final boolean IS_SCALING_OUT = false;
-	public static final boolean ENABLE_COLD_MIGRATION = false;
+	public static final boolean IS_SCALING_OUT = true;
+	public static final boolean ENABLE_COLD_MIGRATION = true;
 	public static final boolean USE_RANGE_SCALING_OUT = false; // only works when ENABLE_NODE_SCALING && IS_SCALING_OUT = true
 	
 	public static final int SP_MIGRATION_START = -101;
@@ -28,7 +28,7 @@ public abstract class MigrationMgr {
 	
 	public static final int MSG_COLD_FINISH = -100;
 	
-	private static final int CHUNK_SIZE = 100;
+	private static final int CHUNK_SIZE = 1000;
 	
 	private static final long START_MIGRATION_TIME = 120_000; // in ms
 //	private static final long START_MIGRATION_TIME = 100_000_000; // in ms
