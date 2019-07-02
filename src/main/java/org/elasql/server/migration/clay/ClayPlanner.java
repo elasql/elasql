@@ -122,8 +122,8 @@ public class ClayPlanner {
 		
 		Partition leastLoadPart = getLeastLoadPartition(partitions);
 		MigrationPlan plan = new MigrationPlan(3, leastLoadPart.getPartId());
-		int start = 300000 / MigrationManager.DATA_RANGE_SIZE;
-		int end = 400000 / MigrationManager.DATA_RANGE_SIZE;
+		int start = 3_000_000 / MigrationManager.DATA_RANGE_SIZE;
+		int end = 4_000_000 / MigrationManager.DATA_RANGE_SIZE;
 		for (int i = start; i < end; i++)
 			plan.addKey(i);
 		plans.add(plan);

@@ -41,7 +41,7 @@ public abstract class MigrationManager {
 			2100 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
 	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: // [Schism: Clay]
-		(ENABLE_NODE_SCALING? 100 : 50);
+		(ENABLE_NODE_SCALING? (IS_SCALING_OUT? 100: 1000) : 50);
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -68,7 +68,7 @@ public abstract class MigrationManager {
 	private AtomicBoolean analysisCompleted = new AtomicBoolean(false);
 
 	// Async pushing
-	private static int PUSHING_COUNT = 100;
+	private static int PUSHING_COUNT = 1000;
 	private static final int PUSHING_BYTE_COUNT = 4000000;
 	private ConcurrentLinkedQueue<RecordKey> skipRequestQueue = new ConcurrentLinkedQueue<RecordKey>();
 	private Map<String, Set<RecordKey>> bgPushCandidates = new HashMap<String, Set<RecordKey>>();
@@ -321,6 +321,7 @@ public abstract class MigrationManager {
 					} else if (!USE_PREDEFINED_PLAN && !isConsolidated.get()) {
 						isConsolidated.set(true);
 						finishClay();
+						// We need do more Clay to ensure the load is balanced
 						sendLaunchClayReq(null);
 						return;
 					}
