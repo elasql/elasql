@@ -27,6 +27,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timer;
 
 /**
  * The class that deal with remote records for parent transaction.
@@ -101,11 +102,13 @@ public class CalvinCacheMgr {
 		
 		try {
 			// Wait for remote records
+			Timer.getLocalTimer().startComponentTimer("Remote");
 			KeyRecordPair pair = inbox.take();
 			while (!pair.key.equals(key)) {
 				cachedRecords.put(pair.key, pair.record);
 				pair = inbox.take();
 			}
+			Timer.getLocalTimer().stopComponentTimer("Remote");
 			rec = pair.record;
 		} catch (InterruptedException e) {
 			e.printStackTrace();

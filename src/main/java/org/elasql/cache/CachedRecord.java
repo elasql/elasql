@@ -36,6 +36,8 @@ public class CachedRecord implements Record, Serializable {
 	private long srcTxNum;
 	private boolean isTemp; // the temporary record will not be flushed.
 	
+	private boolean fromRemote = false;
+	
 	private RecordKey primaryKey;
 	private transient ArrayList<String> fields = new ArrayList<String>();
 	private transient ArrayList<Constant> values = new ArrayList<Constant>();
@@ -166,6 +168,14 @@ public class CachedRecord implements Record, Serializable {
 
 	public void setTemp(boolean isTemp) {
 		this.isTemp = isTemp;
+	}
+	
+	public boolean isFromRemote() {
+		return fromRemote;
+	}
+
+	public void setFromRemote(boolean fromRemote) {
+		this.fromRemote = fromRemote;
 	}
 
 	@Override

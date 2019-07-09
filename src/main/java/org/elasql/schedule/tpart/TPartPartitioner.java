@@ -71,8 +71,10 @@ public class TPartPartitioner extends Task implements Scheduler {
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
-		for (StoredProcedureCall call : calls)
+		for (StoredProcedureCall call : calls) {
+			call.startRecordTime();
 			spcQueue.add(call);
+		}
 	}
 
 	public void run() {
@@ -83,6 +85,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 				// blocked if the queue is empty
 				StoredProcedureCall call = spcQueue.take();
 				TPartStoredProcedureTask task = createStoredProcedureTask(call);
+				task.setSpCall(call);
 
 				// schedules the utility procedures directly without T-Part
 				// module
@@ -162,6 +165,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 		while (plans.hasNext()) {
 			TPartStoredProcedureTask p = plans.next();
 			VanillaDb.taskMgr().runTask(p);
+			if (p.getSpCall() != null && p.getProcedure().isMaster())
+				p.getSpCall().stopRecordTime();
 		}
 	}
 	

@@ -15,6 +15,7 @@ import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timer;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 	private static Logger logger = Logger.getLogger(TPartCacheMgr.class.getName());
@@ -84,29 +85,38 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 
 	CachedRecord takeFromTx(RecordKey key, long src, long dest) {
-//		Timer.getLocalTimer().startComponentTimer("Read from Tx");
-//		try {
-			CachedEntryKey k = new CachedEntryKey(key, src, dest);
-			synchronized (prepareAnchor(k)) {
-				try {
-					// Debug: Tracing the waiting key
-	//				Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
-	//						+ " from tx." + src);
-					// wait if the record has not delivered
-					while (!exchange.containsKey(k)) {
-						prepareAnchor(k).wait();
-					}
-					
-	//				Thread.currentThread().setName("Tx." + dest);
-					
-					return exchange.remove(k);
-				} catch (InterruptedException e) {
-					throw new RuntimeException();
+		CachedRecord rec = null;
+		CachedEntryKey k = new CachedEntryKey(key, src, dest);
+		
+		Timer.getLocalTimer().startComponentTimer("Tmp");
+		synchronized (prepareAnchor(k)) {
+			try {
+				// Debug: Tracing the waiting key
+//				Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
+//						+ " from tx." + src);
+				
+				
+				// wait if the record has not delivered
+				while (!exchange.containsKey(k)) {
+					prepareAnchor(k).wait();
 				}
+				
+//				Thread.currentThread().setName("Tx." + dest);
+				
+				rec = exchange.remove(k);
+			} catch (InterruptedException e) {
+				throw new RuntimeException();
 			}
-//		} finally {
-//			Timer.getLocalTimer().stopComponentTimer("Read from Tx");
-//		}
+		}
+		Timer.getLocalTimer().stopComponentTimer("Tmp");
+		
+		if (rec.isFromRemote()) {
+			Timer.getLocalTimer().mergeComponent("Tmp", "Wait Remote");
+		} else {
+			Timer.getLocalTimer().mergeComponent("Tmp", "Wait Local");
+		}
+		
+		return rec;
 	}
 
 	void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
@@ -115,6 +125,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 					"The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
 		
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
+		rec.setFromRemote(isRemote);
 		synchronized (prepareAnchor(k)) {
 			exchange.put(k, rec);
 			prepareAnchor(k).notifyAll();

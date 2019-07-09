@@ -36,6 +36,7 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timer;
 
 public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper>
 		implements DdStoredProcedure {
@@ -147,7 +148,9 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	public SpResultSet execute() {
 		try {
 			// Get conservative locks it has asked before
+			Timer.getLocalTimer().startComponentTimer("Locks");
 			getConservativeLocks();
+			Timer.getLocalTimer().stopComponentTimer("Locks");
 			
 			// Execute transaction
 			executeTransactionLogic();

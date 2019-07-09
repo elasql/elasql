@@ -39,6 +39,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 	public void schedule(StoredProcedureCall... calls) {
 		try {
 			for (int i = 0; i < calls.length; i++) {
+				calls[i].startRecordTime();
 				spcQueue.put(calls[i]);
 			}
 		} catch (InterruptedException e) {
@@ -80,6 +81,10 @@ public class CalvinScheduler extends Task implements Scheduler {
 
 				// hand over to a thread to run the task
 				VanillaDb.taskMgr().runTask(spt);
+				
+				// XXX: Record schedule time
+				if (sp.willResponseToClients())
+					call.stopRecordTime();
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();

@@ -42,6 +42,7 @@ import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timer;
 
 /**
  * The CURD interfaces to VanillaCore.
@@ -49,6 +50,8 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class VanillaCoreCrud {
 
 	public static CachedRecord read(RecordKey key, Transaction tx) {
+		Timer.getLocalTimer().startComponentTimer("Storage");
+		
 		// Open index select scan
 		TablePlan tp = new TablePlan(key.getTableName(), tx);
 		Schema sch = tp.schema();
@@ -79,6 +82,8 @@ public class VanillaCoreCrud {
 			rec = builder.build();
 		}
 		s.close();
+		
+		Timer.getLocalTimer().stopComponentTimer("Storage");
 
 		return rec;
 	}
@@ -183,6 +188,7 @@ public class VanillaCoreCrud {
 
 	// True: Found match record, False: Cannot find match record
 	public static boolean update(RecordKey key, CachedRecord rec, Transaction tx) {
+		Timer.getLocalTimer().startComponentTimer("Storage");
 		TablePlan tp = new TablePlan(key.getTableName(), tx);
 		Map<String, IndexInfo> indexInfoMap = Elasql.catalogMgr()
 				.getIndexInfo(key.getTableName(), tx);
@@ -251,11 +257,14 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
+		Timer.getLocalTimer().stopComponentTimer("Storage");
 		
 		return true;
 	}
 
 	public static void insert(RecordKey key, CachedRecord rec, Transaction tx) {
+		Timer.getLocalTimer().startComponentTimer("Storage");
+		
 		String tblname = key.getTableName();
 		Plan p = new TablePlan(tblname, tx);
 		Map<String, IndexInfo> indexes = Elasql.catalogMgr().getIndexInfo(
@@ -282,12 +291,16 @@ public class VanillaCoreCrud {
 			s.setVal(fldName, val);
 		}
 		s.close();
+		
+		Timer.getLocalTimer().stopComponentTimer("Storage");
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
 	}
 
 	public static void delete(RecordKey key, Transaction tx) {
+		Timer.getLocalTimer().startComponentTimer("Storage");
+		
 		String tblname = key.getTableName();
 		TablePlan tp = new TablePlan(tblname, tx);
 		Map<String, IndexInfo> indexInfoMap = Elasql.catalogMgr()
@@ -318,6 +331,8 @@ public class VanillaCoreCrud {
 			s.delete();
 		}
 		s.close();
+		
+		Timer.getLocalTimer().stopComponentTimer("Storage");
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);

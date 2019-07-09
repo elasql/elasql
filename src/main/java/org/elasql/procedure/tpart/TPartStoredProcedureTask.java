@@ -5,19 +5,35 @@ import java.util.Set;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TimerStatistics;
 
 public class TPartStoredProcedureTask extends StoredProcedureTask {
 	
 	static {
-		// For Debugging
-//		TimerStatistics.startRecording();
-//		TimerStatistics.startAutoReporting();
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(150_000);
+					TimerStatistics.startRecording();
+					TimerStatistics.startAutoReporting();
+					Thread.sleep(2000_000);
+					TimerStatistics.stopRecording();
+					TimerStatistics.stopAutoReporting();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+		}).start();
 	}
 
 	private TPartStoredProcedure<?> tsp;
@@ -34,18 +50,18 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 	@Override
 	public void run() {
+		Timer timer = Timer.getLocalTimer();
 		SpResultSet rs = null;
 		
 		Thread.currentThread().setName("Tx." + txNum);
-//		Timer timer = Timer.getLocalTimer();
-//		timer.reset();
-//		timer.startExecution();
+		timer.reset();
+		timer.startExecution();
 
-//		try {
+		try {
 			rs = tsp.execute();
-//		} finally {
-//			timer.stopExecution();
-//		}
+		} finally {
+			timer.stopExecution();
+		}
 
 		if (tsp.isMaster()) {
 			if (clientId != -1)
@@ -56,9 +72,8 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
 				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
 			}
-//			timer.addToGlobalStatistics();
+			timer.addToGlobalStatistics();
 		}
-//		timer.addToGlobalStatistics();
 	}
 
 	public long getTxNum() {
@@ -101,5 +116,15 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 	public boolean isReadOnly() {
 		return tsp.isReadOnly();
+	}
+	
+	private StoredProcedureCall call;
+	
+	public void setSpCall(StoredProcedureCall call) {
+		this.call = call;
+	}
+	
+	public StoredProcedureCall getSpCall() {
+		return call;
 	}
 }

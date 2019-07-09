@@ -20,12 +20,27 @@ import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TimerStatistics;
 
 public class CalvinStoredProcedureTask extends StoredProcedureTask {
 	
 	static {
-		// For Debugging
-//		TimerStatistics.startReporting();
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(150_000);
+					TimerStatistics.startRecording();
+					TimerStatistics.startAutoReporting();
+					Thread.sleep(2000_000);
+					TimerStatistics.stopRecording();
+					TimerStatistics.stopAutoReporting();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+		}).start();
 	}
 
 	private CalvinStoredProcedure<?> csp;
@@ -51,11 +66,8 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 
 		if (csp.willResponseToClients()) {
 			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+			timer.addToGlobalStatistics();
 		}
-		
-		// For Debugging
-//		System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
-//		timer.addToGlobalStatistics();
 	}
 
 	public void bookConservativeLocks() {

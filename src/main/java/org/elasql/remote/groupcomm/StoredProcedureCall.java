@@ -16,6 +16,8 @@
 package org.elasql.remote.groupcomm;
 
 import java.io.Serializable;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * 
@@ -23,6 +25,45 @@ import java.io.Serializable;
  * 
  */
 public class StoredProcedureCall implements Serializable {
+	
+	private static BlockingQueue<Long> scheduleTimes = new LinkedBlockingQueue<Long>();
+	
+	static {
+		new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				long sum = 0;
+				long count = 0;
+				long startTime = System.currentTimeMillis();
+				long lastReportTime = startTime;
+				
+				try {
+					while (true) {
+						long scheTime = scheduleTimes.take();
+						scheTime /= 10000;
+						sum += scheTime;
+						count++;
+
+						long currentTime = System.currentTimeMillis();
+						if (currentTime - lastReportTime > 10000) {
+							long average = sum / count;
+							long clockTime = (currentTime - startTime) / 1000;
+							String report = String.format("At %d, schedule: %d (count = %d)",
+									clockTime, average, count);
+							System.out.println(report);
+							sum = 0;
+							count = 0;
+							lastReportTime = currentTime;
+						}
+					}
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+		}).start();
+	}
 
 	public static int PID_NO_OPERATION = Integer.MIN_VALUE;
 
@@ -31,6 +72,7 @@ public class StoredProcedureCall implements Serializable {
 	private Object[] objs;
 
 	private long txNum = -1;
+	private long startTime = -1;
 
 	private int clientId, pid = PID_NO_OPERATION, connectionId = -1;
 
@@ -81,5 +123,20 @@ public class StoredProcedureCall implements Serializable {
 
 	public boolean isNoOpStoredProcCall() {
 		return pid == PID_NO_OPERATION;
+	}
+	
+	public void startRecordTime() {
+		startTime = System.nanoTime();
+	}
+	
+	public void stopRecordTime() {
+		try {
+			if (startTime != -1) {
+				long time = System.nanoTime() - startTime;
+				scheduleTimes.put(time);
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 }
