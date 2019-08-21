@@ -33,7 +33,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(StopCopyMigrationMgr.class.getName());
 	
 	private static final int LARGE_CHUNK_SIZE_IN_BYTES = 16_000_000; // 1MB
-	private static final int LARGE_CHUNK_SIZE_IN_COUNT = 640000;
+	private static final int LARGE_CHUNK_SIZE_IN_COUNT = 160000;
 	private static final int LARGE_CHUNK_SIZE = USE_BYTES_FOR_CHUNK_SIZE? LARGE_CHUNK_SIZE_IN_BYTES : LARGE_CHUNK_SIZE_IN_COUNT;
 	
 	private static final Constant FALSE = new IntegerConstant(0);

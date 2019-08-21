@@ -40,6 +40,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 
 	public CalvinScheduler(CalvinStoredProcedureFactory factory) {
 		this.factory = factory;
+//		TimerStatistics.startReporting();
 	}
 
 	public void schedule(StoredProcedureCall... calls) {
@@ -54,13 +55,19 @@ public class CalvinScheduler extends Task implements Scheduler {
 
 	@Override
 	public void run() {
+//		Timer timer = Timer.getLocalTimer();
+		
 		StoredProcedureCall call = null;
 		try {
 			while (true) {
+//				timer.reset();
+				
 				// retrieve stored procedure call
 				call = spcQueue.take();
 				if (call.isNoOpStoredProcCall())
 					continue;
+				
+//				timer.startComponentTimer("schedule");
 				
 				if (FIRST_TX_ARRIVAL_TIME.get() == -1L)
 					FIRST_TX_ARRIVAL_TIME.set(System.currentTimeMillis());
@@ -68,7 +75,10 @@ public class CalvinScheduler extends Task implements Scheduler {
 				// create store procedure and prepare
 				CalvinStoredProcedure<?> sp = factory.getStoredProcedure(
 						call.getPid(), call.getTxNum());
+				
+//				timer.startComponentTimer(sp.getClass().getSimpleName() + " prepare");
 				sp.prepare(call.getPars());
+//				timer.stopComponentTimer(sp.getClass().getSimpleName() + " prepare");
 	
 				// log request
 				if (!sp.isReadOnly())
@@ -76,11 +86,16 @@ public class CalvinScheduler extends Task implements Scheduler {
 	
 				// if this node doesn't have to participate this transaction,
 				// skip it
-				if (!sp.isParticipating())
+				if (!sp.isParticipating()) {
+//					timer.stopComponentTimer("schedule");
+//					timer.addToGlobalStatistics();
 					continue;
+				}
 	
 				// serialize conservative locking
+//				timer.startComponentTimer("book locks");
 				sp.bookConservativeLocks();
+//				timer.stopComponentTimer("book locks");
 	
 				// create a new task for multi-thread
 				CalvinStoredProcedureTask spt = new CalvinStoredProcedureTask(
@@ -89,6 +104,9 @@ public class CalvinScheduler extends Task implements Scheduler {
 	
 				// hand over to a thread to run the task
 				VanillaDb.taskMgr().runTask(spt);
+				
+//				timer.stopComponentTimer("schedule");
+//				timer.addToGlobalStatistics();
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();

@@ -26,9 +26,11 @@ public class MgCrabSystemController implements MigrationSystemController {
 	
 	private static final Phase INIT_PHASE = Phase.CRABBING;
 	
-	private static final long START_CAUGHT_UP_DELAY = 90_000; // multi-indices
+//	private static final long START_CAUGHT_UP_DELAY = 90_000; // Scaling-out (18 nodes)
+//	private static final long START_CAUGHT_UP_DELAY = 105_000; // Scaling-out (3 nodes)
+//	private static final long START_CAUGHT_UP_DELAY = 150_000; // sensitivity
 //	private static final long START_CAUGHT_UP_DELAY = 500_000; // normal
-//	private static final long START_CAUGHT_UP_DELAY = 5000_000; // long enough to disable
+	private static final long START_CAUGHT_UP_DELAY = 5000_000; // long enough to disable
 	
 	private AtomicInteger numOfRangesToBeMigrated = new AtomicInteger(0);
 	

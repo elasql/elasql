@@ -37,6 +37,10 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class MgCrabMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(MgCrabMigrationMgr.class.getName());
 	
+	private static final boolean ENABLE_TWO_PHASE_BG_PUSH = true;
+	private static final boolean ENABLE_PIPELINING_TWO_PHASE_BG = true;
+	private static final long BG_PUSH_START_DELAY = 50_000; // in ms.
+	
 	private Phase currentPhase = Phase.NORMAL;
 	private List<MigrationRange> migrationRanges;
 	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
@@ -83,57 +87,154 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 				pushRanges.add(range);
 		newPartitionPlan = newPartPlan;
 		
-		if (!pushRanges.isEmpty())
-			scheduleNextBGPushRequest(-1);
+		// Start background pushes
+		if (!pushRanges.isEmpty()) {
+			if (BG_PUSH_START_DELAY == 0) {
+				if (ENABLE_TWO_PHASE_BG_PUSH) {
+					if (ENABLE_PIPELINING_TWO_PHASE_BG)
+						scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PIPELINING);
+					else
+						scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PHASE1);
+				} else {
+					scheduleNextOnePhaseBGPushRequest();
+				}
+			} else {
+				new Thread(new Runnable() {
+					@Override
+					public void run() {
+						try {
+							Thread.sleep(BG_PUSH_START_DELAY);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						
+						if (logger.isLoggable(Level.INFO)) {
+							long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
+							logger.info(String.format("the background pushes start at %d."
+									, time / 1000));
+						}
+						
+						if (ENABLE_TWO_PHASE_BG_PUSH) {
+							if (ENABLE_PIPELINING_TWO_PHASE_BG)
+								scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PIPELINING);
+							else
+								scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PHASE1);
+						} else {
+							scheduleNextOnePhaseBGPushRequest();
+						}
+					}
+				}).start();
+			}
+		}
 		
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("migration ranges: %s", migrationRanges.toString()));
 		}
 	}
 	
-	public void scheduleNextBGPushRequest(long lastPushedTxNum) {
+	public void scheduleNextOnePhaseBGPushRequest() {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
+				for (MigrationRange range : pushRanges) {
+					Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, CHUNK_SIZE);
+					if (chunk.size() > 0) {
+						sendOnePhaseBGPushRequest(range.generateStatusUpdate(), chunk, 
+								range.getSourcePartId(), range.getDestPartId());
+						return;
+					}
+				}
+				
+				// If it reach here, it means that there is no more chunk
+				sendRangeFinishNotification();
+			}
+		}).start();
+	}
+	
+	public void scheduleNextTwoPhaseBGPushRequest(long lastPushedTxNum, BgPushPhases phase) {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				// Phase 1? proceed to phase 2
+				if (phase == BgPushPhases.PHASE2) {
+					sendTwoPhaseBGPushRequest(BgPushPhases.PHASE2, new HashSet<RecordKey>(),
+							lastUpdate.getSourcePartId(), lastUpdate.getDestPartId(), lastPushedTxNum, lastUpdate);
+					return;
+				}
+				
 				// XXX: If there is multiple ranges to this destinations
 				// we should know which range pairs to this transaction number
 				for (MigrationRange range : pushRanges) {
 					Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, CHUNK_SIZE);
 					if (chunk.size() > 0) {
-						sendBGPushRequest(chunk, range.getSourcePartId(), 
-								range.getDestPartId(), lastPushedTxNum);
+						if (phase == BgPushPhases.PIPELINING) {
+							sendTwoPhaseBGPushRequest(BgPushPhases.PIPELINING, chunk, range.getSourcePartId(), 
+									range.getDestPartId(), lastPushedTxNum, lastUpdate);
+						} else {
+							sendTwoPhaseBGPushRequest(BgPushPhases.PHASE1, chunk, range.getSourcePartId(), 
+									range.getDestPartId(), lastPushedTxNum, null);
+						}
 						lastUpdate = range.generateStatusUpdate();
 						return;
 					}
 				}
 				
 				// If it reach here, this should the last push
-				sendBGPushRequest(new HashSet<RecordKey>(), lastUpdate.getSourcePartId(),
-							lastUpdate.getDestPartId(), lastPushedTxNum);
+				if (phase == BgPushPhases.PIPELINING) {
+					sendTwoPhaseBGPushRequest(BgPushPhases.PIPELINING, new HashSet<RecordKey>(), 
+							lastUpdate.getSourcePartId(), lastUpdate.getDestPartId(), lastPushedTxNum, lastUpdate);
+				} else {
+					sendRangeFinishNotification();
+				}
 			}
 		}).start();
 	}
 	
-	public void sendBGPushRequest(Set<RecordKey> chunk, int sourceNodeId, int destNodeId, long lastPushedTxNum) {
+	public void sendOnePhaseBGPushRequest(MigrationRangeUpdate update, Set<RecordKey> chunk,
+			int sourceNodeId, int destNodeId) {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("send a background push request with " + chunk.size() + " keys.");
+			logger.info("send a one-phase background push request with " + chunk.size() + " keys.");
 		
 		// Prepare the parameters
-		Object[] params = new Object[5 + chunk.size()];
+		Object[] params = new Object[4 + chunk.size()];
 		
-		params[0] = lastUpdate;
+		params[0] = update;
 		params[1] = sourceNodeId;
 		params[2] = destNodeId;
-		params[3] = lastPushedTxNum;
-		params[4] = chunk.size();
+		params[3] = chunk.size();
 		
-		int i = 5;
+		int i = 4;
 		for (RecordKey key : chunk)
 			params[i++] = key;
 		
 		// Send a store procedure call
 		Object[] call = { new StoredProcedureCall(-1, -1, 
-				MgCrabStoredProcFactory.SP_BG_PUSH, params)};
+				MgCrabStoredProcFactory.SP_ONE_PHASE_BG_PUSH, params)};
+		Elasql.connectionMgr().sendBroadcastRequest(call, false);
+	}
+	
+	public void sendTwoPhaseBGPushRequest(BgPushPhases phase, Set<RecordKey> chunk, int sourceNodeId, 
+			int destNodeId, long lastPushedTxNum, MigrationRangeUpdate update) {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("send a two-phase background push request with " + chunk.size() + " keys. (" + phase + ")");
+		
+		// Prepare the parameters
+		Object[] params = new Object[6 + chunk.size()];
+		
+		params[0] = phase;
+		params[1] = update;
+		params[2] = sourceNodeId;
+		params[3] = destNodeId;
+		params[4] = lastPushedTxNum;
+		params[5] = chunk.size();
+		
+		int i = 6;
+		for (RecordKey key : chunk)
+			params[i++] = key;
+		
+		// Send a store procedure call
+		Object[] call = { new StoredProcedureCall(-1, -1, 
+				MgCrabStoredProcFactory.SP_TWO_PHASE_BG_PUSH, params)};
 		Elasql.connectionMgr().sendBroadcastRequest(call, false);
 	}
 	

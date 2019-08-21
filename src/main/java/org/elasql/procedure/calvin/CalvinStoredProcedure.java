@@ -79,10 +79,14 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	 **********************/
 
 	public void prepare(Object... pars) {
+//		Timer timer = Timer.getLocalTimer();
 		
+//		timer.startComponentTimer(getClass().getSimpleName() + " analyze paramters");
 		execPlan = analyzeParameters(pars);
+//		timer.stopComponentTimer(getClass().getSimpleName() + " analyze paramters");
 		
 		// Prepare a transaction and a cache
+//		timer.startComponentTimer(getClass().getSimpleName() + " init transaction");
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		if (isParticipating()) {
 			// create a transaction
@@ -98,6 +102,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		} else {
 			postOffice.skipTransaction(txNum);
 		}
+//		timer.stopComponentTimer(getClass().getSimpleName() + " init transaction");
 		
 		// Debug
 //		if (Elasql.migrationMgr().isInMigration())

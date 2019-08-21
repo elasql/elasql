@@ -9,14 +9,12 @@ import org.vanilladb.core.sql.VarcharConstant;
 import org.vanilladb.core.sql.storedprocedure.SpResultRecord;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
-public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
+public class OnePhaseBgPushParamHelper extends StoredProcedureParamHelper {
 	
-	private BgPushPhases currentPhase;
 	private MigrationRangeUpdate update;
 	private int sourceNodeId;
 	private int destNodeId;
 	private int pushingKeyCount;
-	private long lastTxNum;
 	
 	// We cache the raw parameters and translate them on-the-fly
 	// since it is too costly to copy them.
@@ -24,13 +22,11 @@ public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 	
 	@Override
 	public void prepareParameters(Object... pars) {
-		currentPhase = (BgPushPhases) pars[0];
-		if (pars[1] != null)
-			update = (MigrationRangeUpdate) pars[1];
-		sourceNodeId = (Integer) pars[2];
-		destNodeId = (Integer) pars[3];
-		lastTxNum = (Long) pars[4];
-		pushingKeyCount = (Integer) pars[5];
+		if (pars[0] != null)
+			update = (MigrationRangeUpdate) pars[0];
+		sourceNodeId = (Integer) pars[1];
+		destNodeId = (Integer) pars[2];
+		pushingKeyCount = (Integer) pars[3];
 		rawParameters = pars;
 	}
 	
@@ -42,16 +38,8 @@ public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 		return destNodeId;
 	}
 	
-	public BgPushPhases getCurrentPhase() {
-		return currentPhase;
-	}
-	
 	public MigrationRangeUpdate getMigrationRangeUpdate() {
 		return update;
-	}
-	
-	public long getLastPushTxNum() {
-		return lastTxNum;
 	}
 	
 	public int getPushingKeyCount() {
@@ -59,7 +47,7 @@ public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 	}
 	
 	public RecordKey getPushingKey(int index) {
-		return (RecordKey) rawParameters[index + 6];
+		return (RecordKey) rawParameters[index + 4];
 	}
 	
 	@Override

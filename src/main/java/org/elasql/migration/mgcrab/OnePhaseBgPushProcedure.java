@@ -1,4 +1,4 @@
-package org.elasql.migration.squall;
+package org.elasql.migration.mgcrab;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,28 +19,28 @@ import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
-public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
-	private static Logger logger = Logger.getLogger(BgPushProcedure.class.getName());
+public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPushParamHelper> {
+	private static Logger logger = Logger.getLogger(OnePhaseBgPushProcedure.class.getName());
 
 	private static final Constant FALSE = new IntegerConstant(0);
 	private static final Constant TRUE = new IntegerConstant(1);
 
-	private SquallMigrationMgr migraMgr = (SquallMigrationMgr) Elasql.migrationMgr();
+	private MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
 	
 	private Set<RecordKey> pushingKeys = new HashSet<RecordKey>();
 
-	public BgPushProcedure(long txNum) {
-		super(txNum, new BgPushParamHelper());
+	public OnePhaseBgPushProcedure(long txNum) {
+		super(txNum, new OnePhaseBgPushParamHelper());
 	}
-	
+
 	@Override
 	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		ExecutionPlan plan;
 		
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
-
+		
 		// Due to the high cost of pre-process,
 		// we only require the source and the destination node to prepare the keys.
 		if (localNodeId == paramHelper.getSourceNodeId() ||
@@ -62,19 +62,19 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 		
 		return plan;
 	}
-
-	@Override
-	public void prepareKeys(ReadWriteSetAnalyzer analyzer) {
-		for (int i = 0; i < paramHelper.getPushingKeyCount(); i++) {
-			RecordKey key = paramHelper.getPushingKey(i);
-			if (!migraMgr.isMigrated(key))
-				pushingKeys.add(key);
-		}
-	}
 	
 	@Override
 	public boolean willResponseToClients() {
 		return false;
+	}
+	
+	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
+		for (int i = 0; i < paramHelper.getPushingKeyCount(); i++) {
+			RecordKey key = paramHelper.getPushingKey(i);
+			// Important: We only push the un-migrated records to the dest
+			if (!migraMgr.isMigrated(key))
+				pushingKeys.add(key);
+		}
 	}
 	
 	private ExecutionPlan generateExecutionPlan() {
@@ -126,9 +126,8 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 	@Override
 	protected void afterCommit() {
-		if (localNodeId == paramHelper.getDestNodeId()) {
-			migraMgr.scheduleNextBGPushRequest();
-		}
+		if (localNodeId == paramHelper.getDestNodeId())
+			migraMgr.scheduleNextOnePhaseBGPushRequest();
 	}
 	
 	private void readAndPushInSource() {
@@ -228,4 +227,3 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 		// do nothing
 	}
 }
-

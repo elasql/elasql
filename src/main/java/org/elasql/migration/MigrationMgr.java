@@ -9,7 +9,8 @@ public interface MigrationMgr {
 	boolean USE_BYTES_FOR_CHUNK_SIZE = false;
 	
 	int CHUNK_SIZE_IN_BYTES = 1_000_000; // 1MB
-	int CHUNK_SIZE_IN_COUNT = 15000;
+//	int CHUNK_SIZE_IN_COUNT = 15000;
+	int CHUNK_SIZE_IN_COUNT = 40000;
 	int CHUNK_SIZE = USE_BYTES_FOR_CHUNK_SIZE? CHUNK_SIZE_IN_BYTES : CHUNK_SIZE_IN_COUNT;
 	
 	void initializeMigration(Transaction tx, Object[] params);

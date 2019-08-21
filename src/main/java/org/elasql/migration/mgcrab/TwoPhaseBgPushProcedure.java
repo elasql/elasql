@@ -24,8 +24,8 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPushParamHelper> {
 	private static Logger logger = Logger.getLogger(TwoPhaseBgPushProcedure.class.getName());
 
-	private static Constant FALSE = new IntegerConstant(0);
-	private static Constant TRUE = new IntegerConstant(1);
+	private static final Constant FALSE = new IntegerConstant(0);
+	private static final Constant TRUE = new IntegerConstant(1);
 
 	private MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
@@ -74,44 +74,51 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	
 	// Note: only the source and the destination node could execute this method
 	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
+		lastPushedKeys = new HashSet<RecordKey>();
+
 		// For phase One: The source node reads a set of records, then pushes to the
 		// dest node.
-		for (int i = 0; i < paramHelper.getPushingKeyCount(); i++) {
-			RecordKey key = paramHelper.getPushingKey(i);
-			// Important: We only push the un-migrated records to the dest
-			if (!migraMgr.isMigrated(key))
-				pushingKeys.add(key);
-		}
-		
-		// Cache the push keys so that we won't have to broadcast these
-		// keys again via total-ordering.
-		if (localNodeId == paramHelper.getSourceNodeId())
-			migraMgr.cachePushKeys(txNum, pushingKeys);
-		
-		// If this is the first push, skip the second phase.
-		if (paramHelper.getLastPushTxNum() == -1) {
-			lastPushedKeys = new HashSet<RecordKey>();
-			return;
+		if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE1 ||
+				paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
+			for (int i = 0; i < paramHelper.getPushingKeyCount(); i++) {
+				RecordKey key = paramHelper.getPushingKey(i);
+				// Important: We only push the un-migrated records to the dest
+				if (!migraMgr.isMigrated(key))
+					pushingKeys.add(key);
+			}
+			
+			// Cache the push keys so that we won't have to broadcast these
+			// keys again via total-ordering.
+			if (localNodeId == paramHelper.getSourceNodeId())
+				migraMgr.cachePushKeys(txNum, pushingKeys);
 		}
 		
 		// For phase Two: The dest node acquires the locks, then storing them to the 
 		// local storage.
+		if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE2 ||
+				paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
+			
+			// If this is the first push, skip the second phase.
+			if (paramHelper.getLastPushTxNum() == -1)
+				return;
 		
-		// Retrieve the cached keys and records
-		if (localNodeId == paramHelper.getSourceNodeId()) {
-			lastPushedKeys = migraMgr.retrievePushKeys(paramHelper.getLastPushTxNum());
-		} else if (localNodeId == paramHelper.getDestNodeId()) {
-			lastPushedRecords = migraMgr.retrievePushedRecords(paramHelper.getLastPushTxNum());
-			lastPushedKeys = lastPushedRecords.keySet();
+			// Retrieve the cached keys and records
+			if (localNodeId == paramHelper.getSourceNodeId()) {
+				lastPushedKeys = migraMgr.retrievePushKeys(paramHelper.getLastPushTxNum());
+			} else if (localNodeId == paramHelper.getDestNodeId()) {
+				lastPushedRecords = migraMgr.retrievePushedRecords(paramHelper.getLastPushTxNum());
+				lastPushedKeys = lastPushedRecords.keySet();
+			}
+			
+			// Ignore the migrated keys. We only insert the un-migrated records to the dest.
+			Set<RecordKey> migratedKeys = new HashSet<RecordKey>();
+			for (RecordKey key : lastPushedKeys) {
+				if (migraMgr.isMigrated(key))
+					migratedKeys.add(key);
+			}
+			
+			lastPushedKeys.removeAll(migratedKeys);
 		}
-		
-		// Ignore the migrated keys. We only insert the un-migrated records to the dest.
-		Set<RecordKey> migratedKeys = new HashSet<RecordKey>();
-		for (RecordKey key : lastPushedKeys) {
-			if (migraMgr.isMigrated(key))
-				migratedKeys.add(key);
-		}
-		lastPushedKeys.removeAll(migratedKeys);
 		
 		// Note that we will do these phases in pipeline. The phase two of a BG will be
 		// performed with the phase one of the next BG in the same time.
@@ -126,13 +133,16 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		}
 		
 		// Lock the pushed keys of 2nd phase to ensure Serializability
-		if (localNodeId == paramHelper.getSourceNodeId()) {
-			for (RecordKey key : lastPushedKeys) {
-				plan.addLocalReadKey(key);
-			}
-		} else if (localNodeId == paramHelper.getDestNodeId()) {
-			for (RecordKey key : lastPushedKeys) {
-				plan.addLocalInsertKey(key);
+		if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE2 ||
+				paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
+			if (localNodeId == paramHelper.getSourceNodeId()) {
+				for (RecordKey key : lastPushedKeys) {
+					plan.addLocalReadKey(key);
+				}
+			} else if (localNodeId == paramHelper.getDestNodeId()) {
+				for (RecordKey key : lastPushedKeys) {
+					plan.addLocalInsertKey(key);
+				}
 			}
 		}
 		
@@ -159,20 +169,30 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		
 		// The source node
 		if (localNodeId == paramHelper.getSourceNodeId()) {
-			// XXX: I'm not sure if we should do this
-			// Quick fix: Release the locks immediately to prevent blocking the records in the source node
-			Transaction tx = getTransaction();
-			ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-			ccMgr.onTxCommit(tx);
-			
-			readAndPushInSource();
+			if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE1 ||
+					paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
+				// XXX: I'm not sure if we should do this
+				// Quick fix: Release the locks immediately to prevent blocking the records in the source node
+				Transaction tx = getTransaction();
+				ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
+				ccMgr.onTxCommit(tx);
+				
+				readAndPushInSource();
+			}
 		} else if (localNodeId == paramHelper.getDestNodeId()) {
-			insertInDest(lastPushedRecords);
 			
-			// TODO: Optimization: we can release locks at this point.
-			lastPushedRecords = receiveInDest();
-			if (lastPushedRecords != null && !lastPushedRecords.isEmpty())
-				migraMgr.cachePushedRecords(txNum, lastPushedRecords);
+			if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE2 ||
+					paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
+				insertInDest(lastPushedRecords);
+			}
+
+			if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE1 ||
+					paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
+				// TODO: Optimization: we can release locks at this point.
+				lastPushedRecords = receiveInDest();
+				if (lastPushedRecords != null && !lastPushedRecords.isEmpty())
+					migraMgr.cachePushedRecords(txNum, lastPushedRecords);
+			}
 		}
 
 		if (logger.isLoggable(Level.INFO))
@@ -182,10 +202,16 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	@Override
 	protected void afterCommit() {
 		if (localNodeId == paramHelper.getDestNodeId()) {
-			if (pushingKeys.isEmpty())
-				migraMgr.sendRangeFinishNotification();
-			else
-				migraMgr.scheduleNextBGPushRequest(txNum);
+			if (paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
+				if (pushingKeys.isEmpty())
+					migraMgr.sendRangeFinishNotification();
+				else
+					migraMgr.scheduleNextTwoPhaseBGPushRequest(txNum, paramHelper.getCurrentPhase());
+			} else if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE1) {
+				migraMgr.scheduleNextTwoPhaseBGPushRequest(txNum, BgPushPhases.PHASE2);
+			} else {
+				migraMgr.scheduleNextTwoPhaseBGPushRequest(txNum, BgPushPhases.PHASE1);
+			}
 		}
 	}
 	

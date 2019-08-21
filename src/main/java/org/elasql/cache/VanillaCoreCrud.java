@@ -180,6 +180,9 @@ public class VanillaCoreCrud {
 
 	public static void update(RecordKey key, CachedRecord rec, Transaction tx) {
 		String tblName = key.getTableName();
+		
+//		Timer.getLocalTimer().startComponentTimer("Update to table " + tblName);
+		
 		TablePlan tp = new TablePlan(tblName, tx);
 		Plan selectPlan = null;
 		
@@ -255,6 +258,7 @@ public class VanillaCoreCrud {
 		s.close();
 		
 		tx.endStatement();
+//		Timer.getLocalTimer().stopComponentTimer("Update to table " + tblName);
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
@@ -262,6 +266,9 @@ public class VanillaCoreCrud {
 
 	public static void insert(RecordKey key, CachedRecord rec, Transaction tx) {
 		String tblname = key.getTableName();
+		
+//		Timer.getLocalTimer().startComponentTimer("Insert to table " + tblname);
+		
 		Plan p = new TablePlan(tblname, tx);
 
 		// Insert the record into the record file
@@ -287,6 +294,7 @@ public class VanillaCoreCrud {
 		}
 		
 		tx.endStatement();
+//		Timer.getLocalTimer().stopComponentTimer("Insert to table " + tblname);
 		
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
