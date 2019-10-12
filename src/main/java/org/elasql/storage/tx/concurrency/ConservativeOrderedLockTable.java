@@ -116,6 +116,7 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+				// Debug: Tracing the waiting key
 //				String name = Thread.currentThread().getName();
 				
 				/*
@@ -124,7 +125,8 @@ public class ConservativeOrderedLockTable {
 				 */
 				Long head = lockers.requestQueue.peek();
 				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
-					
+
+					// Debug: Tracing the waiting key
 //					long target = lockers.xLocker;
 //					if (target == -1)
 //						target = head;
@@ -139,6 +141,7 @@ public class ConservativeOrderedLockTable {
 					head = lockers.requestQueue.peek();
 				}
 
+				// Debug: Tracing the waiting key
 //				Thread.currentThread().setName(name);
 				
 				if (!sLockable(lockers, txNum))
@@ -184,13 +187,15 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+				// Debug: Tracing the waiting key
 //				String name = Thread.currentThread().getName();
 				
 				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
 				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
 				/* && !waitingTooLong(timestamp) */) {
-					
+
+					// Debug: Tracing the waiting key
 //					long target = lockers.xLocker;
 //					if (target == -1 && !lockers.sLockers.isEmpty())
 //						target = lockers.sLockers.get(0);
@@ -203,6 +208,7 @@ public class ConservativeOrderedLockTable {
 					head = lockers.requestQueue.peek();
 				}
 
+				// Debug: Tracing the waiting key
 //				Thread.currentThread().setName(name);
 				
 				// if (!xLockable(lockers, txNum))

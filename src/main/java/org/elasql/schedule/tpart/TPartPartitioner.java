@@ -20,7 +20,6 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.tpart.graph.Edge;
-import org.elasql.schedule.tpart.graph.GraphDumper;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.schedule.tpart.sink.Sinker;
@@ -175,11 +174,11 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private void printGraphStatistics() {
 		// XXX: Show the statistics of the T-Graph
 		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
-		if (batchId % 100 == 0) {
-			String stat = graph.getStatistics();
-			System.out.println("Time: " + time);
-			System.out.println("T-Graph id: " + (batchId + 1));
-			System.out.print(stat);
+//		if (batchId % 100 == 0) {
+//			String stat = graph.getStatistics();
+//			System.out.println("Time: " + time);
+//			System.out.println("T-Graph id: " + (batchId + 1));
+//			System.out.print(stat);
 			
 			imbalanced += graph.getImbalancedDis();
 			remoteTxRead += graph.getRemoteTxReads();
@@ -187,22 +186,22 @@ public class TPartPartitioner extends Task implements Scheduler {
 			recordCount++;
 			
 			if (time >= nextReportTime) {
-				System.out.println("======== Total Statistics ========");
+//				System.out.println("======== Total Statistics ========");
 				System.out.println(String.format("Time: %d, avg. imbal: %f, avg. remote tx reads: %f, "
 						+ "avg. remote sink reads: %f", time, ((double) imbalanced) / recordCount,
 						((double) remoteTxRead) / recordCount, ((double) remoteSinkRead) / recordCount));
-				System.out.println("==================================\n");
+//				System.out.println("==================================\n");
 				
 				imbalanced = 0;
 				remoteTxRead = 0;
 				remoteSinkRead = 0;
 				recordCount = 0;
-				nextReportTime = time + 3;
+				nextReportTime = time + 5;
 				
 				// Dump the current graph
-				GraphDumper.dumpToFile(new File(dumpDir, String.format("%d_%d.txt", time, batchId)), graph);
+//				GraphDumper.dumpToFile(new File(dumpDir, String.format("%d_%d.txt", time, batchId)), graph);
 			}
-		}
+//		}
 		batchId++;
 	}
 	

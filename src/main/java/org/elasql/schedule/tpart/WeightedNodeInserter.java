@@ -11,7 +11,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class LapNodeInserter extends CostAwareNodeInserter {
+public class WeightedNodeInserter extends CostAwareNodeInserter {
 	
 	private static final double EQUALITY_THRESHOLD = .0001;
 	
@@ -62,6 +62,10 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 	private void analyzeBatch(List<TPartStoredProcedureTask> batch) {
 		for (TPartStoredProcedureTask task : batch) {
 			for (RecordKey readKey : task.getReadSet()) {
+				// Skip replicated records
+				if (partMgr.isFullyReplicated(readKey))
+					continue;
+				
 				UseCount count = useCounts.get(readKey);
 				if (count == null) {
 					count = new UseCount(0);
@@ -136,11 +140,25 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 //		if (task.getTxNum() % 10000 == 0)
 //			System.out.println("Tx." + task.getTxNum() + " select " + minCostPart);
 		
+		// XXX: Debug
+//		int homeWarehouse = -1;
+//		for (RecordKey key : task.getReadSet()) {
+//			if (key.getTableName().equals("warehouse")) {
+//				homeWarehouse = (Integer) key.getKeyVal("w_id").asJavaVal();
+//			}
+//		}
+//		System.out.println(String.format("Assign Tx.%d (home w.%d) to part.%d",
+//				task.getTxNum(), homeWarehouse, minCostPart));
+		
 		// Insert the node
 		graph.insertTxNode(task, minCostPart);
 		
 		// Update the statistics
 		for (RecordKey key : task.getReadSet()) {
+			// Skip replicated records
+			if (partMgr.isFullyReplicated(key))
+				continue;
+			
 			UseCount count = useCounts.get(key);
 			if (count == null) {
 				throw new RuntimeException("We do not have use count for " + key);
@@ -190,7 +208,12 @@ public class LapNodeInserter extends CostAwareNodeInserter {
 		// calculate cross partition edge cost
 		double crossEdgeCost = 0;
 		for (RecordKey key : task.getReadSet()) {
+			// Skip replicated records
+			if (partMgr.isFullyReplicated(key))
+				continue;
+			
 			if (graph.getResourcePosition(key).getPartId() != targetPart) {
+				
 				UseCount count = useCounts.get(key);
 				
 				if (count == null) {

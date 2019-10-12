@@ -33,15 +33,37 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 	
 	private double[] loadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
 	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+	
+//	private int[] warehouses = new int[400];
 
 	/**
 	 * Insert this node to the partition that will result in minimal cost.
 	 */
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
+		// XXX: Check warehouse distributions
+//		Arrays.fill(warehouses, 0);
+		
 		// Sequentially insert each node
 		for (TPartStoredProcedureTask task : tasks) {
 			insertNode(graph, task);
+			
+			// XXX: Check warehouse distributions
+//			for (RecordKey key : task.getReadSet()) {
+//				if (key.getTableName().equals("warehouse")) {
+//					int wid = (Integer) key.getKeyVal("w_id").asJavaVal();
+//					warehouses[wid]++;
+//				}
+//			}
 		}
+		
+		// XXX: Check warehouse distributions
+//		StringBuilder sb = new StringBuilder("Warehouses => ");
+//		for (int i = 0; i < warehouses.length; i++) {
+//			if (warehouses[i] != 0)
+//				sb.append(String.format("%d: %d, ", i, warehouses[i]));
+//		}
+//		System.out.println(sb.toString());
+			
 		
 		// Reset the statistics
 		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++)
@@ -94,6 +116,11 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 		
 		// count read edges
 		for (RecordKey key : task.getReadSet()) {
+			
+			// Skip replicated records
+			if (partMgr.isFullyReplicated(key))
+				continue;
+			
 			if (graph.getResourcePosition(key).getPartId() != targetPart) {
 				crossEdgeCost++;
 			}

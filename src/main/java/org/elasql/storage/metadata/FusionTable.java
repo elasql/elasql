@@ -29,7 +29,7 @@ public class FusionTable {
 	/**
 	 * Create a fusion table with the expected maximum capacity.
 	 * Note that the size of table may exceed the given size.
-	 * The space only released when someone calls removedOverflowKeys.
+	 * The exceeded space is freed only when someone calls removedOverflowKeys.
 	 * 
 	 * @param expectedMaxSize
 	 */
@@ -49,6 +49,7 @@ public class FusionTable {
 				locations[i].nextFreeSlotId = -1;
 		}
 		keyToSlotIds = new HashMap<RecordKey, Integer>(expMaxSize);
+//		keyToSlotIds = new ConcurrentHashMap<RecordKey, Integer>(expMaxSize);
 		overflowedKeys = new HashMap<RecordKey, Integer>();
 		lastReplacedSlot = 0;
 		
@@ -72,6 +73,39 @@ public class FusionTable {
 //				sb.append(String.format("Time: %d seconds - ", time));
 //				for (int i = 0; i < countsPerParts.length; i++)
 //					sb.append(String.format("%d, ", countsPerParts[i]));
+//				sb.delete(sb.length() - 2, sb.length());
+//				
+//				System.out.println(sb.toString());
+//			}
+//		}).start();
+		
+//		new PeriodicalJob(5_000, 2400_000, new Runnable() {
+//			@Override
+//			public void run() {
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				
+//				// Initial table names
+//				String[] tableNames = new String[] {"warehouse", "district", "stock",
+//							"customer", "history", "orders", "new_order", "order_line",
+//				            "item"};
+//				Map<String, Integer> tableToIdx = new HashMap<String, Integer>();
+//				for (int i = 0; i < tableNames.length; i++)
+//					tableToIdx.put(tableNames[i], i);
+//				
+//				// Calculate table names
+//				Set<RecordKey> keys = new HashSet<RecordKey>(keyToSlotIds.keySet());
+//				int[] counts = new int[tableNames.length];
+//				for (RecordKey key : keys) {
+//					int idx = tableToIdx.get(key.getTableName());
+//					counts[idx]++;
+//				}
+//				
+//				// Output the result
+//				StringBuffer sb = new StringBuffer();
+//				sb.append(String.format("Time: %d seconds - ", time));
+//				for (int i = 0; i < tableNames.length; i++)
+//					sb.append(String.format("%d, ", counts[i]));
 //				sb.delete(sb.length() - 2, sb.length());
 //				
 //				System.out.println(sb.toString());

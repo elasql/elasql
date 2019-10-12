@@ -33,8 +33,8 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
-import org.elasql.schedule.tpart.LapNodeInserter;
 import org.elasql.schedule.tpart.TPartPartitioner;
+import org.elasql.schedule.tpart.WeightedNodeInserter;
 import org.elasql.schedule.tpart.graph.LapTGraph;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
@@ -219,7 +219,7 @@ public class Elasql extends VanillaDb {
 		
 		if (SERVICE_TYPE == ServiceType.TPART_LAP) {
 			graph = new LapTGraph();
-			inserter = new LapNodeInserter();
+			inserter = new WeightedNodeInserter();
 		} else {
 			graph = new TGraph();
 			inserter = new CostAwareNodeInserter();

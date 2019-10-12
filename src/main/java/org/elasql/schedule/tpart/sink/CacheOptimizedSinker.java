@@ -40,7 +40,7 @@ public class CacheOptimizedSinker extends Sinker {
 
 	@Override
 	public Iterator<TPartStoredProcedureTask> sink(TGraph graph) {
-
+		
 		// add write back edges
 		graph.addWriteBackEdge();
 
@@ -216,6 +216,7 @@ public class CacheOptimizedSinker extends Sinker {
 			 */
 			if (taskIsLocal || plan.hasLocalWriteBack() || plan.hasSinkPush() ||
 					!plan.getCacheDeletions().isEmpty()) {
+//				System.out.println(String.format("Tx.%d plan: %s", node.getTxNum(), plan));
 				node.getTask().decideExceutionPlan(plan);
 				localTasks.add(node.getTask());
 			}

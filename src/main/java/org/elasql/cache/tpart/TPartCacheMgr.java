@@ -90,14 +90,15 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			synchronized (prepareAnchor(k)) {
 				try {
 					// Debug: Tracing the waiting key
-	//				Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
-	//						+ " from tx." + src);
+//					Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
+//							+ " from tx." + src);
 					// wait if the record has not delivered
 					while (!exchange.containsKey(k)) {
 						prepareAnchor(k).wait();
 					}
-					
-	//				Thread.currentThread().setName("Tx." + dest);
+
+					// Debug: Tracing the waiting key
+//					Thread.currentThread().setName("Tx." + dest);
 					
 					return exchange.remove(k);
 				} catch (InterruptedException e) {
