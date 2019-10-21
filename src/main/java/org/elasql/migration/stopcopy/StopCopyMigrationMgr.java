@@ -48,6 +48,9 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		this.comsFactory = comsFactory;
 	}
 	
+	// Note that this will be called by the scheduler.
+	// We make the scheduler busy on sending chunks
+	// so that it will not have time to dispatch new transactions.
 	public void initializeMigration(Transaction tx, Object[] params) {
 		// Parse parameters
 		PartitionPlan newPartPlan = (PartitionPlan) params[0];
@@ -61,6 +64,12 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		
 		// Wait for active transactions finishes
 		waitForActiveTransactionFinish();
+		
+		try {
+			Thread.sleep(1_000_000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 		
 		analyzeResponsibleRanges(newPartPlan);
 		
