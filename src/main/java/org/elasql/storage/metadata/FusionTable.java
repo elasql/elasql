@@ -5,7 +5,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
+import org.elasql.util.PeriodicalJob;
 
 public class FusionTable {
 	
@@ -14,7 +16,8 @@ public class FusionTable {
 	class LocationRecord {
 		RecordKey key; // null => not used
 		int partId;
-		int nextFreeSlotId;
+		int nextFreeSlotId; // free chain (increase the speed to search free space)
+		boolean referenced; // for clock replacement strategy
 	}
 	
 	private int expMaxSize;
@@ -23,8 +26,33 @@ public class FusionTable {
 	private LocationRecord[] locations;
 	private Map<RecordKey, Integer> keyToSlotIds;
 	private Map<RecordKey, Integer> overflowedKeys;
-	private int lastReplacedSlot;
+	private int nextSlotToReplace;
+	
+	// Tracking
 	private int[] countsPerParts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	private static class HitCounter {
+		int total = 0;
+		int hit = 0;
+		
+		synchronized void hit() {
+			total++;
+			hit++;
+		}
+		
+		synchronized void miss() {
+			total++;
+		}
+		
+		synchronized HitCounter output() {
+			HitCounter cloned = new HitCounter();
+			cloned.total = total;
+			cloned.hit = hit;
+			total = 0;
+			hit = 0;
+			return cloned;
+		}
+	}
+	private HitCounter hitCounter = new HitCounter();
 	
 	/**
 	 * Create a fusion table with the expected maximum capacity.
@@ -51,7 +79,7 @@ public class FusionTable {
 		keyToSlotIds = new HashMap<RecordKey, Integer>(expMaxSize);
 //		keyToSlotIds = new ConcurrentHashMap<RecordKey, Integer>(expMaxSize);
 		overflowedKeys = new HashMap<RecordKey, Integer>();
-		lastReplacedSlot = 0;
+		nextSlotToReplace = 0;
 		
 //		new PeriodicalJob(5000, 600000, new Runnable() {
 //			@Override
@@ -111,6 +139,22 @@ public class FusionTable {
 //				System.out.println(sb.toString());
 //			}
 //		}).start();
+		
+//		new PeriodicalJob(10_000, 2500_000, new Runnable() {
+//			@Override
+//			public void run() {
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				
+//				HitCounter result = hitCounter.output();
+//				double hitRate = 0.0;
+//				if (result.total > 0) {
+//					hitRate = ((double) result.hit) / result.total * 100;
+//				}
+//				System.out.println(String.format("Time: %d seconds, Hit Rate: %.2f%% (hits: %d, total: %d)",
+//						time, hitRate, result.hit, result.total));
+//			}
+//		}).start();
 	}
 	
 	public void setLocation(RecordKey key, int partId) {
@@ -119,6 +163,7 @@ public class FusionTable {
 		if (slotId != null) {
 			countsPerParts[locations[slotId].partId]--;
 			locations[slotId].partId = partId;
+			locations[slotId].referenced = true;
 		} else {
 			if (overflowedKeys.containsKey(key)) {
 				countsPerParts[overflowedKeys.get(key)]--;
@@ -133,14 +178,19 @@ public class FusionTable {
 	public int getLocation(RecordKey key) {
 		Integer slotId = keyToSlotIds.get(key);
 		
-		if (slotId != null)
+		if (slotId != null) {
+//			hitCounter.hit();
+			locations[slotId].referenced = true;
 			return locations[slotId].partId;
-		else {
+		} else {
 			Integer partId = overflowedKeys.get(key);
-			if (partId != null)
+			if (partId != null) {
+//				hitCounter.hit();
 				return partId;
-			else
+			} else {
+//				hitCounter.miss();
 				return -1;
+			}
 		}
 	}
 	
@@ -162,7 +212,7 @@ public class FusionTable {
 			size--;
 			countsPerParts[locations[slotId].partId]--;
 			
-			// add to the free slots
+			// add to the free chain
 			locations[slotId].nextFreeSlotId = firstFreeSlot;
 			firstFreeSlot = slotId;
 			
@@ -201,6 +251,7 @@ public class FusionTable {
 		
 		locations[freeSlot].key = key;
 		locations[freeSlot].partId = partId;
+		locations[freeSlot].referenced = true;
 		keyToSlotIds.put(key, freeSlot);
 		size++;
 	}
@@ -216,9 +267,15 @@ public class FusionTable {
 	}
 	
 	private int swapOutRecord() {
-		int swapSlot = (lastReplacedSlot + 1) % expMaxSize;
-		lastReplacedSlot = swapSlot;
+		// Select a slot (using clock)
+		while (locations[nextSlotToReplace].referenced) {
+			locations[nextSlotToReplace].referenced = false;
+			nextSlotToReplace = (nextSlotToReplace + 1) % expMaxSize;
+		}
+		int swapSlot = nextSlotToReplace;
+		nextSlotToReplace = (nextSlotToReplace + 1) % expMaxSize;
 		
+		// Swap out the content of the slot
 		keyToSlotIds.remove(locations[swapSlot].key);
 		overflowedKeys.put(locations[swapSlot].key, locations[swapSlot].partId);
 		locations[swapSlot].key = null;
