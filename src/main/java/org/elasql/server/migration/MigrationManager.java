@@ -41,7 +41,7 @@ public abstract class MigrationManager {
 			2100 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
 	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: // [Schism: Clay]
-		(ENABLE_NODE_SCALING? (IS_SCALING_OUT? 100: 1000) : 50);
+		(ENABLE_NODE_SCALING? (IS_SCALING_OUT? 100: 1000) : 500);
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
