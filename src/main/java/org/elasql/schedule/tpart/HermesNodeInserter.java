@@ -44,6 +44,9 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		// Step 2: Find overloaded machines
 		overloadedThreshold = 
 				(int) ((tasks.size() / partMgr.getCurrentNumOfParts()) * (IMBALANCED_TOLERANCE + 1));
+		if (overloadedThreshold < 1) {
+			overloadedThreshold = 1;
+		}
 		List<TxNode> candidateTxNodes = findTxNodesOnOverloadedParts(graph, tasks.size());
 		
 //		System.out.println(String.format("Overloaded threshold is %d (batch size: %d)", overloadedThreshold, tasks.size()));

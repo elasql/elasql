@@ -81,7 +81,7 @@ public class FusionTable {
 		overflowedKeys = new HashMap<RecordKey, Integer>();
 		nextSlotToReplace = 0;
 		
-//		new PeriodicalJob(5000, 600000, new Runnable() {
+//		new PeriodicalJob(10_000, 1200_000, new Runnable() {
 //			@Override
 //			public void run() {
 //				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
@@ -140,7 +140,7 @@ public class FusionTable {
 //			}
 //		}).start();
 		
-//		new PeriodicalJob(10_000, 2500_000, new Runnable() {
+//		new PeriodicalJob(10_000, 1200_000, new Runnable() {
 //			@Override
 //			public void run() {
 //				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;

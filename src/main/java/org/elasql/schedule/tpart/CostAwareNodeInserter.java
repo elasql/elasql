@@ -127,11 +127,11 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 		}
 		
 		// count write-back edges
-		for (RecordKey key : task.getWriteSet()) {
-			if (partMgr.getPartition(key) != targetPart) {
-				crossEdgeCost++;
-			}
-		}
+//		for (RecordKey key : task.getWriteSet()) {
+//			if (partMgr.getPartition(key) != targetPart) {
+//				crossEdgeCost++;
+//			}
+//		}
 		
 		double loadCost = loadPerPart[targetPart] + task.getWeight();
 
