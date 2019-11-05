@@ -52,6 +52,6 @@ public class OutEdge implements Comparable<OutEdge> {
 		OutEdge e = (OutEdge) obj;
 		
 		return this.weight == e.weight &&
-				this.opposite.getId() == e.opposite.getId();
+				this.opposite.getKey().equals(e.opposite.getKey());
 	}
 }

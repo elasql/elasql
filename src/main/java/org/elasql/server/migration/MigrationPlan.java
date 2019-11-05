@@ -4,17 +4,18 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
 
+import org.elasql.sql.RecordKey;
+
 public class MigrationPlan {
 	
 	private int sourcePart;
 	private int destPart;
-	// XXX: We should use RecordKeys, but this can save more bandwidth.
-	private Set<Integer> keys;
+	private Set<RecordKey> keys;
 	
 	public MigrationPlan(int source, int dest) {
 		sourcePart = source;
 		destPart = dest;
-		keys = new HashSet<Integer>();
+		keys = new HashSet<RecordKey>();
 	}
 	
 	public int getSourcePart() {
@@ -25,11 +26,11 @@ public class MigrationPlan {
 		return destPart;
 	}
 	 
-	public void addKey(Integer key) {
+	public void addKey(RecordKey key) {
 		keys.add(key);
 	}
 	 
-	public Set<Integer> getKeys() {
+	public Set<RecordKey> getKeys() {
 		return keys;
 	}
 	
@@ -46,13 +47,13 @@ public class MigrationPlan {
 	}
 	
 	public Object[] toStoredProcedureRequest() {
-		LinkedList<Integer> params = new LinkedList<Integer>();
+		LinkedList<Object> params = new LinkedList<Object>();
 		
 		params.add(sourcePart);
 		params.add(destPart);
 		params.addAll(keys);
 		
-		return params.toArray(new Integer[0]);
+		return params.toArray(new Object[0]);
 	}
 	
 	@Override

@@ -1,8 +1,6 @@
 package org.elasql.server.migration;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,8 +38,6 @@ public abstract class MigrationManager {
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
 			2100 * 1000: 10 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
-	public static final int DATA_RANGE_SIZE = PartitionMetaMgr.USE_SCHISM? 1: // [Schism: Clay]
-		(ENABLE_NODE_SCALING? (IS_SCALING_OUT? 100: 1000) : 500);
 
 	// Sink ids for sequencers to identify the messages of migration
 	public static final int SINK_ID_START_MIGRATION = -555;
@@ -84,8 +80,10 @@ public abstract class MigrationManager {
 	// XXX: this is not thread-safe. If a clay did not end before next clay started,
 	// there would be multiple threads accessing it.
 //	private static HashMap<Integer, Vertex> vertexKeys = new HashMap<Integer, Vertex>(1000000);
-	// XXX: Note that the "ranges" are "vertices" 
-	protected HashSet<Integer> migrateRanges = new HashSet<Integer>();
+	// XXX: Note that the "ranges" are "vertices"
+	
+	// We use a RecordKey to represent a group. 
+	protected HashSet<RecordKey> migratingGroups = new HashSet<RecordKey>();
 //	public boolean isReachTarget = true;
 
 	public static long MONITOR_STOP_TIME = -1;
@@ -228,9 +226,10 @@ public abstract class MigrationManager {
 							queuedMigrations = clayPlanner.generateMigrationPlan();
 					} else {
 						if (USE_PREDEFINED_PLAN && !isColdMigrated.get()) {
-							queuedMigrations = generateConsolidationColdMigrationPlans();
+							queuedMigrations = generateConsolidationColdMigrationPlans(-1);
 						} else if (!USE_PREDEFINED_PLAN && !isConsolidated.get()) {
-							queuedMigrations = clayPlanner.generateConsolidationPlan();
+							int latestLoadPart = clayPlanner.findLeastLoadPartition();
+							queuedMigrations = generateConsolidationColdMigrationPlans(latestLoadPart);
 						} else 
 							queuedMigrations = clayPlanner.generateMigrationPlan();
 					}
@@ -254,47 +253,6 @@ public abstract class MigrationManager {
 			logger.info("Clay finishes all its jobs at " +
 					(System.currentTimeMillis() - startTime) / 1000 + " secs");
 		isClayOperating.set(false);
-	}
-	
-	private List<MigrationPlan> generateScalingOutColdMigrationPlans() {
-		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
-		
-		for (int partId = 0; partId < 3; partId++) {
-			int startId = (partId * 1000000) / DATA_RANGE_SIZE;
-			int endId = (partId * 1000000 + 250000 - 1) / DATA_RANGE_SIZE;
-			
-			MigrationPlan p = new MigrationPlan(partId, 3);
-			for (int k = startId; k <= endId; k++)
-				p.addKey(k);
-			plans.add(p);
-		}
-		
-		return plans;
-	}
-	
-	private List<MigrationPlan> generateConsolidationColdMigrationPlans() {
-		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
-		
-		int dataPerPart = 1000000 / DATA_RANGE_SIZE / 3;
-		int startId = 3000000 / DATA_RANGE_SIZE;
-		int endId = 3999999 / DATA_RANGE_SIZE;
-		
-		MigrationPlan p = new MigrationPlan(3, 0);
-		for (int k = startId; k < startId + dataPerPart; k++)
-			p.addKey(k);
-		plans.add(p);
-		
-		p = new MigrationPlan(3, 1);
-		for (int k = startId + dataPerPart; k < startId + 2 * dataPerPart; k++)
-			p.addKey(k);
-		plans.add(p);
-		
-		p = new MigrationPlan(3, 2);
-		for (int k = startId + 2 * dataPerPart; k <= endId; k++)
-			p.addKey(k);
-		plans.add(p);
-		
-		return plans;
 	}
 	
 	private void triggerNextMigration() {
@@ -335,20 +293,25 @@ public abstract class MigrationManager {
 		}
 	}
 
-	public void addMigrationRanges(Integer[] integers) {
+	public void addMigrationRepresentKeys(RecordKey[] representatives) {
 		// Clear previous migration range
-		migrateRanges.clear();
-		for (int i : integers)
-			this.migrateRanges.add(i);
+		migratingGroups.clear();
+		for (RecordKey key : representatives)
+			this.migratingGroups.add(key);
 	}
 	
-	public abstract int getRecordCount();
-	
-	public abstract int keyToInteger(RecordKey k);
+	// Sometimes it is hard to put all the keys in Clay.
+	// In order to eliminate the need of creating vertices for each key,
+	// we merge keys into groups each of which has one representative.
+	public abstract RecordKey getRepresentative(RecordKey key);
 	
 	public boolean keyIsInMigrationRange(RecordKey key) {
-		return migrateRanges.contains(workloadMonitor.mapToVertexId(keyToInteger(key)));
+		return migratingGroups.contains(getRepresentative(key));
 	}
+	
+	protected abstract List<MigrationPlan> generateScalingOutColdMigrationPlans();
+	
+	protected abstract List<MigrationPlan> generateConsolidationColdMigrationPlans(int targetPartition);
 	
 	/**
 	 * @return how long it should wait for starting migration experiments (in ms)
@@ -418,18 +381,12 @@ public abstract class MigrationManager {
 	// For Schism
 	public void outputMetis(HeatGraph graph) {
 		File metisDir = new File(".");
-		File metidFile = new File(metisDir, "metis_mesh_" + 
+		metisDir = new File(metisDir, "metis_mesh_" + 
 				((System.currentTimeMillis() - startTime) / 1000) + ".txt");
-		FileWriter wmetidFile;
-		BufferedWriter bwmetidFile;
 		try {
-			wmetidFile = new FileWriter(metidFile);
-			bwmetidFile = new BufferedWriter(wmetidFile);
-			int vertexCount = getRecordCount() / MigrationManager.DATA_RANGE_SIZE;
-			graph.writeInMetisFormat(bwmetidFile, vertexCount);
-			bwmetidFile.close();
-		} catch (IOException e1) {
-			e1.printStackTrace();
+			graph.generateMetisGraphFile(metisDir);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 

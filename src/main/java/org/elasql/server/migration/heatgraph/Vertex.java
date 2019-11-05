@@ -1,29 +1,31 @@
 package org.elasql.server.migration.heatgraph;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.elasql.server.migration.MigrationManager;
+import org.elasql.sql.RecordKey;
 
-public class Vertex implements Comparable<Vertex> {
+public class Vertex {
 	
-	private HashMap<Integer, OutEdge> edges;
+	private HashMap<RecordKey, OutEdge> edges;
 	private int weight;
-	private int id;
+	private RecordKey key;
 	private int partId;
 
-	public Vertex(int id, int partId) {
-		this(id, partId, 1);
+	public Vertex(RecordKey key, int partId) {
+		this(key, partId, 1);
 	}
 
-	Vertex(int id, int partId, int weight) {
-		this.id = id;
+	Vertex(RecordKey key, int partId, int weight) {
+		this.key = key;
 		this.weight = weight;
 		this.partId = partId;
-		edges = new HashMap<Integer, OutEdge>();
+		edges = new HashMap<RecordKey, OutEdge>();
 	}
 
-	public int getId() {
-		return id;
+	public RecordKey getKey() {
+		return key;
 	}
 
 	public void setPartId(int part) {
@@ -39,16 +41,16 @@ public class Vertex implements Comparable<Vertex> {
 	}
 
 	public void addEdgeTo(Vertex opposite) {
-		OutEdge e = edges.get(opposite.getId());
+		OutEdge e = edges.get(opposite.getKey());
 
 		if (e == null)
-			edges.put(opposite.getId(), new OutEdge(opposite));
+			edges.put(opposite.getKey(), new OutEdge(opposite));
 		else
 			e.incrementWeight();
 	}
 
 	void addEdgeWithWeight(Vertex opposite, int weight) {
-		edges.put(opposite.getId(), new OutEdge(opposite, weight));
+		edges.put(opposite.getKey(), new OutEdge(opposite, weight));
 	}
 
 	public void clear() {
@@ -78,7 +80,7 @@ public class Vertex implements Comparable<Vertex> {
 		return w;
 	}
 
-	public HashMap<Integer, OutEdge> getOutEdges() {
+	public HashMap<RecordKey, OutEdge> getOutEdges() {
 		return edges;
 	}
 	
@@ -86,64 +88,40 @@ public class Vertex implements Comparable<Vertex> {
 		return edges.size();
 	}
 	
-	public String toMetisFormat() {
+	public String toMetisFormat(Map<RecordKey, Integer> keyToInt) {
 		StringBuilder sb = new StringBuilder(weight + " ");
 		for (OutEdge o : edges.values()) {
 			sb.append(String.format("%d %d ", 
-					o.getOpposite().id + 1,
+					keyToInt.get(o.getOpposite().key),
 					o.getWeight()));
 		}
 		return sb.toString();
 	}
 
 	public String toString() {
-		String str = "Vertex id : " + this.id + " Weight :" + this.weight + "\n";
+		String str = "Vertex key: " + this.key + ", weight :" + this.weight + "\n";
 		for (OutEdge e : edges.values()) {
-			str = str + e.getOpposite().id + " w: " + e.getWeight() + "\n ";
+			str = str + e.getOpposite().key + " w: " + e.getWeight() + "\n ";
 		}
 		return str;
 	}
 
+	// Only consider key
 	@Override
-	public int compareTo(Vertex other) {
-		if (this.weight > other.weight)
-			return 1;
-		else if (this.weight < other.weight)
-			return -1;
-		return 0;
-	}
-
-	public boolean excatlyEquals(Vertex v) {
-		if (this.id != v.id)
+	public boolean equals(Object obj) {
+		if (obj == this)
+			return true;
+		
+		if (!obj.getClass().equals(this.getClass()))
 			return false;
 		
-		if (this.weight != v.weight)
-			return false;
-		
-		if (this.partId != v.partId)
-			return false;
-		
-		for (OutEdge edge : edges.values()) {
-			OutEdge itsEdge = v.edges.get(edge.getOpposite().id);
-			if (!edge.equals(itsEdge))
-				return false;
-		}
-			
-		return true;
-	}
-
-	@Override
-	public boolean equals(Object that) {
-		if (that instanceof Vertex) {
-			Vertex p = (Vertex) that;
-			return this.id == p.id;
-		}
-		return false;
+		Vertex v = (Vertex) obj;
+		return this.key.equals(v.key);
 	}
 
 	@Override
 	public int hashCode() {
-		return id;
+		return key.hashCode();
 	}
 
 }

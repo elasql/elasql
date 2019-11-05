@@ -5,23 +5,34 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
+import org.elasql.sql.RecordKey;
 import org.junit.Test;
+import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.IntegerConstant;
 
 import junit.framework.Assert;
 
 public class HeatGraphTest {
 	
+	private static RecordKey toRecordKey(int id) {
+		Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
+		keyEntryMap.put("id", new IntegerConstant(id));
+		return new RecordKey("table", keyEntryMap);
+	}
+	
 	@Test
 	public void testSerialization() {
 		// Create vertices
 		Vertex[] vertices = new Vertex[6];
-		vertices[0] = new Vertex(0, 0, 15);
-		vertices[1] = new Vertex(1, 1, 23);
-		vertices[2] = new Vertex(2, 0, 65);
-		vertices[3] = new Vertex(3, 2, 82);
-		vertices[4] = new Vertex(4, 1, 13);
-		vertices[5] = new Vertex(5, 2, 2);
+		vertices[0] = new Vertex(toRecordKey(0), 0, 15);
+		vertices[1] = new Vertex(toRecordKey(1), 1, 23);
+		vertices[2] = new Vertex(toRecordKey(2), 0, 65);
+		vertices[3] = new Vertex(toRecordKey(3), 2, 82);
+		vertices[4] = new Vertex(toRecordKey(4), 1, 13);
+		vertices[5] = new Vertex(toRecordKey(5), 2, 2);
 		
 		// Create edges
 		vertices[0].addEdgeTo(vertices[1]);
@@ -57,7 +68,7 @@ public class HeatGraphTest {
 			
 			// Check vertices
 			for (int i = 0; i < vertices.length; i++)
-				Assert.assertTrue(vertices[i].equals(resultGraph.getVertex(i)));
+				Assert.assertTrue(vertices[i].equals(resultGraph.getVertex(toRecordKey(i))));
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (ClassNotFoundException e) {

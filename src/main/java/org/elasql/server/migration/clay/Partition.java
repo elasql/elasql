@@ -2,12 +2,24 @@ package org.elasql.server.migration.clay;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.elasql.server.migration.heatgraph.OutEdge;
 import org.elasql.server.migration.heatgraph.Vertex;
 
 public class Partition implements Comparable<Partition> {
+
+	private class VertexWeightComparator implements Comparator<Vertex> {
+		@Override
+		public int compare(Vertex v1, Vertex v2) {
+			if (v1.getVertexWeight() > v2.getVertexWeight())
+				return 1;
+			else if (v1.getVertexWeight() < v2.getVertexWeight())
+				return -1;
+			return 0;
+		}
+	}
 	
 	private int partId;
 	private double localLoad;
@@ -49,12 +61,12 @@ public class Partition implements Comparable<Partition> {
 	}
 
 	public Vertex getHotestVertex() {
-		return Collections.max(vertices);
+		return Collections.max(vertices, new VertexWeightComparator());
 	}
 
 	public Vertex[] getFirstTen() {
 		Vertex[] vtxs = new Vertex[10];
-		Collections.sort(vertices);
+		Collections.sort(vertices, new VertexWeightComparator());
 		int l = vertices.size();
 		int j = 0;
 		for (int i = l - 1; i >= l - 10; i--) {

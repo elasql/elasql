@@ -17,24 +17,19 @@ public class WorkloadMonitor {
 	}
 	
 	public void recordATransaction(Collection<RecordKey> accessedKeys) {
-		LinkedList<Integer> vertexIdSet = new LinkedList<Integer>();
-		Integer vetxId;
+		LinkedList<RecordKey> vertexKeySet = new LinkedList<RecordKey>();
+		RecordKey vertexKey;
 		int partId;
 		// Since only the sequence node can get in, remoteReadKeys basically
 		// contains all the read keys of the transaction.
 		for (RecordKey k : accessedKeys) {
-			vetxId = mapToVertexId(migraMgr.keyToInteger(k));
+			vertexKey = migraMgr.getRepresentative(k);
 			partId = Elasql.partitionMetaMgr().getPartition(k);
 
-			heatGraph.updateWeightOnVertex(vetxId, partId);
-			vertexIdSet.add(vetxId);
+			heatGraph.updateWeightOnVertex(vertexKey, partId);
+			vertexKeySet.add(vertexKey);
 		}
-		heatGraph.updateWeightOnEdges(vertexIdSet);
-	}
-	
-	// E.g. 1~10 => 0, 11~20 => 1
-	public int mapToVertexId(int key) {
-		return (key - 1) / MigrationManager.DATA_RANGE_SIZE;
+		heatGraph.updateWeightOnEdges(vertexKeySet);
 	}
 	
 	/**

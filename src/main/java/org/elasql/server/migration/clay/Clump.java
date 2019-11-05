@@ -11,16 +11,17 @@ import org.elasql.server.migration.MigrationManager;
 import org.elasql.server.migration.MigrationPlan;
 import org.elasql.server.migration.heatgraph.OutEdge;
 import org.elasql.server.migration.heatgraph.Vertex;
+import org.elasql.sql.RecordKey;
 
 public class Clump {
 
 	private class Neighbor implements Comparable<Neighbor> {
 		double weight;
-		int id;
+		RecordKey key;
 		int partId;
 
 		public Neighbor(OutEdge neighborEdge) {
-			this.id = neighborEdge.getOpposite().getId();
+			this.key = neighborEdge.getOpposite().getKey();
 			this.partId = neighborEdge.getOpposite().getPartId();
 			this.weight = neighborEdge.getNormalizedWeight();
 		}
@@ -36,25 +37,25 @@ public class Clump {
 		
 		@Override
 		public String toString() {
-			return "<" + id + " on " + partId + " with " + weight +
+			return "<" + key + " on " + partId + " with " + weight +
 					" weight>";
 		}
 	}
 
-	private Map<Integer, Vertex> vertices;
-	private Map<Integer, Neighbor> neighbors;
+	private Map<RecordKey, Vertex> vertices;
+	private Map<RecordKey, Neighbor> neighbors;
 	private int destPartitionId = -1;
 
 	public Clump(Vertex initVertex) {
-		this.vertices = new HashMap<Integer, Vertex>();
-		this.neighbors = new HashMap<Integer, Neighbor>();
+		this.vertices = new HashMap<RecordKey, Vertex>();
+		this.neighbors = new HashMap<RecordKey, Neighbor>();
 		
 		addVertex(initVertex);
 	}
 
 	public Clump(Clump clump) {
-		this.vertices = new HashMap<Integer, Vertex>();
-		this.neighbors = new HashMap<Integer, Neighbor>();
+		this.vertices = new HashMap<RecordKey, Vertex>();
+		this.neighbors = new HashMap<RecordKey, Neighbor>();
 		this.destPartitionId = clump.destPartitionId;
 		
 		for (Vertex v : clump.vertices.values())
@@ -62,15 +63,15 @@ public class Clump {
 	}
 	
 	public void expand(Vertex neighbor) {
-		if (neighbors.remove(neighbor.getId()) == null) {
-			throw new RuntimeException("There is no neighbor with id " +
-					neighbor.getId() + " in the clump.");
+		if (neighbors.remove(neighbor.getKey()) == null) {
+			throw new RuntimeException("There is no neighbor with key " +
+					neighbor.getKey() + " in the clump.");
 		}
 		addVertex(neighbor);
 	}
 
-	public int getHotestNeighbor() {
-		return Collections.max(neighbors.values()).id;
+	public RecordKey getHotestNeighbor() {
+		return Collections.max(neighbors.values()).key;
 	}
 	
 	public boolean hasNeighbor() {
@@ -111,7 +112,7 @@ public class Clump {
 		
 		// Put the vertices to the plans
 		for (Vertex v : vertices.values())
-			sources[v.getPartId()].addKey(v.getId());
+			sources[v.getPartId()].addKey(v.getKey());
 		
 		List<MigrationPlan> candidatePlans = new LinkedList<MigrationPlan>();
 		
@@ -157,7 +158,7 @@ public class Clump {
 
 	private void addVertex(Vertex v) {
 //		load += v.getVertexWeight();
-		vertices.put(v.getId(), v);
+		vertices.put(v.getKey(), v);
 		
 		// Simplified version: it does not consider 
 		// the vertices on other partition nodes.
@@ -172,12 +173,12 @@ public class Clump {
 
 	private void addNeighbor(OutEdge neighborEdge) {
 		// Avoid self loop
-		if (vertices.containsKey(neighborEdge.getOpposite().getId()))
+		if (vertices.containsKey(neighborEdge.getOpposite().getKey()))
 			return;
 
-		Neighbor w = neighbors.get(neighborEdge.getOpposite().getId());
+		Neighbor w = neighbors.get(neighborEdge.getOpposite().getKey());
 		if (w == null)
-			neighbors.put(neighborEdge.getOpposite().getId(),
+			neighbors.put(neighborEdge.getOpposite().getKey(),
 					new Neighbor(neighborEdge));
 		else
 			w.weight += neighborEdge.getNormalizedWeight();

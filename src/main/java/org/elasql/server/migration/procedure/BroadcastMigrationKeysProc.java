@@ -16,7 +16,7 @@ public class BroadcastMigrationKeysProc extends CalvinStoredProcedure<BroadcastM
 
 	@Override
 	protected void prepareKeys() {
-		Elasql.migrationMgr().addMigrationRanges(paramHelper.getMigrateKeys());
+		Elasql.migrationMgr().addMigrationRepresentKeys(paramHelper.getMigrateKeys());
 		Elasql.migrationMgr().setSourcePartition(paramHelper.getSouceNode());
 		Elasql.migrationMgr().setDestPartition(paramHelper.getDestNode());
 		

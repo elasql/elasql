@@ -1,14 +1,16 @@
 package org.elasql.server.migration.heatgraph;
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -17,6 +19,7 @@ import java.util.Map;
 
 import org.elasql.server.migration.MigrationManager;
 import org.elasql.server.migration.clay.Partition;
+import org.elasql.sql.RecordKey;
 
 public class HeatGraph implements Serializable {
 
@@ -41,21 +44,21 @@ public class HeatGraph implements Serializable {
 		return null;
 	}
 
-	private Map<Integer, Vertex> vertices = new HashMap<Integer, Vertex>(1000000);
+	private Map<RecordKey, Vertex> vertices = new HashMap<RecordKey, Vertex>(1000000);
 
-	public void updateWeightOnVertex(Integer vetxId, int partId) {
-		Vertex vertex = vertices.get(vetxId);
+	public void updateWeightOnVertex(RecordKey key, int partId) {
+		Vertex vertex = vertices.get(key);
 		// Note that a vertex represents a range of records.
 		if (vertex == null)
-			vertices.put(vetxId, new Vertex(vetxId, partId));
+			vertices.put(key, new Vertex(key, partId));
 		else
 			vertex.incrementWeight();
 	}
 
 	// Update weights for co-accessed vertices
-	public void updateWeightOnEdges(Collection<Integer> coaccessedVertices) {
-		for (int i : coaccessedVertices)
-			for (int j : coaccessedVertices)
+	public void updateWeightOnEdges(Collection<RecordKey> coaccessedVertices) {
+		for (RecordKey i : coaccessedVertices)
+			for (RecordKey j : coaccessedVertices)
 				if (i != j)
 					vertices.get(i).addEdgeTo(vertices.get(j));
 	}
@@ -72,34 +75,55 @@ public class HeatGraph implements Serializable {
 		return partitions;
 	}
 
-	public void removeVertex(Vertex v) {
-		vertices.remove(v.getId());
-		for (OutEdge e : v.getOutEdges().values())
-			e.getOpposite().getOutEdges().remove(v.getId());
+	public Vertex getVertex(RecordKey key) {
+		return vertices.get(key);
 	}
-
-	public Vertex getVertex(Integer id) {
-		return vertices.get(id);
-	}
-
-	public void writeInMetisFormat(Writer writer, int verticeCount) throws IOException {
-		// Count vertices and edges
-		long numEdge = 0;
+	
+	public void generateMetisGraphFile(File dirPath) throws IOException {
+		// Ensure the existence of the directory
+		if (dirPath.exists() && !dirPath.isDirectory())
+			throw new IllegalArgumentException(String.format("'%s' is not a directory.", dirPath));
+		else if (!dirPath.exists())
+			dirPath.mkdirs();
+		
+		// Create a mapping from vertex keys to integers and count edges
+		int edgeCount = 0;
+		List<RecordKey> keys = new ArrayList<RecordKey>();
+		Map<RecordKey, Integer> keyToInt = new HashMap<RecordKey, Integer>(vertices.size());
 		for (Vertex v : vertices.values()) {
-			numEdge += v.getOutEdgeCount();
+			edgeCount += v.getOutEdgeCount();
+			keys.add(v.getKey());
+			keyToInt.put(v.getKey(), keys.size()); // id starts from 1
 		}
+		edgeCount /= 2; // because each edge is counted twice
+		
+		// Write the mapping file
+		File mappingFile = new File(dirPath, "mapping.bin");
+		writeMetisMappingFile(mappingFile, keyToInt);
+		
+		// Write the metis graph file
+		File metisFile = new File(dirPath, "metis.txt");
+		writeMetisFile(metisFile, keys, keyToInt, vertices.size(), edgeCount);
+	}
+	
+	private void writeMetisMappingFile(File filePath, Map<RecordKey, Integer> mapping) throws IOException {
+		try (ObjectOutputStream out = new ObjectOutputStream(new BufferedOutputStream(
+				new FileOutputStream(filePath)))) {
+			out.writeObject(mapping);
+		}
+	}
 
-		// Write the first line "[vertex count] [edge count] 011"
-		writer.write(String.format("%d %d 011\n", verticeCount, numEdge / 2));
-
-		// Write each vertice
-		for (int i = 0; i < verticeCount; i++) {
-			Vertex v = vertices.get(i);
-			if (v != null) {
-				writer.write(v.toMetisFormat());
+	public void writeMetisFile(File filePath, List<RecordKey> keys,
+			Map<RecordKey, Integer> keyToInt, int vertexCount, int edgeCount) throws IOException {
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+			// Write the first line "[vertex count] [edge count] 011"
+			writer.write(String.format("%d %d 011\n", vertexCount, edgeCount));
+	
+			// Write each vertex
+			for (RecordKey key : keys) {
+				Vertex v = vertices.get(key);
+				writer.write(v.toMetisFormat(keyToInt));
 				writer.write("\n");
-			} else {
-				writer.write("0\n");
 			}
 		}
 	}
@@ -125,7 +149,7 @@ public class HeatGraph implements Serializable {
 	}
 	
 	void addVertex(Vertex v) {
-		vertices.put(v.getId(), v);
+		vertices.put(v.getKey(), v);
 	}
 
 	private void writeObject(ObjectOutputStream out) throws IOException {
@@ -135,7 +159,7 @@ public class HeatGraph implements Serializable {
 		// Each vertex
 		int edgeCount = 0;
 		for (Vertex v : vertices.values()) {
-			out.writeInt(v.getId());
+			out.writeObject(v.getKey());
 			out.writeInt(v.getPartId());
 			out.writeInt(v.getVertexWeight());
 			edgeCount += v.getOutEdgeCount();
@@ -146,13 +170,13 @@ public class HeatGraph implements Serializable {
 		
 		// Each edge
 		for (Vertex v : vertices.values()) {
-			int fromId = v.getId();
+			RecordKey fromKey = v.getKey();
 			for (OutEdge edge : v.getOutEdges().values()) {
-				int toId = edge.getOpposite().getId();
+				RecordKey toKey = edge.getOpposite().getKey();
 				int weight = edge.getWeight();
 				
-				out.writeInt(fromId);
-				out.writeInt(toId);
+				out.writeObject(fromKey);
+				out.writeObject(toKey);
 				out.writeInt(weight);
 			}
 		}
@@ -161,16 +185,16 @@ public class HeatGraph implements Serializable {
 	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 		// # of vertices
 		int vertexCount = in.readInt();
-		this.vertices = new HashMap<Integer, Vertex>(vertexCount);
+		this.vertices = new HashMap<RecordKey, Vertex>(vertexCount);
 		
 		// Each vertex
 		for (int i = 0; i < vertexCount; i++) {
-			int id = in.readInt();
+			RecordKey key = (RecordKey) in.readObject();
 			int partId = in.readInt();
 			int weight = in.readInt();
 			
-			Vertex v = new Vertex(id, partId, weight);
-			vertices.put(id, v);
+			Vertex v = new Vertex(key, partId, weight);
+			vertices.put(key, v);
 		}
 		
 		// # of edges
@@ -178,12 +202,12 @@ public class HeatGraph implements Serializable {
 		
 		// Each edge
 		for (int i = 0; i < edgeCount; i++) {
-			int fromId = in.readInt();
-			int toId = in.readInt();
+			RecordKey fromKey = (RecordKey) in.readObject();
+			RecordKey toKey = (RecordKey) in.readObject();
 			int weight = in.readInt();
 			
-			Vertex from = vertices.get(fromId);
-			Vertex to = vertices.get(toId);
+			Vertex from = vertices.get(fromKey);
+			Vertex to = vertices.get(toKey);
 			from.addEdgeWithWeight(to, weight);
 		}
 	}

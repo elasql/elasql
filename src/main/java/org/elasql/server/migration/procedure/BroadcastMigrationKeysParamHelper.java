@@ -1,5 +1,6 @@
 package org.elasql.server.migration.procedure;
 
+import org.elasql.sql.RecordKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.sql.Type;
@@ -9,7 +10,7 @@ import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
 public class BroadcastMigrationKeysParamHelper extends StoredProcedureParamHelper {
 
-	private Integer[] migrateKeys;
+	private RecordKey[] migrateKeys;
 	private Integer SourceNode, DestNode;
 
 	@Override
@@ -17,10 +18,10 @@ public class BroadcastMigrationKeysParamHelper extends StoredProcedureParamHelpe
 		int indexCnt = 0;
 		SourceNode = (Integer) pars[indexCnt++];
 		DestNode = (Integer) pars[indexCnt++];
-		migrateKeys = new Integer[pars.length - 2];
+		migrateKeys = new RecordKey[pars.length - 2];
 
 		for (int i = 0; i < pars.length - 2; i++)
-			migrateKeys[i] = (Integer) pars[indexCnt++];
+			migrateKeys[i] = (RecordKey) pars[indexCnt++];
 
 		this.setReadOnly(false);
 	}
@@ -30,7 +31,7 @@ public class BroadcastMigrationKeysParamHelper extends StoredProcedureParamHelpe
 		return true;
 	}
 
-	public Integer[] getMigrateKeys() {
+	public RecordKey[] getMigrateKeys() {
 		return migrateKeys;
 	}
 

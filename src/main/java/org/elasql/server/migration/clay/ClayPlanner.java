@@ -1,10 +1,8 @@
 package org.elasql.server.migration.clay;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -15,6 +13,7 @@ import org.elasql.server.migration.MigrationPlan;
 import org.elasql.server.migration.heatgraph.HeatGraph;
 import org.elasql.server.migration.heatgraph.OutEdge;
 import org.elasql.server.migration.heatgraph.Vertex;
+import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
 public class ClayPlanner {
@@ -111,26 +110,11 @@ public class ClayPlanner {
 		return plans;
 	}
 	
-	// XXX: Only for multi-tanents
-	public List<MigrationPlan> generateConsolidationPlan() {
-		if (numOfClumpsGenerated > 0)
-			return null;
-		
-		List<MigrationPlan> plans = new LinkedList<MigrationPlan>();
+	public int findLeastLoadPartition() {
 		List<Partition> partitions = heatGraph.splitToPartitions();
 		adjustOverloadThreasdhold(partitions);
-		
 		Partition leastLoadPart = getLeastLoadPartition(partitions);
-		MigrationPlan plan = new MigrationPlan(3, leastLoadPart.getPartId());
-		int start = 3_000_000 / MigrationManager.DATA_RANGE_SIZE;
-		int end = 4_000_000 / MigrationManager.DATA_RANGE_SIZE;
-		for (int i = start; i < end; i++)
-			plan.addKey(i);
-		plans.add(plan);
-		
-		numOfClumpsGenerated++;
-		
-		return plans;
+		return leastLoadPart.getPartId();
 	}
 	
 	private void adjustOverloadThreasdhold(List<Partition> partitions) {
@@ -163,8 +147,8 @@ public class ClayPlanner {
 					return candidateClump;
 				
 				// Expand the clump
-				int nId = currentClump.getHotestNeighbor();
-				addedVertex = heatGraph.getVertex(nId);
+				RecordKey hotKey = currentClump.getHotestNeighbor();
+				addedVertex = heatGraph.getVertex(hotKey);
 				currentClump.expand(addedVertex);
 				
 				destPart = updateDestination(currentClump, destPart, partitions);
@@ -349,20 +333,20 @@ public class ClayPlanner {
 	 */
 	private List<MigrationPlan> mergePlans(List<MigrationPlan> planList) {
 		// (tuple id -> part id)
-		Map<Integer, Integer> sources = new HashMap<Integer, Integer>();
-		Map<Integer, Integer> dests = new HashMap<Integer, Integer>();
+		Map<RecordKey, Integer> sources = new HashMap<RecordKey, Integer>();
+		Map<RecordKey, Integer> dests = new HashMap<RecordKey, Integer>();
 		
 		// Record the (first) source node of each tuple
 		for (MigrationPlan p : planList) {
-			for (Integer tupleId: p.getKeys()) {
-				sources.putIfAbsent(tupleId, p.getSourcePart());
+			for (RecordKey tupleKey: p.getKeys()) {
+				sources.putIfAbsent(tupleKey, p.getSourcePart());
 			}
 		}
 		
 		// Record the (last) destination node of each tuple
 		for (MigrationPlan p : planList) {
-			for (Integer tupleId: p.getKeys()) {
-				dests.put(tupleId, p.getDestPart());
+			for (RecordKey tupleKey: p.getKeys()) {
+				dests.put(tupleKey, p.getDestPart());
 			}
 		}
 		
@@ -370,9 +354,9 @@ public class ClayPlanner {
 		// (source part id -> (dest part id -> plan))
 		Map<Integer, Map<Integer, MigrationPlan>> mergedPlans =
 				new HashMap<Integer, Map<Integer, MigrationPlan>>();
-		for (Integer tupleId : sources.keySet()) {
-			int sourcePart = sources.get(tupleId);
-			int destPart = dests.get(tupleId);
+		for (RecordKey tupleKey : sources.keySet()) {
+			int sourcePart = sources.get(tupleKey);
+			int destPart = dests.get(tupleKey);
 			
 			if (sourcePart == destPart)
 				continue;
@@ -389,7 +373,7 @@ public class ClayPlanner {
 				plans.put(destPart, plan);
 			}
 			
-			plan.addKey(tupleId);
+			plan.addKey(tupleKey);
 		}
 		
 		// Convert the map to a list
@@ -407,7 +391,7 @@ public class ClayPlanner {
 		StringBuilder sb = new StringBuilder("[");
 		int count = 0;
 		for (Vertex v : clump.getVertices()) {
-			sb.append(String.format("%d (%d, %f, %f), ", v.getId(), v.getPartId(),
+			sb.append(String.format("%s (%d, %f, %f), ", v.getKey(), v.getPartId(),
 					v.getNormalizedVertexWeight(), v.getNormalizedEdgeWeight()));
 			count++;
 			if (count >= 5)
