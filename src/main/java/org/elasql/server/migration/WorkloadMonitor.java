@@ -23,7 +23,7 @@ public class WorkloadMonitor {
 		// Since only the sequence node can get in, remoteReadKeys basically
 		// contains all the read keys of the transaction.
 		for (RecordKey k : accessedKeys) {
-			vetxId = mapToVertexId(migraMgr.retrieveIdAsInt(k));
+			vetxId = mapToVertexId(migraMgr.keyToInteger(k));
 			partId = Elasql.partitionMetaMgr().getPartition(k);
 
 			heatGraph.updateWeightOnVertex(vetxId, partId);

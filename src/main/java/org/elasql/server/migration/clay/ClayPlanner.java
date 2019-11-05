@@ -1,9 +1,9 @@
 package org.elasql.server.migration.clay;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -28,14 +28,14 @@ public class ClayPlanner {
 //	private static final int CLUMP_MAX_SIZE = 20; // For Google workloads
 //	private static final int CLUMP_MAX_SIZE = 10000; // For multi-tanents
 	
-	public static final int MULTI_PARTS_COST;
+	public static final double MULTI_PARTS_COST;
 	public static final double OVERLOAD_PERCENTAGE;
 	private static final int LOOK_AHEAD_MAX;
 	private static final int CLUMP_MAX_SIZE;
 	
 	static {
 		MULTI_PARTS_COST = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(ClayPlanner.class.getName() + ".MULTI_PARTS_COST", 1);
+				.getPropertyAsDouble(ClayPlanner.class.getName() + ".MULTI_PARTS_COST", 1);
 		OVERLOAD_PERCENTAGE = ElasqlProperties.getLoader()
 				.getPropertyAsDouble(ClayPlanner.class.getName() + ".OVERLOAD_PERCENTAGE", 1.3);
 		LOOK_AHEAD_MAX = ElasqlProperties.getLoader()

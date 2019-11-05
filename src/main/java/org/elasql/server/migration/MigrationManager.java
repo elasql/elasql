@@ -68,7 +68,7 @@ public abstract class MigrationManager {
 	private AtomicBoolean analysisCompleted = new AtomicBoolean(false);
 
 	// Async pushing
-	private static int PUSHING_COUNT = 1000;
+	private static int PUSHING_COUNT = 10000;
 	private static final int PUSHING_BYTE_COUNT = 4000000;
 	private ConcurrentLinkedQueue<RecordKey> skipRequestQueue = new ConcurrentLinkedQueue<RecordKey>();
 	private Map<String, Set<RecordKey>> bgPushCandidates = new HashMap<String, Set<RecordKey>>();
@@ -344,10 +344,10 @@ public abstract class MigrationManager {
 	
 	public abstract int getRecordCount();
 	
-	public abstract int retrieveIdAsInt(RecordKey k);
+	public abstract int keyToInteger(RecordKey k);
 	
 	public boolean keyIsInMigrationRange(RecordKey key) {
-		return migrateRanges.contains(workloadMonitor.mapToVertexId(retrieveIdAsInt(key)));
+		return migrateRanges.contains(workloadMonitor.mapToVertexId(keyToInteger(key)));
 	}
 	
 	/**

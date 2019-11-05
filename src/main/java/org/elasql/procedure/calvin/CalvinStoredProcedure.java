@@ -767,10 +767,13 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	}
 
 	private ArrayList<Integer> recordKeyToSortArray(Set<RecordKey> s) {
-		ArrayList<Integer> l = new ArrayList<Integer>();
-		for (RecordKey k : s)
-			l.add(migraMgr.retrieveIdAsInt(k));
-		Collections.sort(l);
-		return l;
+		throw new RuntimeException("Buggy code");
+		// The following code can not be executed outside of the scheduler thread
+		// because migratMgr.keyToInteger() is not thread-safe.
+//		ArrayList<Integer> l = new ArrayList<Integer>();
+//		for (RecordKey k : s)
+//			l.add(migraMgr.keyToInteger(k));
+//		Collections.sort(l);
+//		return l;
 	}
 }
