@@ -181,7 +181,7 @@ public class ConservativeOrderedLockTable {
 			try {
 //				String name = Thread.currentThread().getName();
 				
-				// long timestamp = System.currentTimeMillis();
+//				 long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
 				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
 				/* && !waitingTooLong(timestamp) */) {

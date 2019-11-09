@@ -78,6 +78,10 @@ public class HeatGraph implements Serializable {
 	public Vertex getVertex(RecordKey key) {
 		return vertices.get(key);
 	}
+
+	public Map<RecordKey, Vertex> getVertice() {
+		return new HashMap<RecordKey, Vertex>(vertices);
+	}
 	
 	public void generateMetisGraphFile(File dirPath) throws IOException {
 		// Ensure the existence of the directory

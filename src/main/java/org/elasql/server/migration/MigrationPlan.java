@@ -64,9 +64,18 @@ public class MigrationPlan {
 		sb.append(sourcePart);
 		sb.append(" to part.");
 		sb.append(destPart);
-		sb.append(" ");
-		sb.append(keys);
-		sb.append("}");
+		sb.append(" [");
+		
+		int count = 0;
+		for (RecordKey key : keys) {
+			sb.append(key);
+			count++;
+			if (count >= 5)
+				break;
+			sb.append(", ");
+		}
+		
+		sb.append("]}");
 		
 		return sb.toString();
 	}

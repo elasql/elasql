@@ -16,11 +16,13 @@
 package org.elasql.cache;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -110,12 +112,12 @@ public class VanillaCoreCrud {
 				break;
 			}
 		}
+		
+		if (index == null)
+			throw new RuntimeException("Cannot find a propert index for " + tblName);
 
 		// Search record ids for record keys
-		// Map<RecordId, Set<RecordKey>> ridToSearchKey = new HashMap<RecordId,
-		// Set<RecordKey>>();
 		Set<RecordId> searchRidSet = new HashSet<RecordId>(50000);
-		LinkedList<RecordId> searchRids = new LinkedList<RecordId>();
 		RecordId rid = null;
 
 		for (RecordKey key : keys) {
@@ -126,38 +128,32 @@ public class VanillaCoreCrud {
 				searchRidSet.add(rid);
 			}
 		}
-		searchRids.addAll(searchRidSet);
 		index.close();
 
 		// Sort the record ids
+		LinkedList<RecordId> searchRids = new LinkedList<RecordId>(searchRidSet);
 		Collections.sort(searchRids);
 
 		// Open a record file
 		TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
-		Schema sch = ti.schema();
 		RecordFile recordFile = ti.open(tx, false);
-		CachedRecord record = null;
 		
-		// Build a non-key field list
-		ArrayList<String> keyFields = new ArrayList<String>();
-		ArrayList<String> nonKeyFields = new ArrayList<String>();
-		for (String fld : sch.fields()) {
-			if (representative.containsField(fld))
-				keyFields.add(fld);
-			else
+		// Build field lists
+		List<String> keyFields = Arrays.asList(representative.getFields());
+		List<String> nonKeyFields = new ArrayList<String>();
+		for (String fld : ti.schema().fields())
+			if (!keyFields.contains(fld))
 				nonKeyFields.add(fld);
-		}
-
+		
+		// Pull records
+		CachedRecord record = null;
 		for (RecordId id : searchRids) {
-
-			// Skip the record that has been found
-			// if (recordMap.containsKey(searchKey))
-			// continue;
 
 			// Move to the record
 			recordFile.moveToRecordId(id);
 			
-			// Construct the key
+			// Construct a RecordKey
+			// Note that the order of fields does matter for comparision
 			ArrayList<Constant> keyFieldVals = new ArrayList<Constant>();
 			for (String fld : keyFields)
 				keyFieldVals.add(recordFile.getVal(fld));

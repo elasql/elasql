@@ -104,7 +104,7 @@ public class CalvinCacheMgr {
 		try {
 			// Wait for remote records
 //			String name = Thread.currentThread().getName();
-//			Thread.currentThread().setName(name + " waits for " + key + " from part." + expectedPart);
+//			Thread.currentThread().setName(name + " waits for " + key);
 			
 			KeyRecordPair pair = inbox.take();
 			while (!pair.key.equals(key)) {

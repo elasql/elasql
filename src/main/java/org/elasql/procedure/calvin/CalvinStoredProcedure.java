@@ -19,7 +19,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -405,17 +404,17 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			e.printStackTrace(new PrintWriter(errors));
 			String str = "TX : " + txNum + " aborts due to an exception!\n";
 			if (readings != null) {
-				str = str + "\n Readings: ";
-				for (Integer k : recordKeyToSortArray(readings.keySet()))
-					str = str + " , " + k;
-				str = str + "\n Error check : \n";
-				for (Entry<RecordKey, CachedRecord> pair : readings.entrySet()) {
-					if (pair.getValue() == null)
-						str = str + "key" + pair.getKey() + "is null!\n";
+//				str = str + "\n Readings: ";
+//				for (Integer k : recordKeyToSortArray(readings.keySet()))
+//					str = str + " , " + k;
+//				str = str + "\n Error check : \n";
+//				for (Entry<RecordKey, CachedRecord> pair : readings.entrySet()) {
+//					if (pair.getValue() == null)
+//						str = str + "key" + pair.getKey() + "is null!\n";
 //					else if (pair.getValue().getVal("i_name") == null)
 //						str = str + "key" + pair.getKey() + "no map!\n";
-
-				}
+//
+//				}
 			}
 			System.out.println(str + errors.toString());
 

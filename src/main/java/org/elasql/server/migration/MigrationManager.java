@@ -36,7 +36,7 @@ public abstract class MigrationManager {
 	private static AtomicBoolean isScaled = new AtomicBoolean(false);
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
-			2100 * 1000: 10 * 1000; // [Schism: Clay]
+			2100 * 1000: 30 * 1000; // [Schism: Clay]
 //			30 * 1000: 10 * 1000; // for consolidation
 
 	// Sink ids for sequencers to identify the messages of migration

@@ -105,6 +105,7 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 					rec = new CachedRecordBuilder(key).build();
 					rec.setSrcTxNum(txNum);
 					rec.setVal("exists", FALSE);
+					throw new RuntimeException("Cannot find record for " + key);
 				} else
 					rec.setVal("exists", TRUE);
 
@@ -127,10 +128,13 @@ public class AsyncMigrateProc extends CalvinStoredProcedure<AsyncMigrateParamHel
 		// For Squall: Pulling-based migration
 		// Send a pull request
 		sendAPullRequest(sourcePart);
+
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Tx." + txNum + " sent a pull request, waiting for " +
+					paramHelper.getPushingKeys().length + " records");
 		
 		// Receive the data from the source node and save them
 		for (RecordKey key : paramHelper.getPushingKeys()) {
-			//System.out.println("++++++++++Receieve "+key);
 			CachedRecord rec = cacheMgr.readFromRemote(key);
 
 			// Flush them to the local storage engine

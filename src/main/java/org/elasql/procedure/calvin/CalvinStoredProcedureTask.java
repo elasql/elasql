@@ -41,6 +41,8 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 	}
 
 	public void run() {
+		
+		Thread.currentThread().setName("Tx." + txNum);
 
 		if (txStartTime == 0)
 			txStartTime = System.currentTimeMillis();
