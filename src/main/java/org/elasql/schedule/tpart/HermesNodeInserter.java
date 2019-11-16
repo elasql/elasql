@@ -42,8 +42,8 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		}
 		
 		// Step 2: Find overloaded machines
-		overloadedThreshold = 
-				(int) ((tasks.size() / partMgr.getCurrentNumOfParts()) * (IMBALANCED_TOLERANCE + 1));
+		overloadedThreshold = (int) Math.ceil(
+				((double) tasks.size() / partMgr.getCurrentNumOfParts()) * (IMBALANCED_TOLERANCE + 1));
 		if (overloadedThreshold < 1) {
 			overloadedThreshold = 1;
 		}

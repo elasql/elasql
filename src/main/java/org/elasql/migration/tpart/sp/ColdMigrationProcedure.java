@@ -24,7 +24,7 @@ public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationPa
 	
 	// the tuples that have been moved to the dest node by other txs
 	// these need to be deleted from cache and inserted to the local storage
-	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>(); 
+	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
 	
 	public ColdMigrationProcedure(long txNum) {
 		super(txNum, new ColdMigrationParamHelper());
@@ -45,28 +45,32 @@ public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationPa
 		while (keyIter.hasNext()) {
 			RecordKey key = keyIter.next();
 			
-			// Check if it has been moved (inside the TGraph)
+			// Check if someone in the T-Graph uses it
+			// Summary:
+			// - In dest => localInsertKeys
+			// - In source => coldKeys
+			// - The other => do nothing (it should be written back by other txs)
 			Node node = resPos.get(key);
 			if (node != null) {
-				if (node.getPartId() == range.getSourcePartId())
+				if (node.getPartId() == range.getSourcePartId()) // Not moved
 					coldKeys.add(key);
-				else if (node.getPartId() == range.getDestPartId())
+				else if (node.getPartId() == range.getDestPartId()) // Moved & in dest
 					localInsertKeys.add(key);
 				else
-					continue;
+					continue; // Moved & not in dest
+			} else {
+				// Check if it has been moved (before this TGraph)
+				Integer partId = partMgr.queryLocationTable(key);
+				if (partId != null) {
+					if (partId == range.getDestPartId()) // Moved & in dest
+						localInsertKeys.add(key);
+					else
+						continue; // Moved & not in dest
+				} else {
+					// No one moves this key
+					coldKeys.add(key);
+				}
 			}
-				
-			// Check if it has been moved (before this TGraph)
-			Integer partId = partMgr.queryLocationTable(key);
-			if (partId != null) {
-				if (partId == range.getDestPartId())
-					localInsertKeys.add(key);
-				else
-					continue;
-			}
-			
-			// No one moves this key
-			coldKeys.add(key);
 		}
 		
 		// Add to read & write keys
