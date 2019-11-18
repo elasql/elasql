@@ -5,14 +5,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.migration.tpart.sp.ColdMigrationProcedure;
-import org.elasql.migration.tpart.sp.MigrationStoredProcFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -36,7 +34,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private static final int NUM_TASK_PER_SINK;
 
 	private TPartStoredProcedureFactory factory;
-	private MigrationStoredProcFactory migraSpFactory;
 	
 	private File dumpDir = new File("batch_dump");
 
@@ -49,13 +46,10 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private BatchNodeInserter inserter;
 	private Sinker sinker;
 	private TGraph graph;
-	
-	private Queue<TPartStoredProcedureTask> migrationTasks = new LinkedList<TPartStoredProcedureTask>();
 
 	public TPartPartitioner(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
 		this.factory = factory;
-		this.migraSpFactory = new MigrationStoredProcFactory();
 		this.inserter = inserter;
 		this.sinker = sinker;
 		this.graph = graph;
@@ -91,8 +85,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 				}
 				
 				if (task.getProcedureType() == ProcedureType.MIGRATION) {
-					// Add to the queue, it will be scheduled to the end of most recent batch
-					migrationTasks.add(task);
+					// Process and dispatch it immediately
+					processMigrationTx(task);
 					continue;
 				}
 
@@ -124,30 +118,28 @@ public class TPartPartitioner extends Task implements Scheduler {
 //		printImbalStatistics();
 //		collectGraphStatistics();
 		
-		// Add the migration txs to the end of the batch
-		while (!migrationTasks.isEmpty()) {
-			TPartStoredProcedureTask task = migrationTasks.remove();
-			ColdMigrationProcedure sp = (ColdMigrationProcedure) task.getProcedure();
-			sp.prepareMigrationKeys(graph);
-			graph.insertTxNode(task, sp.getMigrationRange().getDestPartId());
-		}
-		
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 			dispatchToTaskMgr(plansTter);
 		}
 	}
+	
+	private void processMigrationTx(TPartStoredProcedureTask task) {
+		// Insert the task to T-Graph
+		ColdMigrationProcedure sp = (ColdMigrationProcedure) task.getProcedure();
+		graph.insertTxNode(task, sp.getMigrationRange().getDestPartId());
+		
+		// Sink the graph
+		Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
+		dispatchToTaskMgr(plansTter);
+	}
 
 	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call) {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), null);
 		} else {
-			TPartStoredProcedure<?> sp = null;
-			if (call.getPid() < 0) {
-				sp = migraSpFactory.getStoredProcedure(call.getPid(), call.getTxNum());
-			} else
-				sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
+			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
 
 			if (!sp.isReadOnly())

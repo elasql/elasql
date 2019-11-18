@@ -141,12 +141,6 @@ public class CacheOptimizedSinker extends Sinker {
 				
 				// Update the migration status
 				migraMgr.markMigrationRangeMoved(sp.getMigrationRange());
-				
-				// Update location information
-				for (RecordKey key : sp.getLocalCacheToStorage()) {
-					parMeta.removeFromLocationTable(key);
-				}
-				
 			} else { // Normal tx
 				for (Edge e : node.getWriteBackEdges()) {
 
@@ -176,6 +170,23 @@ public class CacheOptimizedSinker extends Sinker {
 						}
 						
 						parMeta.setCurrentLocation(k, dataWriteBackPos);
+					}
+
+					// A special case:
+					// If there is a migration happened,
+					// some records in the fusion table may not be
+					// inserted to the storage of the destination node.
+					// These records may currently located in the cache
+					// of the destination node. For such records, we
+					// delete it from cache and insert them to the storage.
+					Integer fusionRecord = parMeta.queryLocationTable(k);
+					if (fusionRecord != null && fusionRecord == dataOriginalPos
+							&& dataWriteBackPos == dataOriginalPos) {
+						if (dataWriteBackPos == myId) {
+							// This action will also delete it form cache.
+							plan.addStorageInsertion(k);
+						}
+						parMeta.removeFromLocationTable(k);
 					}
 					
 					if (dataWriteBackPos == myId) {

@@ -23,6 +23,7 @@ import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.tpart.sp.MigrationStoredProcFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -247,6 +248,7 @@ public class Elasql extends VanillaDb {
 			throw new IllegalArgumentException("Not supported");
 		}
 		
+		factory = new MigrationStoredProcFactory(factory);
 		TPartPartitioner scheduler = new TPartPartitioner(factory,  inserter,
 				new CacheOptimizedSinker(), graph);
 		
