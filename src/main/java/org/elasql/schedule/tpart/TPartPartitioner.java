@@ -46,13 +46,21 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private BatchNodeInserter inserter;
 	private Sinker sinker;
 	private TGraph graph;
+	private boolean batchingEnabled = true;
 
 	public TPartPartitioner(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
+		this(factory, inserter, sinker, graph, true);
+	}
+	
+	public TPartPartitioner(TPartStoredProcedureFactory factory, 
+			BatchNodeInserter inserter, Sinker sinker, TGraph graph,
+			boolean isBatching) {
 		this.factory = factory;
 		this.inserter = inserter;
 		this.sinker = sinker;
 		this.graph = graph;
+		this.batchingEnabled = isBatching;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
 		// Clear the dump dir
@@ -98,7 +106,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 				}
 				
 				// sink current t-graph if # pending tx exceeds threshold
-				if (batchedTasks.size() >= NUM_TASK_PER_SINK) {
+				if ((batchingEnabled && batchedTasks.size() >= NUM_TASK_PER_SINK)
+						|| !batchingEnabled) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
 				}
