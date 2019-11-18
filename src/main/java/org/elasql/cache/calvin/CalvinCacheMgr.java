@@ -154,6 +154,8 @@ public class CalvinCacheMgr {
 			if (rec.isTemp())
 				continue;
 			
+			// XXX: We should only modify 'local' records.
+			// So we should check if it is local before performing operations
 			if (rec.isDeleted())
 				VanillaCoreCrud.delete(key, tx);
 			else if (rec.isNewInserted())

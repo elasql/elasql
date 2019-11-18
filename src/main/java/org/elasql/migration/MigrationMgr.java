@@ -13,14 +13,26 @@ import org.elasql.storage.metadata.PartitionPlan;
 import org.elasql.storage.metadata.RangePartitionPlan;
 import org.elasql.storage.metadata.ScalingInPartitionPlan;
 import org.elasql.storage.metadata.ScalingOutPartitionPlan;
+import org.elasql.util.ElasqlProperties;
 
 public abstract class MigrationMgr {
 	private static Logger logger = Logger.getLogger(MigrationMgr.class.getName());
 	
-	public static final boolean ENABLE_NODE_SCALING = false;
-	public static final boolean IS_SCALING_OUT = true;
-	public static final boolean ENABLE_COLD_MIGRATION = true;
-	public static final boolean USE_RANGE_SCALING_OUT = false; // only works when ENABLE_NODE_SCALING && IS_SCALING_OUT = true
+	public static final boolean ENABLE_NODE_SCALING;
+	public static final boolean IS_SCALING_OUT; // Scaling-out or consolidation
+	public static final boolean ENABLE_COLD_MIGRATION; // Only add/remove machines or proactively migrates
+	public static final boolean USE_RANGE_SCALING_OUT; // only works when ENABLE_NODE_SCALING && IS_SCALING_OUT = true
+	
+	static {
+		ENABLE_NODE_SCALING = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(MigrationMgr.class.getName() + ".ENABLE_NODE_SCALING", false);
+		IS_SCALING_OUT = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(MigrationMgr.class.getName() + ".IS_SCALING_OUT", true);
+		ENABLE_COLD_MIGRATION = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(MigrationMgr.class.getName() + ".ENABLE_COLD_MIGRATION", true);
+		USE_RANGE_SCALING_OUT = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(MigrationMgr.class.getName() + ".USE_RANGE_SCALING_OUT", false);
+	}
 	
 	public static final int SP_MIGRATION_START = -101;
 	public static final int SP_COLD_MIGRATION = -102;
@@ -198,7 +210,15 @@ public abstract class MigrationMgr {
 		}
 	}
 	
-	public Integer getSourcePart(RecordKey key) {
+	/**
+	 * Get the partition id of a migrating record. Return
+	 * null if the record is not in the migration range or
+	 * the record has been migrated.
+	 * 
+	 * @param key the key of the specified record
+	 * @return the id of the partition owning the record
+	 */
+	public Integer getPartition(RecordKey key) {
 		int id = toNumericId(key);
 		for (MigrationRange range : targetRanges)
 			if (range.contains(id))

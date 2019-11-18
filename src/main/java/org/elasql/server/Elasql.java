@@ -23,6 +23,7 @@ import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.tpart.sp.MigrationStoredProcFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -33,9 +34,10 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
-import org.elasql.schedule.tpart.LapNodeInserter;
+import org.elasql.schedule.tpart.HermesNodeInserter;
+import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.TPartPartitioner;
-import org.elasql.schedule.tpart.graph.LapTGraph;
+import org.elasql.schedule.tpart.graph.FusionTGraph;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
 import org.elasql.storage.log.DdLogMgr;
@@ -56,7 +58,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB.
 	 */
 	public enum ServiceType {
-		NAIVE, CALVIN, TPART, TPART_LAP;
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP;
 
 		static ServiceType fromInteger(int index) {
 			switch (index) {
@@ -67,7 +69,11 @@ public class Elasql extends VanillaDb {
 			case 2:
 				return TPART;
 			case 3:
-				return TPART_LAP;
+				return HERMES;
+			case 4:
+				return G_STORE;
+			case 5:
+				return LEAP;
 			default:
 				throw new RuntimeException("Unsupport service type");
 			}
@@ -170,7 +176,9 @@ public class Elasql extends VanillaDb {
 			remoteRecReceiver = new CalvinPostOffice();
 			break;
 		case TPART:
-		case TPART_LAP:
+		case HERMES:
+		case G_STORE:
+		case LEAP:
 			remoteRecReceiver = new TPartCacheMgr();
 			break;
 		default:
@@ -191,7 +199,9 @@ public class Elasql extends VanillaDb {
 			scheduler = initCalvinScheduler((CalvinStoredProcedureFactory) factory);
 			break;
 		case TPART:
-		case TPART_LAP:
+		case HERMES:
+		case G_STORE:
+		case LEAP:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			scheduler = initTPartScheduler((TPartStoredProcedureFactory) factory);
@@ -217,14 +227,28 @@ public class Elasql extends VanillaDb {
 		TGraph graph;
 		BatchNodeInserter inserter;
 		
-		if (SERVICE_TYPE == ServiceType.TPART_LAP) {
-			graph = new LapTGraph();
-			inserter = new LapNodeInserter();
-		} else {
+		switch (SERVICE_TYPE) {
+		case TPART:
 			graph = new TGraph();
 			inserter = new CostAwareNodeInserter();
+			break;
+		case HERMES:
+			graph = new FusionTGraph();
+			inserter = new HermesNodeInserter();
+			break;
+		case G_STORE:
+			graph = new TGraph();
+			inserter = new LocalFirstNodeInserter();
+			break;
+		case LEAP:
+			graph = new FusionTGraph();
+			inserter = new LocalFirstNodeInserter();
+			break;
+		default:
+			throw new IllegalArgumentException("Not supported");
 		}
 		
+		factory = new MigrationStoredProcFactory(factory);
 		TPartPartitioner scheduler = new TPartPartitioner(factory,  inserter,
 				new CacheOptimizedSinker(), graph);
 		

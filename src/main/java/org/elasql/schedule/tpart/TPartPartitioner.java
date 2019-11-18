@@ -5,14 +5,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.migration.tpart.sp.ColdMigrationProcedure;
-import org.elasql.migration.tpart.sp.MigrationStoredProcFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -20,7 +18,6 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.tpart.graph.Edge;
-import org.elasql.schedule.tpart.graph.GraphDumper;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.schedule.tpart.sink.Sinker;
@@ -37,7 +34,6 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private static final int NUM_TASK_PER_SINK;
 
 	private TPartStoredProcedureFactory factory;
-	private MigrationStoredProcFactory migraSpFactory;
 	
 	private File dumpDir = new File("batch_dump");
 
@@ -50,13 +46,10 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private BatchNodeInserter inserter;
 	private Sinker sinker;
 	private TGraph graph;
-	
-	private Queue<TPartStoredProcedureTask> migrationTasks = new LinkedList<TPartStoredProcedureTask>();
 
 	public TPartPartitioner(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
 		this.factory = factory;
-		this.migraSpFactory = new MigrationStoredProcFactory();
 		this.inserter = inserter;
 		this.sinker = sinker;
 		this.graph = graph;
@@ -95,8 +88,8 @@ public class TPartPartitioner extends Task implements Scheduler {
 				}
 				
 				if (task.getProcedureType() == ProcedureType.MIGRATION) {
-					// Add to the queue, it will be scheduled to the end of most recent batch
-					migrationTasks.add(task);
+					// Process and dispatch it immediately
+					processMigrationTx(task);
 					continue;
 				}
 
@@ -128,30 +121,28 @@ public class TPartPartitioner extends Task implements Scheduler {
 //		printImbalStatistics();
 //		collectGraphStatistics();
 		
-		// Add the migration txs to the end of the batch
-		while (!migrationTasks.isEmpty()) {
-			TPartStoredProcedureTask task = migrationTasks.remove();
-			ColdMigrationProcedure sp = (ColdMigrationProcedure) task.getProcedure();
-			sp.prepareMigrationKeys(graph);
-			graph.insertTxNode(task, sp.getMigrationRange().getDestPartId());
-		}
-		
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 			dispatchToTaskMgr(plansTter);
 		}
 	}
+	
+	private void processMigrationTx(TPartStoredProcedureTask task) {
+		// Insert the task to T-Graph
+		ColdMigrationProcedure sp = (ColdMigrationProcedure) task.getProcedure();
+		graph.insertTxNode(task, sp.getMigrationRange().getDestPartId());
+		
+		// Sink the graph
+		Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
+		dispatchToTaskMgr(plansTter);
+	}
 
 	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call) {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), null);
 		} else {
-			TPartStoredProcedure<?> sp = null;
-			if (call.getPid() < 0) {
-				sp = migraSpFactory.getStoredProcedure(call.getPid(), call.getTxNum());
-			} else
-				sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
+			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
 
 			if (!sp.isReadOnly())
@@ -180,11 +171,11 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private void printGraphStatistics() {
 		// XXX: Show the statistics of the T-Graph
 		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
-		if (batchId % 100 == 0) {
-			String stat = graph.getStatistics();
-			System.out.println("Time: " + time);
-			System.out.println("T-Graph id: " + (batchId + 1));
-			System.out.print(stat);
+//		if (batchId % 100 == 0) {
+//			String stat = graph.getStatistics();
+//			System.out.println("Time: " + time);
+//			System.out.println("T-Graph id: " + (batchId + 1));
+//			System.out.print(stat);
 			
 			imbalanced += graph.getImbalancedDis();
 			remoteTxRead += graph.getRemoteTxReads();
@@ -192,22 +183,22 @@ public class TPartPartitioner extends Task implements Scheduler {
 			recordCount++;
 			
 			if (time >= nextReportTime) {
-				System.out.println("======== Total Statistics ========");
+//				System.out.println("======== Total Statistics ========");
 				System.out.println(String.format("Time: %d, avg. imbal: %f, avg. remote tx reads: %f, "
 						+ "avg. remote sink reads: %f", time, ((double) imbalanced) / recordCount,
 						((double) remoteTxRead) / recordCount, ((double) remoteSinkRead) / recordCount));
-				System.out.println("==================================\n");
+//				System.out.println("==================================\n");
 				
 				imbalanced = 0;
 				remoteTxRead = 0;
 				remoteSinkRead = 0;
 				recordCount = 0;
-				nextReportTime = time + 3;
+				nextReportTime = time + 5;
 				
 				// Dump the current graph
-				GraphDumper.dumpToFile(new File(dumpDir, String.format("%d_%d.txt", time, batchId)), graph);
+//				GraphDumper.dumpToFile(new File(dumpDir, String.format("%d_%d.txt", time, batchId)), graph);
 			}
-		}
+//		}
 		batchId++;
 	}
 	

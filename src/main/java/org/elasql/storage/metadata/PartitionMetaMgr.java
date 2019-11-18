@@ -188,7 +188,7 @@ public class PartitionMetaMgr {
 	 */
 	public int getPartition(RecordKey key) {
 		if (isInMigration) {
-			Integer partId = Elasql.migrationMgr().getSourcePart(key);
+			Integer partId = Elasql.migrationMgr().getPartition(key);
 			if (partId != null)
 				return partId;
 		}
@@ -225,7 +225,7 @@ public class PartitionMetaMgr {
 			return location;
 		
 		if (isInMigration) {
-			Integer partId = Elasql.migrationMgr().getSourcePart(key);
+			Integer partId = Elasql.migrationMgr().getPartition(key);
 			if (partId != null)
 				return partId;
 		}

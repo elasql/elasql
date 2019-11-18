@@ -8,7 +8,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class LapTGraph extends TGraph {
+public class FusionTGraph extends TGraph {
 
 	@Override
 	/**
@@ -42,11 +42,18 @@ public class LapTGraph extends TGraph {
 			}
 		}
 		
-		// Put the rest of the records on where they are
+		// Handle the rest of written records
 		for (Entry<RecordKey, TxNode> resPosPair : resPos.entrySet()) {
 			RecordKey res = resPosPair.getKey();
 			TxNode node = resPosPair.getValue();
-			node.addWriteBackEdges(new Edge(sinkNodes[node.getPartId()], res));
+			
+			// Quick fix: ignore insert-only tables
+			if (res.getTableName().equals("orders") || res.getTableName().equals("new_order") ||
+					res.getTableName().equals("order_line"))
+				node.addWriteBackEdges(new Edge(sinkNodes[partMgr.getPartition(res)], res));
+			else
+			// Put the records on where they are
+				node.addWriteBackEdges(new Edge(sinkNodes[node.getPartId()], res));
 		}
 		
 		// Clear the resource map for the next run

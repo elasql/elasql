@@ -95,7 +95,6 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 //				Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
 //						+ " from tx." + src);
 				
-				
 				// wait if the record has not delivered
 				while (!exchange.containsKey(k)) {
 					prepareAnchor(k).wait();

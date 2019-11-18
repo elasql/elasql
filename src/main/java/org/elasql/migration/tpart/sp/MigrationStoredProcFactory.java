@@ -6,6 +6,12 @@ import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 
 public class MigrationStoredProcFactory implements TPartStoredProcedureFactory {
 
+	private TPartStoredProcedureFactory underlayingSpFactory;
+	
+	public MigrationStoredProcFactory(TPartStoredProcedureFactory factory) {
+		this.underlayingSpFactory = factory;
+	}
+	
 	@Override
 	public TPartStoredProcedure<?> getStoredProcedure(int pid, long txNum) {
 		TPartStoredProcedure<?> sp;
@@ -20,7 +26,7 @@ public class MigrationStoredProcFactory implements TPartStoredProcedureFactory {
 				sp = new MigrationEndProcedure(txNum);
 				break;
 			default:
-				throw new UnsupportedOperationException("Procedure " + pid + " is not found");
+				sp = underlayingSpFactory.getStoredProcedure(pid, txNum);
 		}
 		return sp;
 	}

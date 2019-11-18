@@ -10,21 +10,24 @@ import java.util.logging.Logger;
 import org.elasql.cache.CachedRecord;
 import org.elasql.migration.MigrationRange;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
-import org.elasql.schedule.tpart.graph.Node;
-import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
+/**
+ * This transaction migrates cold data in the migration range. The cold data
+ * are the records that are not in the fusion table. This transaction must
+ * be processed and sunk individually. If it was processed and sunk with other
+ * transactions by T-Part, some records might become missing.
+ * 
+ * @author yslin
+ *
+ */
 public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationParamHelper> {
 	private static Logger logger = Logger.getLogger(ColdMigrationProcedure.class.getName());
 	
 	// the tuples that are not moved
-	private Set<RecordKey> coldKeys = new HashSet<RecordKey>(); 
-	
-	// the tuples that have been moved to the dest node by other txs
-	// these need to be deleted from cache and inserted to the local storage
-	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>(); 
+	private Set<RecordKey> coldKeys = new HashSet<RecordKey>();
 	
 	public ColdMigrationProcedure(long txNum) {
 		super(txNum, new ColdMigrationParamHelper());
@@ -32,49 +35,33 @@ public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationPa
 
 	@Override
 	protected void prepareKeys() {
-		// Do nothing
-	}
-	
-	public void prepareMigrationKeys(TGraph graph) {
 		MigrationRange range = paramHelper.getMigrationRange();
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
-		Map<RecordKey, Node> resPos = graph.getResourceNodeMap();
 		
 		// Iterate over the keys in the migration range
 		Iterator<RecordKey> keyIter = Elasql.migrationMgr().toKeyIterator(range);
 		while (keyIter.hasNext()) {
 			RecordKey key = keyIter.next();
 			
-			// Check if it has been moved (inside the TGraph)
-			Node node = resPos.get(key);
-			if (node != null) {
-				if (node.getPartId() == range.getSourcePartId())
-					coldKeys.add(key);
-				else if (node.getPartId() == range.getDestPartId())
-					localInsertKeys.add(key);
-				else
-					continue;
-			}
-				
-			// Check if it has been moved (before this TGraph)
+			// Check if the record is in the fusion table (cache)
+			// We only move the records not in the table,
+			// which we consider as cold data.
+			// -------------------------------------------------
+			// Note that some records are in the fusion table
+			// but currently located in the destination node.
+			// We ignore those records for now, but later txs
+			// who touch them should insert them to the storage
+			// of the destination node.
+			// -------------------------------------------------
 			Integer partId = partMgr.queryLocationTable(key);
-			if (partId != null) {
-				if (partId == range.getDestPartId())
-					localInsertKeys.add(key);
-				else
-					continue;
-			}
-			
-			// No one moves this key
-			coldKeys.add(key);
+			if (partId == null)
+				coldKeys.add(key);
 		}
+		
+//		System.out.println("Cold keys: " + coldKeys);
 		
 		// Add to read & write keys
 		for (RecordKey key : coldKeys) {
-			addReadKey(key);
-			addWriteKey(key);
-		}
-		for (RecordKey key : localInsertKeys) {
 			addReadKey(key);
 			addWriteKey(key);
 		}
@@ -90,16 +77,12 @@ public class ColdMigrationProcedure extends TPartStoredProcedure<ColdMigrationPa
 
 	@Override
 	public double getWeight() {
-		return coldKeys.size() + localInsertKeys.size();
+		return coldKeys.size();
 	}
 	
 	@Override
 	public ProcedureType getProcedureType() {
 		return ProcedureType.MIGRATION;
-	}
-	
-	public Set<RecordKey> getLocalCacheToStorage() {
-		return localInsertKeys;
 	}
 	
 	public MigrationRange getMigrationRange() {
