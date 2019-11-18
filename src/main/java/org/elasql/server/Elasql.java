@@ -226,23 +226,28 @@ public class Elasql extends VanillaDb {
 	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
 		TGraph graph;
 		BatchNodeInserter inserter;
+		boolean isBatching = true;
 		
 		switch (SERVICE_TYPE) {
 		case TPART:
 			graph = new TGraph();
 			inserter = new CostAwareNodeInserter();
+			isBatching = true;
 			break;
 		case HERMES:
 			graph = new FusionTGraph();
 			inserter = new HermesNodeInserter();
+			isBatching = true;
 			break;
 		case G_STORE:
 			graph = new TGraph();
 			inserter = new LocalFirstNodeInserter();
+			isBatching = false;
 			break;
 		case LEAP:
 			graph = new FusionTGraph();
 			inserter = new LocalFirstNodeInserter();
+			isBatching = false;
 			break;
 		default:
 			throw new IllegalArgumentException("Not supported");
@@ -250,7 +255,7 @@ public class Elasql extends VanillaDb {
 		
 		factory = new MigrationStoredProcFactory(factory);
 		TPartPartitioner scheduler = new TPartPartitioner(factory,  inserter,
-				new CacheOptimizedSinker(), graph);
+				new CacheOptimizedSinker(), graph, isBatching);
 		
 		taskMgr().runTask(scheduler);
 		return scheduler;
