@@ -99,4 +99,20 @@ public class ScalingInPartitionPlan extends PartitionPlan implements Serializabl
 		
 		return sb.toString();
 	}
+
+	@Override
+	public PartitionPlan getBasePartitionPlan() {
+		return this;
+	}
+
+	@Override
+	public boolean isBasePartitionPlan() {
+		return true;
+	}
+
+	@Override
+	public void changeBasePartitionPlan(PartitionPlan plan) {
+		throw new RuntimeException("There is no base partition plan in "
+				+ "ScalingInPartitionPlan that can be changed");
+	}
 }

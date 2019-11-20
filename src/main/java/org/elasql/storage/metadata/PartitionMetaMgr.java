@@ -17,20 +17,11 @@ package org.elasql.storage.metadata;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
-import org.elasql.util.PeriodicalJob;
 
 public class PartitionMetaMgr {
 
@@ -196,7 +187,7 @@ public class PartitionMetaMgr {
 	}
 	
 	public void startMigration(PartitionPlan newPlan) {
-		partPlan = newPlan;
+		partPlan.changeBasePartitionPlan(newPlan);
 		isInMigration = true;
 	}
 	

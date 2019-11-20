@@ -8,6 +8,8 @@ import org.vanilladb.core.sql.IntegerConstant;
 
 public class NotificationPartitionPlan extends PartitionPlan {
 	
+	private static final long serialVersionUID = 1L;
+	
 	public static final String TABLE_NAME = "notification";
 	public static final String KEY_SOURCE_NAME = "src_server_id";
 	public static final String KEY_DEST_NAME = "dest_server_id";
@@ -51,12 +53,27 @@ public class NotificationPartitionPlan extends PartitionPlan {
 		return underlayerPlan.numberOfPartitions();
 	}
 	
-	public PartitionPlan getUnderlayerPlan() {
-		return underlayerPlan;
-	}
-	
 	@Override
 	public String toString() {
 		return String.format("NotificationPlan: [%s]", underlayerPlan.toString());
+	}
+
+	@Override
+	public PartitionPlan getBasePartitionPlan() {
+		return underlayerPlan.getBasePartitionPlan();
+	}
+
+	@Override
+	public boolean isBasePartitionPlan() {
+		return false;
+	}
+
+	@Override
+	public void changeBasePartitionPlan(PartitionPlan plan) {
+		if (underlayerPlan.isBasePartitionPlan()) {
+			underlayerPlan = plan;
+		} else {
+			underlayerPlan.changeBasePartitionPlan(plan);
+		}
 	}
 }

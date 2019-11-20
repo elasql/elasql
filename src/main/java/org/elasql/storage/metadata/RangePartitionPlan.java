@@ -110,4 +110,20 @@ public class RangePartitionPlan extends PartitionPlan implements Serializable {
 		return String.format("Range Partition: [%d partitions on '%s', each partition has %d records]",
 				numOfParts, partField, recsPerPart);
 	}
+
+	@Override
+	public PartitionPlan getBasePartitionPlan() {
+		return this;
+	}
+
+	@Override
+	public boolean isBasePartitionPlan() {
+		return true;
+	}
+
+	@Override
+	public void changeBasePartitionPlan(PartitionPlan plan) {
+		throw new RuntimeException("There is no base partition plan in "
+				+ "RangePartitionPlan that can be changed");
+	}
 }

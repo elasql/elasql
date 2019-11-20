@@ -5,6 +5,8 @@ import org.vanilladb.core.sql.Constant;
 
 public class HashPartitionPlan extends PartitionPlan {
 	
+	private static final long serialVersionUID = 1L;
+	
 	private int numOfParts;
 	private String partField;
 	
@@ -40,5 +42,21 @@ public class HashPartitionPlan extends PartitionPlan {
 	@Override
 	public int numberOfPartitions() {
 		return numOfParts;
+	}
+
+	@Override
+	public PartitionPlan getBasePartitionPlan() {
+		return this;
+	}
+
+	@Override
+	public boolean isBasePartitionPlan() {
+		return true;
+	}
+
+	@Override
+	public void changeBasePartitionPlan(PartitionPlan plan) {
+		throw new RuntimeException("There is no base partition plan in "
+				+ "HashPartitionPlan that can be changed");
 	}
 }

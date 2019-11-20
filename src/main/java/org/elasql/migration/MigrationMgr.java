@@ -8,11 +8,8 @@ import java.util.logging.Logger;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
-import org.elasql.storage.metadata.RangePartitionPlan;
-import org.elasql.storage.metadata.ScalingInPartitionPlan;
-import org.elasql.storage.metadata.ScalingOutPartitionPlan;
+import org.elasql.storage.metadata.ScalablePartitionPlan;
 import org.elasql.util.ElasqlProperties;
 
 public abstract class MigrationMgr {
@@ -42,7 +39,7 @@ public abstract class MigrationMgr {
 	
 	private static final int CHUNK_SIZE = 1000;
 	
-	private static final long START_MIGRATION_TIME = 120_000; // in ms
+	private static final long START_MIGRATION_TIME = 300_000; // in ms
 //	private static final long START_MIGRATION_TIME = 100_000_000; // in ms
 	private static final long COLD_MIGRATION_DELAY = 0_000; // in ms
 	
@@ -72,20 +69,16 @@ public abstract class MigrationMgr {
 					logger.info("Triggers a migration.");
 				
 				// Trigger a new migration
-				NotificationPartitionPlan wrapperPlan = (NotificationPartitionPlan)
-						Elasql.partitionMetaMgr().getPartitionPlan();
-				RangePartitionPlan oldPlan = (RangePartitionPlan) wrapperPlan.getUnderlayerPlan();
-				PartitionPlan newPlan;
+				PartitionPlan partPlan = Elasql.partitionMetaMgr().getPartitionPlan();
+				ScalablePartitionPlan scalePlan = (ScalablePartitionPlan) partPlan.getBasePartitionPlan();
+				MigrationPlan migratePlan;
 				if (IS_SCALING_OUT) {
-					if (USE_RANGE_SCALING_OUT)
-						newPlan = oldPlan.scaleOutRangePartition();
-					else
-						newPlan = oldPlan.scaleOut();
+					migratePlan = scalePlan.scaleOut();
 				} else
-					newPlan = oldPlan.scaleIn();
+					migratePlan = scalePlan.scaleIn();
 				
-				sendMigrationStartRequest(oldPlan, newPlan, getMigrationTableName(), false);
-				initializeMigration(oldPlan, newPlan, getMigrationTableName());
+				sendMigrationStartRequest(migratePlan, false);
+				initializeMigration(migratePlan);
 				
 				// Postpone the cold migration forever
 				if (!ENABLE_COLD_MIGRATION)
@@ -118,13 +111,12 @@ public abstract class MigrationMgr {
 		}
 	}
 	
-	public void sendMigrationStartRequest(PartitionPlan oldPlan,
-			PartitionPlan newPlan, String targetTable, boolean isAppiaThread) {
+	public void sendMigrationStartRequest(MigrationPlan migratePlan, boolean isAppiaThread) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Send a MigrationStart request.");
 		
 		// Send a store procedure call
-		Object[] params = new Object[] {oldPlan, newPlan, targetTable};
+		Object[] params = new Object[] {migratePlan};
 		Object[] call = { new StoredProcedureCall(-1, -1, SP_MIGRATION_START, params)};
 		Elasql.connectionMgr().sendBroadcastRequest(call, isAppiaThread);
 	}
@@ -152,36 +144,22 @@ public abstract class MigrationMgr {
 	// ======== Functions for Scheduler on Each Node =========
 	
 	// Currently, it can only handle range partitioning
-	public void initializeMigration(PartitionPlan oldPartPlan,
-			PartitionPlan newPartPlan, String targetTable) {
+	public void initializeMigration(MigrationPlan migratePlan) {
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
-			logger.info(String.format("a new migration starts at %d. Old: %s, New: %s"
-					, time / 1000, oldPartPlan, newPartPlan));
+			logger.info(String.format("a new migration starts at %d from %s"
+					+ " to %s.", time / 1000, migratePlan.oldPartitionPlan(),
+					migratePlan.newPartitionPlan()));
 		}
 		
 		// Analyze the migration plans to find out which ranges to migrate
-		if (IS_SCALING_OUT) {
-			RangePartitionPlan originalPlan = (RangePartitionPlan) oldPartPlan;
-			if (USE_RANGE_SCALING_OUT) {
-				RangePartitionPlan scalingOutPlan = (RangePartitionPlan) newPartPlan;
-				targetRanges = scalingOutPlan.generateMigrationRanges(originalPlan, targetTable);
-			} else {
-				ScalingOutPartitionPlan scalingOutPlan = (ScalingOutPartitionPlan) newPartPlan;
-				targetRanges = scalingOutPlan.generateMigrationRanges(originalPlan, targetTable);
-			}
-		} else {
-			RangePartitionPlan originalPlan = (RangePartitionPlan) oldPartPlan;
-			ScalingInPartitionPlan scalingInPlan = (ScalingInPartitionPlan) newPartPlan;
-			targetRanges = scalingInPlan.generateMigrationRanges(originalPlan, targetTable);
-		}
-		
+		targetRanges = migratePlan.generateMigrationRanges();
 
 		if (logger.isLoggable(Level.INFO))
 			logger.info(String.format("migration ranges: %s", targetRanges));
 		
 		// Change the current partition plan of the system
-		Elasql.partitionMetaMgr().startMigration(newPartPlan);
+		Elasql.partitionMetaMgr().startMigration(migratePlan.newPartitionPlan());
 	}
 	
 	public void markMigrationRangeMoved(MigrationRange range) {
@@ -227,8 +205,6 @@ public abstract class MigrationMgr {
 	}
 	
 	// ======== Utility Functions =========
-	
-	public abstract String getMigrationTableName();
 	
 	public abstract Iterator<RecordKey> toKeyIterator(MigrationRange range);
 	

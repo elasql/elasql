@@ -15,8 +15,7 @@ public class MigrationStartProcedure extends TPartStoredProcedure<MigrationStart
 
 	@Override
 	protected void prepareKeys() {
-		Elasql.migrationMgr().initializeMigration(paramHelper.getOldPartitionPlan(),
-				paramHelper.getNewPartitionPlan(), paramHelper.getTableName());
+		Elasql.migrationMgr().initializeMigration(paramHelper.getMigrationPlan());
 	}
 
 	@Override
