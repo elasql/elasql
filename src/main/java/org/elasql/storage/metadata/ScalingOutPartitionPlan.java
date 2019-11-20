@@ -1,6 +1,5 @@
 package org.elasql.storage.metadata;
 
-import java.io.Serializable;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -9,7 +8,7 @@ import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 
 // Only scaling-out by one node
-public class ScalingOutPartitionPlan extends PartitionPlan implements Serializable {
+public class ScalingOutPartitionPlan implements PartitionPlan {
 	
 	private static final long serialVersionUID = 1L;
 	

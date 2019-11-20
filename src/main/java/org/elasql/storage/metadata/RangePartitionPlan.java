@@ -1,6 +1,5 @@
 package org.elasql.storage.metadata;
 
-import java.io.Serializable;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -8,7 +7,7 @@ import org.elasql.migration.MigrationRange;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 
-public class RangePartitionPlan extends PartitionPlan implements Serializable {
+public class RangePartitionPlan implements PartitionPlan {
 	
 	private static final long serialVersionUID = 1L;
 	

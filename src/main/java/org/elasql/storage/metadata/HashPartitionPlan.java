@@ -3,7 +3,7 @@ package org.elasql.storage.metadata;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 
-public class HashPartitionPlan extends PartitionPlan {
+public class HashPartitionPlan implements PartitionPlan {
 	
 	private static final long serialVersionUID = 1L;
 	

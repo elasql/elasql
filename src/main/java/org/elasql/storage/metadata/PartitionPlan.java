@@ -4,9 +4,7 @@ import java.io.Serializable;
 
 import org.elasql.sql.RecordKey;
 
-public abstract class PartitionPlan implements Serializable {
-	
-	private static final long serialVersionUID = 1L;
+public interface PartitionPlan extends Serializable {
 
 	/**
 	 * Check if a record is fully replicated on each node.
@@ -15,7 +13,7 @@ public abstract class PartitionPlan implements Serializable {
 	 *            the key of the record
 	 * @return if the record is fully replicated
 	 */
-	public abstract boolean isFullyReplicated(RecordKey key);
+	boolean isFullyReplicated(RecordKey key);
 
 	/**
 	 * Query the belonging partition.
@@ -24,7 +22,7 @@ public abstract class PartitionPlan implements Serializable {
 	 *            the key of the record
 	 * @return the id of the partition
 	 */
-	public abstract int getPartition(RecordKey key);
+	int getPartition(RecordKey key);
 	
 	/**
 	 * If this partition plan is a wrapper, returns the underlying
@@ -32,7 +30,7 @@ public abstract class PartitionPlan implements Serializable {
 	 * 
 	 * @return
 	 */
-	public abstract PartitionPlan getBasePartitionPlan();
+	PartitionPlan getBasePartitionPlan();
 	
 	/**
 	 * Check if this is the base partition plan, which means that
@@ -40,12 +38,10 @@ public abstract class PartitionPlan implements Serializable {
 	 * 
 	 * @return
 	 */
-	public abstract boolean isBasePartitionPlan();
+	boolean isBasePartitionPlan();
 	
-	public abstract void changeBasePartitionPlan(PartitionPlan plan);
+	void changeBasePartitionPlan(PartitionPlan plan);
 	
-	public int numberOfPartitions() {
-		return PartitionMetaMgr.NUM_PARTITIONS;
-	}
+	int numberOfPartitions();
 
 }

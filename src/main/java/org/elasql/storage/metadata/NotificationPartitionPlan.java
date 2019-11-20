@@ -6,7 +6,7 @@ import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
-public class NotificationPartitionPlan extends PartitionPlan {
+public class NotificationPartitionPlan implements PartitionPlan {
 	
 	private static final long serialVersionUID = 1L;
 	
