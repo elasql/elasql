@@ -31,10 +31,8 @@ public class HashPartitionPlan implements PartitionPlan {
 	@Override
 	public int getPartition(RecordKey key) {
 		if (partField != null) {
-			// XXX: only works for YCSB
 			Constant idCon = key.getKeyVal(partField);
-			int id = Integer.parseInt((String) idCon.asJavaVal());
-			return id % numOfParts;
+			return idCon.hashCode() % numOfParts;
 		} else
 			return key.hashCode() % numOfParts;
 	}
