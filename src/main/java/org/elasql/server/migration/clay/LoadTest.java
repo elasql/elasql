@@ -1,7 +1,6 @@
 package org.elasql.server.migration.clay;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -16,27 +15,27 @@ import org.vanilladb.core.sql.Constant;
 public class LoadTest {
 
 	public static void main(String[] args) {
-		System.setProperty("org.elasql.server.migration.clay.ClayPlanner.CLUMP_MAX_SIZE", "50");
+		System.setProperty("org.elasql.server.migration.clay.ClayPlanner.CLUMP_MAX_SIZE", "100");
 		System.setProperty("org.elasql.server.migration.clay.ClayPlanner.LOOK_AHEAD_MAX", "5");
-		System.setProperty("org.elasql.server.migration.clay.ClayPlanner.OVERLOAD_PERCENTAGE", "1.2");
-		System.setProperty("org.elasql.server.migration.clay.ClayPlanner.MULTI_PARTS_COST", "1");
-		System.setProperty("org.elasql.storage.metadata.PartitionMetaMgr.NUM_PARTITIONS", "20");
+		System.setProperty("org.elasql.server.migration.clay.ClayPlanner.OVERLOAD_PERCENTAGE", "1.05");
+		System.setProperty("org.elasql.server.migration.clay.ClayPlanner.MULTI_PARTS_COST", "0.01");
+		System.setProperty("org.elasql.storage.metadata.PartitionMetaMgr.NUM_PARTITIONS", "4");
 		
 		HeatGraph graph = HeatGraph.deserializeFromFile(
-				new File("R:\\Experiments\\hermes\\2019-after-sigmod\\heatgraph_39.bin"));
+				new File("R:\\Experiments\\hermes\\2019-after-sigmod\\heatgraph_even.bin"));
 		
-		try {
-			System.in.read();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+//		try {
+//			System.in.read();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
 		
-		analyzeGraph(graph);
+//		analyzeGraph(graph);
 		
 		ClayPlanner planner = new ClayPlanner(graph);
 		List<MigrationPlan> plans = planner.generateMigrationPlan();
-		analyzePlans(plans);
-//		System.out.println(plans);
+//		analyzePlans(plans);
+		System.out.println(plans);
 	}
 	
 	public static void analyzeGraph(HeatGraph graph) {

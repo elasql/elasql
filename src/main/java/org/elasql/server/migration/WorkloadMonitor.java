@@ -23,6 +23,9 @@ public class WorkloadMonitor {
 		// Since only the sequence node can get in, remoteReadKeys basically
 		// contains all the read keys of the transaction.
 		for (RecordKey k : accessedKeys) {
+			if (Elasql.partitionMetaMgr().isFullyReplicated(k))
+				continue;
+			
 			vertexKey = migraMgr.getRepresentative(k);
 			partId = Elasql.partitionMetaMgr().getPartition(k);
 

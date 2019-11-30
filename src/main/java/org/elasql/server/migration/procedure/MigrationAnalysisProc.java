@@ -32,6 +32,22 @@ public class MigrationAnalysisProc extends CalvinStoredProcedure<StoredProcedure
 	@Override
 	public void prepareKeys() {
 		Elasql.migrationMgr().prepareAnalysis();
+	}
+
+	@Override
+	public boolean willResponseToClients() {
+		return false;
+	}
+
+	@Override
+	public boolean isParticipated() {
+		if (Elasql.serverId() == sourceNode)
+			return true;
+		return false;
+	}
+
+	@Override
+	protected void executeTransactionLogic() {
 		// Only Migration SourceNode perform Analysis process
 		if (Elasql.serverId() == sourceNode) {
 			if (logger.isLoggable(Level.INFO))
@@ -64,18 +80,6 @@ public class MigrationAnalysisProc extends CalvinStoredProcedure<StoredProcedure
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Sent the migration starting request.");
 		}
-	}
-
-	@Override
-	public boolean willResponseToClients() {
-		return false;
-	}
-
-	@Override
-	protected void executeTransactionLogic() {
-
-		
-
 	}
 
 	@Override

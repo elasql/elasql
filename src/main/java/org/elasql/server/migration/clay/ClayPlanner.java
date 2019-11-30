@@ -141,7 +141,7 @@ public class ClayPlanner {
 				destPart = findInitialDest(addedVertex, partitions);
 				currentClump.setDestination(destPart.getPartId());
 				
-//				System.out.println("Init clump: " + printClump(candidateClump));
+//				System.out.println("Init clump: " + printClump(currentClump));
 			} else {
 				if (!currentClump.hasNeighbor())
 					return candidateClump;

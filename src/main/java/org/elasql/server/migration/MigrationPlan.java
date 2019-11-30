@@ -64,7 +64,9 @@ public class MigrationPlan {
 		sb.append(sourcePart);
 		sb.append(" to part.");
 		sb.append(destPart);
-		sb.append(" [");
+		sb.append(" with ");
+		sb.append(keys.size());
+		sb.append(" keys, first 5: [");
 		
 		int count = 0;
 		for (RecordKey key : keys) {

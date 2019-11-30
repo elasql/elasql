@@ -23,20 +23,38 @@ import org.elasql.server.migration.clay.ClayPlanner;
 import org.elasql.server.migration.heatgraph.HeatGraph;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
 public abstract class MigrationManager {
 	private static Logger logger = Logger.getLogger(MigrationManager.class.getName());
 
-	public static final boolean ENABLE_NODE_SCALING = false;
-	public static final boolean IS_SCALING_OUT = false; // only works when 'ENABLE_NODE_SCALING' = true
-	public static final boolean USE_PREDEFINED_PLAN = false; // only works when 'ENABLE_NODE_SCALING' = true
+	public static final boolean ENABLE_NODE_SCALING;
+	public static final boolean IS_SCALING_OUT; // only works when 'ENABLE_NODE_SCALING' = true
+	public static final boolean USE_PREDEFINED_PLAN; // only works when 'ENABLE_NODE_SCALING' = true
+
+	private static final long START_MIGRATION_TIME; // in ms
+	
+	// To use with Hermes
+	private static final String PROPERTY_PREFIX = "org.elasql.migration.MigrationMgr";
+	
+	static {
+		ENABLE_NODE_SCALING = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(PROPERTY_PREFIX + ".ENABLE_NODE_SCALING", false);
+		IS_SCALING_OUT = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(PROPERTY_PREFIX + ".IS_SCALING_OUT", true);
+		USE_PREDEFINED_PLAN = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(PROPERTY_PREFIX + ".USE_PREDEFINED_PLAN", false);
+		START_MIGRATION_TIME = ElasqlProperties.getLoader()
+				.getPropertyAsLong(PROPERTY_PREFIX + ".START_MIGRATION_TIME", -1);
+	}
 	
 	private static AtomicBoolean isScaled = new AtomicBoolean(false);
 	
 	public static final int MONITORING_TIME = PartitionMetaMgr.USE_SCHISM? 
-			2100 * 1000: 30 * 1000; // [Schism: Clay]
+			300 * 1000: 5 * 1000;
+//			2100 * 1000: 30 * 1000; // for simple workloads
 //			30 * 1000: 10 * 1000; // for consolidation
 
 	// Sink ids for sequencers to identify the messages of migration
@@ -64,7 +82,7 @@ public abstract class MigrationManager {
 	private AtomicBoolean analysisCompleted = new AtomicBoolean(false);
 
 	// Async pushing
-	private static int PUSHING_COUNT = 10000;
+	private static int PUSHING_COUNT = 1000;
 	private static final int PUSHING_BYTE_COUNT = 4000000;
 	private ConcurrentLinkedQueue<RecordKey> skipRequestQueue = new ConcurrentLinkedQueue<RecordKey>();
 	private Map<String, Set<RecordKey>> bgPushCandidates = new HashMap<String, Set<RecordKey>>();
@@ -110,7 +128,10 @@ public abstract class MigrationManager {
 			@Override
 			public void run() {
 				try {
-					Thread.sleep(getWaitingTime());
+					if (START_MIGRATION_TIME != -1)
+						Thread.sleep(START_MIGRATION_TIME);
+					else
+						Thread.sleep(getWaitingTime());
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -126,7 +147,6 @@ public abstract class MigrationManager {
 						else
 							if (logger.isLoggable(Level.WARNING))
 								logger.warning("Clay is still operating. Stop initialization of next run.");
-						
 						try {
 							Thread.sleep(getMigrationPreiod());
 						} catch (InterruptedException e) {
@@ -181,7 +201,8 @@ public abstract class MigrationManager {
 	public void analyzeTransactionRequest(Collection<RecordKey> keys) {
 		workloadMonitor.recordATransaction(keys);
 		
-		if (System.currentTimeMillis() > MONITOR_STOP_TIME) {
+		if (System.currentTimeMillis() > MONITOR_STOP_TIME ||
+				(ENABLE_NODE_SCALING && USE_PREDEFINED_PLAN)) {
 			stopMonitoring();
 		}
 	}
@@ -382,7 +403,7 @@ public abstract class MigrationManager {
 	public void outputMetis(HeatGraph graph) {
 		File metisDir = new File(".");
 		metisDir = new File(metisDir, "metis_mesh_" + 
-				((System.currentTimeMillis() - startTime) / 1000) + ".txt");
+				((System.currentTimeMillis() - startTime) / 1000));
 		try {
 			graph.generateMetisGraphFile(metisDir);
 		} catch (IOException e) {

@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
@@ -44,6 +45,7 @@ import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper> implements DdStoredProcedure {
+	private static Logger logger = Logger.getLogger(CalvinStoredProcedure.class.getName());
 
 	// All New Design of Squall
 	// Assumption :
@@ -528,6 +530,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			return;
 		}
 		int nodeId = Elasql.partitionMetaMgr().getPartition(readKey);
+		
+		if (nodeId == -1) {
+			logger.severe("Cannot find a partition for " + readKey);
+		}
 
 		// Check which node has the corresponding record
 		// Normal

@@ -58,7 +58,10 @@ public abstract class PartitionMetaMgr {
 	}
 
 	public void setPartition(RecordKey key, int loc) {
-		locationTable.put(key, new Integer(loc));
+		if (loc < 0 || loc >= NUM_PARTITIONS)
+			throw new RuntimeException("Trying to set the location of " + key + " to " + loc);
+		
+		locationTable.put(key, Integer.valueOf(loc));
 	}
 
 	protected abstract int getLocation(RecordKey key);
