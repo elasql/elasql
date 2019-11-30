@@ -102,6 +102,8 @@ public class SunkPlan {
 	}
 	
 	public Set<RecordKey> getReadSet() {
+		if (readingInfoMap == null)
+			readingInfoMap = new HashMap<RecordKey, Long>();
 		return readingInfoMap.keySet();
 	}
 

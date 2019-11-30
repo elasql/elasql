@@ -117,6 +117,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			paramHelper.setCommitted(true);
 		} catch (Exception e) {
 			e.printStackTrace();
+			System.out.println("Tx." + txNum + "'s plan: " + plan);
 			tx.rollback();
 			paramHelper.setCommitted(false);
 		}

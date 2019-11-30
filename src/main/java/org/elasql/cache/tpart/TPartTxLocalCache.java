@@ -123,41 +123,29 @@ public class TPartTxLocalCache {
 //		timer.stopComponentTimer("Pass to next Tx");
 
 //		timer.startComponentTimer("Writeback");
-		if (plan.isLocalTask()) {
-			// Flush to the local storage (write back)
-			for (RecordKey key : plan.getLocalWriteBackInfo()) {
+		// Flush to the local storage (write back)
+		for (RecordKey key : plan.getLocalWriteBackInfo()) {
 
-				CachedRecord rec = recordCache.get(key);
-				
-				// For migration
-				if (plan.getStorageInsertions().contains(key)) {
-					cacheMgr.insertToLocalStorage(key, rec, tx);
-					continue;
-				}
-
-				// If there is no such record in the local cache,
-				// it might be pushed from the same transaction on the other
-				// machine.
-				// Migrated data need to insert
-				if (plan.getCacheInsertions().contains(key))
-					cacheMgr.insertToCache(key, rec, txNum);
-				else
-					cacheMgr.writeBack(key, rec, tx);
-			}
-		} else {
-
-			// Flush to the local storage (write back)
-			for (RecordKey key : plan.getLocalWriteBackInfo()) {
-
-				CachedRecord rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
+			CachedRecord rec = null;
+			if (plan.isLocalTask()) 
+				rec = recordCache.get(key);
+			else
+				rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
 			
-				// Migrated data need to insert
-				if (plan.getCacheInsertions().contains(key))
-					cacheMgr.insertToCache(key, rec, txNum);
-				else
-					cacheMgr.writeBack(key, rec, tx);
+			// For migration
+			if (plan.getStorageInsertions().contains(key)) {
+				cacheMgr.insertToLocalStorage(key, rec, tx);
+				continue;
 			}
 
+			// If there is no such record in the local cache,
+			// it might be pushed from the same transaction on the other
+			// machine.
+			// Migrated data need to insert
+			if (plan.getCacheInsertions().contains(key))
+				cacheMgr.insertToCache(key, rec, txNum);
+			else
+				cacheMgr.writeBack(key, rec, tx);
 		}
 //		timer.stopComponentTimer("Writeback");
 		

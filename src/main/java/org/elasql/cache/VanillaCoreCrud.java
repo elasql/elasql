@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -30,6 +31,7 @@ import org.vanilladb.core.query.algebra.Plan;
 import org.vanilladb.core.query.algebra.SelectPlan;
 import org.vanilladb.core.query.algebra.SelectScan;
 import org.vanilladb.core.query.algebra.TablePlan;
+import org.vanilladb.core.query.algebra.TableScan;
 import org.vanilladb.core.query.algebra.UpdateScan;
 import org.vanilladb.core.query.algebra.index.IndexSelectPlan;
 import org.vanilladb.core.server.VanillaDb;
@@ -47,6 +49,9 @@ import org.vanilladb.core.storage.tx.Transaction;
  * The CURD interfaces to VanillaCore.
  */
 public class VanillaCoreCrud {
+	
+	private static ConcurrentHashMap<RecordKey, RecordId> indexCache
+		= new ConcurrentHashMap<RecordKey, RecordId>();
 
 	public static CachedRecord read(RecordKey key, Transaction tx) {
 		// Open index select scan
@@ -79,6 +84,25 @@ public class VanillaCoreCrud {
 			rec = builder.build();
 		}
 		s.close();
+		
+		// XXX: Quick fix
+		if (rec == null) {
+			RecordId rid = indexCache.get(key);
+			if (rid != null) {
+				tp = new TablePlan(key.getTableName(), tx);
+				TableScan ts = (TableScan) tp.open();
+				ts.moveToRecordId(rid);
+				
+				CachedRecordBuilder builder = new CachedRecordBuilder(key);
+				for (String fld : sch.fields()) {
+					if (!key.containsField(fld)) {
+						builder.addField(fld, ts.getVal(fld));
+					}
+				}
+				rec = builder.build();
+			} else
+				throw new RuntimeException("" + key + " is missing!!!");
+		}
 
 		return rec;
 	}
@@ -221,6 +245,9 @@ public class VanillaCoreCrud {
 		UpdateScan s = (UpdateScan) selectPlan.open();
 		s.beforeFirst();
 
+		// XXX: Quick fix
+		boolean found = true;
+
 		// the record key should identifies one record uniquely
 		if (s.next()) {
 			Constant newval, oldval;
@@ -239,7 +266,29 @@ public class VanillaCoreCrud {
 				s.setVal(fld, newval);
 			}
 		} else
-			return false;
+			// XXX: Quick fix
+			found = false;
+//			return false;
+		
+		// XXX: Quick fix
+		if (!found) {
+			RecordId rid = indexCache.get(key);
+			if (rid != null) {
+				tp = new TablePlan(key.getTableName(), tx);
+				TableScan ts = (TableScan) tp.open();
+				ts.moveToRecordId(rid);
+				
+				Constant newval, oldval;
+				for (String fld : targetflds) {
+					newval = rec.getVal(fld);
+					oldval = s.getVal(fld);
+					if (newval.equals(oldval))
+						continue;
+					ts.setVal(fld, newval);
+				}
+			} else
+				return false;
+		}
 		
 		// close opened indexes
 		for (String fld : targetflds) {
@@ -265,6 +314,9 @@ public class VanillaCoreCrud {
 		UpdateScan s = (UpdateScan) p.open();
 		s.insert();
 		RecordId rid = s.getRecordId();
+		
+		// XXX: Quick fix
+		indexCache.put(key, rid);
 
 		// then modify each field, inserting an index record if appropriate
 		for (String fldName : rec.getFldNames()) {

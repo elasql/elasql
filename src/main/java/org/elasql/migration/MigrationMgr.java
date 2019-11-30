@@ -18,7 +18,8 @@ public abstract class MigrationMgr {
 	public static final boolean ENABLE_NODE_SCALING;
 	public static final boolean IS_SCALING_OUT; // Scaling-out or consolidation
 	public static final boolean ENABLE_COLD_MIGRATION; // Only add/remove machines or proactively migrates
-	public static final boolean USE_RANGE_SCALING_OUT; // only works when ENABLE_NODE_SCALING && IS_SCALING_OUT = true
+	
+	private static final long START_MIGRATION_TIME; // in ms
 	
 	static {
 		ENABLE_NODE_SCALING = ElasqlProperties.getLoader()
@@ -27,8 +28,8 @@ public abstract class MigrationMgr {
 				.getPropertyAsBoolean(MigrationMgr.class.getName() + ".IS_SCALING_OUT", true);
 		ENABLE_COLD_MIGRATION = ElasqlProperties.getLoader()
 				.getPropertyAsBoolean(MigrationMgr.class.getName() + ".ENABLE_COLD_MIGRATION", true);
-		USE_RANGE_SCALING_OUT = ElasqlProperties.getLoader()
-				.getPropertyAsBoolean(MigrationMgr.class.getName() + ".USE_RANGE_SCALING_OUT", false);
+		START_MIGRATION_TIME = ElasqlProperties.getLoader()
+				.getPropertyAsLong(MigrationMgr.class.getName() + ".START_MIGRATION_TIME", 300_000);
 	}
 	
 	public static final int SP_MIGRATION_START = -101;
@@ -39,8 +40,6 @@ public abstract class MigrationMgr {
 	
 	private static final int CHUNK_SIZE = 1000;
 	
-	private static final long START_MIGRATION_TIME = 300_000; // in ms
-//	private static final long START_MIGRATION_TIME = 100_000_000; // in ms
 	private static final long COLD_MIGRATION_DELAY = 0_000; // in ms
 	
 	private Deque<MigrationRange> targetRanges;

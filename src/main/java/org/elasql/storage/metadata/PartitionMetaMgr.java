@@ -15,24 +15,21 @@
  ******************************************************************************/
 package org.elasql.storage.metadata;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
 public class PartitionMetaMgr {
+	private static Logger logger = Logger.getLogger(PartitionMetaMgr.class.getName());
 
-	public final static int NUM_PARTITIONS;
-//	public final static File LOGDIR;
-//	public final static File LOGFILE;
-	public static FileWriter WRLOGFILE;
-	public static BufferedWriter BWRLOGFILE;
-	
+	public static final int NUM_PARTITIONS;
 	public static final int LOC_TABLE_MAX_SIZE;
-	private static FusionTable fusionTable;
+	
+	private static final FusionTable FUSION_TABLE;
 	
 	private PartitionPlan partPlan;
 	private boolean isInMigration;
@@ -43,121 +40,14 @@ public class PartitionMetaMgr {
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 		LOC_TABLE_MAX_SIZE = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".LOC_TABLE_MAX_SIZE", -1);
-//		if (LOC_TABLE_MAX_SIZE == -1)
-//			locationTable = new HashMap<RecordKey, Integer>();
-//			locationTable = new ConcurrentHashMap<RecordKey, Integer>();
-//		else
-//			locationTable = new HashMap<RecordKey, Integer>(LOC_TABLE_MAX_SIZE + 1000);
-		fusionTable = new FusionTable(LOC_TABLE_MAX_SIZE);
-		
-//		new PeriodicalJob(5000, 1500_000, new Runnable() {
-//			@Override
-//			public void run() {
-//					System.out.println("Location Table : " + locationTable.size() +
-//						", Queue: " + fifoQueue.size());
-//					System.out.println("Fusion Table : " + fusionTable.size());
-//				}
-//			}
-//		).start();
-		
-		// Note: Remember to use ConcurrentHashMap
-//		new PeriodicalJob(5000, 660000, new Runnable() {
-//			@Override
-//			public void run() {
-//				count(0);
-//				count(1);
-//			}
-//			
-//			void count(int tenantId) {
-//				int startId = tenantId * 25_000 + 1;
-//				int endId = (tenantId + 1) * 25_000;
-//				int[] counts = new int[4];
-//				for (int i = 0; i < counts.length; i++)
-//					counts[i] = 6250;
-//				
-//				for (Entry<RecordKey, Integer> entry : locationTable.entrySet()) {
-//					int id = Integer.parseInt((String) entry.getKey().getKeyVal("ycsb_id").asJavaVal());
-////					int id = (Integer) entry.getKey().getKeyVal("i_id").asJavaVal();
-//					int sourcePart = id % 4;
-//					int newPart = entry.getValue();
-//					
-//					if (startId <= id && id <= endId) {
-//						counts[sourcePart]--;
-//						counts[newPart]++;
-//					}
-//				}
-//				
-//				System.out.println(String.format("Tenant %d: %s", tenantId, Arrays.toString(counts)));
-//			}
-//		}).start();
-		
-//		Thread thread = new Thread(new Runnable() {
-//			public void run() {
-//				try {
-//					Thread.sleep(450000);
-//					File dir = new File(".");
-//					File outputFile = new File(dir, "loc_tbl.txt");
-//					FileWriter wrFile = new FileWriter(outputFile);
-//					BufferedWriter bwrFile = new BufferedWriter(wrFile);
-//					HashMap<RecordKey, LinkedList<Integer>> tmp = (HashMap<RecordKey, LinkedList<Integer>>) locationTable
-//							.clone();
-//
-//					Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
-//					RecordKey key;
-//					int[] l;
-//					int p, iid;
-//					for (int j = 0; j < PartitionMetaMgr.NUM_PARTITIONS; j++) {
-//						l = new int[PartitionMetaMgr.NUM_PARTITIONS];
-//						System.out.print(String.format("Items : %7d ~ %7d -> ", j * 100000, (j + 1) * 100000));
-//						for (int i = 1; i <= 100000; i++) {
-//							iid = 100000 * j + i;
-//							keyEntryMap.put("i_id", new IntegerConstant(iid));
-//							key = new RecordKey("item", keyEntryMap);
-//							LinkedList<Integer> t = tmp.get(key);
-//
-//							if (t != null)
-//								p = t.getFirst();
-//							else
-//								p = getRangeLoc(key);
-//							l[p]++;
-//						}
-//						for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
-//							System.out.print(String.format("P %d : %6d ", i, l[i]));
-//						System.out.println("");
-//					}
-//
-//					System.out.println("Before");
-//					for (int j = 0; j < PartitionMetaMgr.NUM_PARTITIONS; j++) {
-//						l = new int[PartitionMetaMgr.NUM_PARTITIONS];
-//						System.out.print(String.format("Items : %7d ~ %7d -> ", j * 100000, (j + 1) * 100000));
-//						for (int i = 1; i <= 100000; i++) {
-//							iid = 100000 * j + i;
-//							keyEntryMap.put("i_id", new IntegerConstant(iid));
-//							key = new RecordKey("item", keyEntryMap);
-//
-//							p = key.hashCode() % PartitionMetaMgr.NUM_PARTITIONS;
-//							l[p]++;
-//						}
-//						for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++)
-//							System.out.print(String.format("P %d : %6d ", i, l[i]));
-//						System.out.println("");
-//					}
-//
-//					for (Entry<RecordKey, LinkedList<Integer>> e : tmp.entrySet())
-//						bwrFile.write(e.getKey() + " loc: " + e.getValue() + "\n");
-//					bwrFile.close();
-//				} catch (InterruptedException e) {
-//					e.printStackTrace();
-//				} catch (IOException e) {
-//					e.printStackTrace();
-//				}
-//			}
-//		});
-//		thread.start();
+		FUSION_TABLE = new FusionTable(LOC_TABLE_MAX_SIZE);
 	}
 	
 	public PartitionMetaMgr(PartitionPlan plan) {
 		partPlan = plan;
+		
+		if (logger.isLoggable(Level.INFO))
+			logger.info(String.format("Using '%s'", partPlan));
 	}
 
 	/**
@@ -211,7 +101,7 @@ public class PartitionMetaMgr {
 	 * @return the id of the partition where the record is
 	 */
 	public int getCurrentLocation(RecordKey key) {
-		int location = fusionTable.getLocation(key);
+		int location = FUSION_TABLE.getLocation(key);
 		if (location != -1)
 			return location;
 		
@@ -225,14 +115,14 @@ public class PartitionMetaMgr {
 	}
 
 	public void setCurrentLocation(RecordKey key, int loc) {
-		if (getPartition(key) == loc && fusionTable.containsKey(key))
-			fusionTable.remove(key);
+		if (getPartition(key) == loc && FUSION_TABLE.containsKey(key))
+			FUSION_TABLE.remove(key);
 		else
-			fusionTable.setLocation(key, loc);
+			FUSION_TABLE.setLocation(key, loc);
 	}
 	
 	public Integer queryLocationTable(RecordKey key) {
-		int partId = fusionTable.getLocation(key);
+		int partId = FUSION_TABLE.getLocation(key);
 		if (partId == -1)
 			return null;
 		else
@@ -240,7 +130,7 @@ public class PartitionMetaMgr {
 	}
 	
 	public boolean removeFromLocationTable(RecordKey key) {
-		return fusionTable.remove(key) != -1;
+		return FUSION_TABLE.remove(key) != -1;
 	}
 	
 	/**
@@ -249,6 +139,6 @@ public class PartitionMetaMgr {
 	 * @return
 	 */
 	public Set<RecordKey> chooseOverflowedKeys() {
-		return fusionTable.getOverflowKeys();
+		return FUSION_TABLE.getOverflowKeys();
 	}
 }
