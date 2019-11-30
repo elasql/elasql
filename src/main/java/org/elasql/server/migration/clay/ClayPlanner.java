@@ -32,6 +32,8 @@ public class ClayPlanner {
 	private static final int LOOK_AHEAD_MAX;
 	private static final int CLUMP_MAX_SIZE;
 	
+	private static final int MAX_CLUMPS = 500;
+	
 	static {
 		MULTI_PARTS_COST = ElasqlProperties.getLoader()
 				.getPropertyAsDouble(ClayPlanner.class.getName() + ".MULTI_PARTS_COST", 1);
@@ -94,6 +96,11 @@ public class ClayPlanner {
 			plans.addAll(clump.toMigrationPlans());
 			
 			updateMigratedVertices(clump);
+			
+			if (numOfClumpsGenerated == MAX_CLUMPS) {
+				System.out.println("Reach the limit of the number of clumps");
+				break;
+			}
 		}
 		
 		if (plans.isEmpty())
