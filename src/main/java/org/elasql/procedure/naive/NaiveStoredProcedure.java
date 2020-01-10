@@ -141,7 +141,11 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	}
 	
 	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
-		cacheMgr.insert(key, new CachedRecord(fldVals), tx);
+		cacheMgr.insert(
+			key,
+			CachedRecord.newRecordForInsertion(key, fldVals),
+			tx
+		);
 	}
 	
 	protected void delete(RecordKey key) {

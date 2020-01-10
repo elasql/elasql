@@ -127,19 +127,24 @@ public class CalvinCacheMgr {
 		cachedRecords.put(key, rec);
 		writeKeys.add(key);
 	}
+	
+	public void insert(RecordKey key, CachedRecord rec) {
+		rec.setNewInserted();
+		rec.setSrcTxNum(tx.getTransactionNumber());
+		cachedRecords.put(key, rec);
+		writeKeys.add(key);
+	}
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
-		CachedRecord rec = new CachedRecord(fldVals);
+		CachedRecord rec = CachedRecord.newRecordForInsertion(key, fldVals);
 		rec.setSrcTxNum(tx.getTransactionNumber());
-		rec.setNewInserted(true);
 		cachedRecords.put(key, rec);
 		writeKeys.add(key);
 	}
 
 	public void delete(RecordKey key) {
-		CachedRecord dummyRec = new CachedRecord();
+		CachedRecord dummyRec = CachedRecord.newRecordForDeletion(key);
 		dummyRec.setSrcTxNum(tx.getTransactionNumber());
-		dummyRec.delete();
 		cachedRecords.put(key, dummyRec);
 		writeKeys.add(key);
 	}

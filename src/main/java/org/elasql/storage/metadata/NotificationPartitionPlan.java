@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.sql.RecordKey;
+import org.elasql.sql.RecordKeyBuilder;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
@@ -15,10 +16,10 @@ public class NotificationPartitionPlan extends PartitionPlan {
 	public static final String KEY_RECV_NAME = "recv_node_id";
 	
 	public static RecordKey createRecordKey(int sender, int reciever) {
-		Map<String, Constant> keyEntryMap = new HashMap<String, Constant>();
-		keyEntryMap.put(KEY_SENDER_NAME, new IntegerConstant(sender));
-		keyEntryMap.put(KEY_RECV_NAME, new IntegerConstant(reciever));
-		return new RecordKey(TABLE_NAME, keyEntryMap);
+		RecordKeyBuilder builder = new RecordKeyBuilder(TABLE_NAME);
+		builder.addFldVal(KEY_SENDER_NAME, new IntegerConstant(sender));
+		builder.addFldVal(KEY_RECV_NAME, new IntegerConstant(reciever));
+		return builder.build();
 	}
 	
 	public static CachedRecord createRecord(int sender, int reciever, long txNum) {
@@ -27,14 +28,11 @@ public class NotificationPartitionPlan extends PartitionPlan {
 	
 	public static CachedRecord createRecord(int sender, int reciever,
 			long txNum, Map<String, Constant> fldVals) {
-		// Create key value sets
-		Map<String, Constant> newFldVals = new HashMap<String, Constant>(fldVals);
-		newFldVals.put(KEY_SENDER_NAME, new IntegerConstant(sender));
-		newFldVals.put(KEY_RECV_NAME, new IntegerConstant(reciever));
-
 		// Create a record
-		CachedRecord rec = new CachedRecord(newFldVals);
+		RecordKey key = createRecordKey(sender, reciever);
+		CachedRecord rec = new CachedRecord(key);
 		rec.setSrcTxNum(txNum);
+		rec.setTempRecord(true);
 		return rec;
 	}
 	

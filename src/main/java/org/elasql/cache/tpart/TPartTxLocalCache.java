@@ -87,16 +87,14 @@ public class TPartTxLocalCache {
 	}
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
-		CachedRecord rec = new CachedRecord(fldVals);
+		CachedRecord rec = CachedRecord.newRecordForInsertion(key, fldVals);
 		rec.setSrcTxNum(txNum);
-		rec.setNewInserted(true);
 		recordCache.put(key, rec);
 	}
 
 	public void delete(RecordKey key) {
-		CachedRecord dummyRec = new CachedRecord();
+		CachedRecord dummyRec = CachedRecord.newRecordForDeletion(key);
 		dummyRec.setSrcTxNum(txNum);
-		dummyRec.delete();
 		recordCache.put(key, dummyRec);
 	}
 

@@ -161,11 +161,11 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 				// Prevent null pointer exceptions in the destination node
 				if (rec == null) {
-					rec = new CachedRecord();
+					rec = new CachedRecord(key);
 					rec.setSrcTxNum(txNum);
-					rec.setVal("exists", FALSE);
+					rec.addFldVal("exists", FALSE);
 				} else
-					rec.setVal("exists", TRUE);
+					rec.addFldVal("exists", TRUE);
 
 				ts.addTuple(key, txNum, txNum, rec);
 			}
@@ -215,10 +215,8 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 
 			// Flush them to the local storage engine
 			if (rec.getVal("exists").equals(TRUE)) {
-				rec.getFldValMap().remove("exists");
-				rec.getDirtyFldNames().remove("exists");
-				
-				cacheMgr.insert(key, rec.getFldValMap());
+				rec.removeField("exists");
+				cacheMgr.insert(key, rec);
 			}
 		}
 	}

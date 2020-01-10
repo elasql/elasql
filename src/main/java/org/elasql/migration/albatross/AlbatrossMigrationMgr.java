@@ -315,7 +315,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		Map<RecordKey, CachedRecord> records = readRecords(tx, insertSet);
 		for (Map.Entry<RecordKey, CachedRecord> entry : records.entrySet()) {
 			CachedRecord rec = entry.getValue();
-			rec.setNewInserted(true);
+			rec.setNewInserted();
 			ts.addTuple(entry.getKey(), txNum, txNum, rec);
 		}
 		
@@ -333,11 +333,8 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 			CachedRecord rec = entry.getValue();
 			// We do not record which fields are dirty. So, we simply 
 			// make it update all non-key fields
-			for (String field : rec.getDirtyFldNames()) {
-				if (!key.getKeyFldSet().contains(field))
-					rec.setVal(field, rec.getVal(field));
-			}
-			ts.addTuple(entry.getKey(), txNum, txNum, rec);
+			rec.markAllNonKeyFieldsDirty();
+			ts.addTuple(key, txNum, txNum, rec);
 		}
 
 		if (logger.isLoggable(Level.INFO))
@@ -358,7 +355,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 				throw new RuntimeException("Something wrong: " + k);
 
 			// Flush them to the local storage engine
-			cacheMgr.insert(k, rec.getFldValMap());
+			cacheMgr.insert(k, rec);
 		}
 		
 		// Delete records

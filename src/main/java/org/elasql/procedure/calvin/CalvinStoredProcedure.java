@@ -341,7 +341,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	
 	private void performInsertionForMigrations(Set<RecordKey> migratingKeys, Map<RecordKey, CachedRecord> migratingRecords) {
 		for (RecordKey key : migratingKeys) {
-			cacheMgr.insert(key, migratingRecords.get(key).getFldValMap());
+			cacheMgr.insert(key, migratingRecords.get(key));
 		}
 	}
 }
