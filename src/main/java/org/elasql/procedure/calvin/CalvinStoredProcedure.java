@@ -25,7 +25,6 @@ import java.util.logging.Logger;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
-import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
@@ -38,11 +37,12 @@ import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper>
-		implements DdStoredProcedure {
+		extends StoredProcedure<H> {
 	private static Logger logger = Logger.getLogger(CalvinStoredProcedure.class.getName());
 
 	// Protected resource
@@ -52,8 +52,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	
 	private ExecutionPlan execPlan;
 	private Transaction tx;
+	private boolean isCommitted = false;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
+		super(paramHelper);
+		
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
 
@@ -169,7 +172,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 //			Timer.getLocalTimer().startComponentTimer("commit");
 			tx.commit();
 //			Timer.getLocalTimer().stopComponentTimer("commit");
-			paramHelper.setCommitted(true);
+			isCommitted = true;
 			
 			afterCommit();
 			
@@ -178,13 +181,16 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan);
 			e.printStackTrace();
 			tx.rollback();
-			paramHelper.setCommitted(false);
 		} finally {
 			// Clean the cache
 			cacheMgr.notifyTxCommitted();
 		}
 
-		return paramHelper.createResultSet();
+		return new SpResultSet(
+			isCommitted,
+			paramHelper.getResultSetSchema(),
+			paramHelper.newResultSetRecord()
+		);
 	}
 
 	public boolean isParticipating() {
@@ -195,9 +201,15 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		return execPlan.getParticipantRole() == ParticipantRole.ACTIVE;
 	}
 
-	@Override
 	public boolean isReadOnly() {
 		return execPlan.isReadOnly();
+	}
+	
+	@Override
+	protected void executeSql() {
+		// Do nothing
+		// Because we have overrided execute(), there is no need
+		// to implement this method.
 	}
 
 	protected void performForegroundMigration() {

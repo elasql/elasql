@@ -15,20 +15,15 @@
  *******************************************************************************/
 package org.elasql.procedure.naive;
 
-import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
-public class NaiveStoredProcedureTask extends StoredProcedureTask {
-	
-	private NaiveStoredProcedure<?> nsp;
+public class NaiveStoredProcedureTask extends StoredProcedureTask<NaiveStoredProcedure<?>> {
 	
 	public NaiveStoredProcedureTask(int cid, int connId, long txNum,
-			DdStoredProcedure sp) {
+			NaiveStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
-		
-		nsp = (NaiveStoredProcedure<?>) sp;
 	}
 
 	public void run() {
@@ -37,6 +32,6 @@ public class NaiveStoredProcedureTask extends StoredProcedureTask {
 	}
 	
 	public void lockConservatively() {
-		nsp.requestConservativeLocks();
+		sp.requestConservativeLocks();
 	}
 }

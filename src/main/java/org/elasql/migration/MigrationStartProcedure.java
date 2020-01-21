@@ -17,7 +17,7 @@ public class MigrationStartProcedure extends CalvinStoredProcedure<StoredProcedu
 	private Object[] params;
 	
 	public MigrationStartProcedure(long txNum) {
-		super(txNum, StoredProcedureParamHelper.DefaultParamHelper());
+		super(txNum, StoredProcedureParamHelper.newDefaultParamHelper());
 	}
 	
 	@Override

@@ -15,24 +15,22 @@
  *******************************************************************************/
 package org.elasql.procedure.calvin;
 
-import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
-public class CalvinStoredProcedureTask extends StoredProcedureTask {
+public class CalvinStoredProcedureTask
+		extends StoredProcedureTask<CalvinStoredProcedure<?>> {
 	
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
 	}
 
-	private CalvinStoredProcedure<?> csp;
-
-	public CalvinStoredProcedureTask(int cid, int connId, long txNum, DdStoredProcedure sp) {
+	public CalvinStoredProcedureTask(
+			int cid, int connId, long txNum,
+			CalvinStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
-
-		csp = (CalvinStoredProcedure<?>) sp;
 	}
 
 	public void run() {
@@ -55,7 +53,7 @@ public class CalvinStoredProcedureTask extends StoredProcedureTask {
 //			System.out.println(String.format("Tx.%d commits at %d ms.", txNum, time));
 //		}
 
-		if (csp.willResponseToClients()) {
+		if (sp.willResponseToClients()) {
 			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 		}
 		

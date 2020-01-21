@@ -24,18 +24,18 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
-public class TPartStoredProcedureTask extends StoredProcedureTask {
+public class TPartStoredProcedureTask extends StoredProcedureTask<TPartStoredProcedure<?>> {
 
-	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
+	public TPartStoredProcedureTask(
+			int cid, int connId, long txNum,
+			TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
-		this.tsp = sp;
 	}
 
 	@Override
@@ -46,14 +46,14 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 		// try {
 		// long start = System.nanoTime();
-		rs = tsp.execute();
+		rs = sp.execute();
 		// long time = System.nanoTime() - start;
 		// System.out.println(time / 1000);
 		// } finally {
 //		Timers.getTimer().stopExecution();
 		// }
 
-		if (tsp.isMaster()) {
+		if (sp.isMaster()) {
 			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 			// System.out.println("Commit: " + (System.nanoTime() - startTime));
 		}
@@ -62,20 +62,21 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 //		Timers.addToStatstics();
 	}
 
+	@Override
 	public long getTxNum() {
 		return txNum;
 	}
 
 	public Set<RecordKey> getReadSet() {
-		return tsp.getReadSet();
+		return sp.getReadSet();
 	}
 
 	public Set<RecordKey> getWriteSet() {
-		return tsp.getWriteSet();
+		return sp.getWriteSet();
 	}
 
 	public double getWeight() {
-		return tsp.getWeight();
+		return sp.getWeight();
 	}
 
 	public int getPartitionId() {
@@ -87,16 +88,16 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 	}
 
 	public void setSunkPlan(SunkPlan plan) {
-		tsp.setSunkPlan(plan);
+		sp.setSunkPlan(plan);
 	}
 
 	public ProcedureType getProcedureType() {
-		if (tsp == null)
+		if (sp == null)
 			return ProcedureType.NOP;
-		return tsp.getProcedureType();
+		return sp.getProcedureType();
 	}
 
 	public boolean isReadOnly() {
-		return tsp.isReadOnly();
+		return sp.isReadOnly();
 	}
 }

@@ -28,7 +28,6 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.tpart.CachedEntryKey;
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.cache.tpart.TPartTxLocalCache;
-import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.tpart.sink.PushInfo;
 import org.elasql.schedule.tpart.sink.SunkPlan;
@@ -37,10 +36,12 @@ import org.elasql.sql.RecordKey;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
 
-public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper> implements DdStoredProcedure {
+public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
+		extends StoredProcedure<H> {
 
 	public static enum ProcedureType {
 		NOP, NORMAL, UTILITY
@@ -58,8 +59,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
+	private boolean isCommitted = false;
 
 	public TPartStoredProcedure(long txNum, H paramHelper) {
+		super(paramHelper);
+		
 		if (paramHelper == null)
 			throw new NullPointerException("paramHelper should not be null");
 
@@ -98,13 +102,24 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			executeTransactionLogic();
 
 			tx.commit();
-			paramHelper.setCommitted(true);
+			isCommitted = true;
 		} catch (Exception e) {
 			e.printStackTrace();
 			tx.rollback();
-			paramHelper.setCommitted(false);
 		}
-		return paramHelper.createResultSet();
+		
+		return new SpResultSet(
+			isCommitted,
+			paramHelper.getResultSetSchema(),
+			paramHelper.newResultSetRecord()
+		);
+	}
+	
+	@Override
+	protected void executeSql() {
+		// Do nothing
+		// Because we have overrided execute(), there is no need
+		// to implement this method.
 	}
 
 	public void setSunkPlan(SunkPlan p) {
@@ -131,7 +146,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		return writeKeys;
 	}
 
-	@Override
 	public boolean isReadOnly() {
 		return paramHelper.isReadOnly();
 	}

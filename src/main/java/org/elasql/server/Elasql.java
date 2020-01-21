@@ -108,7 +108,7 @@ public class Elasql extends VanillaDb {
 	 * @param isSequencer
 	 *            is this server a sequencer
 	 */
-	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory) {
+	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory<?> factory) {
 		PartitionPlan partitionPlan = null;
 		Class<?> planCls = ElasqlProperties.getLoader().getPropertyAsClass(
 				Elasql.class.getName() + ".DEFAULT_PARTITION_PLAN", HashPartitionPlan.class,
@@ -125,7 +125,7 @@ public class Elasql extends VanillaDb {
 		init(dirName, id, isSequencer, factory, partitionPlan, null);
 	}
 	
-	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory factory,
+	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory<?> factory,
 			PartitionPlan partitionPlan, MigrationComponentFactory migraComsFactory) {
 		myNodeId = id;
 
@@ -178,7 +178,7 @@ public class Elasql extends VanillaDb {
 		}
 	}
 
-	public static void initScheduler(DdStoredProcedureFactory factory, MigrationComponentFactory migraComsFactory) {
+	public static void initScheduler(DdStoredProcedureFactory<?> factory, MigrationComponentFactory migraComsFactory) {
 		switch (SERVICE_TYPE) {
 		case NAIVE:
 			if (!NaiveStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))

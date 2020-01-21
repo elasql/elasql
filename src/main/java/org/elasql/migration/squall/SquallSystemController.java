@@ -10,7 +10,6 @@ import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationStoredProcFactory;
 import org.elasql.migration.MigrationSystemController;
-import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
@@ -69,9 +68,8 @@ public class SquallSystemController implements MigrationSystemController {
 		
 		// Send a store procedure call
 		Object[] params = new Object[] {newPartPlan};
-		Object[] call = { new StoredProcedureCall(-1, -1, 
-				MigrationStoredProcFactory.SP_MIGRATION_START, params)};
-		Elasql.connectionMgr().sendBroadcastRequest(call, false);
+		Elasql.connectionMgr().sendStoredProcedureCall(false, 
+				MigrationStoredProcFactory.SP_MIGRATION_START, params);
 	}
 	
 	public void onReceiveMigrationRangeFinishMsg(MigrationRangeFinishMessage msg) {
@@ -97,8 +95,7 @@ public class SquallSystemController implements MigrationSystemController {
 		
 		// Send a store procedure call
 		Object[] params = new Object[] {};
-		Object[] call = { new StoredProcedureCall(-1, -1, 
-				MigrationStoredProcFactory.SP_MIGRATION_END, params)};
-		Elasql.connectionMgr().sendBroadcastRequest(call, true);
+		Elasql.connectionMgr().sendStoredProcedureCall(true, 
+				MigrationStoredProcFactory.SP_MIGRATION_END, params);
 	}
 }

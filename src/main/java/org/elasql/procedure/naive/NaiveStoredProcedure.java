@@ -22,18 +22,18 @@ import java.util.Map;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.naive.NaiveCacheMgr;
-import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
-		implements DdStoredProcedure {
+		extends StoredProcedure<H> {
 
 	// Protected resource
 	protected Transaction tx;
@@ -43,10 +43,13 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	// Record keys
 	private List<RecordKey> readKeys = new ArrayList<RecordKey>();
 	private List<RecordKey> writeKeys = new ArrayList<RecordKey>();
+	private boolean isCommitted = false; 
 	
 	private NaiveCacheMgr cacheMgr = (NaiveCacheMgr) Elasql.remoteRecReceiver();
 	
 	public NaiveStoredProcedure(long txNum, H paramHelper) {
+		super(paramHelper);
+		
 		this.txNum = txNum;
 		this.paramHelper = paramHelper;
 
@@ -109,17 +112,28 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 
 			// The transaction finishes normally
 			tx.commit();
+			
+			isCommitted = true;
 
 		} catch (Exception e) {
 			tx.rollback();
-			paramHelper.setCommitted(false);
 			e.printStackTrace();
 		}
 
-		return paramHelper.createResultSet();
+		return new SpResultSet(
+			isCommitted,
+			paramHelper.getResultSetSchema(),
+			paramHelper.newResultSetRecord()
+		);
 	}
 	
 	@Override
+	protected void executeSql() {
+		// Do nothing
+		// Because we have overrided execute(), there is no need
+		// to implement this method.
+	}
+	
 	public boolean isReadOnly() {
 		return paramHelper.isReadOnly();
 	}

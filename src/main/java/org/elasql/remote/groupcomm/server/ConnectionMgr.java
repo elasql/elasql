@@ -43,12 +43,10 @@ public class ConnectionMgr
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
 
 	private ServerAppl serverAppl;
-	private int myId;
 	private boolean sequencerMode;
 	private BlockingQueue<TotalOrderMessage> tomQueue = new LinkedBlockingQueue<TotalOrderMessage>();
 
 	public ConnectionMgr(int id, boolean seqMode) {
-		myId = id;
 		sequencerMode = seqMode;
 		serverAppl = new ServerAppl(id, this, this, this);
 		serverAppl.start();
@@ -92,14 +90,10 @@ public class ConnectionMgr
 				ChannelType.CLIENT);
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
-
-	public void sendBroadcastRequest(Object[] objs, boolean isAppiaThread) {
-		serverAppl.sendBroadcastRequest(objs, isAppiaThread);
-	}
-
-	public void callStoredProc(int pid, Object... pars) {
-		StoredProcedureCall[] spcs = { new StoredProcedureCall(myId, pid, pars) };
-		serverAppl.sendTotalOrderRequest(spcs);
+	
+	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
+		Object[] spCalls = { new StoredProcedureCall(-1, -1, pid, pars)};
+		serverAppl.sendTotalOrderRequest(spCalls, fromAppiaThread);
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
@@ -140,10 +134,5 @@ public class ConnectionMgr
 	@Override
 	public void onNodeFail(int id, ChannelType ct) {
 		// do nothing
-	}
-
-	@Override
-	public String mkClientResponse(Object o) {
-		return null;
 	}
 }

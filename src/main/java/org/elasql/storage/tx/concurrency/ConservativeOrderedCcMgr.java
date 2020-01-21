@@ -109,11 +109,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 
 	@Override
 	public void onTxEndStatement(Transaction tx) {
-		
-	}
-	
-	@Override
-	public void onIndexClosed() {
 		// Next-key lock algorithm is non-deterministic. It may
 		// cause deadlocks during the execution. Therefore,
 		// we release the locks earlier to prevent deadlocks.

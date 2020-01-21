@@ -19,7 +19,6 @@ import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationRangeUpdate;
 import org.elasql.migration.MigrationSystemController;
-import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
@@ -136,9 +135,8 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 			params[i++] = key;
 		
 		// Send a store procedure call
-		Object[] call = { new StoredProcedureCall(-1, -1, 
-				AlbatrossStoredProcFactory.SP_BG_PUSH, params)};
-		Elasql.connectionMgr().sendBroadcastRequest(call, false);
+		Elasql.connectionMgr().sendStoredProcedureCall(false, 
+				AlbatrossStoredProcFactory.SP_BG_PUSH, params);
 	}
 	
 	public void addUpdatedKey(RecordKey key) {
