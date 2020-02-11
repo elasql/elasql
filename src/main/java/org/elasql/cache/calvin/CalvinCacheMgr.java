@@ -17,6 +17,7 @@ package org.elasql.cache.calvin;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -143,6 +144,14 @@ public class CalvinCacheMgr {
 		cachedRecords.put(key, dummyRec);
 		writeKeys.add(key);
 	}
+	
+//	public static void setMigrated(RecordKey key, Transaction tx, List<IndexInfo> allIndexes) {
+//		VanillaCoreCrud.setMigrated(key, tx, allIndexes);
+//	}
+//	
+//	public static boolean isMigrated(RecordKey key, Transaction tx, IndexInfo ii) {
+//		return VanillaCoreCrud.isMigrated(key, tx, ii);
+//	}
 	
 	public void flush() {
 		for (RecordKey key : writeKeys) {

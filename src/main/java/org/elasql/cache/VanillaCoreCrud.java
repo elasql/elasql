@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +40,9 @@ import org.vanilladb.core.sql.ConstantRange;
 import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.storage.index.Index;
 import org.vanilladb.core.storage.index.SearchKey;
+import org.vanilladb.core.storage.index.SearchKeyType;
 import org.vanilladb.core.storage.index.SearchRange;
+import org.vanilladb.core.storage.index.btree.BTreeIndex;
 import org.vanilladb.core.storage.metadata.TableInfo;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.record.RecordFile;
@@ -366,6 +369,66 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
+	}
+	
+	public static boolean isMigrated(RecordKey key, Transaction tx, List<IndexInfo> allIndexes,
+			List<SearchKeyType> allSKtype) {
+		
+		// Open an index
+		IndexInfo ii = null;
+		SearchKeyType sk = null;
+		Iterator<IndexInfo> iiIterator = allIndexes.iterator();
+        Iterator<SearchKeyType> skIterator = allSKtype.iterator();
+        while(iiIterator.hasNext() && skIterator.hasNext()) {
+        	ii = (IndexInfo) iiIterator.next();
+        	sk = (SearchKeyType) skIterator.next();
+        	if(key.getTableName().equals(ii.tableName())) {
+        		break;
+        	}
+        }
+        if(ii == null)
+        	return false;
+        
+        BTreeIndex index = (BTreeIndex) Index.newInstance(ii, sk, tx);
+
+		// Search record ids for record keys
+		// Map<RecordId, Set<RecordKey>> ridToSearchKey = new HashMap<RecordId,
+		// Set<RecordKey>>();
+
+		SearchKey searchKey = new SearchKey(ii.fieldNames(), key.getKeyEntryMap());
+		index.beforeFirst(new SearchRange(searchKey));
+
+		while (index.next()) {
+			boolean isMigrated = index.isMigrated();
+			index.close();
+			return isMigrated;
+		}
+		return false;
+	}
+	
+	public static int setMigrated(RecordKey key, Transaction tx, List<IndexInfo> allIndexes,
+			List<SearchKeyType> allSKtype) {
+		int flag = 0;
+		Iterator<IndexInfo> iiIterator = allIndexes.iterator();
+        Iterator<SearchKeyType> skIterator = allSKtype.iterator();
+        while(iiIterator.hasNext() && skIterator.hasNext()) {
+        	IndexInfo ii = (IndexInfo) iiIterator.next();
+        	SearchKeyType sk = (SearchKeyType) skIterator.next();
+        	if(key.getTableName().equals(ii.tableName())) {
+        		BTreeIndex index = (BTreeIndex) Index.newInstance(ii, sk, tx);
+    			SearchKey searchKey = new SearchKey(ii.fieldNames(), key.getKeyEntryMap());
+    			index.beforeFirst(new SearchRange(searchKey));
+
+    			while (index.next()) {
+    				index.setMigrated();
+    				index.close();
+//    				flag += 1;
+    			}
+    			flag += 1;
+        		break;
+        	}
+        }
+        return flag;
 	}
 	
 	private static IndexSelectPlan selectByBestMatchedIndex(String tblName,

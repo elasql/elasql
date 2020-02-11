@@ -9,8 +9,8 @@ public interface MigrationSystemController {
 	
 	int MSG_RANGE_FINISH = -8787;
 	
-//	long START_MIGRATION_TIME = 60_000; // debug
-	long START_MIGRATION_TIME = 180_000; // normal
+//	long START_MIGRATION_TIME = 90_000; // debug
+	long START_MIGRATION_TIME = 500_000; // normal
 	
 	int CONTROLLER_NODE_ID = PartitionMetaMgr.NUM_PARTITIONS;
 	

@@ -25,6 +25,7 @@ import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.migration.zephyr.AcceptByteSave;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -89,6 +90,7 @@ public class Elasql extends VanillaDb {
 	private static Scheduler scheduler;
 	private static DdLogMgr ddLogMgr;
 	private static MigrationMgr migraMgr;
+	private static AcceptByteSave acceptByteSave;
 	
 	// Only for the sequencer
 	private static MigrationSystemController migraSysControl;
@@ -155,6 +157,10 @@ public class Elasql extends VanillaDb {
 		initDdLogMgr();
 		if (migraComsFactory != null)
 			migraMgr = migraComsFactory.newMigrationMgr();
+		
+		acceptByteSave = new AcceptByteSave();
+		taskMgr().runTask(acceptByteSave);
+		
 	}
 
 	// ================
@@ -249,6 +255,10 @@ public class Elasql extends VanillaDb {
 
 	public static RemoteRecordReceiver remoteRecReceiver() {
 		return remoteRecReceiver;
+	}
+	
+	public static AcceptByteSave CallAcceptByteSave() {
+		return acceptByteSave;
 	}
 
 	public static Scheduler scheduler() {

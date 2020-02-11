@@ -15,6 +15,7 @@
  ******************************************************************************/
 package org.elasql.remote.groupcomm.server;
 
+import java.net.SocketAddress;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
@@ -22,6 +23,8 @@ import java.util.logging.Logger;
 
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.remote.groupcomm.ByteSet;
+import org.elasql.remote.groupcomm.Bytes;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
@@ -46,7 +49,7 @@ public class ConnectionMgr
 	private int myId;
 	private boolean sequencerMode;
 	private BlockingQueue<TotalOrderMessage> tomQueue = new LinkedBlockingQueue<TotalOrderMessage>();
-
+	
 	public ConnectionMgr(int id, boolean seqMode) {
 		myId = id;
 		sequencerMode = seqMode;
@@ -106,6 +109,11 @@ public class ConnectionMgr
 		P2pMessage p2pmsg = new P2pMessage(reading, nodeId, ChannelType.SERVER);
 		serverAppl.sendP2pMessage(p2pmsg);
 	}
+	
+	public void pushByteSet(int nodeId, ByteSet reading) {
+		P2pMessage p2pmsg = new P2pMessage(reading, nodeId, ChannelType.SERVER);
+		serverAppl.sendP2pMessage(p2pmsg);
+	}
 
 	@Override
 	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
@@ -121,6 +129,19 @@ public class ConnectionMgr
 			
 			for (Tuple t : ts.getTupleSet())
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
+		} else if(msg.getClass().equals(ByteSet.class)) {
+			if (logger.isLoggable(Level.INFO))
+				logger.info("get ByteSet, ready to call byteAcceptAndSave");
+			
+			ByteSet bs = (ByteSet) msg;
+			
+			for (Bytes b : bs.getByteSet()) {
+				/*if (logger.isLoggable(Level.INFO)) {
+					logger.info(String.format("serial_nm: %s, part: %d, total : %d, "
+							+ "byte_lenth: %d", b.serial_nm, b.part, b.totalPart, b.byte_lenth));
+				}*/
+				Elasql.CallAcceptByteSave().byteAcceptAndSave(b);
+			}
 		} else
 			throw new IllegalArgumentException();
 	}
@@ -145,5 +166,9 @@ public class ConnectionMgr
 	@Override
 	public String mkClientResponse(Object o) {
 		return null;
+	}
+	
+	public SocketAddress getSocketAddress(int nodeId){
+		return serverAppl.getSocketAddress(nodeId);
 	}
 }

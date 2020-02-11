@@ -25,8 +25,10 @@ import java.util.logging.Logger;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
+import org.elasql.migration.zephyr.BgPushProcedure;
 import org.elasql.procedure.DdStoredProcedure;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
@@ -90,8 +92,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
 		if (isParticipating()) {
 			// create a transaction
-			tx = Elasql.txMgr().newTransaction(
-					Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
+			if(execPlan.getLocalInsertKeys().size() > 0)
+				tx = Elasql.txMgr().newTransaction(
+						Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum, true);
+			else
+				tx = Elasql.txMgr().newTransaction(
+						Connection.TRANSACTION_SERIALIZABLE, execPlan.isReadOnly(), txNum);
 			tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 			
 			// create a cache manager
@@ -121,8 +127,15 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			analyzer = new StandardAnalyzer();
 		prepareKeys(analyzer);
 		
+		analyzer.generatePlan();
+		
+		ExecutionPlan plan = analyzer.generatePlan();
+		
+//		if(plan.isNeedAbort())
+//			return new ExecutionPlan();
+		
 		// generate execution plan
-		return analyzer.generatePlan();
+		return plan;
 	}
 	
 	protected void executeLogicInScheduler(Transaction tx) {
@@ -147,6 +160,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	@Override
 	public SpResultSet execute() {
 		try {
+//			if(Elasql.migrationMgr().isInMigration() && !execPlan.isNeedAbort()
+//					&&!this.getClass().equals(BgPushProcedure.class))
+//				if (logger.isLoggable(Level.SEVERE) && execPlan.getLocalInsertKeys().size()>0)
+//					logger.severe("Tx." + txNum+ "\n" + execPlan);
+			
+			
 			// Get conservative locks it has asked before
 //			Timer.getLocalTimer().startComponentTimer("get lock");
 			getConservativeLocks();
@@ -155,16 +174,21 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			// Perform foreground migration
 //			Timer.getLocalTimer().startComponentTimer("perform fg push");
 			performForegroundMigration();
+			
 //			Timer.getLocalTimer().stopComponentTimer("perform fg push");
 			
 			// Execute transaction
 			executeTransactionLogic();
-			
+
 			// Flush the cached records
 //			Timer.getLocalTimer().startComponentTimer("flush");
+			
+			
+			if(execPlan.isNeedAbort()) {
+				throw new RuntimeException("");
+			}
 			cacheMgr.flush();
 //			Timer.getLocalTimer().stopComponentTimer("flush");
-			
 			// The transaction finishes normally
 //			Timer.getLocalTimer().startComponentTimer("commit");
 			tx.commit();
@@ -174,9 +198,13 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			afterCommit();
 			
 		} catch (Exception e) {
-			if (logger.isLoggable(Level.SEVERE))
-				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan);
-			e.printStackTrace();
+//			if (logger.isLoggable(Level.SEVERE))
+//				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan
+//						+ " " + this.getClass().getName());
+			
+//			if (logger.isLoggable(Level.SEVERE))
+//				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan);
+//			e.printStackTrace();
 			tx.rollback();
 			paramHelper.setCommitted(false);
 		} finally {
@@ -241,7 +269,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// Read the remote records
 //		Timer.getLocalTimer().startComponentTimer("read remote");
+		long time_start = System.currentTimeMillis();
 		collectRemoteReadings(execPlan.getRemoteReadKeys(), readings);
+		long time_finish = System.currentTimeMillis();
+		if (logger.isLoggable(Level.SEVERE))
+			logger.severe("wait read remote: " + (time_start - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get())/1000 + "," + (time_finish - time_start));
+		
 //		Timer.getLocalTimer().stopComponentTimer("read remote");
 
 		// Write the local records

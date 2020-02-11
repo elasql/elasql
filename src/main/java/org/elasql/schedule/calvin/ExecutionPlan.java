@@ -54,6 +54,8 @@ public class ExecutionPlan {
 	
 	private boolean forceReadWriteTx = false;
 	private boolean forceRemoteReadEnabled = false;
+	private boolean IsNeedAbort = false;
+	private int sourceId = -1;
 
 	public void addLocalReadKey(RecordKey key) {
 		localReadKeys.add(key);
@@ -209,6 +211,22 @@ public class ExecutionPlan {
 			return true;
 		
 		return !remoteReadKeys.isEmpty() || !incomingMigratingKeys.isEmpty();
+	}
+	
+	public void setNeedAbort() {
+		IsNeedAbort = true;
+	}
+	
+	public boolean isNeedAbort() {
+		return IsNeedAbort;
+	}
+	
+	public void setSource(int id) {
+		sourceId = id;
+	}
+	
+	public int getSource() {
+		return sourceId;
 	}
 	
 	@Override

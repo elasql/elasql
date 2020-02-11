@@ -16,13 +16,16 @@ import org.elasql.migration.squall.SquallSystemController;
 import org.elasql.migration.stopcopy.StopCopyMigrationMgr;
 import org.elasql.migration.stopcopy.StopCopyStoredProcFactory;
 import org.elasql.migration.stopcopy.StopCopySystemController;
+import org.elasql.migration.zephyr.ZephyrMigrationMgr;
+import org.elasql.migration.zephyr.ZephyrStoredProcFactory;
+import org.elasql.migration.zephyr.ZephyrSystemController;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.storage.metadata.PartitionPlan;
 
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
 	
-	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.MGCRAB;
+	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.Zephyr;
 	
 	public MigrationComponentFactory() {
 		if (logger.isLoggable(Level.INFO))
@@ -39,6 +42,8 @@ public abstract class MigrationComponentFactory {
 			return new AlbatrossMigrationMgr(this);
 		case STOP_COPY:
 			return new StopCopyMigrationMgr(this);
+		case Zephyr:
+			return new ZephyrMigrationMgr(this);
 		}
 		throw new RuntimeException("it should not be here.");
 	}
@@ -53,6 +58,8 @@ public abstract class MigrationComponentFactory {
 			return new AlbatrossSystemController(this);
 		case STOP_COPY:
 			return new StopCopySystemController(this);
+		case Zephyr:
+			return new ZephyrSystemController(this);
 		}
 		throw new RuntimeException("it should not be here.");
 	}
@@ -68,6 +75,8 @@ public abstract class MigrationComponentFactory {
 			return new AlbatrossStoredProcFactory(underlayerFactory);
 		case STOP_COPY:
 			return new StopCopyStoredProcFactory(underlayerFactory);
+		case Zephyr:
+			return new ZephyrStoredProcFactory(underlayerFactory);
 		}
 		throw new RuntimeException("it should not be here.");
 	}
