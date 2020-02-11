@@ -21,12 +21,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.remote.groupcomm.ClientResponse;
+import org.elasql.remote.groupcomm.ElasqlSpResultSet;
 import org.vanilladb.comm.client.ClientAppl;
 import org.vanilladb.comm.client.ClientNodeFailListener;
 import org.vanilladb.comm.client.ClientP2pMessageListener;
 import org.vanilladb.comm.messages.ChannelType;
 import org.vanilladb.comm.messages.P2pMessage;
-import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class GroupCommConnection implements ClientP2pMessageListener, ClientNodeFailListener {
 
@@ -57,7 +57,7 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 		new Thread(null, batchSender, "Batch-Spc-Sender").start();
 	}
 
-	public SpResultSet callStoredProc(int connId, int pid, Object... pars) {
+	public ElasqlSpResultSet callStoredProc(int connId, int pid, Object... pars) {
 		// Check if there is a queue for it
 		BlockingQueue<ClientResponse> respQueue = rteToRespQueue.get(connId);
 		if (respQueue == null) {
@@ -81,7 +81,7 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 			// Record the tx number of the response
 			rteToLastTxNum.put(connId, cr.getTxNum());
 			
-			return (SpResultSet) cr.getResultSet();
+			return cr.getResultSet();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 			throw new RuntimeException("Something wrong");
