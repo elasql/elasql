@@ -1,12 +1,8 @@
 package org.elasql.storage.metadata;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.elasql.cache.CachedRecord;
 import org.elasql.sql.RecordKey;
 import org.elasql.sql.RecordKeyBuilder;
-import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
 public class NotificationPartitionPlan extends PartitionPlan {
@@ -23,11 +19,6 @@ public class NotificationPartitionPlan extends PartitionPlan {
 	}
 	
 	public static CachedRecord createRecord(int sender, int reciever, long txNum) {
-		return createRecord(sender, reciever, txNum, new HashMap<String, Constant>());
-	}
-	
-	public static CachedRecord createRecord(int sender, int reciever,
-			long txNum, Map<String, Constant> fldVals) {
 		// Create a record
 		RecordKey key = createRecordKey(sender, reciever);
 		CachedRecord rec = new CachedRecord(key);

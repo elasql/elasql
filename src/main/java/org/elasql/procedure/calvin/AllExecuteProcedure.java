@@ -15,8 +15,6 @@
  *******************************************************************************/
 package org.elasql.procedure.calvin;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,7 +48,8 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		
 		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
 	}
-	
+
+	@Override
 	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
@@ -66,7 +65,8 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		// generate execution plan
 		return alterExecutionPlan(analyzer.generatePlan());
 	}
-	
+
+	@Override
 	public boolean willResponseToClients() {
 		// The master node is the only one that will response to the clients.
 		return localNodeId == MASTER_NODE;
@@ -93,6 +93,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		return plan;
 	}
 
+	@Override
 	protected void executeTransactionLogic() {
 		executeSql(null);
 
@@ -135,12 +136,9 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	private void sendNotification() {
 		// Create a key value set
-		Map<String, Constant> fldVals = new HashMap<String, Constant>();
-		fldVals.put(KEY_FINISH, new IntegerConstant(1));
-		
 		RecordKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
-		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE,
-				txNum, fldVals);
+		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE, txNum);
+		notVal.addFldVal(KEY_FINISH, new IntegerConstant(1));
 
 		TupleSet ts = new TupleSet(-1);
 		// Use node id as source tx number
