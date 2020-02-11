@@ -22,15 +22,13 @@ import org.elasql.storage.metadata.PartitionPlan;
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
 	
-	public static final MigrationAlgorithm CURRENT_ALGO = MigrationAlgorithm.MGCRAB;
-	
 	public MigrationComponentFactory() {
 		if (logger.isLoggable(Level.INFO))
-			logger.info("using " + CURRENT_ALGO + " as migration algorithm.");
+			logger.info("using " + MigrationSettings.MIGRATION_ALGORITHM + " as migration algorithm.");
 	}
 	
 	public MigrationMgr newMigrationMgr() {
-		switch (CURRENT_ALGO) {
+		switch (MigrationSettings.MIGRATION_ALGORITHM) {
 		case MGCRAB:
 			return new MgCrabMigrationMgr(this);
 		case SQUALL:
@@ -44,7 +42,7 @@ public abstract class MigrationComponentFactory {
 	}
 	
 	public MigrationSystemController newSystemController() {
-		switch (CURRENT_ALGO) {
+		switch (MigrationSettings.MIGRATION_ALGORITHM) {
 		case MGCRAB:
 			return new MgCrabSystemController(this);
 		case SQUALL:
@@ -59,7 +57,7 @@ public abstract class MigrationComponentFactory {
 	
 	public MigrationStoredProcFactory newMigrationSpFactory(
 			CalvinStoredProcedureFactory underlayerFactory) {
-		switch (CURRENT_ALGO) {
+		switch (MigrationSettings.MIGRATION_ALGORITHM) {
 		case MGCRAB:
 			return new MgCrabStoredProcFactory(underlayerFactory);
 		case SQUALL:

@@ -17,6 +17,7 @@ import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeUpdate;
+import org.elasql.migration.MigrationSettings;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
@@ -32,9 +33,10 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class StopCopyMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(StopCopyMigrationMgr.class.getName());
 	
-	private static final int LARGE_CHUNK_SIZE_IN_BYTES = 16_000_000; // 1MB
-	private static final int LARGE_CHUNK_SIZE_IN_COUNT = 160000;
-	private static final int LARGE_CHUNK_SIZE = USE_BYTES_FOR_CHUNK_SIZE? LARGE_CHUNK_SIZE_IN_BYTES : LARGE_CHUNK_SIZE_IN_COUNT;
+	private static final int LARGE_CHUNK_SIZE_IN_BYTES = MigrationSettings.CHUNK_SIZE_IN_BYTES * 4;
+	private static final int LARGE_CHUNK_SIZE_IN_COUNT = MigrationSettings.CHUNK_SIZE_IN_COUNT * 4;
+	private static final int LARGE_CHUNK_SIZE = MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE?
+			LARGE_CHUNK_SIZE_IN_BYTES : LARGE_CHUNK_SIZE_IN_COUNT;
 	
 	private static final Constant FALSE = new IntegerConstant(0);
 	private static final Constant TRUE = new IntegerConstant(1);
@@ -64,12 +66,6 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		
 		// Wait for active transactions finishes
 		waitForActiveTransactionFinish();
-		
-		try {
-			Thread.sleep(1_000_000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
 		
 		analyzeResponsibleRanges(newPartPlan);
 		
@@ -145,7 +141,8 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 			finishDests = 0;
 			
 			for (MigrationRange range : sourceRanges) {
-				Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
+				Set<RecordKey> chunk = range.generateNextMigrationChunk(
+						MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
 				if (chunk.size() > 0) {
 					readAndPushADataChunk(tx, chunk, range.getDestPartId());
 					waitForDests.add(range.getDestPartId());
@@ -155,7 +152,8 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 			}
 			
 			for (MigrationRange range : destRanges) {
-				Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
+				Set<RecordKey> chunk = range.generateNextMigrationChunk(
+						MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
 				if (chunk.size() > 0) {
 					receiveAndInsertDataChunk(tx, cacheMgr, chunk);
 					sendAnAck(tx, range.getSourcePartId());

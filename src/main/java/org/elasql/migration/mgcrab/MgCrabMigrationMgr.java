@@ -15,6 +15,7 @@ import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationRangeUpdate;
+import org.elasql.migration.MigrationSettings;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.CalvinScheduler;
@@ -35,10 +36,6 @@ import org.vanilladb.core.storage.tx.Transaction;
  */
 public class MgCrabMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(MgCrabMigrationMgr.class.getName());
-	
-	private static final boolean ENABLE_TWO_PHASE_BG_PUSH = true;
-	private static final boolean ENABLE_PIPELINING_TWO_PHASE_BG = true;
-	private static final long BG_PUSH_START_DELAY = 50_000; // in ms.
 	
 	private Phase currentPhase = Phase.NORMAL;
 	private List<MigrationRange> migrationRanges;
@@ -88,9 +85,9 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		
 		// Start background pushes
 		if (!pushRanges.isEmpty()) {
-			if (BG_PUSH_START_DELAY == 0) {
-				if (ENABLE_TWO_PHASE_BG_PUSH) {
-					if (ENABLE_PIPELINING_TWO_PHASE_BG)
+			if (MgcrabSettings.BG_PUSH_START_DELAY == 0) {
+				if (MgcrabSettings.ENABLE_TWO_PHASE_BG_PUSH) {
+					if (MgcrabSettings.ENABLE_PIPELINING_TWO_PHASE_BG)
 						scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PIPELINING);
 					else
 						scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PHASE1);
@@ -101,10 +98,12 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 				new Thread(new Runnable() {
 					@Override
 					public void run() {
-						try {
-							Thread.sleep(BG_PUSH_START_DELAY);
-						} catch (InterruptedException e) {
-							e.printStackTrace();
+						if (MgcrabSettings.BG_PUSH_START_DELAY > 0) {
+							try {
+								Thread.sleep(MgcrabSettings.BG_PUSH_START_DELAY);
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							}
 						}
 						
 						if (logger.isLoggable(Level.INFO)) {
@@ -113,8 +112,8 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 									, time / 1000));
 						}
 						
-						if (ENABLE_TWO_PHASE_BG_PUSH) {
-							if (ENABLE_PIPELINING_TWO_PHASE_BG)
+						if (MgcrabSettings.ENABLE_TWO_PHASE_BG_PUSH) {
+							if (MgcrabSettings.ENABLE_PIPELINING_TWO_PHASE_BG)
 								scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PIPELINING);
 							else
 								scheduleNextTwoPhaseBGPushRequest(-1, BgPushPhases.PHASE1);
@@ -136,7 +135,8 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 			@Override
 			public void run() {
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, CHUNK_SIZE);
+					Set<RecordKey> chunk = range.generateNextMigrationChunk(
+							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						sendOnePhaseBGPushRequest(range.generateStatusUpdate(), chunk, 
 								range.getSourcePartId(), range.getDestPartId());
@@ -164,7 +164,8 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 				// XXX: If there is multiple ranges to this destinations
 				// we should know which range pairs to this transaction number
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, CHUNK_SIZE);
+					Set<RecordKey> chunk = range.generateNextMigrationChunk(
+							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						if (phase == BgPushPhases.PIPELINING) {
 							sendTwoPhaseBGPushRequest(BgPushPhases.PIPELINING, chunk, range.getSourcePartId(), 
@@ -269,6 +270,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 	}
 	
 	// XXX: Currently, we do not identify which range finished.
+	// We only count how many ranges are finished, instead.
 	public void sendRangeFinishNotification() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a range finish notification to the system controller");

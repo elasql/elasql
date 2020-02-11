@@ -11,6 +11,7 @@ import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationRangeUpdate;
+import org.elasql.migration.MigrationSettings;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.CalvinScheduler;
@@ -70,7 +71,8 @@ public class SquallMigrationMgr implements MigrationMgr {
 			@Override
 			public void run() {
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(USE_BYTES_FOR_CHUNK_SIZE, CHUNK_SIZE);
+					Set<RecordKey> chunk = range.generateNextMigrationChunk(
+							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						sendBGPushRequest(range.generateStatusUpdate(), chunk, 
 								range.getSourcePartId(), range.getDestPartId());

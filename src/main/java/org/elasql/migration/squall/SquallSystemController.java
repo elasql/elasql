@@ -8,6 +8,7 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
+import org.elasql.migration.MigrationSettings;
 import org.elasql.migration.MigrationStoredProcFactory;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.server.Elasql;
@@ -26,7 +27,7 @@ public class SquallSystemController implements MigrationSystemController {
 			logger.info("the system controller is ready");
 		
 		this.comsFactory = comsFactory;
-		if (ENABLE_MIGRATION)
+		if (MigrationSettings.ENABLE_MIGRATION)
 			startMigrationTrigger();
 	}
 
@@ -40,7 +41,7 @@ public class SquallSystemController implements MigrationSystemController {
 			public void run() {
 				// Wait for some time
 				try {
-					Thread.sleep(START_MIGRATION_TIME);
+					Thread.sleep(MigrationSettings.START_MIGRATION_TIME);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}

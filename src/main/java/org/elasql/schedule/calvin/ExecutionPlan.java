@@ -215,6 +215,8 @@ public class ExecutionPlan {
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		
+		sb.append("============== Execution Plan ==============");
+		sb.append('\n');
 		sb.append("Role: " + role);
 		sb.append('\n');
 		sb.append("Local Reads: " + localReadKeys);
@@ -234,6 +236,8 @@ public class ExecutionPlan {
 		sb.append("Migration Push Sets: " + migrationPushSets);
 		sb.append('\n');
 		sb.append("Imcoming Migrating Keys: " + incomingMigratingKeys);
+		sb.append('\n');
+		sb.append("===========================================");
 		sb.append('\n');
 		
 		return sb.toString();
