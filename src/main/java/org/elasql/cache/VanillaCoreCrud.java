@@ -28,6 +28,7 @@ import java.util.Set;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.sql.RecordKeyBuilder;
+import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.vanilladb.core.query.algebra.Plan;
 import org.vanilladb.core.query.algebra.SelectPlan;
 import org.vanilladb.core.query.algebra.SelectScan;
@@ -82,6 +83,7 @@ public class VanillaCoreCrud {
 	
 	public static Map<RecordKey, CachedRecord> batchRead(Set<RecordKey> keys, Transaction tx) {
 		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
+		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 
 		// Check if all record keys are in the same table
 		RecordKey representative = null;
@@ -96,7 +98,6 @@ public class VanillaCoreCrud {
 
 		// Open an index
 		IndexInfo ii = null;
-		Index index = null;
 
 		// We only need one index
 		for (int i = 0; i < representative.getNumOfFlds(); i++) {
@@ -104,13 +105,12 @@ public class VanillaCoreCrud {
 			List<IndexInfo> iis = Elasql.catalogMgr().getIndexInfo(tblName, fldName, tx);
 			if (iis != null && iis.size() > 0) {
 				ii = iis.get(0);
-				index = ii.open(tx);
 				break;
 			}
 		}
 		
 		if (ii == null)
-			throw new RuntimeException("cannot find a index for " + representative);
+			throw new RuntimeException("cannot find an index for " + representative);
 
 		// Search record ids for record keys
 		// Map<RecordId, Set<RecordKey>> ridToSearchKey = new HashMap<RecordId,
@@ -121,15 +121,21 @@ public class VanillaCoreCrud {
 
 		for (RecordKey key : keys) {
 			SearchKey searchKey = key.toSearchKey(ii.fieldNames());
+			Index index = ii.open(tx);
 			index.beforeFirst(new SearchRange(searchKey));
 
-			while (index.next()) {
+			if (index.next()) {
 				rid = index.getDataRecordId();
 				searchRidSet.add(rid);
+			} else {
+				throw new RuntimeException("Cannot find a record for " + key);
 			}
+
+			index.close();
+			// If we did not release index locks here, this search would cause deadlock.
+			ccMgr.releaseIndexLocks();
 		}
 		searchRids.addAll(searchRidSet);
-		index.close();
 
 		// Sort the record ids
 		Collections.sort(searchRids);
