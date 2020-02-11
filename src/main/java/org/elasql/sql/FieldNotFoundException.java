@@ -1,4 +1,4 @@
-package org.elasql.cache;
+package org.elasql.sql;
 
 public class FieldNotFoundException extends RuntimeException {
 	

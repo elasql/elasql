@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.elasql.sql.FieldNotFoundException;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.Record;
