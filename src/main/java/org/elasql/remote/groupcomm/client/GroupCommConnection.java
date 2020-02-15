@@ -34,15 +34,18 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 	private Map<Integer, BlockingQueue<ClientResponse>> rteToRespQueue = new ConcurrentHashMap<Integer, BlockingQueue<ClientResponse>>();
 	// RTE id -> The transaction number of the received response last time
 	private Map<Integer, Long> rteToLastTxNum = new ConcurrentHashMap<Integer, Long>();
-
+	
+	private ClientAppl clientAppl;
 	private BatchSpcSender batchSender;
 	private int myId;
+	private DirectMessageListener directMessageListener;
 
-	public GroupCommConnection(int id) {
-		myId = id;
+	public GroupCommConnection(int id, DirectMessageListener directMessageListener) {
+		this.myId = id;
+		this.directMessageListener = directMessageListener;
 
 		// Initialize group communication
-		ClientAppl clientAppl = new ClientAppl(id, this, this);
+		clientAppl = new ClientAppl(id, this, this);
 		clientAppl.start();
 		// wait for all servers to start up
 		try {
@@ -90,18 +93,35 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 
 	@Override
 	public void onRecvClientP2pMessage(P2pMessage p2pmsg) {
-		ClientResponse c = (ClientResponse) p2pmsg.getMessage();
-		
-		// Check if this response is for this node
-		if (c.getClientId() == myId) {
-			rteToRespQueue.get(c.getRteId()).add(c);
+		Object message = p2pmsg.getMessage();
+		if (message.getClass().equals(ClientResponse.class)) {
+			ClientResponse c = (ClientResponse) message;
+			
+			// Check if this response is for this node
+			if (c.getClientId() == myId) {
+				rteToRespQueue.get(c.getRteId()).add(c);
+			} else {
+				throw new RuntimeException("Something wrong");
+			}
 		} else {
-			throw new RuntimeException("Something wrong");
+			directMessageListener.onReceivedDirectMessage(message);
 		}
 	}
 
 	@Override
 	public void onNodeFail(int id, ChannelType channelType) {
 		// do nothing
+	}
+	
+	public void sendP2pMessageToClientNode(int clientId, Object message) {
+		clientAppl.sendMessageToClientNode(clientId, message);
+	}
+	
+	public int getServerCount() {
+		return clientAppl.getServerCount();
+	}
+	
+	public int getClientCount() {
+		return clientAppl.getClientCount();
 	}
 }
