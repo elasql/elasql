@@ -31,6 +31,13 @@ import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
+/**
+ * A stored procedure that executes its logic on all the machines.
+ * 
+ * @author SLMT
+ *
+ * @param <H>
+ */
 public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		extends CalvinStoredProcedure<H> {
 	private static Logger logger = Logger.getLogger(AllExecuteProcedure.class

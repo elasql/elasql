@@ -37,6 +37,7 @@ import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.storedprocedure.ManuallyAbortException;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
@@ -176,6 +177,10 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			
 			afterCommit();
 			
+		} catch (ManuallyAbortException me) {
+			if (logger.isLoggable(Level.WARNING))
+				logger.warning("Manually aborted by the procedure: " + me.getMessage());
+			tx.rollback();
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.SEVERE))
 				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan);
