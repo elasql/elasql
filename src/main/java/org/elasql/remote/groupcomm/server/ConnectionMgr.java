@@ -15,6 +15,7 @@
  ******************************************************************************/
 package org.elasql.remote.groupcomm.server;
 
+import java.io.Serializable;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
@@ -27,39 +28,41 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
-import org.vanilladb.comm.messages.ChannelType;
-import org.vanilladb.comm.messages.P2pMessage;
-import org.vanilladb.comm.messages.TotalOrderMessage;
-import org.vanilladb.comm.server.ServerAppl;
-import org.vanilladb.comm.server.ServerNodeFailListener;
-import org.vanilladb.comm.server.ServerP2pMessageListener;
-import org.vanilladb.comm.server.ServerTotalOrderedMessageListener;
+import org.vanilladb.comm.server.VanillaCommServer;
+import org.vanilladb.comm.server.VanillaCommServerListener;
+import org.vanilladb.comm.view.ProcessType;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
-public class ConnectionMgr
-		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener {
+public class ConnectionMgr implements VanillaCommServerListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
+	
+	private static class TotalOrderMessage {
+		int serialNumber;
+		Serializable message;
+	}
 
-	private ServerAppl serverAppl;
+	private VanillaCommServer commServer;
 	private boolean sequencerMode;
 	private BlockingQueue<TotalOrderMessage> tomQueue = new LinkedBlockingQueue<TotalOrderMessage>();
+	private long expectedTxNumber = 1;
+	private boolean areAllServersReady = false;
 
 	public ConnectionMgr(int id, boolean seqMode) {
 		sequencerMode = seqMode;
-		serverAppl = new ServerAppl(id, this, this, this);
-		serverAppl.start();
+		commServer = new VanillaCommServer(id, this);
+		new Thread(null, commServer, "VanillaComm-Server").start();
 
-		// wait for all servers to start up
+		// wait for all servers ready
 		if (logger.isLoggable(Level.INFO))
 			logger.info("wait for all servers to start up comm. module");
 		try {
-			Thread.sleep(1000);
+			while (!areAllServersReady)
+				this.wait();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		serverAppl.startPFD();
 
 		if (!sequencerMode) {
 			VanillaDb.taskMgr().runTask(new Task() {
@@ -69,9 +72,18 @@ public class ConnectionMgr
 					while (true) {
 						try {
 							TotalOrderMessage tom = tomQueue.take();
-							for (int i = 0; i < tom.getMessages().length; ++i) {
-								StoredProcedureCall spc = (StoredProcedureCall) tom.getMessages()[i];
-								spc.setTxNum(tom.getTotalOrderIdStart() + i);
+							StoredProcedureCall[] batch = (StoredProcedureCall[]) tom.message;
+							for (int i = 0; i < batch.length; ++i) {
+								StoredProcedureCall spc = (StoredProcedureCall) batch[i];
+								long transactionNumber = tom.serialNumber * batch.length + i + 1;
+								
+								// Sanity check
+								if (transactionNumber != expectedTxNumber)
+									throw new RuntimeException("Expected tx number: " + expectedTxNumber +
+											", but it was: " + transactionNumber);
+								expectedTxNumber++;
+								
+								spc.setTxNum(transactionNumber);
 								Elasql.scheduler().schedule(spc);
 							}
 						} catch (InterruptedException e) {
@@ -85,27 +97,34 @@ public class ConnectionMgr
 	}
 
 	public void sendClientResponse(int clientId, int rteId, long txNum, SpResultSet rs) {
-		// call the communication module to send the response back to client
-		P2pMessage p2pmsg = new P2pMessage(new ClientResponse(clientId, rteId, txNum, rs), clientId,
-				ChannelType.CLIENT);
-		serverAppl.sendP2pMessage(p2pmsg);
+		commServer.sendP2pMessage(ProcessType.CLIENT, clientId,
+				new ClientResponse(clientId, rteId, txNum, rs));
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
 		Object[] spCalls = { new StoredProcedureCall(-1, -1, pid, pars)};
-		serverAppl.sendTotalOrderRequest(spCalls, fromAppiaThread);
+		commServer.sendTotalOrderMessage(spCalls);
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
-		P2pMessage p2pmsg = new P2pMessage(reading, nodeId, ChannelType.SERVER);
-		serverAppl.sendP2pMessage(p2pmsg);
+		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
 	}
 
 	@Override
-	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
-		Object msg = p2pmsg.getMessage();
-		if (msg.getClass().equals(TupleSet.class)) {
-			TupleSet ts = (TupleSet) msg;
+	public void onServerReady() {
+		areAllServersReady = true;
+		this.notifyAll();
+	}
+
+	@Override
+	public void onServerFailed(int failedServerId) {
+		// Do nothing
+	}
+
+	@Override
+	public void onReceiveP2pMessage(ProcessType senderType, int senderId, Serializable message) {
+		if (message.getClass().equals(TupleSet.class)) {
+			TupleSet ts = (TupleSet) message;
 			
 			if (ts.sinkId() == MigrationSystemController.MSG_RANGE_FINISH) {
 				Elasql.migraSysControl().onReceiveMigrationRangeFinishMsg(
@@ -120,19 +139,17 @@ public class ConnectionMgr
 	}
 
 	@Override
-	public void onRecvServerTotalOrderedMessage(TotalOrderMessage tom) {
+	public void onReceiveTotalOrderMessage(int serialNumber, Serializable message) {
 		if (sequencerMode)
 			return;
 
 		try {
+			TotalOrderMessage tom = new TotalOrderMessage();
+			tom.serialNumber = serialNumber;
+			tom.message = message;
 			tomQueue.put(tom);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-	}
-
-	@Override
-	public void onNodeFail(int id, ChannelType ct) {
-		// do nothing
 	}
 }
