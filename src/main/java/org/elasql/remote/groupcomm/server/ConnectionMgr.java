@@ -45,8 +45,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	private VanillaCommServer commServer;
 	private boolean sequencerMode;
-	private BlockingQueue<TotalOrderMessage> tomQueue = new LinkedBlockingQueue<TotalOrderMessage>();
-	private long expectedTxNumber = 1;
+	private BlockingQueue<Serializable> tomSendQueue = new LinkedBlockingQueue<Serializable>();
+	private BlockingQueue<TotalOrderMessage> tomReceiveQueue = new LinkedBlockingQueue<TotalOrderMessage>();
 	private boolean areAllServersReady = false;
 
 	public ConnectionMgr(int id, boolean seqMode) {
@@ -54,45 +54,12 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		commServer = new VanillaCommServer(id, this);
 		new Thread(null, commServer, "VanillaComm-Server").start();
 
-		// wait for all servers ready
-		if (logger.isLoggable(Level.INFO))
-			logger.info("wait for all servers to start up comm. module");
-		try {
-			while (!areAllServersReady)
-				this.wait();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-
-		if (!sequencerMode) {
-			VanillaDb.taskMgr().runTask(new Task() {
-
-				@Override
-				public void run() {
-					while (true) {
-						try {
-							TotalOrderMessage tom = tomQueue.take();
-							StoredProcedureCall[] batch = (StoredProcedureCall[]) tom.message;
-							for (int i = 0; i < batch.length; ++i) {
-								StoredProcedureCall spc = (StoredProcedureCall) batch[i];
-								long transactionNumber = tom.serialNumber * batch.length + i + 1;
-								
-								// Sanity check
-								if (transactionNumber != expectedTxNumber)
-									throw new RuntimeException("Expected tx number: " + expectedTxNumber +
-											", but it was: " + transactionNumber);
-								expectedTxNumber++;
-								
-								spc.setTxNum(transactionNumber);
-								Elasql.scheduler().schedule(spc);
-							}
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
-
-				}
-			});
+		// Only the sequencer needs to wait for all servers ready
+		if (sequencerMode) {
+			waitForServersReady();
+			createTomSender();
+		} else {
+			createTomReceiver();
 		}
 	}
 
@@ -112,8 +79,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	@Override
 	public void onServerReady() {
-		areAllServersReady = true;
-		this.notifyAll();
+		synchronized (this) {
+			areAllServersReady = true;
+			this.notifyAll();
+		}
 	}
 
 	@Override
@@ -123,7 +92,12 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	@Override
 	public void onReceiveP2pMessage(ProcessType senderType, int senderId, Serializable message) {
-		if (message.getClass().equals(TupleSet.class)) {
+		if (senderType == ProcessType.CLIENT) {
+			// Normally, the client will only sends its request to the sequencer.
+			// However, any other server can also send a total order request.
+			// So, we do not need to check if this machine is the sequencer.
+			tomSendQueue.add(message);
+		} else if (message.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) message;
 			
 			if (ts.sinkId() == MigrationSystemController.MSG_RANGE_FINISH) {
@@ -147,9 +121,64 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			TotalOrderMessage tom = new TotalOrderMessage();
 			tom.serialNumber = serialNumber;
 			tom.message = message;
-			tomQueue.put(tom);
+			tomReceiveQueue.put(tom);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
+		}
+	}
+	
+	private void createTomReceiver() {
+		VanillaDb.taskMgr().runTask(new Task() {
+			@Override
+			public void run() {
+				long transactionNumber = 1;
+				
+				while (true) {
+					try {
+						TotalOrderMessage tom = tomReceiveQueue.take();
+						StoredProcedureCall[] batch = (StoredProcedureCall[]) tom.message;
+						for (int i = 0; i < batch.length; ++i) {
+							StoredProcedureCall spc = (StoredProcedureCall) batch[i];
+							spc.setTxNum(transactionNumber);
+							transactionNumber++;
+							Elasql.scheduler().schedule(spc);
+						}
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+
+			}
+		});
+	}
+	
+	private void createTomSender() {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				while (true) {
+					try {
+						Serializable message = tomSendQueue.take();
+						commServer.sendTotalOrderMessage(message);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+
+			}
+		}).start();;
+	}
+	
+	private void waitForServersReady() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("wait for all servers to start up comm. module");
+		synchronized (this) {
+			try {
+				while (!areAllServersReady)
+					this.wait();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 }
