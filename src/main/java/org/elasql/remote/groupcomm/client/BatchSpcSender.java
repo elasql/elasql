@@ -56,7 +56,7 @@ class BatchSpcSender implements Runnable {
 	public void run() {
 		// periodically send batch of requests
 		if (logger.isLoggable(Level.INFO))
-			logger.info("start batching-request worker thread");
+			logger.info("start batching-request worker thread (batch size = " + BATCH_SIZE + ")"); 
 
 		while (true)
 			sendBatchRequestToDb();
@@ -73,7 +73,7 @@ class BatchSpcSender implements Runnable {
 			}
 		}
 	}
-
+	
 	private void sendBatchRequestToDb() {
 		// Waiting for the queue reaching the threshold
 		int size = numOfQueuedSpcs.get();
@@ -102,7 +102,7 @@ class BatchSpcSender implements Runnable {
 			
 			if (spc == null)
 				throw new RuntimeException("Something wrong");
-			
+
 			batchSpc[i] = spc;
 		}
 		numOfQueuedSpcs.addAndGet(-size);

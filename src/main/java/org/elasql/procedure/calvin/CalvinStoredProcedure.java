@@ -107,6 +107,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			postOffice.skipTransaction(txNum);
 		}
 //		timer.stopComponentTimer(getClass().getSimpleName() + " init transaction");
+
+		// Debug
+//		if (txNum % 500 == 1)
+//			System.out.println(String.format("Tx.%d params: %s", txNum, Arrays.toString(pars)));
+//			System.out.println("Tx." + txNum + "'s execution plan:\n" + execPlan);
 		
 		// Debug
 //		if (Elasql.migrationMgr().isInMigration())
