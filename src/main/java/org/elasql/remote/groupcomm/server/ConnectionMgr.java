@@ -94,7 +94,11 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
 			for (StoredProcedureCall spc : spcs)
 				tomRequest.add(spc);
-			tomSendQueue.add(tomRequest);
+			try {
+				tomSendQueue.put(tomRequest);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		} else if (message.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) message;
 			
