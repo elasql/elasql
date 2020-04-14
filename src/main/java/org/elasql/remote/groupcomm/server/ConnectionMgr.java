@@ -16,6 +16,8 @@
 package org.elasql.remote.groupcomm.server;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
@@ -32,21 +34,13 @@ import org.vanilladb.comm.server.VanillaCommServer;
 import org.vanilladb.comm.server.VanillaCommServerListener;
 import org.vanilladb.comm.view.ProcessType;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.server.VanillaDb;
-import org.vanilladb.core.server.task.Task;
 
 public class ConnectionMgr implements VanillaCommServerListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
-	
-	private static class TotalOrderMessage {
-		int serialNumber;
-		Serializable message;
-	}
 
 	private VanillaCommServer commServer;
 	private boolean sequencerMode;
-	private BlockingQueue<Serializable> tomSendQueue = new LinkedBlockingQueue<Serializable>();
-	private BlockingQueue<TotalOrderMessage> tomReceiveQueue = new LinkedBlockingQueue<TotalOrderMessage>();
+	private BlockingQueue<List<Serializable>> tomSendQueue = new LinkedBlockingQueue<List<Serializable>>();
 	private boolean areAllServersReady = false;
 
 	public ConnectionMgr(int id, boolean seqMode) {
@@ -58,8 +52,6 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		if (sequencerMode) {
 			waitForServersReady();
 			createTomSender();
-		} else {
-			createTomReceiver();
 		}
 	}
 
@@ -96,7 +88,13 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			// Normally, the client will only sends its request to the sequencer.
 			// However, any other server can also send a total order request.
 			// So, we do not need to check if this machine is the sequencer.
-			tomSendQueue.add(message);
+			
+			// Transfer the given batch to a list of messages
+			StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
+			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
+			for (StoredProcedureCall spc : spcs)
+				tomRequest.add(spc);
+			tomSendQueue.add(tomRequest);
 		} else if (message.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) message;
 			
@@ -116,40 +114,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public void onReceiveTotalOrderMessage(int serialNumber, Serializable message) {
 		if (sequencerMode)
 			return;
-
-		try {
-			TotalOrderMessage tom = new TotalOrderMessage();
-			tom.serialNumber = serialNumber;
-			tom.message = message;
-			tomReceiveQueue.put(tom);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private void createTomReceiver() {
-		VanillaDb.taskMgr().runTask(new Task() {
-			@Override
-			public void run() {
-				long transactionNumber = 1;
-				
-				while (true) {
-					try {
-						TotalOrderMessage tom = tomReceiveQueue.take();
-						StoredProcedureCall[] batch = (StoredProcedureCall[]) tom.message;
-						for (int i = 0; i < batch.length; ++i) {
-							StoredProcedureCall spc = (StoredProcedureCall) batch[i];
-							spc.setTxNum(transactionNumber);
-							transactionNumber++;
-							Elasql.scheduler().schedule(spc);
-						}
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-
-			}
-		});
+		
+		StoredProcedureCall spc = (StoredProcedureCall) message;
+		spc.setTxNum(serialNumber);
+		Elasql.scheduler().schedule(spc);
 	}
 	
 	private void createTomSender() {
@@ -158,8 +126,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			public void run() {
 				while (true) {
 					try {
-						Serializable message = tomSendQueue.take();
-						commServer.sendTotalOrderMessage(message);
+						List<Serializable> messages = tomSendQueue.take();
+						commServer.sendTotalOrderMessages(messages);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}

@@ -15,6 +15,8 @@
  *******************************************************************************/
 package org.elasql.remote.groupcomm.client;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -95,17 +97,12 @@ class BatchSpcSender implements Runnable {
 		}
 
 		// Send a batch of requests
-		StoredProcedureCall[] batchSpc = new StoredProcedureCall[size];
-		StoredProcedureCall spc;
-		for (int i = 0; i < batchSpc.length; i++) {
-			spc = spcQueue.poll();
-			
-			if (spc == null)
-				throw new RuntimeException("Something wrong");
-
-			batchSpc[i] = spc;
+		List<StoredProcedureCall> batchSpc = new ArrayList<StoredProcedureCall>(size * 2);
+		while (spcQueue.peek() != null) {
+			StoredProcedureCall spc = spcQueue.poll();
+			batchSpc.add(spc);
 		}
-		numOfQueuedSpcs.addAndGet(-size);
-		commClient.sendP2pMessage(ProcessType.SERVER, sequencerId, batchSpc);
+		numOfQueuedSpcs.addAndGet(-batchSpc.size());
+		commClient.sendP2pMessage(ProcessType.SERVER, sequencerId, batchSpc.toArray(new StoredProcedureCall[0]));
 	}
 }

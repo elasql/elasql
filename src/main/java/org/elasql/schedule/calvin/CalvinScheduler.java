@@ -43,11 +43,9 @@ public class CalvinScheduler extends Task implements Scheduler {
 //		TimerStatistics.startReporting();
 	}
 
-	public void schedule(StoredProcedureCall... calls) {
+	public void schedule(StoredProcedureCall call) {
 		try {
-			for (int i = 0; i < calls.length; i++) {
-				spcQueue.put(calls[i]);
-			}
+			spcQueue.put(call);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

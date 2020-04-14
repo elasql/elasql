@@ -36,11 +36,9 @@ public class NaiveScheduler extends Task implements Scheduler {
 		this.factory = factory;
 	}
 
-	public void schedule(StoredProcedureCall... calls) {
+	public void schedule(StoredProcedureCall call) {
 		try {
-			for (int i = 0; i < calls.length; i++) {
-				spcQueue.put(calls[i]);
-			}
+			spcQueue.put(call);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

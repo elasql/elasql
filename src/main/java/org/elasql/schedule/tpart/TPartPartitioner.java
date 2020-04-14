@@ -89,10 +89,13 @@ public class TPartPartitioner extends Task implements Scheduler {
 		this.graph = graph;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 	}
-
-	public void schedule(StoredProcedureCall... calls) {
-		for (StoredProcedureCall call : calls)
-			spcQueue.add(call);
+	
+	public void schedule(StoredProcedureCall call) {
+		try {
+			spcQueue.put(call);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void run() {
