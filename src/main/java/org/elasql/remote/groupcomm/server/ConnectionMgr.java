@@ -115,7 +115,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 
 	@Override
-	public void onReceiveTotalOrderMessage(int serialNumber, Serializable message) {
+	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
 		if (sequencerMode)
 			return;
 		
