@@ -15,6 +15,9 @@
  ******************************************************************************/
 package org.elasql.remote.groupcomm.server;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
@@ -27,85 +30,77 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
-import org.vanilladb.comm.messages.ChannelType;
-import org.vanilladb.comm.messages.P2pMessage;
-import org.vanilladb.comm.messages.TotalOrderMessage;
-import org.vanilladb.comm.server.ServerAppl;
-import org.vanilladb.comm.server.ServerNodeFailListener;
-import org.vanilladb.comm.server.ServerP2pMessageListener;
-import org.vanilladb.comm.server.ServerTotalOrderedMessageListener;
+import org.vanilladb.comm.server.VanillaCommServer;
+import org.vanilladb.comm.server.VanillaCommServerListener;
+import org.vanilladb.comm.view.ProcessType;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.server.VanillaDb;
-import org.vanilladb.core.server.task.Task;
 
-public class ConnectionMgr
-		implements ServerTotalOrderedMessageListener, ServerP2pMessageListener, ServerNodeFailListener {
+public class ConnectionMgr implements VanillaCommServerListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
 
-	private ServerAppl serverAppl;
+	private VanillaCommServer commServer;
 	private boolean sequencerMode;
-	private BlockingQueue<TotalOrderMessage> tomQueue = new LinkedBlockingQueue<TotalOrderMessage>();
+	private BlockingQueue<List<Serializable>> tomSendQueue = new LinkedBlockingQueue<List<Serializable>>();
+	private boolean areAllServersReady = false;
 
 	public ConnectionMgr(int id, boolean seqMode) {
 		sequencerMode = seqMode;
-		serverAppl = new ServerAppl(id, this, this, this);
-		serverAppl.start();
+		commServer = new VanillaCommServer(id, this);
+		new Thread(null, commServer, "VanillaComm-Server").start();
 
-		// wait for all servers to start up
-		if (logger.isLoggable(Level.INFO))
-			logger.info("wait for all servers to start up comm. module");
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		serverAppl.startPFD();
-
-		if (!sequencerMode) {
-			VanillaDb.taskMgr().runTask(new Task() {
-
-				@Override
-				public void run() {
-					while (true) {
-						try {
-							TotalOrderMessage tom = tomQueue.take();
-							for (int i = 0; i < tom.getMessages().length; ++i) {
-								StoredProcedureCall spc = (StoredProcedureCall) tom.getMessages()[i];
-								spc.setTxNum(tom.getTotalOrderIdStart() + i);
-								Elasql.scheduler().schedule(spc);
-							}
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
-
-				}
-			});
+		// Only the sequencer needs to wait for all servers ready
+		if (sequencerMode) {
+			waitForServersReady();
+			createTomSender();
 		}
 	}
 
 	public void sendClientResponse(int clientId, int rteId, long txNum, SpResultSet rs) {
-		// call the communication module to send the response back to client
-		P2pMessage p2pmsg = new P2pMessage(new ClientResponse(clientId, rteId, txNum, rs), clientId,
-				ChannelType.CLIENT);
-		serverAppl.sendP2pMessage(p2pmsg);
+		commServer.sendP2pMessage(ProcessType.CLIENT, clientId,
+				new ClientResponse(clientId, rteId, txNum, rs));
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
 		Object[] spCalls = { new StoredProcedureCall(-1, -1, pid, pars)};
-		serverAppl.sendTotalOrderRequest(spCalls, fromAppiaThread);
+		commServer.sendTotalOrderMessage(spCalls);
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
-		P2pMessage p2pmsg = new P2pMessage(reading, nodeId, ChannelType.SERVER);
-		serverAppl.sendP2pMessage(p2pmsg);
+		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
 	}
 
 	@Override
-	public void onRecvServerP2pMessage(P2pMessage p2pmsg) {
-		Object msg = p2pmsg.getMessage();
-		if (msg.getClass().equals(TupleSet.class)) {
-			TupleSet ts = (TupleSet) msg;
+	public void onServerReady() {
+		synchronized (this) {
+			areAllServersReady = true;
+			this.notifyAll();
+		}
+	}
+
+	@Override
+	public void onServerFailed(int failedServerId) {
+		// Do nothing
+	}
+
+	@Override
+	public void onReceiveP2pMessage(ProcessType senderType, int senderId, Serializable message) {
+		if (senderType == ProcessType.CLIENT) {
+			// Normally, the client will only sends its request to the sequencer.
+			// However, any other server can also send a total order request.
+			// So, we do not need to check if this machine is the sequencer.
+			
+			// Transfer the given batch to a list of messages
+			StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
+			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
+			for (StoredProcedureCall spc : spcs)
+				tomRequest.add(spc);
+			try {
+				tomSendQueue.put(tomRequest);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		} else if (message.getClass().equals(TupleSet.class)) {
+			TupleSet ts = (TupleSet) message;
 			
 			if (ts.sinkId() == MigrationSystemController.MSG_RANGE_FINISH) {
 				Elasql.migraSysControl().onReceiveMigrationRangeFinishMsg(
@@ -120,19 +115,42 @@ public class ConnectionMgr
 	}
 
 	@Override
-	public void onRecvServerTotalOrderedMessage(TotalOrderMessage tom) {
+	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
 		if (sequencerMode)
 			return;
-
-		try {
-			tomQueue.put(tom);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+		
+		StoredProcedureCall spc = (StoredProcedureCall) message;
+		spc.setTxNum(serialNumber);
+		Elasql.scheduler().schedule(spc);
 	}
+	
+	private void createTomSender() {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				while (true) {
+					try {
+						List<Serializable> messages = tomSendQueue.take();
+						commServer.sendTotalOrderMessages(messages);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
 
-	@Override
-	public void onNodeFail(int id, ChannelType ct) {
-		// do nothing
+			}
+		}).start();;
+	}
+	
+	private void waitForServersReady() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("wait for all servers to start up comm. module");
+		synchronized (this) {
+			try {
+				while (!areAllServersReady)
+					this.wait();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }

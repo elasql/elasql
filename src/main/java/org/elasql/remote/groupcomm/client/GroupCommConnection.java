@@ -15,6 +15,7 @@
  *******************************************************************************/
 package org.elasql.remote.groupcomm.client;
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,20 +23,18 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.ElasqlSpResultSet;
-import org.vanilladb.comm.client.ClientAppl;
-import org.vanilladb.comm.client.ClientNodeFailListener;
-import org.vanilladb.comm.client.ClientP2pMessageListener;
-import org.vanilladb.comm.messages.ChannelType;
-import org.vanilladb.comm.messages.P2pMessage;
+import org.vanilladb.comm.client.VanillaCommClient;
+import org.vanilladb.comm.client.VanillaCommClientListener;
+import org.vanilladb.comm.view.ProcessType;
 
-public class GroupCommConnection implements ClientP2pMessageListener, ClientNodeFailListener {
+public class GroupCommConnection implements VanillaCommClientListener {
 
 	// RTE id -> A blocking queue of responses from servers
 	private Map<Integer, BlockingQueue<ClientResponse>> rteToRespQueue = new ConcurrentHashMap<Integer, BlockingQueue<ClientResponse>>();
 	// RTE id -> The transaction number of the received response last time
 	private Map<Integer, Long> rteToLastTxNum = new ConcurrentHashMap<Integer, Long>();
 	
-	private ClientAppl clientAppl;
+	private VanillaCommClient commClient;
 	private BatchSpcSender batchSender;
 	private int myId;
 	private DirectMessageListener directMessageListener;
@@ -45,18 +44,13 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 		this.directMessageListener = directMessageListener;
 
 		// Initialize group communication
-		clientAppl = new ClientAppl(id, this, this);
-		clientAppl.start();
-		// wait for all servers to start up
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		clientAppl.startPFD();
+		commClient = new VanillaCommClient(id, this);
+		
+		// Create a thread for it
+		new Thread(null, commClient, "VanillaComm-Clinet").start();
 
 		// Start the batch sender
-		batchSender = new BatchSpcSender(id, clientAppl);
+		batchSender = new BatchSpcSender(id, commClient);
 		new Thread(null, batchSender, "Batch-Spc-Sender").start();
 	}
 
@@ -92,9 +86,8 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 	}
 
 	@Override
-	public void onRecvClientP2pMessage(P2pMessage p2pmsg) {
-		Object message = p2pmsg.getMessage();
-		if (message.getClass().equals(ClientResponse.class)) {
+	public void onReceiveP2pMessage(ProcessType senderType, int senderId, Serializable message) {
+		if (senderType == ProcessType.SERVER) {
 			ClientResponse c = (ClientResponse) message;
 			
 			// Check if this response is for this node
@@ -107,21 +100,16 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 			directMessageListener.onReceivedDirectMessage(message);
 		}
 	}
-
-	@Override
-	public void onNodeFail(int id, ChannelType channelType) {
-		// do nothing
-	}
 	
-	public void sendP2pMessageToClientNode(int clientId, Object message) {
-		clientAppl.sendMessageToClientNode(clientId, message);
+	public void sendP2pMessageToClientNode(int clientId, Serializable message) {
+		commClient.sendP2pMessage(ProcessType.CLIENT, clientId, message);
 	}
 	
 	public int getServerCount() {
-		return clientAppl.getServerCount();
+		return commClient.getServerCount();
 	}
 	
 	public int getClientCount() {
-		return clientAppl.getClientCount();
+		return commClient.getClientCount();
 	}
 }
