@@ -345,7 +345,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 				CachedRecord rec = records.get(key);
 				if (rec == null)
 					throw new RuntimeException("cannot find the record for " + key);
-				ts.addTuple(key, txNum, txNum, records.get(key));
+				ts.addTuple(key, txNum, txNum, rec);
 			}
 			
 			// Push to the target
