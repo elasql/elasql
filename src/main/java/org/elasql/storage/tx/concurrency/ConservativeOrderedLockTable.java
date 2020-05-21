@@ -124,11 +124,17 @@ public class ConservativeOrderedLockTable {
 				 */
 				Long head = lockers.requestQueue.peek();
 				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
-					
-					long target = lockers.xLocker;
-					if (target == -1)
-						target = head;
-					Thread.currentThread().setName(name + " waits for slock of " + obj + " from tx." + target);
+
+					// For debug
+					if (lockers.xLocker != -1) {
+						Thread.currentThread().setName(String.format(
+								"%s waits for slock of %s from tx.%d (xlock holder)",
+								name, obj, lockers.xLocker));
+					} else {
+						Thread.currentThread().setName(String.format(
+								"%s waits for slock of %s from tx.%d (head of queue)",
+								name, obj, head));
+					}
 					
 					anchor.wait();
 
@@ -191,12 +197,20 @@ public class ConservativeOrderedLockTable {
 				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
 				/* && !waitingTooLong(timestamp) */) {
 					
-					long target = lockers.xLocker;
-					if (target == -1 && !lockers.sLockers.isEmpty())
-						target = lockers.sLockers.get(0);
-					if (target == -1)
-						target = head;
-					Thread.currentThread().setName(name + " waits for xlock of " + obj + " from tx." + target);
+					// For debug
+					if (lockers.xLocker != -1) {
+						Thread.currentThread().setName(String.format(
+								"%s waits for xlock of %s from tx.%d (xlock holder)",
+								name, obj, lockers.xLocker));
+					} else if (!lockers.sLockers.isEmpty()) {
+						Thread.currentThread().setName(String.format(
+								"%s waits for xlock of %s from tx.%d (slock holder, %d other holders)",
+								name, obj, lockers.sLockers.get(0), lockers.sLockers.size() - 1));
+					} else {
+						Thread.currentThread().setName(String.format(
+								"%s waits for xlock of %s from tx.%d (head of queue)",
+								name, obj, head));
+					}
 					
 					anchor.wait();
 					lockers = prepareLockers(obj);

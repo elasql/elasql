@@ -34,7 +34,7 @@ public class CalvinStoredProcedureTask
 	}
 
 	public void run() {
-		Thread.currentThread().setName("Tx." + txNum);
+		Thread.currentThread().setName("Tx." + txNum + " (running)");
 		
 //		Timer timer = Timer.getLocalTimer();
 		SpResultSet rs = null;
@@ -61,5 +61,7 @@ public class CalvinStoredProcedureTask
 //		if (timer.getExecutionTime() > 1000_000)
 //			System.out.println("Tx:" + txNum + "'s Timer:\n" + timer.toString());
 //		timer.addToGlobalStatistics();
+		
+		Thread.currentThread().setName("Tx." + txNum + " (committed)");
 	}
 }
