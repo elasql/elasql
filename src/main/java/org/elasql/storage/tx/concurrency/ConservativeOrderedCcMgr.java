@@ -99,11 +99,13 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	
 	@Override
 	public void onTxCommit(Transaction tx) {
+		releaseIndexLocks();
 		releaseLocks();
 	}
 	
 	@Override
 	public void onTxRollback(Transaction tx) {
+		releaseIndexLocks();
 		releaseLocks();
 	}
 
