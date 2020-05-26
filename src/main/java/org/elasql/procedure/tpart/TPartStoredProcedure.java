@@ -130,6 +130,13 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			paramHelper.newResultSetRecord()
 		);
 	}
+	
+	@Override
+	protected void executeSql() {
+		// Do nothing
+		// Because we have overrided execute(), there is no need
+		// to implement this method.
+	}
 
 	public boolean isMaster() {
 		return plan.isHereMaster();
