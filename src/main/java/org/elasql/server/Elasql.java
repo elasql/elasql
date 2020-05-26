@@ -33,10 +33,16 @@ import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.schedule.Scheduler;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
-import org.elasql.schedule.tpart.HeuristicNodeInserter;
-import org.elasql.schedule.tpart.TGraph;
+import org.elasql.schedule.tpart.BatchNodeInserter;
+import org.elasql.schedule.tpart.CostAwareNodeInserter;
+import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.TPartPartitioner;
-import org.elasql.schedule.tpart.sink.CacheOptimizedSinker;
+import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.hermes.FusionSinker;
+import org.elasql.schedule.tpart.hermes.FusionTGraph;
+import org.elasql.schedule.tpart.hermes.FusionTable;
+import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
+import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashPartitionPlan;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
@@ -49,13 +55,14 @@ public class Elasql extends VanillaDb {
 	private static Logger logger = Logger.getLogger(VanillaDb.class.getName());
 
 	public static final long START_TX_NUMBER = 0;
+	public static final long START_TIME_MS = System.currentTimeMillis();
 
 	/**
 	 * The type of transactional execution engine supported by distributed
 	 * deterministic VanillaDB.
 	 */
 	public enum ServiceType {
-		NAIVE, CALVIN, TPART;
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP;
 
 		static ServiceType fromInteger(int index) {
 			switch (index) {
@@ -65,6 +72,12 @@ public class Elasql extends VanillaDb {
 				return CALVIN;
 			case 2:
 				return TPART;
+			case 3:
+				return HERMES;
+			case 4:
+				return G_STORE;
+			case 5:
+				return LEAP;
 			default:
 				throw new RuntimeException("Unsupport service type");
 			}
@@ -170,6 +183,9 @@ public class Elasql extends VanillaDb {
 			remoteRecReceiver = new CalvinPostOffice();
 			break;
 		case TPART:
+		case HERMES:
+		case G_STORE:
+		case LEAP:
 			remoteRecReceiver = new TPartCacheMgr();
 			break;
 
@@ -194,6 +210,9 @@ public class Elasql extends VanillaDb {
 			scheduler = initCalvinScheduler(calvinFactory);
 			break;
 		case TPART:
+		case HERMES:
+		case G_STORE:
+		case LEAP:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			scheduler = initTPartScheduler((TPartStoredProcedureFactory) factory);
@@ -216,8 +235,48 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static Scheduler initTPartScheduler(TPartStoredProcedureFactory factory) {
-		TPartPartitioner scheduler = new TPartPartitioner(factory, new HeuristicNodeInserter(),
-				new CacheOptimizedSinker(), new TGraph());
+		TGraph graph;
+		BatchNodeInserter inserter;
+		Sinker sinker;
+		FusionTable table;
+		boolean isBatching = true;
+		
+		switch (SERVICE_TYPE) {
+		case TPART:
+			graph = new TGraph();
+			inserter = new CostAwareNodeInserter();
+			sinker = new Sinker();
+			isBatching = true;
+			break;
+		case HERMES:
+			table = new FusionTable();
+			graph = new FusionTGraph(table);
+			inserter = new HermesNodeInserter();
+			sinker = new FusionSinker(table);
+			isBatching = true;
+			break;
+		case G_STORE:
+			graph = new TGraph();
+			inserter = new LocalFirstNodeInserter();
+			sinker = new Sinker();
+			isBatching = false;
+			break;
+		case LEAP:
+			table = new FusionTable();
+			graph = new FusionTGraph(table);
+			inserter = new LocalFirstNodeInserter();
+			sinker = new FusionSinker(table);
+			isBatching = false;
+			break;
+		default:
+			throw new IllegalArgumentException("Not supported");
+		}
+		
+		// TODO: Uncomment this when the migration module is migrated
+//		factory = new MigrationStoredProcFactory(factory);
+		TPartPartitioner scheduler = new TPartPartitioner(factory,  inserter,
+				sinker, graph, isBatching);
+		
 		taskMgr().runTask(scheduler);
 		return scheduler;
 	}

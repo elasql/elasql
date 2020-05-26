@@ -42,6 +42,17 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		readObjs = new HashSet<Object>();
 		writeObjs = new HashSet<Object>();
 	}
+	
+	public void bookReadKey(RecordKey key) {
+		if (key != null) {
+			// The key needs to be booked only once. 
+			if (!bookedObjs.contains(key))
+				lockTbl.requestLock(key, txNum);
+			
+			bookedObjs.add(key);
+			readObjs.add(key);
+		}
+	}
 
 	/**
 	 * Book the read lock of the specified objects.
@@ -59,6 +70,17 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 			
 			bookedObjs.addAll(keys);
 			readObjs.addAll(keys);
+		}
+	}
+	
+	public void bookWriteKey(RecordKey key) {
+		if (key != null) {
+			// The key needs to be booked only once. 
+			if (!bookedObjs.contains(key))
+				lockTbl.requestLock(key, txNum);
+			
+			bookedObjs.add(key);
+			writeObjs.add(key);
 		}
 	}
 	

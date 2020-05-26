@@ -187,7 +187,8 @@ public class VanillaCoreCrud {
 		return recordMap;
 	}
 
-	public static void update(RecordKey key, CachedRecord rec, Transaction tx) {
+	public static boolean update(RecordKey key, CachedRecord rec, Transaction tx) {
+		boolean found = false;
 		String tblName = key.getTableName();
 		
 //		Timer.getLocalTimer().startComponentTimer("Update to table " + tblName);
@@ -214,6 +215,7 @@ public class VanillaCoreCrud {
 		UpdateScan s = (UpdateScan) selectPlan.open();
 		s.beforeFirst();
 		while (s.next()) {
+			found = true;
 			
 			// Construct a mapping from field names to values
 			Map<String, Constant> oldValMap = new HashMap<String, Constant>();
@@ -271,6 +273,8 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
+		
+		return found;
 	}
 
 	public static void insert(RecordKey key, CachedRecord rec, Transaction tx) {

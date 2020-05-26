@@ -1,18 +1,3 @@
-/*******************************************************************************
- * Copyright 2016, 2018 elasql.org contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *******************************************************************************/
 package org.elasql.procedure.tpart;
 
 import java.util.Set;
@@ -24,59 +9,71 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
-public class TPartStoredProcedureTask extends StoredProcedureTask<TPartStoredProcedure<?>> {
+public class TPartStoredProcedureTask
+		extends StoredProcedureTask<TPartStoredProcedure<?>> {
+	
+	static {
+		// For Debugging
+//		TimerStatistics.startRecording();
+//		TimerStatistics.startAutoReporting();
+	}
 
+	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
 
-	public TPartStoredProcedureTask(
-			int cid, int connId, long txNum,
-			TPartStoredProcedure<?> sp) {
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
+		this.tsp = sp;
 	}
 
 	@Override
 	public void run() {
-//		Timers.createTimer(txNum);
 		SpResultSet rs = null;
-//		Timers.getTimer().startExecution();
+		
+		Thread.currentThread().setName("Tx." + txNum);
+//		Timer timer = Timer.getLocalTimer();
+//		timer.reset();
+//		timer.startExecution();
 
-		// try {
-		// long start = System.nanoTime();
-		rs = sp.execute();
-		// long time = System.nanoTime() - start;
-		// System.out.println(time / 1000);
-		// } finally {
-//		Timers.getTimer().stopExecution();
-		// }
+//		try {
+			rs = tsp.execute();
+//		} finally {
+//			timer.stopExecution();
+//		}
 
-		if (sp.isMaster()) {
-			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
-			// System.out.println("Commit: " + (System.nanoTime() - startTime));
+		if (tsp.isMaster()) {
+			if (clientId != -1)
+				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+
+			// TODO: Uncomment this when the migration module is migrated
+//			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
+//				// Send a notification to the sequencer
+//				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
+//				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
+//			}
+//			timer.addToGlobalStatistics();
 		}
-		// System.out.println("task time:" + (System.nanoTime() -
-		// taskStartTime));
-//		Timers.addToStatstics();
+//		timer.addToGlobalStatistics();
 	}
 
-	@Override
 	public long getTxNum() {
 		return txNum;
 	}
 
 	public Set<RecordKey> getReadSet() {
-		return sp.getReadSet();
+		return tsp.getReadSet();
 	}
 
 	public Set<RecordKey> getWriteSet() {
-		return sp.getWriteSet();
+		return tsp.getWriteSet();
 	}
 
 	public double getWeight() {
-		return sp.getWeight();
+		return tsp.getWeight();
 	}
 
 	public int getPartitionId() {
@@ -87,17 +84,21 @@ public class TPartStoredProcedureTask extends StoredProcedureTask<TPartStoredPro
 		this.parId = parId;
 	}
 
-	public void setSunkPlan(SunkPlan plan) {
-		sp.setSunkPlan(plan);
+	public void decideExceutionPlan(SunkPlan plan) {
+		tsp.decideExceutionPlan(plan);
+	}
+
+	public TPartStoredProcedure<?> getProcedure() {
+		return tsp;
 	}
 
 	public ProcedureType getProcedureType() {
-		if (sp == null)
+		if (tsp == null)
 			return ProcedureType.NOP;
-		return sp.getProcedureType();
+		return tsp.getProcedureType();
 	}
 
 	public boolean isReadOnly() {
-		return sp.isReadOnly();
+		return tsp.isReadOnly();
 	}
 }

@@ -15,22 +15,29 @@
  *******************************************************************************/
 package org.elasql.storage.metadata;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.elasql.sql.RecordKey;
 import org.elasql.util.ElasqlProperties;
 
 public class PartitionMetaMgr {
+	private static Logger logger = Logger.getLogger(PartitionMetaMgr.class.getName());
 
-	public final static int NUM_PARTITIONS;
+	public static final int NUM_PARTITIONS;
 
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 18);
+				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
 	}
 
 	private PartitionPlan partPlan;
 	
 	public PartitionMetaMgr(PartitionPlan plan) {
 		partPlan = plan;
+		
+		if (logger.isLoggable(Level.INFO))
+			logger.info(String.format("Using '%s'", partPlan));
 	}
 
 	/**

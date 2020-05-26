@@ -1,18 +1,3 @@
-/*******************************************************************************
- * Copyright 2016, 2018 elasql.org contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *******************************************************************************/
 package org.elasql.schedule.tpart.sink;
 
 import java.util.ArrayList;
@@ -27,7 +12,7 @@ import org.elasql.sql.RecordKey;
 
 public class SunkPlan {
 	private int sinkProcessId;
-	private boolean isLocalTask;
+	private boolean isHereMaster;
 
 	// key->srcTxNum
 	private Map<RecordKey, Long> readingInfoMap;
@@ -37,28 +22,31 @@ public class SunkPlan {
 
 	private List<RecordKey> localWriteBackInfo = new ArrayList<RecordKey>();
 
-	private Map<Integer, List<RecordKey>> remoteWriteBackInfo;
-
-	private Map<RecordKey, Set<Long>> writeDestMap = new HashMap<RecordKey, Set<Long>>();
+	// Migration flags
+	private Set<RecordKey> cacheInsertions = new HashSet<RecordKey>();
+	private Set<RecordKey> cacheDeletions = new HashSet<RecordKey>();
+	private Set<RecordKey> storageInsertions = new HashSet<RecordKey>();
+	
+	// <Record Key -> Target transactions to be passed in local>
+	private Map<RecordKey, Set<Long>> passToLocalTxns = new HashMap<RecordKey, Set<Long>>();
 
 	private Map<Integer, Set<PushInfo>> sinkPushingInfoMap = new HashMap<Integer, Set<PushInfo>>();
 
 	private Set<RecordKey> sinkReadingSet = new HashSet<RecordKey>();
 
-	public SunkPlan(int sinkProcessId, boolean isLocalTask) {
+	public SunkPlan(int sinkProcessId, boolean isHereMaster) {
 		this.sinkProcessId = sinkProcessId;
-		this.isLocalTask = isLocalTask;
+		this.isHereMaster = isHereMaster;
 	}
 
 	public void addReadingInfo(RecordKey key, long srcTxNum) {
 		// not need to specify dest, that is the owner tx num
-
 		if (readingInfoMap == null)
 			readingInfoMap = new HashMap<RecordKey, Long>();
 		readingInfoMap.put(key, srcTxNum);
 	}
 
-	public void addPushingInfo(RecordKey key, int targetNodeId, long srcTxNum, long destTxNum) {
+	public void addPushingInfo(RecordKey key, int targetNodeId, long destTxNum) {
 		if (pushingInfoMap == null)
 			pushingInfoMap = new HashMap<Integer, Set<PushInfo>>();
 		Set<PushInfo> pushInfos = pushingInfoMap.get(targetNodeId);
@@ -69,13 +57,13 @@ public class SunkPlan {
 		pushInfos.add(new PushInfo(destTxNum, targetNodeId, key));
 	}
 
-	public void addWritingInfo(RecordKey key, long destTxNum) {
-		if (writeDestMap.get(key) == null)
-			writeDestMap.put(key, new HashSet<Long>());
-		writeDestMap.get(key).add(destTxNum);
+	public void addLocalPassingTarget(RecordKey key, long destTxNum) {
+		if (passToLocalTxns.get(key) == null)
+			passToLocalTxns.put(key, new HashSet<Long>());
+		passToLocalTxns.get(key).add(destTxNum);
 	}
 
-	public void addSinkPushingInfo(RecordKey key, int destNodeId, long srcTxNum, long destTxNum) {
+	public void addSinkPushingInfo(RecordKey key, int destNodeId, long destTxNum) {
 		Set<PushInfo> pushInfos = sinkPushingInfoMap.get(destNodeId);
 		if (pushInfos == null) {
 			pushInfos = new HashSet<PushInfo>();
@@ -96,8 +84,8 @@ public class SunkPlan {
 		return sinkReadingSet;
 	}
 
-	public Long[] getWritingDestOfRecord(RecordKey key) {
-		Set<Long> set = writeDestMap.get(key);
+	public Long[] getLocalPassingTarget(RecordKey key) {
+		Set<Long> set = passToLocalTxns.get(key);
 		return (set == null) ? null : set.toArray(new Long[0]);
 	}
 
@@ -105,12 +93,18 @@ public class SunkPlan {
 		return sinkProcessId;
 	}
 
-	public boolean isLocalTask() {
-		return isLocalTask;
+	public boolean isHereMaster() {
+		return isHereMaster;
 	}
 
 	public void addLocalWriteBackInfo(RecordKey key) {
 		localWriteBackInfo.add(key);
+	}
+	
+	public Set<RecordKey> getReadSet() {
+		if (readingInfoMap == null)
+			readingInfoMap = new HashMap<RecordKey, Long>();
+		return readingInfoMap.keySet();
 	}
 
 	public long getReadSrcTxNum(RecordKey key) {
@@ -125,16 +119,55 @@ public class SunkPlan {
 		return localWriteBackInfo;
 	}
 
-	public Map<Integer, List<RecordKey>> getRemoteWriteBackInfo() {
-		return remoteWriteBackInfo;
-	}
-
 	public boolean hasLocalWriteBack() {
 		return localWriteBackInfo.size() > 0;
 	}
 
 	public boolean hasSinkPush() {
 		return sinkPushingInfoMap.size() > 0;
+	}
+
+	public void addCacheInsertion(RecordKey key) {
+		cacheInsertions.add(key);
+	}
+
+	public void addCacheDeletion(RecordKey key) {
+		cacheDeletions.add(key);
+	}
+	
+	public void addStorageInsertion(RecordKey key) {
+		storageInsertions.add(key);
+	}
+
+	public Set<RecordKey> getCacheInsertions() {
+		return cacheInsertions;
+	}
+
+	public Set<RecordKey> getCacheDeletions() {
+		return cacheDeletions;
+	}
+	
+	public Set<RecordKey> getStorageInsertions() {
+		return storageInsertions;
+	}
+	
+	public boolean isReadOnly() {
+		return localWriteBackInfo.isEmpty();
+	}
+	
+	/*
+	 * For each tx node, create a procedure task for it. The task will
+	 * be scheduled locally if 1) the task is partitioned into current
+	 * server or 2) the task needs to write back records to this server.
+	 */
+	// A plan should be executed in the local node if:
+	// - The local node is the master node
+	// - It needs to write back records to the local storage (sink)
+	// - It needs to push data from the local storage to remote
+	// - It needs to delete cached records (Hermes-specific)
+	public boolean shouldExecuteHere() {
+		return isHereMaster || hasLocalWriteBack() || hasSinkPush() ||
+				!cacheDeletions.isEmpty();
 	}
 
 	@Override
@@ -146,7 +179,7 @@ public class SunkPlan {
 		sb.append("\n");
 
 		sb.append("Is Local: ");
-		sb.append(isLocalTask);
+		sb.append(isHereMaster);
 		sb.append("\n");
 
 		sb.append("Reading Info: ");
@@ -161,21 +194,17 @@ public class SunkPlan {
 		sb.append(localWriteBackInfo);
 		sb.append("\n");
 
-		sb.append("Remote Writing Back Info: ");
-		sb.append(remoteWriteBackInfo);
-		sb.append("\n");
-
 		sb.append("Write Dest: ");
 		Iterator<?> iterator = null;
-		if (writeDestMap != null) {
-			iterator = writeDestMap.keySet().iterator();
+		if (passToLocalTxns != null) {
+			iterator = passToLocalTxns.keySet().iterator();
 
 			while (iterator.hasNext()) {
 				RecordKey key = (RecordKey) iterator.next();
-				Set<Long> value = writeDestMap.get(key);
+				Set<Long> value = passToLocalTxns.get(key);
 				sb.append(key + " : [");
-				for(Long p : value)
-					sb.append(p+",");
+				for (Long p : value)
+					sb.append(p + ",");
 				sb.append("]");
 			}
 		}
@@ -189,10 +218,10 @@ public class SunkPlan {
 				Integer key = (Integer) iterator.next();
 				Set<PushInfo> value = sinkPushingInfoMap.get(key);
 				sb.append(key + " : [");
-				for(PushInfo p : value)
-					sb.append(p+",");
+				for (PushInfo p : value)
+					sb.append(p + ",");
 				sb.append("]");
-				
+
 			}
 		}
 		sb.append("\n");
@@ -206,6 +235,18 @@ public class SunkPlan {
 			}
 		}
 
+		sb.append("\n");
+		
+		sb.append("Cache Insertions: ");
+		sb.append(cacheInsertions);
+		sb.append("\n");
+		
+		sb.append("Cache Deletions: ");
+		sb.append(cacheDeletions);
+		sb.append("\n");
+		
+		sb.append("Storage Deletions: ");
+		sb.append(storageInsertions);
 		sb.append("\n");
 
 		return sb.toString();

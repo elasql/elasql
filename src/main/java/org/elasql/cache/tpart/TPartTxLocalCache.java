@@ -1,23 +1,9 @@
-/*******************************************************************************
- * Copyright 2016, 2018 elasql.org contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *******************************************************************************/
 package org.elasql.cache.tpart;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.schedule.tpart.sink.SunkPlan;
@@ -47,6 +33,8 @@ public class TPartTxLocalCache {
 	 * 
 	 * @param key
 	 *            the key of the record
+	 * @param mySinkId
+	 *            the id of the sink where the transaction executes
 	 * @return the specified record
 	 */
 	public CachedRecord readFromSink(RecordKey key) {
@@ -57,6 +45,18 @@ public class TPartTxLocalCache {
 		recordCache.put(key, rec);
 
 		return rec;
+	}
+	
+	public Map<RecordKey, CachedRecord> batchReadFromSink(Set<RecordKey> keys) {
+		Map<RecordKey, CachedRecord> records = cacheMgr.batchReadFromSink(keys, tx);
+		
+		for (CachedRecord rec : records.values()) {
+			rec.setSrcTxNum(txNum);
+		}
+		// XXX: Comment this to speed up
+		// recordCache.putAll(records);
+		
+		return records;
 	}
 
 	/**
@@ -72,12 +72,14 @@ public class TPartTxLocalCache {
 	 * @return the specified record
 	 */
 	public CachedRecord read(RecordKey key, long src) {
+		
 		CachedRecord rec = recordCache.get(key);
 		if (rec != null)
 			return rec;
 
 		rec = cacheMgr.takeFromTx(key, src, txNum);
 		recordCache.put(key, rec);
+		
 		return rec;
 	}
 
@@ -88,20 +90,23 @@ public class TPartTxLocalCache {
 
 	public void insert(RecordKey key, Map<String, Constant> fldVals) {
 		CachedRecord rec = CachedRecord.newRecordForInsertion(key, fldVals);
-		rec.setSrcTxNum(txNum);
+		rec.setSrcTxNum(tx.getTransactionNumber());
 		recordCache.put(key, rec);
 	}
 
 	public void delete(RecordKey key) {
 		CachedRecord dummyRec = CachedRecord.newRecordForDeletion(key);
-		dummyRec.setSrcTxNum(txNum);
+		dummyRec.setSrcTxNum(tx.getTransactionNumber());
 		recordCache.put(key, dummyRec);
 	}
 
 	public void flush(SunkPlan plan, List<CachedEntryKey> cachedEntrySet) {
+//		Timer timer = Timer.getLocalTimer();
+		
 		// Pass to the transactions
+//		timer.startComponentTimer("Pass to next Tx");
 		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
-			Long[] dests = plan.getWritingDestOfRecord(entry.getKey());
+			Long[] dests = plan.getLocalPassingTarget(entry.getKey());
 			if (dests != null) {
 				for (long dest : dests) {
 					// The destination might be the local storage (txNum < 0)
@@ -112,32 +117,39 @@ public class TPartTxLocalCache {
 				}
 			}
 		}
+//		timer.stopComponentTimer("Pass to next Tx");
 
-		if (plan.isLocalTask()) {
-			// Flush to the local storage (write back)
-			for (RecordKey key : plan.getLocalWriteBackInfo()) {
+//		timer.startComponentTimer("Writeback");
+		// Flush to the local storage (write back)
+		for (RecordKey key : plan.getLocalWriteBackInfo()) {
 
-				CachedRecord rec = recordCache.get(key);
-
-				// If there is no such record in the local cache,
-				// it might be pushed from the same transaction on the other
-				// machine.
-
-				cacheMgr.writeBack(key, rec, tx);
-
-			}
-		} else {
-
-			// Flush to the local storage (write back)
-			for (RecordKey key : plan.getLocalWriteBackInfo()) {
-
-				CachedRecord rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
-
-				cacheMgr.writeBack(key, rec, tx);
-
+			CachedRecord rec = null;
+			if (plan.isHereMaster()) 
+				rec = recordCache.get(key);
+			else
+				rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
+			
+			// For migration
+			if (plan.getStorageInsertions().contains(key)) {
+				cacheMgr.insertToLocalStorage(key, rec, tx);
+				continue;
 			}
 
+			// If there is no such record in the local cache,
+			// it might be pushed from the same transaction on the other
+			// machine.
+			// Migrated data need to insert
+			if (plan.getCacheInsertions().contains(key))
+				cacheMgr.insertToCache(key, rec, txNum);
+			else
+				cacheMgr.writeBack(key, rec, tx);
 		}
-
+//		timer.stopComponentTimer("Writeback");
+		
+		// Clean up migrated rec
+//		timer.startComponentTimer("Delete cached records");
+		for (RecordKey key : plan.getCacheDeletions())
+			cacheMgr.deleteFromCache(key, txNum);
+//		timer.stopComponentTimer("Delete cached records");
 	}
 }
