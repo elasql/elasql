@@ -6,16 +6,13 @@ import java.util.logging.Logger;
 
 import org.elasql.migration.albatross.AlbatrossMigrationMgr;
 import org.elasql.migration.albatross.AlbatrossStoredProcFactory;
-import org.elasql.migration.albatross.AlbatrossSystemController;
 import org.elasql.migration.mgcrab.MgCrabMigrationMgr;
 import org.elasql.migration.mgcrab.MgCrabStoredProcFactory;
 import org.elasql.migration.mgcrab.MgCrabSystemController;
 import org.elasql.migration.squall.SquallMigrationMgr;
 import org.elasql.migration.squall.SquallStoredProcFactory;
-import org.elasql.migration.squall.SquallSystemController;
 import org.elasql.migration.stopcopy.StopCopyMigrationMgr;
 import org.elasql.migration.stopcopy.StopCopyStoredProcFactory;
-import org.elasql.migration.stopcopy.StopCopySystemController;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.storage.metadata.PartitionPlan;
 
@@ -46,11 +43,11 @@ public abstract class MigrationComponentFactory {
 		case MGCRAB:
 			return new MgCrabSystemController(this);
 		case SQUALL:
-			return new SquallSystemController(this);
+			return new MigrationSystemController(this);
 		case ALBATROSS:
-			return new AlbatrossSystemController(this);
+			return new MigrationSystemController(this);
 		case STOP_COPY:
-			return new StopCopySystemController(this);
+			return new MigrationSystemController(this);
 		}
 		throw new RuntimeException("it should not be here.");
 	}

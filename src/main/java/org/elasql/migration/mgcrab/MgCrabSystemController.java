@@ -1,13 +1,11 @@
 package org.elasql.migration.mgcrab;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationRange;
-import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSettings;
 import org.elasql.migration.MigrationStoredProcFactory;
 import org.elasql.migration.MigrationSystemController;
@@ -21,22 +19,14 @@ import org.elasql.storage.metadata.PartitionPlan;
  * (2) notifies of phase changing, and
  * (3) finishes a migration.
  */
-public class MgCrabSystemController implements MigrationSystemController {
+public class MgCrabSystemController extends MigrationSystemController {
 	private static Logger logger = Logger.getLogger(MgCrabSystemController.class.getName());
 	
-	private AtomicInteger numOfRangesToBeMigrated = new AtomicInteger(0);
-	
-	private MigrationComponentFactory comsFactory;
-	
 	public MgCrabSystemController(MigrationComponentFactory comsFactory) {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("the system controller is ready");
-		
-		this.comsFactory = comsFactory;
-		if (MigrationSettings.ENABLE_MIGRATION)
-			startMigrationTrigger();
+		super(comsFactory);
 	}
 
+	@Override
 	public void startMigrationTrigger() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Starts migration trigger thread.");
@@ -81,6 +71,7 @@ public class MgCrabSystemController implements MigrationSystemController {
 		}).start();
 	}
 	
+	@Override
 	public void sendMigrationStartRequest(PartitionPlan newPartPlan) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a MigrationStart request.");
@@ -99,32 +90,5 @@ public class MgCrabSystemController implements MigrationSystemController {
 		Object[] params = new Object[] {Phase.CAUGHT_UP};
 		Elasql.connectionMgr().sendStoredProcedureCall(false, 
 				MgCrabStoredProcFactory.SP_PHASE_CHANGE, params);
-	}
-	
-	public void onReceiveMigrationRangeFinishMsg(MigrationRangeFinishMessage msg) {
-		int currentLeft = numOfRangesToBeMigrated.get();
-		int newCount = currentLeft - msg.getFinishRangeCount();
-		while (!numOfRangesToBeMigrated.compareAndSet(currentLeft, newCount)) {
-			currentLeft = numOfRangesToBeMigrated.get();
-			newCount = currentLeft - msg.getFinishRangeCount();
-		}
-		
-		if (numOfRangesToBeMigrated.get() == 0)
-			sendMigrationFinishRequest();
-		else {
-			if (logger.isLoggable(Level.INFO))
-				logger.info("got a migration range finish notification. " +
-						newCount + " ranges are left to go.");
-		}
-	}
-	
-	public void sendMigrationFinishRequest() {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("send a MigrationFinish request.");
-		
-		// Send a store procedure call
-		Object[] params = new Object[] {};
-		Elasql.connectionMgr().sendStoredProcedureCall(true, 
-				MigrationStoredProcFactory.SP_MIGRATION_END, params);
 	}
 }
