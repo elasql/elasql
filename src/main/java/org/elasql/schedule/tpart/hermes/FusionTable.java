@@ -5,9 +5,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
+import org.elasql.util.PeriodicalJob;
 
 public class FusionTable {
 	
@@ -15,7 +17,7 @@ public class FusionTable {
 	
 	static {
 		EXPECTED_MAX_SIZE = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".EXPECTED_MAX_SIZE", 100_000);
+				.getPropertyAsInteger(FusionTable.class.getName() + ".EXPECTED_MAX_SIZE", 100_000);
 	}
 	
 	class LocationRecord {
@@ -87,21 +89,21 @@ public class FusionTable {
 //			}
 //		}).start();
 		
-//		new PeriodicalJob(5_000, 2400_000, new Runnable() {
-//			@Override
-//			public void run() {
-//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
-//				time /= 1000;
-//				
-//				StringBuffer sb = new StringBuffer();
-//				sb.append(String.format("Time: %d seconds - ", time));
-//				for (int i = 0; i < countsPerParts.length; i++)
-//					sb.append(String.format("%d, ", countsPerParts[i]));
-//				sb.delete(sb.length() - 2, sb.length());
-//				
-//				System.out.println(sb.toString());
-//			}
-//		}).start();
+		new PeriodicalJob(3_000, 360_000, new Runnable() {
+			@Override
+			public void run() {
+				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+				time /= 1000;
+				
+				StringBuffer sb = new StringBuffer();
+				sb.append(String.format("Time: %d seconds - ", time));
+				for (int i = 0; i < countsPerParts.length; i++)
+					sb.append(String.format("%d, ", countsPerParts[i]));
+				sb.delete(sb.length() - 2, sb.length());
+				
+				System.out.println(sb.toString());
+			}
+		}).start();
 		
 //		new PeriodicalJob(5_000, 2400_000, new Runnable() {
 //			@Override
@@ -136,7 +138,7 @@ public class FusionTable {
 //			}
 //		}).start();
 		
-//		new PeriodicalJob(10_000, 1200_000, new Runnable() {
+//		new PeriodicalJob(5_000, 360_000, new Runnable() {
 //			@Override
 //			public void run() {
 //				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
@@ -175,16 +177,16 @@ public class FusionTable {
 		Integer slotId = keyToSlotIds.get(key);
 		
 		if (slotId != null) {
-//			hitCounter.hit();
+			hitCounter.hit();
 			locations[slotId].referenced = true;
 			return locations[slotId].partId;
 		} else {
 			Integer partId = overflowedKeys.get(key);
 			if (partId != null) {
-//				hitCounter.hit();
+				hitCounter.hit();
 				return partId;
 			} else {
-//				hitCounter.miss();
+				hitCounter.miss();
 				return -1;
 			}
 		}

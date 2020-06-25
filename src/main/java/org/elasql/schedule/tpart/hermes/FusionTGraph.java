@@ -54,10 +54,10 @@ public class FusionTGraph extends TGraph {
 			TxNode node = resPosPair.getValue();
 			
 			// Quick fix: ignore insert-only tables
-			if (res.getTableName().equals("orders") || res.getTableName().equals("new_order") ||
-					res.getTableName().equals("order_line"))
-				node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getPartition(res)], res));
-			else
+//			if (res.getTableName().equals("orders") || res.getTableName().equals("new_order") ||
+//					res.getTableName().equals("order_line"))
+//				node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getPartition(res)], res));
+//			else
 			// Put the records on where they are
 				node.addWriteBackEdges(new Edge(sinkNodes[node.getPartId()], res));
 		}
