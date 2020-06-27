@@ -105,6 +105,7 @@ public class Elasql extends VanillaDb {
 	
 	// Only for the sequencer
 	private static MigrationSystemController migraSysControl;
+	private static boolean isSequencer;
 
 	// connection information
 	private static int myNodeId;
@@ -121,7 +122,7 @@ public class Elasql extends VanillaDb {
 	 * @param isSequencer
 	 *            is this server a sequencer
 	 */
-	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory<?> factory) {
+	public static void init(String dirName, int id, boolean sequencerMode, DdStoredProcedureFactory<?> factory) {
 		PartitionPlan partitionPlan = null;
 		Class<?> planCls = ElasqlProperties.getLoader().getPropertyAsClass(
 				Elasql.class.getName() + ".DEFAULT_PARTITION_PLAN", HashPartitionPlan.class,
@@ -135,12 +136,13 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 		
-		init(dirName, id, isSequencer, factory, partitionPlan, null);
+		init(dirName, id, sequencerMode, factory, partitionPlan, null);
 	}
 	
-	public static void init(String dirName, int id, boolean isSequencer, DdStoredProcedureFactory<?> factory,
+	public static void init(String dirName, int id, boolean sequencerMode, DdStoredProcedureFactory<?> factory,
 			PartitionPlan partitionPlan, MigrationComponentFactory migraComsFactory) {
 		myNodeId = id;
+		isSequencer = sequencerMode;
 
 		if (logger.isLoggable(Level.INFO))
 			logger.info("ElaSQL initializing...");
@@ -152,6 +154,7 @@ public class Elasql extends VanillaDb {
 			logger.info("initializing using Sequencer mode");
 			initConnectionMgr(myNodeId, true);
 			initPartitionMetaMgr(partitionPlan);
+			initScheduler(factory, migraComsFactory);
 			if (migraComsFactory != null)
 				migraSysControl = migraComsFactory.newSystemController();
 			return;
@@ -332,6 +335,10 @@ public class Elasql extends VanillaDb {
 	
 	public static MigrationSystemController migraSysControl() {
 		return migraSysControl;
+	}
+	
+	public static boolean isSequencer() {
+		return isSequencer;
 	}
 
 	// ===============

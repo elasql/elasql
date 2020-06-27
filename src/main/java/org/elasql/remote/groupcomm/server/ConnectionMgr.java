@@ -30,6 +30,7 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
+import org.elasql.server.Elasql.ServiceType;
 import org.vanilladb.comm.server.VanillaCommServer;
 import org.vanilladb.comm.server.VanillaCommServerListener;
 import org.vanilladb.comm.view.ProcessType;
@@ -116,7 +117,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
-		if (sequencerMode)
+		// The sequencer running with Calvin must receive stored procedure call for planning migrations
+		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
 			return;
 		
 		StoredProcedureCall spc = (StoredProcedureCall) message;

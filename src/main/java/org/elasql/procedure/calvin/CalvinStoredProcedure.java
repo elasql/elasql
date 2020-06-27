@@ -29,6 +29,7 @@ import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
+import org.elasql.schedule.calvin.SequencerAnalyzer;
 import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -124,11 +125,20 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// analyze read-write set
 		ReadWriteSetAnalyzer analyzer;
-		if (Elasql.migrationMgr().isInMigration())
-			analyzer = Elasql.migrationMgr().newAnalyzer();
-		else
-			analyzer = new StandardAnalyzer();
-		prepareKeys(analyzer);
+		if (Elasql.isSequencer()) {
+			// The sequencer monitors transactions
+			SequencerAnalyzer seqAnalyzer = new SequencerAnalyzer();
+			prepareKeys(seqAnalyzer);
+			Elasql.migraSysControl().monitorTransaction(
+					seqAnalyzer.getReadKeys(), seqAnalyzer.getWriteKeys());
+			analyzer = seqAnalyzer;
+		} else {
+			if (Elasql.migrationMgr().isInMigration())
+				analyzer = Elasql.migrationMgr().newAnalyzer();
+			else
+				analyzer = new StandardAnalyzer();
+			prepareKeys(analyzer);
+		}
 		
 		// generate execution plan
 		return analyzer.generatePlan();

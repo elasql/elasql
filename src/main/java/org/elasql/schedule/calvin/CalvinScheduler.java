@@ -26,6 +26,7 @@ import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.Scheduler;
+import org.elasql.server.Elasql;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
@@ -84,7 +85,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 	
 				// if this node doesn't have to participate this transaction,
 				// skip it
-				if (!sp.isParticipating()) {
+				if (!sp.isParticipating() || Elasql.isSequencer()) {
 //					timer.stopComponentTimer("schedule");
 //					timer.addToGlobalStatistics();
 					continue;

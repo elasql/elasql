@@ -43,7 +43,6 @@ public class MigrationSystemController implements Runnable {
 		}
 	}
 	
-	// TODO: Plug this up
 	public void monitorTransaction(Set<RecordKey> reads, Set<RecordKey> writes) {
 		workloadFeeds.add(new TransactionInfo(reads, writes));
 	}
