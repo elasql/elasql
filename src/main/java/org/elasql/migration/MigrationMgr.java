@@ -6,7 +6,7 @@ import org.vanilladb.core.storage.tx.Transaction;
 
 public interface MigrationMgr {
 	
-	void initializeMigration(Transaction tx, Object[] params);
+	void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params);
 	
 	void finishMigration(Transaction tx, Object[] params);
 	
@@ -23,5 +23,4 @@ public interface MigrationMgr {
 	boolean isInMigration();
 	
 	ReadWriteSetAnalyzer newAnalyzer();
-	
 }

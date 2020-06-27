@@ -1,6 +1,5 @@
 package org.elasql.migration;
 
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -9,12 +8,14 @@ import org.elasql.migration.albatross.AlbatrossStoredProcFactory;
 import org.elasql.migration.mgcrab.MgCrabMigrationMgr;
 import org.elasql.migration.mgcrab.MgCrabStoredProcFactory;
 import org.elasql.migration.mgcrab.MgCrabSystemController;
+import org.elasql.migration.planner.MigrationPlanner;
+import org.elasql.migration.planner.PredefinedPlanner;
+import org.elasql.migration.planner.clay.ClayPlanner;
 import org.elasql.migration.squall.SquallMigrationMgr;
 import org.elasql.migration.squall.SquallStoredProcFactory;
 import org.elasql.migration.stopcopy.StopCopyMigrationMgr;
 import org.elasql.migration.stopcopy.StopCopyStoredProcFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
-import org.elasql.storage.metadata.PartitionPlan;
 
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
@@ -27,13 +28,13 @@ public abstract class MigrationComponentFactory {
 	public MigrationMgr newMigrationMgr() {
 		switch (MigrationSettings.MIGRATION_ALGORITHM) {
 		case MGCRAB:
-			return new MgCrabMigrationMgr(this);
+			return new MgCrabMigrationMgr();
 		case SQUALL:
-			return new SquallMigrationMgr(this);
+			return new SquallMigrationMgr();
 		case ALBATROSS:
-			return new AlbatrossMigrationMgr(this);
+			return new AlbatrossMigrationMgr();
 		case STOP_COPY:
-			return new StopCopyMigrationMgr(this);
+			return new StopCopyMigrationMgr();
 		}
 		throw new RuntimeException("it should not be here.");
 	}
@@ -67,7 +68,15 @@ public abstract class MigrationComponentFactory {
 		throw new RuntimeException("it should not be here.");
 	}
 	
-	public abstract List<MigrationRange> generateMigrationRanges(PartitionPlan oldPlan, PartitionPlan newPlan);
+	public MigrationPlanner newMigrationPlanner() {
+		switch (MigrationSettings.PLANNING_ALGORITHM) {
+		case PREDEFINED:
+			return new PredefinedPlanner(newPredefinedMigrationPlan());
+		case CLAY:
+			return new ClayPlanner();
+		}
+		throw new RuntimeException("it should not be here.");
+	}
 	
-	public abstract PartitionPlan newPartitionPlan();
+	public abstract MigrationPlan newPredefinedMigrationPlan();
 }

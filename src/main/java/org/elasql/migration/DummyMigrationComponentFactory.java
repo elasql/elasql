@@ -1,9 +1,5 @@
 package org.elasql.migration;
 
-import java.util.List;
-
-import org.elasql.storage.metadata.PartitionPlan;
-
 public class DummyMigrationComponentFactory extends MigrationComponentFactory {
 	
 	private String message;
@@ -13,12 +9,7 @@ public class DummyMigrationComponentFactory extends MigrationComponentFactory {
 	}
 
 	@Override
-	public List<MigrationRange> generateMigrationRanges(PartitionPlan oldPlan, PartitionPlan newPlan) {
-		throw new RuntimeException(message);
-	}
-
-	@Override
-	public PartitionPlan newPartitionPlan() {
+	public MigrationPlan newPredefinedMigrationPlan() {
 		throw new RuntimeException(message);
 	}
 

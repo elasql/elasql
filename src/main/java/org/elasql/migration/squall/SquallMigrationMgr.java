@@ -6,8 +6,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationRangeUpdate;
@@ -19,7 +19,6 @@ import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.squall.SquallAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -29,16 +28,10 @@ public class SquallMigrationMgr implements MigrationMgr {
 	private List<MigrationRange> migrationRanges;
 	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
 	private PartitionPlan newPartitionPlan;
-	private MigrationComponentFactory comsFactory;
 	private boolean isInMigration;
-	
-	public SquallMigrationMgr(MigrationComponentFactory comsFactory) {
-		this.comsFactory = comsFactory;
-	}
-	
-	public void initializeMigration(Transaction tx, Object[] params) {
-		// Parse parameters
-		PartitionPlan newPartPlan = (PartitionPlan) params[0];
+
+	public void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params) {
+		PartitionPlan newPartPlan = plan.getNewPart();
 		
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
@@ -49,10 +42,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 		
 		// Initialize states
 		isInMigration = true;
-		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
-		if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
-			currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
-		migrationRanges = comsFactory.generateMigrationRanges(currentPlan, newPartPlan);
+		migrationRanges = plan.getMigrationRanges();
 		for (MigrationRange range : migrationRanges)
 			if (range.getDestPartId() == Elasql.serverId())
 				pushRanges.add(range);

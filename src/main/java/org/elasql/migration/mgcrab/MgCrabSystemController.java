@@ -5,13 +5,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.migration.MigrationComponentFactory;
+import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationSettings;
 import org.elasql.migration.MigrationStoredProcFactory;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.migration.planner.MigrationPlanner;
 import org.elasql.server.Elasql;
-import org.elasql.storage.metadata.NotificationPartitionPlan;
-import org.elasql.storage.metadata.PartitionPlan;
 
 /**
  * The system controller only exists in the sequencer node. Job: 
@@ -25,59 +25,76 @@ public class MgCrabSystemController extends MigrationSystemController {
 	public MgCrabSystemController(MigrationComponentFactory comsFactory) {
 		super(comsFactory);
 	}
-
+	
 	@Override
-	public void startMigrationTrigger() {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("Starts migration trigger thread.");
+	public void run() {
+		// Wait for some time
+		try {
+			Thread.sleep(MigrationSettings.START_MONITOR_TIME);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 		
-		new Thread(new Runnable() {
+		// Periodically monitor, plan and trigger migrations
+		MigrationPlanner planner = comsFactory.newMigrationPlanner();
+		while (true) {
+			try {
+				// Reset the workload logs
+				workloadFeeds.clear();
 
-			@Override
-			public void run() {
-				// Wait for some time
-				try {
-					Thread.sleep(MigrationSettings.START_MIGRATION_TIME);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
+				// Monitor transactions
+				long startMonitorTime = System.currentTimeMillis();
+				while (System.currentTimeMillis() - startMonitorTime <
+						MigrationSettings.MIGRATION_PERIOD) {
+					TransactionInfo info = workloadFeeds.take();
+					planner.monitorTransaction(info.reads, info.writes);
 				}
 				
+				// Generate migration plans
+				MigrationPlan plan = planner.generateMigrationPlan();
+				if (plan == null)
+					continue;
+				
+				// Trigger a migration
 				if (logger.isLoggable(Level.INFO))
 					logger.info("Triggers a migration.");
 				
-				PartitionPlan newPartPlan = comsFactory.newPartitionPlan();
-				sendMigrationStartRequest(newPartPlan);
-				
-				// Determine how many ranges should be migrated
-				PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
-				if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
-					currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
-				List<MigrationRange> ranges = comsFactory.generateMigrationRanges(currentPlan, newPartPlan);
+				sendMigrationStartRequest(plan);
+				List<MigrationRange> ranges = plan.getMigrationRanges();
 				numOfRangesToBeMigrated.set(ranges.size());
 				
-				if (!MgcrabSettings.ENABLE_CAUGHT_UP)
-					return;
-				
-				// Wait for some time
-				try {
-					Thread.sleep(MgcrabSettings.START_CAUGHT_UP_DELAY);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
+				// Caught up phase
+				if (MgcrabSettings.ENABLE_CAUGHT_UP) {
+					// Wait for some time
+					try {
+						Thread.sleep(MgcrabSettings.START_CAUGHT_UP_DELAY);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					
+					sendCaughtUpModeRequest();
 				}
 				
-				sendCaughtUpModeRequest();
+				// Wait for finish of migrations
+				while (numOfRangesToBeMigrated.get() > 0) {
+					synchronized (migrationLock) {
+						migrationLock.wait();
+					}
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				return;
 			}
-			
-		}).start();
+		}
 	}
 	
 	@Override
-	public void sendMigrationStartRequest(PartitionPlan newPartPlan) {
+	public void sendMigrationStartRequest(MigrationPlan plan) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a MigrationStart request.");
 		
 		// Send a store procedure call
-		Object[] params = new Object[] {newPartPlan, MgcrabSettings.INIT_PHASE};
+		Object[] params = new Object[] { plan, MgcrabSettings.INIT_PHASE };
 		Elasql.connectionMgr().sendStoredProcedureCall(false, 
 				MigrationStoredProcFactory.SP_MIGRATION_START, params);
 	}

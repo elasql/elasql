@@ -13,8 +13,8 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
-import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationRangeUpdate;
@@ -26,7 +26,6 @@ import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.albatross.AlbatrossAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -40,7 +39,6 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 	private List<MigrationRange> migrationRanges;
 	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
 	private PartitionPlan newPartitionPlan;
-	private MigrationComponentFactory comsFactory;
 	private boolean isInMigration;
 	private int localNodeId;
 	
@@ -51,14 +49,12 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 	private Map<Integer, Set<RecordKey>> deletedKeys = new HashMap<Integer, Set<RecordKey>>();
 	
 	
-	public AlbatrossMigrationMgr(MigrationComponentFactory comsFactory) {
-		this.comsFactory = comsFactory;
+	public AlbatrossMigrationMgr() {
 		this.localNodeId = Elasql.serverId();
 	}
 	
-	public void initializeMigration(Transaction tx, Object[] params) {
-		// Parse parameters
-		PartitionPlan newPartPlan = (PartitionPlan) params[0];
+	public void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params) {
+		PartitionPlan newPartPlan = plan.getNewPart();
 		
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
@@ -69,10 +65,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		
 		// Initialize states
 		isInMigration = true;
-		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
-		if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
-			currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
-		migrationRanges = comsFactory.generateMigrationRanges(currentPlan, newPartPlan);
+		migrationRanges = plan.getMigrationRanges();
 		for (MigrationRange range : migrationRanges)
 			if (range.getDestPartId() == localNodeId)
 				pushRanges.add(range);

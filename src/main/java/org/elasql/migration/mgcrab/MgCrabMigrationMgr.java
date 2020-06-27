@@ -10,8 +10,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationRangeUpdate;
@@ -24,7 +24,6 @@ import org.elasql.schedule.calvin.mgcrab.CaughtUpAnalyzer;
 import org.elasql.schedule.calvin.mgcrab.CrabbingAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
-import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -41,7 +40,6 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 	private List<MigrationRange> migrationRanges;
 	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
 	private PartitionPlan newPartitionPlan;
-	private MigrationComponentFactory comsFactory;
 	
 	// XXX: We assume that the destination only has one range to receive at a time. 
 	private MigrationRangeUpdate lastUpdate;
@@ -56,14 +54,9 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 	private Map<Long, Map<RecordKey, CachedRecord>> txNumToPushedRecords = 
 			new ConcurrentHashMap<Long, Map<RecordKey, CachedRecord>>();
 	
-	public MgCrabMigrationMgr(MigrationComponentFactory comsFactory) {
-		this.comsFactory = comsFactory;
-	}
-	
-	public void initializeMigration(Transaction tx, Object[] params) {
-		// Parse parameters
-		PartitionPlan newPartPlan = (PartitionPlan) params[0];
-		Phase initialPhase = (Phase) params[1];
+	public void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params) {
+		PartitionPlan newPartPlan = plan.getNewPart();
+		Phase initialPhase = (Phase) params[0];
 		
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
@@ -74,10 +67,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		
 		// Initialize states
 		currentPhase = initialPhase;
-		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
-		if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
-			currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
-		migrationRanges = comsFactory.generateMigrationRanges(currentPlan, newPartPlan);
+		migrationRanges = plan.getMigrationRanges();
 		for (MigrationRange range : migrationRanges)
 			if (range.getDestPartId() == Elasql.serverId())
 				pushRanges.add(range);

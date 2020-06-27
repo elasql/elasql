@@ -13,8 +13,8 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
-import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeUpdate;
 import org.elasql.migration.MigrationSettings;
@@ -44,18 +44,12 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 	private List<MigrationRange> sourceRanges = new ArrayList<MigrationRange>();
 	private List<MigrationRange> destRanges = new ArrayList<MigrationRange>();
 	
-	private MigrationComponentFactory comsFactory;
-	
-	public StopCopyMigrationMgr(MigrationComponentFactory comsFactory) {
-		this.comsFactory = comsFactory;
-	}
-	
 	// Note that this will be called by the scheduler.
 	// We make the scheduler busy on sending chunks
 	// so that it will not have time to dispatch new transactions.
-	public void initializeMigration(Transaction tx, Object[] params) {
+	public void initializeMigration(Transaction tx, MigrationPlan migraPlan, Object[] params) {
 		// Parse parameters
-		PartitionPlan newPartPlan = (PartitionPlan) params[0];
+		PartitionPlan newPartPlan = migraPlan.getNewPart();
 		
 		if (logger.isLoggable(Level.INFO)) {
 			long time = System.currentTimeMillis() - CalvinScheduler.FIRST_TX_ARRIVAL_TIME.get();
@@ -67,7 +61,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		// Wait for active transactions finishes
 		waitForActiveTransactionFinish();
 		
-		analyzeResponsibleRanges(newPartPlan);
+		analyzeResponsibleRanges(migraPlan);
 		
 		// Start the migration immediately
 		performEagerMigration(tx);
@@ -97,11 +91,8 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		}
 	}
 	
-	private void analyzeResponsibleRanges(PartitionPlan newPlan) {
-		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
-		if (currentPlan.getClass().equals(NotificationPartitionPlan.class))
-			currentPlan = ((NotificationPartitionPlan) currentPlan).getUnderlayerPlan();
-		List<MigrationRange> ranges = comsFactory.generateMigrationRanges(currentPlan, newPlan);
+	private void analyzeResponsibleRanges(MigrationPlan plan) {
+		List<MigrationRange> ranges = plan.getMigrationRanges();
 		
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("migration ranges: %s", ranges));
