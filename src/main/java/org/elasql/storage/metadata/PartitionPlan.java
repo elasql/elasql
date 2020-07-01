@@ -22,8 +22,11 @@ public abstract class PartitionPlan {
 	 */
 	public abstract int getPartition(RecordKey key);
 	
+	public abstract PartitionPlan getBasePlan();
+	
+	public abstract void setBasePlan(PartitionPlan plan);
+	
 	public int numberOfPartitions() {
 		return PartitionMetaMgr.NUM_PARTITIONS;
 	}
-
 }

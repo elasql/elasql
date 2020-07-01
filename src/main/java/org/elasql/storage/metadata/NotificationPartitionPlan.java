@@ -27,10 +27,10 @@ public class NotificationPartitionPlan extends PartitionPlan {
 		return rec;
 	}
 	
-	private PartitionPlan underlayerPlan;
+	private PartitionPlan basePlan;
 	
 	public NotificationPartitionPlan(PartitionPlan plan) {
-		underlayerPlan = plan;
+		basePlan = plan;
 	}
 	
 	@Override
@@ -38,7 +38,7 @@ public class NotificationPartitionPlan extends PartitionPlan {
 		if (key.getTableName().equals(TABLE_NAME))
 			return false;
 		
-		return underlayerPlan.isFullyReplicated(key);
+		return basePlan.isFullyReplicated(key);
 	}
 
 	@Override
@@ -46,20 +46,26 @@ public class NotificationPartitionPlan extends PartitionPlan {
 		if (key.getTableName().equals(TABLE_NAME))
 			return -1; // Not belongs to anyone, preventing for inserting to local
 		
-		return underlayerPlan.getPartition(key);
+		return basePlan.getPartition(key);
 	}
 	
 	@Override
 	public int numberOfPartitions() {
-		return underlayerPlan.numberOfPartitions();
-	}
-	
-	public PartitionPlan getUnderlayerPlan() {
-		return underlayerPlan;
+		return basePlan.numberOfPartitions();
 	}
 	
 	@Override
 	public String toString() {
-		return String.format("Notification Partition Plan (underlayer: %s)", underlayerPlan.toString());
+		return String.format("Notification Partition Plan (underlayer: %s)", basePlan.toString());
+	}
+
+	@Override
+	public PartitionPlan getBasePlan() {
+		return basePlan;
+	}
+
+	@Override
+	public void setBasePlan(PartitionPlan plan) {
+		basePlan = plan;
 	}
 }

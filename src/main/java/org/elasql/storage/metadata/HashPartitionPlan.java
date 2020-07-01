@@ -28,4 +28,14 @@ public class HashPartitionPlan extends PartitionPlan {
 	public int numberOfPartitions() {
 		return numOfParts;
 	}
+
+	@Override
+	public PartitionPlan getBasePlan() {
+		return this;
+	}
+
+	@Override
+	public void setBasePlan(PartitionPlan plan) {
+		new UnsupportedOperationException();
+	}
 }
