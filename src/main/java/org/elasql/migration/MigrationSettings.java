@@ -11,6 +11,7 @@ public final class MigrationSettings {
 	
 	public static final MigrationAlgorithm MIGRATION_ALGORITHM;
 	public static final PlanningAlgorithm PLANNING_ALGORITHM;
+	public static final boolean USE_PREDEFINED_PLAN;
 	
 	public static final boolean USE_BYTES_FOR_CHUNK_SIZE;
 	public static final int CHUNK_SIZE_IN_BYTES;
@@ -30,6 +31,8 @@ public final class MigrationSettings {
 		algorithm = ElasqlProperties.getLoader().getPropertyAsInteger(
 				MigrationSettings.class.getName() + ".PLANNING_ALGORITHM", 0);
 		PLANNING_ALGORITHM = PlanningAlgorithm.fromInteger(algorithm);
+		USE_PREDEFINED_PLAN = ElasqlProperties.getLoader().getPropertyAsBoolean(
+				MigrationSettings.class.getName() + ".USE_PREDEFINED_PLAN", true);
 		
 		// Chunk size
 		USE_BYTES_FOR_CHUNK_SIZE = ElasqlProperties.getLoader().getPropertyAsBoolean(

@@ -12,8 +12,10 @@ import org.elasql.migration.planner.MigrationPlanner;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.vanilladb.core.server.VanillaDb;
+import org.vanilladb.core.server.task.Task;
 
-public class MigrationSystemController implements Runnable {
+public class MigrationSystemController extends Task {
 	private static Logger logger = Logger.getLogger(MigrationSystemController.class.getName());
 	
 	public static final int MSG_RANGE_FINISH = -8787;
@@ -31,6 +33,7 @@ public class MigrationSystemController implements Runnable {
 	protected AtomicInteger numOfRangesToBeMigrated = new AtomicInteger(0);
 	protected MigrationComponentFactory comsFactory;
 	protected BlockingQueue<TransactionInfo> workloadFeeds = new LinkedBlockingQueue<TransactionInfo>();
+	protected volatile boolean isAcceptingWorkloadFeeds = false;
 	protected Object migrationLock = new Object();
 	
 	public MigrationSystemController(MigrationComponentFactory comsFactory) {
@@ -39,16 +42,20 @@ public class MigrationSystemController implements Runnable {
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Start the migration controller");
 			
-			new Thread(this).start();
+			VanillaDb.taskMgr().runTask(this);
 		}
 	}
 	
 	public void monitorTransaction(Set<RecordKey> reads, Set<RecordKey> writes) {
-		workloadFeeds.add(new TransactionInfo(reads, writes));
+		if (isAcceptingWorkloadFeeds) {
+			workloadFeeds.add(new TransactionInfo(reads, writes));
+		}
 	}
 	
 	@Override
 	public void run() {
+		Thread.currentThread().setName("Migration System Controller");
+		
 		// Wait for some time
 		try {
 			Thread.sleep(MigrationSettings.START_MONITOR_TIME);
@@ -56,46 +63,11 @@ public class MigrationSystemController implements Runnable {
 			e.printStackTrace();
 		}
 		
-		// Periodically monitor, plan and trigger migrations
-		MigrationPlanner planner = comsFactory.newMigrationPlanner();
-		while (true) {
-			try {
-				// Reset the workload logs
-				planner.reset();
-				workloadFeeds.clear();
-
-				// Monitor transactions
-				long startMonitorTime = System.currentTimeMillis();
-				while (System.currentTimeMillis() - startMonitorTime <
-						MigrationSettings.MIGRATION_PERIOD) {
-					TransactionInfo info = workloadFeeds.take();
-					planner.monitorTransaction(info.reads, info.writes);
-				}
-				
-				// Generate migration plans
-				MigrationPlan plan = planner.generateMigrationPlan();
-				if (plan == null)
-					continue;
-				
-				// Trigger a migration
-				if (logger.isLoggable(Level.INFO))
-					logger.info("Triggers a migration.");
-				
-				sendMigrationStartRequest(plan);
-				List<MigrationRange> ranges = plan.getMigrationRanges();
-				numOfRangesToBeMigrated.set(ranges.size());
-				
-				// Wait for finish of migrations
-				while (numOfRangesToBeMigrated.get() > 0) {
-					synchronized (migrationLock) {
-						migrationLock.wait();
-					}
-				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-				return;
-			}
-		}
+		// Use either a predefined plan or a migration planner
+		if (MigrationSettings.USE_PREDEFINED_PLAN)
+			executeMigrationWithPredefinedPlan();
+		else
+			runMigrationPlanner();
 	}
 	
 	public void sendMigrationStartRequest(MigrationPlan plan) {
@@ -117,8 +89,6 @@ public class MigrationSystemController implements Runnable {
 		}
 		
 		if (numOfRangesToBeMigrated.get() == 0) {
-			sendMigrationFinishRequest();
-			
 			// Notify the controller thread
 			synchronized (migrationLock) {
 				migrationLock.notifyAll();
@@ -138,5 +108,78 @@ public class MigrationSystemController implements Runnable {
 		Object[] params = new Object[] {};
 		Elasql.connectionMgr().sendStoredProcedureCall(true, 
 				MigrationStoredProcFactory.SP_MIGRATION_END, params);
+	}
+	
+	private void runMigrationPlanner() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("The migration controller starts monitoring the workload");
+		
+		// Periodically monitor, plan and trigger migrations
+		MigrationPlanner planner = comsFactory.newMigrationPlanner();
+		while (true) {
+			try {
+				// Reset the workload logs
+				planner.reset();
+				workloadFeeds.clear();
+				isAcceptingWorkloadFeeds = true;
+
+				// Monitor transactions
+				long startMonitorTime = System.currentTimeMillis();
+				while (System.currentTimeMillis() - startMonitorTime <
+						MigrationSettings.MIGRATION_PERIOD) {
+					TransactionInfo info = workloadFeeds.take();
+					planner.monitorTransaction(info.reads, info.writes);
+				}
+				isAcceptingWorkloadFeeds = false;
+				
+				if (logger.isLoggable(Level.INFO))
+					logger.info("A monitoring period finished, starting to generate a migration plan.");
+				
+				// Generate migration plans
+				MigrationPlan plan = planner.generateMigrationPlan();
+				if (plan == null) {
+					if (logger.isLoggable(Level.INFO))
+						logger.info("No migration is needed.");
+					continue;
+				}
+				
+				executeMigration(plan);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				return;
+			}
+		}
+	}
+	
+	private void executeMigrationWithPredefinedPlan() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Start a migration with the predefined migration plan");
+		
+		try {
+			MigrationPlan plan = comsFactory.newPredefinedMigrationPlan();
+			executeMigration(plan);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void executeMigration(MigrationPlan plan) throws InterruptedException {
+		// Trigger a migration
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Triggers a migration. The plan is: " + plan.toString());
+		
+		sendMigrationStartRequest(plan);
+		List<MigrationRange> ranges = plan.getMigrationRanges();
+		numOfRangesToBeMigrated.set(ranges.size());
+		
+		// Wait for finish of migrations
+		while (numOfRangesToBeMigrated.get() > 0) {
+			synchronized (migrationLock) {
+				migrationLock.wait();
+			}
+		}
+		
+		// Send the migration finish request
+		sendMigrationFinishRequest();
 	}
 }

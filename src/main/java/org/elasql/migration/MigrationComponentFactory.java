@@ -9,7 +9,6 @@ import org.elasql.migration.mgcrab.MgCrabMigrationMgr;
 import org.elasql.migration.mgcrab.MgCrabStoredProcFactory;
 import org.elasql.migration.mgcrab.MgCrabSystemController;
 import org.elasql.migration.planner.MigrationPlanner;
-import org.elasql.migration.planner.PredefinedPlanner;
 import org.elasql.migration.planner.clay.ClayPlanner;
 import org.elasql.migration.squall.SquallMigrationMgr;
 import org.elasql.migration.squall.SquallStoredProcFactory;
@@ -70,8 +69,6 @@ public abstract class MigrationComponentFactory {
 	
 	public MigrationPlanner newMigrationPlanner() {
 		switch (MigrationSettings.PLANNING_ALGORITHM) {
-		case PREDEFINED:
-			return new PredefinedPlanner(newPredefinedMigrationPlan());
 		case CLAY:
 			return new ClayPlanner();
 		}
