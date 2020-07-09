@@ -13,6 +13,7 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
+import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
@@ -48,9 +49,11 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 	private Map<Integer, Set<RecordKey>> insertedKeys = new HashMap<Integer, Set<RecordKey>>();
 	private Map<Integer, Set<RecordKey>> deletedKeys = new HashMap<Integer, Set<RecordKey>>();
 	
+	private MigrationComponentFactory comsFactory;
 	
-	public AlbatrossMigrationMgr() {
+	public AlbatrossMigrationMgr(MigrationComponentFactory comsFactory) {
 		this.localNodeId = Elasql.serverId();
+		this.comsFactory = comsFactory;
 	}
 	
 	public void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params) {
@@ -65,7 +68,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		
 		// Initialize states
 		isInMigration = true;
-		migrationRanges = plan.getMigrationRanges();
+		migrationRanges = plan.getMigrationRanges(comsFactory);
 		for (MigrationRange range : migrationRanges)
 			if (range.getDestPartId() == localNodeId)
 				pushRanges.add(range);

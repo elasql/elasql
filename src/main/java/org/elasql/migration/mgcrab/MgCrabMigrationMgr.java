@@ -10,6 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
@@ -54,6 +55,12 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 	private Map<Long, Map<RecordKey, CachedRecord>> txNumToPushedRecords = 
 			new ConcurrentHashMap<Long, Map<RecordKey, CachedRecord>>();
 	
+	private MigrationComponentFactory comsFactory;
+	
+	public MgCrabMigrationMgr(MigrationComponentFactory comsFactory) {
+		this.comsFactory = comsFactory;
+	}
+	
 	public void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params) {
 		PartitionPlan newPartPlan = plan.getNewPart();
 		Phase initialPhase = (Phase) params[0];
@@ -67,7 +74,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		
 		// Initialize states
 		currentPhase = initialPhase;
-		migrationRanges = plan.getMigrationRanges();
+		migrationRanges = plan.getMigrationRanges(comsFactory);
 		for (MigrationRange range : migrationRanges)
 			if (range.getDestPartId() == Elasql.serverId())
 				pushRanges.add(range);

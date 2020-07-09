@@ -1,5 +1,7 @@
 package org.elasql.migration.planner.clay;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -9,14 +11,18 @@ import org.elasql.sql.RecordKey;
 
 public class ScatterMigrationRange implements MigrationRange {
 	
-	private Set<RecordKey> targetKeys;
 	private int sourcePartId, destPartId;
-	private Set<RecordKey> unmigratedKeys = new HashSet<RecordKey>();
+	
+	private Set<RecordKey> targetKeys;
+	private Set<RecordKey> unmigratedKeys;
+	private Deque<RecordKey> keysToPush;
 	
 	public ScatterMigrationRange(int sourcePartId, int destPartId, Set<RecordKey> keys) {
 		this.sourcePartId = sourcePartId;
 		this.destPartId = destPartId;
 		this.targetKeys = keys;
+		this.unmigratedKeys = new HashSet<RecordKey>(targetKeys);
+		this.keysToPush = new ArrayDeque<RecordKey>(targetKeys);
 	}
 
 	@Override
@@ -46,12 +52,11 @@ public class ScatterMigrationRange implements MigrationRange {
 			throw new UnsupportedOperationException("A scatter migration range does not support byte counting");
 		
 		Set<RecordKey> chunk = new HashSet<RecordKey>();
-		for (RecordKey key : unmigratedKeys) {
+		while (!keysToPush.isEmpty()) {
+			chunk.add(keysToPush.removeFirst());
 			if (chunk.size() >= maxChunkSize)
 				break;
-			chunk.add(key);
 		}
-		
 		return chunk;
 	}
 
@@ -68,14 +73,23 @@ public class ScatterMigrationRange implements MigrationRange {
 	@Override
 	public MigrationRangeUpdate generateStatusUpdate() {
 		return new ScatterMigrationRangeUpdate(sourcePartId, destPartId,
-				new HashSet<RecordKey>(unmigratedKeys));
+				new ArrayDeque<RecordKey>(keysToPush));
 	}
 
 	@Override
 	public boolean updateMigrationStatus(MigrationRangeUpdate update) {
 		ScatterMigrationRangeUpdate sUpdate = (ScatterMigrationRangeUpdate) update;
-		unmigratedKeys = sUpdate.getUnmigratedKeys();
+		// Only keeps the keys that are will be pushed in the future.
+		// The other keys that are not in the keysToPush must have been migrated
+		// by either foreground pushes/pulls or background pushes.
+		unmigratedKeys.retainAll(sUpdate.getKeysToPush());
 		return true;
+	}
+	
+	@Override
+	public String toString() {
+		return String.format("Migration from part.%d to part.%d with %d keys [sample: %s]",
+				sourcePartId, destPartId, targetKeys.size(), targetKeys.iterator().next());
 	}
 
 }

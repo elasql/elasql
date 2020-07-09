@@ -90,6 +90,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		execPlan = analyzeParameters(pars);
 //		timer.stopComponentTimer(getClass().getSimpleName() + " analyze paramters");
 		
+		// The sequencer only analyzes the parameters
+		if (Elasql.isSequencer()) {
+			return;
+		}
+		
 		// Prepare a transaction and a cache
 //		timer.startComponentTimer(getClass().getSimpleName() + " init transaction");
 		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
@@ -198,7 +203,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 			tx.rollback();
 		} catch (Exception e) {
 			if (logger.isLoggable(Level.SEVERE))
-				logger.severe("Tx." + txNum + " crashes. The execution plan: " + execPlan);
+				logger.severe("Tx." + txNum + " crashes. The execution plan: \n" + execPlan);
 			e.printStackTrace();
 			tx.rollback();
 		} finally {

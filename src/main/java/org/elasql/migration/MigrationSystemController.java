@@ -116,7 +116,7 @@ public class MigrationSystemController extends Task {
 		
 		// Periodically monitor, plan and trigger migrations
 		MigrationPlanner planner = comsFactory.newMigrationPlanner();
-		while (true) {
+//		while (true) {
 			try {
 				// Reset the workload logs
 				planner.reset();
@@ -130,6 +130,12 @@ public class MigrationSystemController extends Task {
 					TransactionInfo info = workloadFeeds.take();
 					planner.monitorTransaction(info.reads, info.writes);
 				}
+//				TransactionInfo info = workloadFeeds.take();
+//				while (true) {
+//					if (planner.monitorTransaction(info.reads, info.writes))
+//						break;
+//					info = workloadFeeds.take();
+//				}
 				isAcceptingWorkloadFeeds = false;
 				
 				if (logger.isLoggable(Level.INFO))
@@ -140,15 +146,43 @@ public class MigrationSystemController extends Task {
 				if (plan == null) {
 					if (logger.isLoggable(Level.INFO))
 						logger.info("No migration is needed.");
-					continue;
+//					continue;
+					return;
 				}
 				
-				executeMigration(plan);
+				// Execute each plan one by one to avoid concurrent migrations
+				// since some migrations technique seems to have problems
+				// when the migration is multi-source to multi-dest secenarios.
+				List<MigrationPlan> subplans = plan.splits();
+				int total = subplans.size();
+				int count = 0;
+
+				if (logger.isLoggable(Level.INFO))
+					logger.info("" + total + " migrations to go.");
+				
+				for (MigrationPlan subplan : subplans) {
+					executeMigration(subplan);
+					count++;
+
+					if (logger.isLoggable(Level.INFO)) {
+						if (count % (total / 10) == 0) {
+							logger.info(String.format("%d migration finishes, %d to go",
+									count, total - count));
+						}
+					}
+				}
+
+				if (logger.isLoggable(Level.INFO))
+					logger.info("All migrations finishes");
+				
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				return;
 			}
-		}
+//		}
+
+		if (logger.isLoggable(Level.INFO))
+			logger.info("The migration planner stops");
 	}
 	
 	private void executeMigrationWithPredefinedPlan() {
@@ -157,7 +191,17 @@ public class MigrationSystemController extends Task {
 		
 		try {
 			MigrationPlan plan = comsFactory.newPredefinedMigrationPlan();
-			executeMigration(plan);
+			List<MigrationPlan> subplans = plan.splits();
+			int count = subplans.size();
+
+			if (logger.isLoggable(Level.INFO))
+				logger.info("" + count + " migrations to go.");
+			
+			for (MigrationPlan subplan : subplans)
+				executeMigration(subplan);
+
+			if (logger.isLoggable(Level.INFO))
+				logger.info("All migrations finishes");
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -165,11 +209,12 @@ public class MigrationSystemController extends Task {
 	
 	private void executeMigration(MigrationPlan plan) throws InterruptedException {
 		// Trigger a migration
-		if (logger.isLoggable(Level.INFO))
+		if (logger.isLoggable(Level.INFO)) {
 			logger.info("Triggers a migration. The plan is: " + plan.toString());
+		}
 		
 		sendMigrationStartRequest(plan);
-		List<MigrationRange> ranges = plan.getMigrationRanges();
+		List<MigrationRange> ranges = plan.getMigrationRanges(comsFactory);
 		numOfRangesToBeMigrated.set(ranges.size());
 		
 		// Wait for finish of migrations

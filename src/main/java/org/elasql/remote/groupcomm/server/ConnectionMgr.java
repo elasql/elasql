@@ -62,8 +62,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
-		Object[] spCalls = { new StoredProcedureCall(-1, -1, pid, pars)};
-		commServer.sendTotalOrderMessage(spCalls);
+		commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {

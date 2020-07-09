@@ -97,11 +97,11 @@ class Clump {
 		return false;
 	}
 	
-	ScatterRangeMigrationPlan toMigrationPlan() {
+	ScatterMigrationPlan toMigrationPlan() {
 		if (destPartitionId == -1)
 			throw new RuntimeException("The destination has not been decided yet.");
 		
-		ScatterRangeMigrationPlan plan = new ScatterRangeMigrationPlan();
+		ScatterMigrationPlan plan = new ScatterMigrationPlan();
 		
 		// Put the vertices to the plans
 		for (Vertex v : vertices.values())
@@ -133,24 +133,22 @@ class Clump {
 	 * The second formula in Section 7.2 of Clay's paper.
 	 */
 	double calcRecvLoadDelta(int destPartId, double multiPartsCost) {
-		Collection<Vertex> vertices = getVertices();
-		
 		// Added node loading
 		double addedNodeLoad = 0;
-		for (Vertex v : vertices)
+		for (Vertex v : vertices.values())
 			if (v.getPartId() != destPartId)
 				addedNodeLoad += v.getVertexWeight();
 		
 		// Cross-partition edge loading
 		double addedCrossLoad = 0, reducedCrossLoad = 0;
-		for (Vertex v : vertices) {
+		for (Vertex v : vertices.values()) {
 			if (v.getPartId() != destPartId) {
-				for (OutEdge e : v.getOutEdges().values()) {
+				for (OutEdge e : v.getOutEdges()) {
 					Vertex u = e.getOpposite();
 					if (u.getPartId() == destPartId) {
 						reducedCrossLoad += e.getWeight();
 					} else {
-						if (!vertices.contains(u))
+						if (!vertices.containsKey(u.getKey()))
 							addedCrossLoad += e.getWeight();
 					}
 				}
@@ -184,7 +182,7 @@ class Clump {
 //				addNeighbor(o);
 		
 		// Correct version: consider the vertices on all partitions
-		for (OutEdge o : v.getOutEdges().values())
+		for (OutEdge o : v.getOutEdges())
 			addNeighbor(o);
 	}
 

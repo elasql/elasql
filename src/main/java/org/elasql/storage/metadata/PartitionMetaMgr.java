@@ -74,4 +74,8 @@ public class PartitionMetaMgr {
 	public int getCurrentNumOfParts() {
 		return partPlan.numberOfPartitions();
 	}
+	
+	public RecordKey getPartitioningKey(RecordKey key) {
+		return partPlan.getPartitioningKey(key);
+	}
 }

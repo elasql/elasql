@@ -15,6 +15,7 @@ import org.elasql.migration.squall.SquallStoredProcFactory;
 import org.elasql.migration.stopcopy.StopCopyMigrationMgr;
 import org.elasql.migration.stopcopy.StopCopyStoredProcFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
+import org.elasql.sql.RecordKey;
 
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
@@ -27,13 +28,13 @@ public abstract class MigrationComponentFactory {
 	public MigrationMgr newMigrationMgr() {
 		switch (MigrationSettings.MIGRATION_ALGORITHM) {
 		case MGCRAB:
-			return new MgCrabMigrationMgr();
+			return new MgCrabMigrationMgr(this);
 		case SQUALL:
-			return new SquallMigrationMgr();
+			return new SquallMigrationMgr(this);
 		case ALBATROSS:
-			return new AlbatrossMigrationMgr();
+			return new AlbatrossMigrationMgr(this);
 		case STOP_COPY:
-			return new StopCopyMigrationMgr();
+			return new StopCopyMigrationMgr(this);
 		}
 		throw new RuntimeException("it should not be here.");
 	}
@@ -76,4 +77,6 @@ public abstract class MigrationComponentFactory {
 	}
 	
 	public abstract MigrationPlan newPredefinedMigrationPlan();
+	
+	public abstract MigrationRange toMigrationRange(int sourceId, int destId, RecordKey partitioningKey);
 }

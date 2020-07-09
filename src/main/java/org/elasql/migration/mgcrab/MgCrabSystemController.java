@@ -60,7 +60,7 @@ public class MgCrabSystemController extends MigrationSystemController {
 					logger.info("Triggers a migration.");
 				
 				sendMigrationStartRequest(plan);
-				List<MigrationRange> ranges = plan.getMigrationRanges();
+				List<MigrationRange> ranges = plan.getMigrationRanges(comsFactory);
 				numOfRangesToBeMigrated.set(ranges.size());
 				
 				// Caught up phase

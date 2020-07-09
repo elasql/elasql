@@ -86,7 +86,7 @@ public class StoredProcedureCall implements Serializable {
 	
 	@Override
 	public String toString() {
-		return "{Tx." + txNum + ", pars: " + Arrays.toString(objs) + ", issued client " +
-					clientId + " on connection " + connectionId + "}";
+		return String.format("{Tx.%d, procedure id: %d, parameters: %s, from no.%d connection of client node %d}",
+				txNum, pid, Arrays.toString(objs), connectionId, clientId);
 	}
 }

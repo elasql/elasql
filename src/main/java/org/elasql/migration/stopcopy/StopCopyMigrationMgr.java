@@ -13,6 +13,7 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.cache.calvin.CalvinCacheMgr;
 import org.elasql.cache.calvin.CalvinPostOffice;
+import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
@@ -43,6 +44,11 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 	
 	private List<MigrationRange> sourceRanges = new ArrayList<MigrationRange>();
 	private List<MigrationRange> destRanges = new ArrayList<MigrationRange>();
+	private MigrationComponentFactory comsFactory;
+	
+	public StopCopyMigrationMgr(MigrationComponentFactory comsFactory) {
+		this.comsFactory = comsFactory;
+	}
 	
 	// Note that this will be called by the scheduler.
 	// We make the scheduler busy on sending chunks
@@ -92,7 +98,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 	}
 	
 	private void analyzeResponsibleRanges(MigrationPlan plan) {
-		List<MigrationRange> ranges = plan.getMigrationRanges();
+		List<MigrationRange> ranges = plan.getMigrationRanges(comsFactory);
 		
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("migration ranges: %s", ranges));

@@ -152,6 +152,7 @@ public class Elasql extends VanillaDb {
 
 		if (isSequencer) {
 			logger.info("initializing using Sequencer mode");
+			VanillaDb.initTaskMgr();
 			initConnectionMgr(myNodeId, true);
 			initPartitionMetaMgr(partitionPlan);
 			initScheduler(factory, migraComsFactory);

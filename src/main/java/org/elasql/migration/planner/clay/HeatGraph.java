@@ -173,7 +173,7 @@ public class HeatGraph implements Serializable {
 		// Each edge
 		for (Vertex v : vertices.values()) {
 			RecordKey fromKey = v.getKey();
-			for (OutEdge edge : v.getOutEdges().values()) {
+			for (OutEdge edge : v.getOutEdges()) {
 				RecordKey toKey = edge.getOpposite().getKey();
 				int weight = edge.getWeight();
 				

@@ -78,6 +78,10 @@ public class CalvinScheduler extends Task implements Scheduler {
 //				timer.startComponentTimer(sp.getClass().getSimpleName() + " prepare");
 				sp.prepare(call.getPars());
 //				timer.stopComponentTimer(sp.getClass().getSimpleName() + " prepare");
+				
+				// The sequencer does not go further
+				if (Elasql.isSequencer()) 
+					continue;
 	
 				// log request
 				if (!sp.isReadOnly())
@@ -85,7 +89,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 	
 				// if this node doesn't have to participate this transaction,
 				// skip it
-				if (!sp.isParticipating() || Elasql.isSequencer()) {
+				if (!sp.isParticipating()) {
 //					timer.stopComponentTimer("schedule");
 //					timer.addToGlobalStatistics();
 					continue;

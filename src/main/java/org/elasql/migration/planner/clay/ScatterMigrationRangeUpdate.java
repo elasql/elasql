@@ -1,7 +1,6 @@
 package org.elasql.migration.planner.clay;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Deque;
 
 import org.elasql.migration.MigrationRangeUpdate;
 import org.elasql.sql.RecordKey;
@@ -11,11 +10,11 @@ public class ScatterMigrationRangeUpdate implements MigrationRangeUpdate {
 	private static final long serialVersionUID = 20181101001L;
 
 	private int sourcePartId, destPartId;
-	private Set<RecordKey> unmigratedKeys = new HashSet<RecordKey>();
+	private Deque<RecordKey> keysToPush;
 	
 	ScatterMigrationRangeUpdate(int sourcePartId, int destPartId,
-			Set<RecordKey> unmigratedKeys) {
-		this.unmigratedKeys = unmigratedKeys;
+			Deque<RecordKey> keysToPush) {
+		this.keysToPush = keysToPush;
 		this.sourcePartId = sourcePartId;
 		this.destPartId = destPartId;
 	}
@@ -30,7 +29,7 @@ public class ScatterMigrationRangeUpdate implements MigrationRangeUpdate {
 		return destPartId;
 	}
 	
-	Set<RecordKey> getUnmigratedKeys() {
-		return unmigratedKeys;
+	Deque<RecordKey> getKeysToPush() {
+		return keysToPush;
 	}
 }

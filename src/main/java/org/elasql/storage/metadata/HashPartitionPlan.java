@@ -38,4 +38,9 @@ public class HashPartitionPlan extends PartitionPlan {
 	public void setBasePlan(PartitionPlan plan) {
 		new UnsupportedOperationException();
 	}
+	
+	@Override
+	public RecordKey getPartitioningKey(RecordKey key) {
+		return key;
+	}
 }

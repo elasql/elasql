@@ -29,4 +29,6 @@ public abstract class PartitionPlan {
 	public int numberOfPartitions() {
 		return PartitionMetaMgr.NUM_PARTITIONS;
 	}
+	
+	public abstract RecordKey getPartitioningKey(RecordKey key);
 }

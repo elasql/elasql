@@ -42,6 +42,11 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 		    hash = 31 * hash + destId;
 		    return hash;
 		}
+		
+		@Override
+		public String toString() {
+			return String.format("[Part.%d -> Part.%d]", sourceId, destId);
+		}
 	}
 	
 	private static Set<RecordKey> getKeySet(Map<MigrationPath, Set<RecordKey>> map,
@@ -219,8 +224,12 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 				putMigratingKeysTo(p, p.destId);
 				
 				// Add foreground migrations
-				addToForegourndMigration(p, migratingReadKeys.get(p));
-				addToForegourndMigration(p, migratingUpdateKeys.get(p));
+				Set<RecordKey> keys = migratingReadKeys.get(p);
+				if (keys != null)
+					addToForegourndMigration(p, keys);
+				keys = migratingUpdateKeys.get(p);
+				if (keys != null)
+					addToForegourndMigration(p, keys);
 			} else {
 				putMigratingKeysTo(p, p.sourceId);
 				

@@ -38,6 +38,10 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		ExecutionPlan plan;
 		
+		// Sequencer skips
+		if (Elasql.isSequencer())
+			return new ExecutionPlan();
+		
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
@@ -79,6 +83,10 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 	
 	private ExecutionPlan generateExecutionPlan() {
 		ExecutionPlan plan = new ExecutionPlan();
+		
+		// If there is no key to push, return an empty plan
+		if (pushingKeys.isEmpty())
+			return plan;
 		
 		if (localNodeId == paramHelper.getSourceNodeId()) {
 			for (RecordKey key : pushingKeys) {

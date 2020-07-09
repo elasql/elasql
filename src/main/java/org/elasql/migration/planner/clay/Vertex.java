@@ -1,13 +1,16 @@
 package org.elasql.migration.planner.clay;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.elasql.sql.RecordKey;
 
 class Vertex {
 	
-	private HashMap<RecordKey, OutEdge> edges;
+	private HashMap<RecordKey, OutEdge> keyToEdge;
+	private List<OutEdge> edges;
 	private int weight;
 	private RecordKey key;
 	private int partId;
@@ -20,7 +23,8 @@ class Vertex {
 		this.key = key;
 		this.weight = weight;
 		this.partId = partId;
-		edges = new HashMap<RecordKey, OutEdge>();
+		keyToEdge = new HashMap<RecordKey, OutEdge>();
+		edges = new ArrayList<OutEdge>();
 	}
 
 	RecordKey getKey() {
@@ -40,20 +44,25 @@ class Vertex {
 	}
 
 	void addEdgeTo(Vertex opposite) {
-		OutEdge e = edges.get(opposite.getKey());
+		OutEdge e = keyToEdge.get(opposite.getKey());
 
-		if (e == null)
-			edges.put(opposite.getKey(), new OutEdge(opposite));
-		else
+		if (e == null) {
+			e = new OutEdge(opposite);
+			keyToEdge.put(opposite.getKey(), e);
+			edges.add(e);
+		} else
 			e.incrementWeight();
 	}
 	
 	void setEdgeTo(Vertex opposite, int weight) {
-		edges.put(opposite.getKey(), new OutEdge(opposite, weight));
+		OutEdge e = new OutEdge(opposite, weight);
+		keyToEdge.put(opposite.getKey(), e);
+		edges.add(e);
 	}
 
 	void clear() {
 		this.weight = 0;
+		keyToEdge.clear();
 		edges.clear();
 	}
 
@@ -63,12 +72,12 @@ class Vertex {
 
 	int getEdgeWeight() {
 		int w = 0;
-		for (OutEdge e : edges.values())
+		for (OutEdge e : edges)
 			w += e.getWeight();
 		return w;
 	}
 
-	Map<RecordKey, OutEdge> getOutEdges() {
+	List<OutEdge> getOutEdges() {
 		return edges;
 	}
 	
@@ -78,7 +87,7 @@ class Vertex {
 	
 	String toMetisFormat(Map<RecordKey, Integer> keyToInt) {
 		StringBuilder sb = new StringBuilder(weight + " ");
-		for (OutEdge o : edges.values()) {
+		for (OutEdge o : edges) {
 			sb.append(String.format("%d %d ", 
 					keyToInt.get(o.getOpposite().key),
 					o.getWeight()));
@@ -89,7 +98,7 @@ class Vertex {
 	@Override
 	public String toString() {
 		String str = "Vertex key: " + this.key + ", weight :" + this.weight + "\n";
-		for (OutEdge e : edges.values()) {
+		for (OutEdge e : edges) {
 			str = str + e.getOpposite().key + " w: " + e.getWeight() + "\n ";
 		}
 		return str;

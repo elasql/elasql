@@ -9,6 +9,7 @@ public interface MigrationPlan extends Serializable {
 	
 	PartitionPlan getNewPart();
 	
-	List<MigrationRange> getMigrationRanges();
+	List<MigrationRange> getMigrationRanges(MigrationComponentFactory factory);
 	
+	List<MigrationPlan> splits();
 }

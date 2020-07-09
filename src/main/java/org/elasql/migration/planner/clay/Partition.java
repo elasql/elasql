@@ -53,7 +53,7 @@ class Partition implements Comparable<Partition> {
 			throw new RuntimeException("Vertex " + v + " is not in partition " + partId);
 		
 		localLoad += v.getVertexWeight();
-		for (OutEdge e : v.getOutEdges().values())
+		for (OutEdge e : v.getOutEdges())
 			if (e.getOpposite().getPartId() != partId)
 				crossPartLoad += e.getWeight();
 		vertices.add(v);

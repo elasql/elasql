@@ -68,4 +68,9 @@ public class NotificationPartitionPlan extends PartitionPlan {
 	public void setBasePlan(PartitionPlan plan) {
 		basePlan = plan;
 	}
+
+	@Override
+	public RecordKey getPartitioningKey(RecordKey key) {
+		return basePlan.getPartitioningKey(key);
+	}
 }

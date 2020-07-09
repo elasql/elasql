@@ -1,6 +1,7 @@
 package org.elasql.migration.planner.clay;
 
-import java.util.HashSet;
+import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
@@ -21,7 +22,6 @@ import org.elasql.util.ElasqlProperties;
  * Proceedings of the VLDB Endowment 10.4 (2016): 445-456.
  * 
  * @author yslin
- *
  */
 public class ClayPlanner implements MigrationPlanner {
 	private static Logger logger = Logger.getLogger(ClayPlanner.class.getName());
@@ -31,6 +31,7 @@ public class ClayPlanner implements MigrationPlanner {
 	private static final int LOOK_AHEAD_MAX;
 	private static final int CLUMP_MAX_SIZE;
 	private static final int MAX_CLUMPS;
+	private static final double SAMPLE_RATE;
 	
 	static {
 		MULTI_PARTS_COST = ElasqlProperties.getLoader()
@@ -43,32 +44,77 @@ public class ClayPlanner implements MigrationPlanner {
 				.getPropertyAsInteger(ClayPlanner.class.getName() + ".CLUMP_MAX_SIZE", 20);
 		MAX_CLUMPS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(ClayPlanner.class.getName() + ".MAX_CLUMPS", 5000);
+		SAMPLE_RATE = ElasqlProperties.getLoader()
+				.getPropertyAsDouble(ClayPlanner.class.getName() + ".SAMPLE_RATE", 0.01);
 	}
 	
-	private HeatGraph heatGraph = new HeatGraph();
+	private HeatGraph heatGraph;
+	private int sampleGate = (int) (1 / SAMPLE_RATE);
+	private int seenCount = 0, sampledCount = 0;
+	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+	
+	public ClayPlanner() {
+		heatGraph = new HeatGraph();
+	}
+	
+	public ClayPlanner(HeatGraph graph) {
+		heatGraph = graph;
+	}
 
 	@Override
 	public void monitorTransaction(Set<RecordKey> reads, Set<RecordKey> writes) {
-		Set<RecordKey> accessedKeys = new HashSet<RecordKey>();
-		accessedKeys.addAll(reads);
-		accessedKeys.addAll(writes);
+//		seenCount++;
+//		if (seenCount % sampleGate == 0) {
+//			Set<RecordKey> accessedKeys = new HashSet<RecordKey>();
+//			accessedKeys.addAll(reads);
+//			accessedKeys.addAll(writes);
+//			
+//			for (RecordKey k : accessedKeys) {
+//				if (Elasql.partitionMetaMgr().isFullyReplicated(k))
+//					throw new RuntimeException("Given read/write-set contain fully replicated keys");
+//				
+//				int partId = Elasql.partitionMetaMgr().getPartition(k);
+//				heatGraph.updateWeightOnVertex(k, partId);
+//			}
+//			heatGraph.updateWeightOnEdges(accessedKeys);
+//
+//			// Only need to check the given number of transactions
+//			sampledCount++;
+//			if (sampledCount >= 10000) {
+//				return true;
+//			}
+//		}
+//		return false;
 		
-		for (RecordKey k : accessedKeys) {
-			if (Elasql.partitionMetaMgr().isFullyReplicated(k))
-				throw new RuntimeException("Given read/write-set contain fully replicated keys");
-			
-			int partId = Elasql.partitionMetaMgr().getPartition(k);
-			heatGraph.updateWeightOnVertex(k, partId);
+		List<RecordKey> accessedPartKeys = new ArrayList<RecordKey>();
+		for (RecordKey k : reads) {
+			RecordKey partKey = partMgr.getPartitioningKey(k);
+			int partId = partMgr.getPartition(k);
+			heatGraph.updateWeightOnVertex(partKey, partId);
+			accessedPartKeys.add(partKey);
 		}
-		heatGraph.updateWeightOnEdges(accessedKeys);
+		for (RecordKey k : writes) {
+			RecordKey partKey = partMgr.getPartitioningKey(k);
+			int partId = partMgr.getPartition(k);
+			heatGraph.updateWeightOnVertex(partKey, partId);
+			accessedPartKeys.add(partKey);
+		}
+		heatGraph.updateWeightOnEdges(accessedPartKeys);
 	}
 
 	@Override
 	public MigrationPlan generateMigrationPlan() {
 		long startTime = System.currentTimeMillis();
-		ScatterRangeMigrationPlan plan = new ScatterRangeMigrationPlan();
+		ScatterMigrationPlan plan = new ScatterMigrationPlan();
 		int totalPartitions = PartitionMetaMgr.NUM_PARTITIONS;
 		int numOfClumpsGenerated = 0;
+		
+		// Debug
+		heatGraph.serializeToFile(new File("/home/db-team/clay-heat.bin"));
+		
+		if (logger.isLoggable(Level.FINE)) {
+			logger.fine(String.format("%d transactions are seen and %d transactions are sampled", seenCount, sampledCount));
+		}
 		
 		while (true) {
 			List<Partition> partitions = heatGraph.splitToPartitions(totalPartitions, MULTI_PARTS_COST);
@@ -111,7 +157,7 @@ public class ClayPlanner implements MigrationPlanner {
 			numOfClumpsGenerated++;
 			
 			// Generate migration plans from the clump
-			ScatterRangeMigrationPlan clumpPlan = clump.toMigrationPlan();
+			ScatterMigrationPlan clumpPlan = clump.toMigrationPlan();
 			plan.merge(clumpPlan);
 			
 			updateMigratedVertices(clump);
@@ -128,7 +174,7 @@ public class ClayPlanner implements MigrationPlanner {
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info(String.format("Clay takes %d ms to generate %d clumps",
 					(System.currentTimeMillis() - startTime), numOfClumpsGenerated));
-			logger.info("Generated a migration plans: " + plan.countKeys());
+			logger.info("Generated a migration plans with " + plan.countKeys() + " keys");
 		}
 		
 		return plan;
@@ -137,6 +183,8 @@ public class ClayPlanner implements MigrationPlanner {
 	@Override
 	public void reset() {
 		heatGraph = new HeatGraph();
+		seenCount = 0;
+		sampledCount = 0;
 	}
 	
 	private double calculateOverloadThreasdhold(List<Partition> partitions) {
@@ -173,7 +221,9 @@ public class ClayPlanner implements MigrationPlanner {
 				destPart = findInitialDest(addedVertex, partitions);
 				currentClump.setDestination(destPart.getPartId());
 				
-//				System.out.println("Init clump: " + printClump(currentClump));
+				if (logger.isLoggable(Level.FINER)) {
+					logger.finer("Init clump: " + printClump(currentClump));
+				}
 			} else {
 				if (!currentClump.hasNeighbor())
 					return candidateClump;
@@ -186,13 +236,14 @@ public class ClayPlanner implements MigrationPlanner {
 				destPart = updateDestination(currentClump, destPart, partitions, overloadThreasdhold);
 				currentClump.setDestination(destPart.getPartId());
 				
-//				System.out.println("Expanded clump: " + printClump(currentClump));
-//				System.out.println("Expanded clump size: " + currentClump.size());
-//				System.out.println(String.format("Delta for recv part %d: %f", destPart.getPartId(),
-//						calcRecvLoadDelta(currentClump, destPart.getPartId())));
-//				System.out.println(String.format("Is feasible ? %s", isFeasible(currentClump, destPart)));
-//				System.out.println(String.format("Delta for sender part %d: %f", addedVertex.getPartId(),
-//						calcSendLoadDelta(currentClump, addedVertex.getPartId())));
+				if (logger.isLoggable(Level.FINER)) {
+					logger.finer("Expanded clump: " + printClump(currentClump));
+					logger.finer(String.format("Delta for recv part %d: %f", destPart.getPartId(),
+							currentClump.calcRecvLoadDelta(destPart.getPartId(), MULTI_PARTS_COST)));
+					logger.finer(String.format("Is feasible ? %s", isFeasible(currentClump, destPart, overloadThreasdhold)));
+					logger.finer(String.format("Delta for sender part %d: %f", addedVertex.getPartId(),
+							currentClump.calcRecvLoadDelta(addedVertex.getPartId(), MULTI_PARTS_COST)));
+				}
 			}
 			
 			// Examine the clump
@@ -218,12 +269,13 @@ public class ClayPlanner implements MigrationPlanner {
 	private Partition findInitialDest(Vertex v, List<Partition> partitions) {
 		int destId = -1;
 		
-		// Find the most co-accessed partition
+		// Find the most co-accessed partition (except for the original one)
 		int[] coaccessed = new int[partitions.size()];
-		for (OutEdge e : v.getOutEdges().values())
+		for (OutEdge e : v.getOutEdges())
 			coaccessed[e.getOpposite().getPartId()]++;
 		for (int part = 0; part < coaccessed.length; part++) {
-			if (coaccessed[part] > 0) {
+			// Skip the original one to avoid the clump tends to not move
+			if (part != v.getPartId() && coaccessed[part] > 0) {
 				if (destId == -1 || coaccessed[part] > coaccessed[destId]) {
 					destId = part;
 				}
@@ -292,10 +344,10 @@ public class ClayPlanner implements MigrationPlanner {
 		StringBuilder sb = new StringBuilder("[");
 		int count = 0;
 		for (Vertex v : clump.getVertices()) {
-			sb.append(String.format("%s (%d, %f, %f), ", v.getKey(), v.getPartId(),
+			sb.append(String.format("%s (%d, %d, %d), ", v.getKey(), v.getPartId(),
 					v.getVertexWeight(), v.getEdgeWeight()));
 			count++;
-			if (count >= 5)
+			if (count >= 3)
 				break;
 		}
 		sb.append(String.format("size: %d] ", clump.getVertices().size()));

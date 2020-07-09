@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
@@ -29,6 +30,11 @@ public class SquallMigrationMgr implements MigrationMgr {
 	private List<MigrationRange> pushRanges = new ArrayList<MigrationRange>(); // the ranges whose destination is this node.
 	private PartitionPlan newPartitionPlan;
 	private boolean isInMigration;
+	private MigrationComponentFactory comsFactory;
+	
+	public SquallMigrationMgr(MigrationComponentFactory comsFactory) {
+		this.comsFactory = comsFactory;
+	}
 
 	public void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params) {
 		PartitionPlan newPartPlan = plan.getNewPart();
@@ -42,7 +48,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 		
 		// Initialize states
 		isInMigration = true;
-		migrationRanges = plan.getMigrationRanges();
+		migrationRanges = plan.getMigrationRanges(comsFactory);
 		for (MigrationRange range : migrationRanges)
 			if (range.getDestPartId() == Elasql.serverId())
 				pushRanges.add(range);
@@ -63,6 +69,8 @@ public class SquallMigrationMgr implements MigrationMgr {
 				for (MigrationRange range : pushRanges) {
 					Set<RecordKey> chunk = range.generateNextMigrationChunk(
 							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
+					// Debug
+					System.out.println("Generated a chunk: " + chunk);
 					if (chunk.size() > 0) {
 						sendBGPushRequest(range.generateStatusUpdate(), chunk, 
 								range.getSourcePartId(), range.getDestPartId());
