@@ -23,7 +23,6 @@ import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
-import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
@@ -58,19 +57,8 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	@Override
 	protected ExecutionPlan analyzeParameters(Object[] pars) {
-		// prepare parameters
-		paramHelper.prepareParameters(pars);
-
-		// analyze read-write set
-		ReadWriteSetAnalyzer analyzer;
-		if (Elasql.migrationMgr().isInMigration())
-			analyzer = Elasql.migrationMgr().newAnalyzer();
-		else
-			analyzer = new StandardAnalyzer();
-		prepareKeys(analyzer);
-		
-		// generate execution plan
-		return alterExecutionPlan(analyzer.generatePlan());
+		ExecutionPlan plan = super.analyzeParameters(pars);
+		return alterExecutionPlan(plan);
 	}
 
 	@Override
