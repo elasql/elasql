@@ -10,8 +10,8 @@ import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.server.Elasql;
-import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
+import org.elasql.storage.metadata.PartitioningKey;
 
 public class ScatterMigrationPlan implements MigrationPlan {
 
@@ -47,11 +47,12 @@ public class ScatterMigrationPlan implements MigrationPlan {
 		}
 	}
 
-	private Map<PrimaryKey, Route> keysToMigrate = new HashMap<PrimaryKey, Route>();
+	private Map<PartitioningKey, Route> keysToMigrate = new HashMap<PartitioningKey, Route>();
 	
-	public void addKey(int source, int dest, PrimaryKey partKey) {
+	public void addPartKey(PartitioningKey partKey, int source, int dest) {
 		Route route = keysToMigrate.get(partKey);
 		
+		// The following merges multiple routes into a route for a partitioning key
 		// We treat the first source as the origin, ignore all latter sources
 		if (route != null) {
 			// The new source must match the previous destination
@@ -72,10 +73,10 @@ public class ScatterMigrationPlan implements MigrationPlan {
 	}
 	
 	public void merge(ScatterMigrationPlan plan) {
-		for (Map.Entry<PrimaryKey, Route> entry : plan.keysToMigrate.entrySet()) {
-			PrimaryKey key = entry.getKey();
+		for (Map.Entry<PartitioningKey, Route> entry : plan.keysToMigrate.entrySet()) {
+			PartitioningKey key = entry.getKey();
 			Route r = entry.getValue();
-			addKey(r.sourcePartId, r.destPartId, key);
+			addPartKey(key, r.sourcePartId, r.destPartId);
 		}
 	}
 	
@@ -108,8 +109,8 @@ public class ScatterMigrationPlan implements MigrationPlan {
 //		return plans;
 
 		List<MigrationPlan> plans = new ArrayList<MigrationPlan>();
-		for (Map.Entry<PrimaryKey, Route> entry : keysToMigrate.entrySet()) {
-			PrimaryKey key = entry.getKey();
+		for (Map.Entry<PartitioningKey, Route> entry : keysToMigrate.entrySet()) {
+			PartitioningKey key = entry.getKey();
 			Route r = entry.getValue();
 			plans.add(new PointMigrationPlan(r.sourcePartId, r.destPartId, key));
 		}
@@ -126,11 +127,11 @@ public class ScatterMigrationPlan implements MigrationPlan {
 
 	@Override
 	public PartitionPlan getNewPart() {
-		Map<PrimaryKey, Integer> partition = new HashMap<PrimaryKey, Integer>();
-		for (Map.Entry<PrimaryKey, Route> entry : keysToMigrate.entrySet()) {
-			PrimaryKey key = entry.getKey();
+		Map<PartitioningKey, Integer> partitioning = new HashMap<PartitioningKey, Integer>();
+		for (Map.Entry<PartitioningKey, Route> entry : keysToMigrate.entrySet()) {
+			PartitioningKey key = entry.getKey();
 			Route r = entry.getValue();
-			partition.put(key, r.destPartId);
+			partitioning.put(key, r.destPartId);
 		}
 		
 		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
@@ -138,14 +139,13 @@ public class ScatterMigrationPlan implements MigrationPlan {
 		// Merge this plan with the current one to avoid duplication
 		if (currentPlan.getClass().equals(ScatterPartitionPlan.class)) {
 			ScatterPartitionPlan currentScatter = (ScatterPartitionPlan) currentPlan;
-			for (Map.Entry<PrimaryKey, Integer> entry : currentScatter.getMapping().entrySet()) {
-				partition.putIfAbsent(entry.getKey(), entry.getValue());
+			for (Map.Entry<PartitioningKey, Integer> entry : currentScatter.getMapping().entrySet()) {
+				partitioning.putIfAbsent(entry.getKey(), entry.getValue());
 			}
-			
-			return new ScatterPartitionPlan(currentScatter.getBasePlan(), partition);
+			return new ScatterPartitionPlan(currentScatter.getBasePlan(), partitioning);
 		}
 		
-		return new ScatterPartitionPlan(currentPlan, partition);
+		return new ScatterPartitionPlan(currentPlan, partitioning);
 	}
 
 	@Override

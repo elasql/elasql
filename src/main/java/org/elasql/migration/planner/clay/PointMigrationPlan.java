@@ -9,17 +9,17 @@ import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.server.Elasql;
-import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
+import org.elasql.storage.metadata.PartitioningKey;
 
 public class PointMigrationPlan implements MigrationPlan {
 
 	private static final long serialVersionUID = 20200705001L;
 	
 	private int sourceId, destId;
-	private PrimaryKey partKey;
+	private PartitioningKey partKey;
 	
-	public PointMigrationPlan(int sourceId, int destId, PrimaryKey partKey) {
+	public PointMigrationPlan(int sourceId, int destId, PartitioningKey partKey) {
 		this.sourceId = sourceId;
 		this.destId = destId;
 		this.partKey = partKey;
@@ -28,7 +28,7 @@ public class PointMigrationPlan implements MigrationPlan {
 	@Override
 	public PartitionPlan getNewPart() {
 		PartitionPlan currentPlan = Elasql.partitionMetaMgr().getPartitionPlan();
-		Map<PrimaryKey, Integer> partitioning;
+		Map<PartitioningKey, Integer> partitioning;
 		
 		// Merge this plan with the current one to avoid duplication
 		if (currentPlan.getClass().equals(ScatterPartitionPlan.class)) {
@@ -36,7 +36,7 @@ public class PointMigrationPlan implements MigrationPlan {
 			partitioning = currentScatter.getMapping();
 			currentPlan = currentScatter.getBasePlan();
 		} else {
-			partitioning = new HashMap<PrimaryKey, Integer>();
+			partitioning = new HashMap<PartitioningKey, Integer>();
 		}
 
 		partitioning.put(partKey, destId);

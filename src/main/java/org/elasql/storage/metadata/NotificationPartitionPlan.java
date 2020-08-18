@@ -70,7 +70,7 @@ public class NotificationPartitionPlan extends PartitionPlan {
 	}
 
 	@Override
-	public PrimaryKey getPartitioningKey(PrimaryKey key) {
+	public PartitioningKey getPartitioningKey(PrimaryKey key) {
 		return basePlan.getPartitioningKey(key);
 	}
 }

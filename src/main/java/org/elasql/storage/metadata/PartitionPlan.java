@@ -30,5 +30,5 @@ public abstract class PartitionPlan {
 		return PartitionMetaMgr.NUM_PARTITIONS;
 	}
 	
-	public abstract PrimaryKey getPartitioningKey(PrimaryKey key);
+	public abstract PartitioningKey getPartitioningKey(PrimaryKey key);
 }

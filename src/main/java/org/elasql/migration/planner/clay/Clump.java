@@ -5,13 +5,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.metadata.PartitioningKey;
 
 class Clump {
 
 	private class Neighbor implements Comparable<Neighbor> {
 		double weight;
-		PrimaryKey key;
+		PartitioningKey key;
 		int partId;
 
 		Neighbor(OutEdge neighborEdge) {
@@ -36,20 +36,20 @@ class Clump {
 		}
 	}
 
-	private Map<PrimaryKey, Vertex> vertices;
-	private Map<PrimaryKey, Neighbor> neighbors;
+	private Map<PartitioningKey, Vertex> vertices;
+	private Map<PartitioningKey, Neighbor> neighbors;
 	private int destPartitionId = -1;
 
 	Clump(Vertex initVertex) {
-		this.vertices = new HashMap<PrimaryKey, Vertex>();
-		this.neighbors = new HashMap<PrimaryKey, Neighbor>();
+		this.vertices = new HashMap<PartitioningKey, Vertex>();
+		this.neighbors = new HashMap<PartitioningKey, Neighbor>();
 		
 		addVertex(initVertex);
 	}
 
 	Clump(Clump clump) {
-		this.vertices = new HashMap<PrimaryKey, Vertex>();
-		this.neighbors = new HashMap<PrimaryKey, Neighbor>();
+		this.vertices = new HashMap<PartitioningKey, Vertex>();
+		this.neighbors = new HashMap<PartitioningKey, Neighbor>();
 		this.destPartitionId = clump.destPartitionId;
 		
 		for (Vertex v : clump.vertices.values())
@@ -65,7 +65,7 @@ class Clump {
 		addVertex(neighbor);
 	}
 
-	PrimaryKey getHotestNeighbor() {
+	PartitioningKey getHotestNeighbor() {
 		return Collections.max(neighbors.values()).key;
 	}
 	
@@ -106,7 +106,7 @@ class Clump {
 		// Put the vertices to the plans
 		for (Vertex v : vertices.values())
 			if (v.getPartId() != destPartitionId)
-				plan.addKey(v.getPartId(), destPartitionId, v.getKey());
+				plan.addPartKey(v.getKey(), v.getPartId(), destPartitionId);
 		
 		return plan;
 	}

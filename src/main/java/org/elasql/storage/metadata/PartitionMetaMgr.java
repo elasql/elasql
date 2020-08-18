@@ -75,7 +75,7 @@ public class PartitionMetaMgr {
 		return partPlan.numberOfPartitions();
 	}
 	
-	public PrimaryKey getPartitioningKey(PrimaryKey key) {
+	public PartitioningKey getPartitioningKey(PrimaryKey key) {
 		return partPlan.getPartitioningKey(key);
 	}
 }

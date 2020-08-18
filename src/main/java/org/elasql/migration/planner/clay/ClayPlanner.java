@@ -12,6 +12,7 @@ import org.elasql.migration.planner.MigrationPlanner;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.storage.metadata.PartitioningKey;
 import org.elasql.util.ElasqlProperties;
 
 /**
@@ -86,15 +87,15 @@ public class ClayPlanner implements MigrationPlanner {
 //		}
 //		return false;
 		
-		List<PrimaryKey> accessedPartKeys = new ArrayList<PrimaryKey>();
+		List<PartitioningKey> accessedPartKeys = new ArrayList<PartitioningKey>();
 		for (PrimaryKey k : reads) {
-			PrimaryKey partKey = partMgr.getPartitioningKey(k);
+			PartitioningKey partKey = partMgr.getPartitioningKey(k);
 			int partId = partMgr.getPartition(k);
 			heatGraph.updateWeightOnVertex(partKey, partId);
 			accessedPartKeys.add(partKey);
 		}
 		for (PrimaryKey k : writes) {
-			PrimaryKey partKey = partMgr.getPartitioningKey(k);
+			PartitioningKey partKey = partMgr.getPartitioningKey(k);
 			int partId = partMgr.getPartition(k);
 			heatGraph.updateWeightOnVertex(partKey, partId);
 			accessedPartKeys.add(partKey);
@@ -229,7 +230,7 @@ public class ClayPlanner implements MigrationPlanner {
 					return candidateClump;
 				
 				// Expand the clump
-				PrimaryKey hotKey = currentClump.getHotestNeighbor();
+				PartitioningKey hotKey = currentClump.getHotestNeighbor();
 				addedVertex = heatGraph.getVertex(hotKey);
 				currentClump.expand(addedVertex);
 				

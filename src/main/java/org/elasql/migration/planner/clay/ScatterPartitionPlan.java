@@ -5,13 +5,14 @@ import java.util.Map;
 
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
+import org.elasql.storage.metadata.PartitioningKey;
 
 public class ScatterPartitionPlan extends PartitionPlan {
 	
 	private PartitionPlan basePartition;
-	private Map<PrimaryKey, Integer> scatterPartition; // <Partitioning Key -> Partition ID>
+	private Map<PartitioningKey, Integer> scatterPartition; // <Partitioning Key -> Partition ID>
 	
-	public ScatterPartitionPlan(PartitionPlan basePartition, Map<PrimaryKey, Integer> scatterPartition) {
+	public ScatterPartitionPlan(PartitionPlan basePartition, Map<PartitioningKey, Integer> scatterPartition) {
 		this.basePartition = basePartition;
 		this.scatterPartition = scatterPartition;
 	}
@@ -23,7 +24,7 @@ public class ScatterPartitionPlan extends PartitionPlan {
 
 	@Override
 	public int getPartition(PrimaryKey key) {
-		PrimaryKey partKey = basePartition.getPartitioningKey(key);
+		PartitioningKey partKey = basePartition.getPartitioningKey(key);
 		Integer part = scatterPartition.get(partKey);
 		if (part != null)
 			return part;
@@ -40,7 +41,7 @@ public class ScatterPartitionPlan extends PartitionPlan {
 		basePartition = plan;
 	}
 	
-	public Map<PrimaryKey, Integer> getMapping() {
+	public Map<PartitioningKey, Integer> getMapping() {
 		return scatterPartition;
 	}
 	
@@ -48,12 +49,12 @@ public class ScatterPartitionPlan extends PartitionPlan {
 	public String toString() {
 		// Sample some records
 		StringBuilder sb = new StringBuilder();
-		Iterator<Map.Entry<PrimaryKey, Integer>> iter = scatterPartition.entrySet().iterator();
+		Iterator<Map.Entry<PartitioningKey, Integer>> iter = scatterPartition.entrySet().iterator();
 		int count = 0;
 		while (count < 5 && iter.hasNext()) {
 			count++;
-			Map.Entry<PrimaryKey, Integer> entry = iter.next();
-			PrimaryKey key = entry.getKey();
+			Map.Entry<PartitioningKey, Integer> entry = iter.next();
+			PartitioningKey key = entry.getKey();
 			Integer part = entry.getValue();
 			if (count > 1) {
 				sb.append(", ");
@@ -66,7 +67,7 @@ public class ScatterPartitionPlan extends PartitionPlan {
 	}
 
 	@Override
-	public PrimaryKey getPartitioningKey(PrimaryKey key) {
+	public PartitioningKey getPartitioningKey(PrimaryKey key) {
 		return basePartition.getPartitioningKey(key);
 	}
 }

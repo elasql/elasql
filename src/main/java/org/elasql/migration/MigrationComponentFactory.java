@@ -15,7 +15,7 @@ import org.elasql.migration.squall.SquallStoredProcFactory;
 import org.elasql.migration.stopcopy.StopCopyMigrationMgr;
 import org.elasql.migration.stopcopy.StopCopyStoredProcFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
-import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.metadata.PartitioningKey;
 
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());
@@ -78,5 +78,5 @@ public abstract class MigrationComponentFactory {
 	
 	public abstract MigrationPlan newPredefinedMigrationPlan();
 	
-	public abstract MigrationRange toMigrationRange(int sourceId, int destId, PrimaryKey partitioningKey);
+	public abstract MigrationRange toMigrationRange(int sourceId, int destId, PartitioningKey partKey);
 }

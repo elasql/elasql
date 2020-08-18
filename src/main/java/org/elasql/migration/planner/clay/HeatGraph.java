@@ -17,7 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.metadata.PartitioningKey;
 
 public class HeatGraph implements Serializable {
 
@@ -42,9 +42,9 @@ public class HeatGraph implements Serializable {
 		return null;
 	}
 
-	private Map<PrimaryKey, Vertex> vertices = new HashMap<PrimaryKey, Vertex>(1000000);
+	private Map<PartitioningKey, Vertex> vertices = new HashMap<PartitioningKey, Vertex>(1000000);
 
-	void updateWeightOnVertex(PrimaryKey key, int partId) {
+	void updateWeightOnVertex(PartitioningKey key, int partId) {
 		Vertex vertex = vertices.get(key);
 		// Note that a vertex represents a range of records.
 		if (vertex == null)
@@ -54,9 +54,9 @@ public class HeatGraph implements Serializable {
 	}
 
 	// Update weights for co-accessed vertices
-	void updateWeightOnEdges(Collection<PrimaryKey> coaccessedVertices) {
-		for (PrimaryKey i : coaccessedVertices)
-			for (PrimaryKey j : coaccessedVertices)
+	void updateWeightOnEdges(Collection<PartitioningKey> coaccessedVertices) {
+		for (PartitioningKey i : coaccessedVertices)
+			for (PartitioningKey j : coaccessedVertices)
 				if (!i.equals(j))
 					vertices.get(i).addEdgeTo(vertices.get(j));
 	}
@@ -73,12 +73,12 @@ public class HeatGraph implements Serializable {
 		return partitions;
 	}
 
-	Vertex getVertex(PrimaryKey key) {
+	Vertex getVertex(PartitioningKey key) {
 		return vertices.get(key);
 	}
 
-	Map<PrimaryKey, Vertex> getVertice() {
-		return new HashMap<PrimaryKey, Vertex>(vertices);
+	Map<PartitioningKey, Vertex> getVertice() {
+		return new HashMap<PartitioningKey, Vertex>(vertices);
 	}
 	
 	void generateMetisGraphFile(File dirPath) throws IOException {
@@ -90,8 +90,8 @@ public class HeatGraph implements Serializable {
 		
 		// Create a mapping from vertex keys to integers and count edges
 		int edgeCount = 0;
-		List<PrimaryKey> keys = new ArrayList<PrimaryKey>();
-		Map<PrimaryKey, Integer> keyToInt = new HashMap<PrimaryKey, Integer>(vertices.size());
+		List<PartitioningKey> keys = new ArrayList<PartitioningKey>();
+		Map<PartitioningKey, Integer> keyToInt = new HashMap<PartitioningKey, Integer>(vertices.size());
 		for (Vertex v : vertices.values()) {
 			edgeCount += v.getOutEdgeCount();
 			keys.add(v.getKey());
@@ -108,21 +108,21 @@ public class HeatGraph implements Serializable {
 		writeMetisFile(metisFile, keys, keyToInt, vertices.size(), edgeCount);
 	}
 	
-	private void writeMetisMappingFile(File filePath, Map<PrimaryKey, Integer> mapping) throws IOException {
+	private void writeMetisMappingFile(File filePath, Map<PartitioningKey, Integer> mapping) throws IOException {
 		try (ObjectOutputStream out = new ObjectOutputStream(new BufferedOutputStream(
 				new FileOutputStream(filePath)))) {
 			out.writeObject(mapping);
 		}
 	}
 
-	void writeMetisFile(File filePath, List<PrimaryKey> keys,
-			Map<PrimaryKey, Integer> keyToInt, int vertexCount, int edgeCount) throws IOException {
+	void writeMetisFile(File filePath, List<PartitioningKey> keys,
+			Map<PartitioningKey, Integer> keyToInt, int vertexCount, int edgeCount) throws IOException {
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
 			// Write the first line "[vertex count] [edge count] 011"
 			writer.write(String.format("%d %d 011\n", vertexCount, edgeCount));
 	
 			// Write each vertex
-			for (PrimaryKey key : keys) {
+			for (PartitioningKey key : keys) {
 				Vertex v = vertices.get(key);
 				writer.write(v.toMetisFormat(keyToInt));
 				writer.write("\n");
@@ -172,9 +172,9 @@ public class HeatGraph implements Serializable {
 		
 		// Each edge
 		for (Vertex v : vertices.values()) {
-			PrimaryKey fromKey = v.getKey();
+			PartitioningKey fromKey = v.getKey();
 			for (OutEdge edge : v.getOutEdges()) {
-				PrimaryKey toKey = edge.getOpposite().getKey();
+				PartitioningKey toKey = edge.getOpposite().getKey();
 				int weight = edge.getWeight();
 				
 				out.writeObject(fromKey);
@@ -187,11 +187,11 @@ public class HeatGraph implements Serializable {
 	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 		// # of vertices
 		int vertexCount = in.readInt();
-		this.vertices = new HashMap<PrimaryKey, Vertex>(vertexCount);
+		this.vertices = new HashMap<PartitioningKey, Vertex>(vertexCount);
 		
 		// Each vertex
 		for (int i = 0; i < vertexCount; i++) {
-			PrimaryKey key = (PrimaryKey) in.readObject();
+			PartitioningKey key = (PartitioningKey) in.readObject();
 			int partId = in.readInt();
 			int weight = in.readInt();
 			
@@ -204,8 +204,8 @@ public class HeatGraph implements Serializable {
 		
 		// Each edge
 		for (int i = 0; i < edgeCount; i++) {
-			PrimaryKey fromKey = (PrimaryKey) in.readObject();
-			PrimaryKey toKey = (PrimaryKey) in.readObject();
+			PartitioningKey fromKey = (PartitioningKey) in.readObject();
+			PartitioningKey toKey = (PartitioningKey) in.readObject();
 			int weight = in.readInt();
 			
 			Vertex from = vertices.get(fromKey);

@@ -40,7 +40,7 @@ public class HashPartitionPlan extends PartitionPlan {
 	}
 	
 	@Override
-	public PrimaryKey getPartitioningKey(PrimaryKey key) {
-		return key;
+	public PartitioningKey getPartitioningKey(PrimaryKey key) {
+		return new PartitioningKey(key);
 	}
 }

@@ -1,6 +1,6 @@
 package org.elasql.migration;
 
-import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.metadata.PartitioningKey;
 
 public class DummyMigrationComponentFactory extends MigrationComponentFactory {
 	
@@ -16,7 +16,7 @@ public class DummyMigrationComponentFactory extends MigrationComponentFactory {
 	}
 
 	@Override
-	public MigrationRange toMigrationRange(int sourceId, int destId, PrimaryKey partitioningKey) {
+	public MigrationRange toMigrationRange(int sourceId, int destId, PartitioningKey partitioningKey) {
 		throw new RuntimeException(message);
 	}
 
