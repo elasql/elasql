@@ -3,17 +3,17 @@ package org.elasql.migration.planner.clay;
 import java.util.Deque;
 
 import org.elasql.migration.MigrationRangeUpdate;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class ScatterMigrationRangeUpdate implements MigrationRangeUpdate {
 	
 	private static final long serialVersionUID = 20181101001L;
 
 	private int sourcePartId, destPartId;
-	private Deque<RecordKey> keysToPush;
+	private Deque<PrimaryKey> keysToPush;
 	
 	ScatterMigrationRangeUpdate(int sourcePartId, int destPartId,
-			Deque<RecordKey> keysToPush) {
+			Deque<PrimaryKey> keysToPush) {
 		this.keysToPush = keysToPush;
 		this.sourcePartId = sourcePartId;
 		this.destPartId = destPartId;
@@ -29,7 +29,7 @@ public class ScatterMigrationRangeUpdate implements MigrationRangeUpdate {
 		return destPartId;
 	}
 	
-	Deque<RecordKey> getKeysToPush() {
+	Deque<PrimaryKey> getKeysToPush() {
 		return keysToPush;
 	}
 }

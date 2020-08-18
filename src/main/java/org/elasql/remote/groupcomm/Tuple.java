@@ -18,19 +18,19 @@ package org.elasql.remote.groupcomm;
 import java.io.Serializable;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class Tuple implements Serializable {
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = -606284893049245719L;
-	public RecordKey key;
+	public PrimaryKey key;
 	public CachedRecord rec;
 	public long srcTxNum;
 	public long destTxNum;
 
-	public Tuple(RecordKey key, long srcTxNum, long destTxNum, CachedRecord rec) {
+	public Tuple(PrimaryKey key, long srcTxNum, long destTxNum, CachedRecord rec) {
 		this.key = key;
 		this.rec = rec;
 		this.srcTxNum = srcTxNum;

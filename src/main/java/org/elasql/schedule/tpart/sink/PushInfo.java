@@ -1,13 +1,13 @@
 package org.elasql.schedule.tpart.sink;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class PushInfo {
 	private long destTxNum;
 	private int serverId;
-	private RecordKey record;
+	private PrimaryKey record;
 
-	public PushInfo(long destTxNum, int serverId, RecordKey record) {
+	public PushInfo(long destTxNum, int serverId, PrimaryKey record) {
 		this.destTxNum = destTxNum;
 		this.serverId = serverId;
 		this.record = record;
@@ -29,11 +29,11 @@ public class PushInfo {
 		this.serverId = serverId;
 	}
 
-	public RecordKey getRecord() {
+	public PrimaryKey getRecord() {
 		return record;
 	}
 
-	public void setRecord(RecordKey record) {
+	public void setRecord(PrimaryKey record) {
 		this.record = record;
 	}
 

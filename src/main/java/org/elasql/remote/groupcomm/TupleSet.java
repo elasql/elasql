@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class TupleSet implements Serializable {
 	/**
@@ -48,7 +48,7 @@ public class TupleSet implements Serializable {
 		return tuples;
 	}
 
-	public void addTuple(RecordKey key, long srcTxNum, long destTxNum,
+	public void addTuple(PrimaryKey key, long srcTxNum, long destTxNum,
 			CachedRecord rec) {
 		// Clone the record to prevent concurrent access from communication threads
 		rec = new CachedRecord(rec);

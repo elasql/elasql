@@ -24,7 +24,7 @@ import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.mgcrab.CaughtUpAnalyzer;
 import org.elasql.schedule.calvin.mgcrab.CrabbingAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -47,13 +47,13 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 	
 	// For the source node to record the last pushed keys in the two phase
 	// background pushing.
-	private Map<Long, Set<RecordKey>> txNumToPushKeys = 
-			new ConcurrentHashMap<Long, Set<RecordKey>>();
+	private Map<Long, Set<PrimaryKey>> txNumToPushKeys = 
+			new ConcurrentHashMap<Long, Set<PrimaryKey>>();
 	
 	// Two phase background pushing stores the pushed records on the
 	// destination node.
-	private Map<Long, Map<RecordKey, CachedRecord>> txNumToPushedRecords = 
-			new ConcurrentHashMap<Long, Map<RecordKey, CachedRecord>>();
+	private Map<Long, Map<PrimaryKey, CachedRecord>> txNumToPushedRecords = 
+			new ConcurrentHashMap<Long, Map<PrimaryKey, CachedRecord>>();
 	
 	private MigrationComponentFactory comsFactory;
 	
@@ -132,7 +132,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 			@Override
 			public void run() {
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(
+					Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
 							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						sendOnePhaseBGPushRequest(range.generateStatusUpdate(), chunk, 
@@ -153,7 +153,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 			public void run() {
 				// Phase 1? proceed to phase 2
 				if (phase == BgPushPhases.PHASE2) {
-					sendTwoPhaseBGPushRequest(BgPushPhases.PHASE2, new HashSet<RecordKey>(),
+					sendTwoPhaseBGPushRequest(BgPushPhases.PHASE2, new HashSet<PrimaryKey>(),
 							lastUpdate.getSourcePartId(), lastUpdate.getDestPartId(), lastPushedTxNum, lastUpdate);
 					return;
 				}
@@ -161,7 +161,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 				// XXX: If there is multiple ranges to this destinations
 				// we should know which range pairs to this transaction number
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(
+					Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
 							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						if (phase == BgPushPhases.PIPELINING) {
@@ -178,7 +178,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 				
 				// If it reach here, this should the last push
 				if (phase == BgPushPhases.PIPELINING) {
-					sendTwoPhaseBGPushRequest(BgPushPhases.PIPELINING, new HashSet<RecordKey>(), 
+					sendTwoPhaseBGPushRequest(BgPushPhases.PIPELINING, new HashSet<PrimaryKey>(), 
 							lastUpdate.getSourcePartId(), lastUpdate.getDestPartId(), lastPushedTxNum, lastUpdate);
 				} else {
 					sendRangeFinishNotification();
@@ -187,7 +187,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		}).start();
 	}
 	
-	public void sendOnePhaseBGPushRequest(MigrationRangeUpdate update, Set<RecordKey> chunk,
+	public void sendOnePhaseBGPushRequest(MigrationRangeUpdate update, Set<PrimaryKey> chunk,
 			int sourceNodeId, int destNodeId) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a one-phase background push request with " + chunk.size() + " keys.");
@@ -201,7 +201,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		params[3] = chunk.size();
 		
 		int i = 4;
-		for (RecordKey key : chunk)
+		for (PrimaryKey key : chunk)
 			params[i++] = key;
 		
 		// Send a store procedure call
@@ -209,7 +209,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 				MgCrabStoredProcFactory.SP_ONE_PHASE_BG_PUSH, params);
 	}
 	
-	public void sendTwoPhaseBGPushRequest(BgPushPhases phase, Set<RecordKey> chunk, int sourceNodeId, 
+	public void sendTwoPhaseBGPushRequest(BgPushPhases phase, Set<PrimaryKey> chunk, int sourceNodeId, 
 			int destNodeId, long lastPushedTxNum, MigrationRangeUpdate update) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a two-phase background push request with " + chunk.size() + " keys. (" + phase + ")");
@@ -225,7 +225,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		params[5] = chunk.size();
 		
 		int i = 6;
-		for (RecordKey key : chunk)
+		for (PrimaryKey key : chunk)
 			params[i++] = key;
 		
 		// Send a store procedure call
@@ -233,19 +233,19 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 				MgCrabStoredProcFactory.SP_TWO_PHASE_BG_PUSH, params);
 	}
 	
-	public void cachePushKeys(long pushTxNum, Set<RecordKey> pushKeys) {
+	public void cachePushKeys(long pushTxNum, Set<PrimaryKey> pushKeys) {
 		txNumToPushKeys.put(pushTxNum, pushKeys);
 	}
 	
-	public void cachePushedRecords(long pushTxNum, Map<RecordKey, CachedRecord> pushedRecords) {
+	public void cachePushedRecords(long pushTxNum, Map<PrimaryKey, CachedRecord> pushedRecords) {
 		txNumToPushedRecords.put(pushTxNum, pushedRecords);
 	}
 	
-	public Set<RecordKey> retrievePushKeys(long pushTxNum) {
+	public Set<PrimaryKey> retrievePushKeys(long pushTxNum) {
 		return txNumToPushKeys.remove(pushTxNum);
 	}
 	
-	public Map<RecordKey, CachedRecord> retrievePushedRecords(long pushTxNum) {
+	public Map<PrimaryKey, CachedRecord> retrievePushedRecords(long pushTxNum) {
 		return txNumToPushedRecords.remove(pushTxNum);
 	}
 	
@@ -294,21 +294,21 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		pushRanges.clear();
 	}
 	
-	public boolean isMigratingRecord(RecordKey key) {
+	public boolean isMigratingRecord(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return true;
 		return false;
 	}
 	
-	public boolean isMigrated(RecordKey key) {
+	public boolean isMigrated(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.isMigrated(key);
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public void setMigrated(RecordKey key) {
+	public void setMigrated(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key)) {
 				range.setMigrated(key);
@@ -317,14 +317,14 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkSourceNode(RecordKey key) {
+	public int checkSourceNode(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.getSourcePartId();
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkDestNode(RecordKey key) {
+	public int checkDestNode(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.getDestPartId();

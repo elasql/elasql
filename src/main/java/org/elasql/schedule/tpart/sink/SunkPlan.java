@@ -8,45 +8,45 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class SunkPlan {
 	private int sinkProcessId;
 	private boolean isHereMaster;
 
 	// key->srcTxNum
-	private Map<RecordKey, Long> readingInfoMap;
+	private Map<PrimaryKey, Long> readingInfoMap;
 
 	// destServerId -> PushInfos
 	private Map<Integer, Set<PushInfo>> pushingInfoMap;
 
-	private List<RecordKey> localWriteBackInfo = new ArrayList<RecordKey>();
+	private List<PrimaryKey> localWriteBackInfo = new ArrayList<PrimaryKey>();
 
 	// Migration flags
-	private Set<RecordKey> cacheInsertions = new HashSet<RecordKey>();
-	private Set<RecordKey> cacheDeletions = new HashSet<RecordKey>();
-	private Set<RecordKey> storageInsertions = new HashSet<RecordKey>();
+	private Set<PrimaryKey> cacheInsertions = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> cacheDeletions = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> storageInsertions = new HashSet<PrimaryKey>();
 	
 	// <Record Key -> Target transactions to be passed in local>
-	private Map<RecordKey, Set<Long>> passToLocalTxns = new HashMap<RecordKey, Set<Long>>();
+	private Map<PrimaryKey, Set<Long>> passToLocalTxns = new HashMap<PrimaryKey, Set<Long>>();
 
 	private Map<Integer, Set<PushInfo>> sinkPushingInfoMap = new HashMap<Integer, Set<PushInfo>>();
 
-	private Set<RecordKey> sinkReadingSet = new HashSet<RecordKey>();
+	private Set<PrimaryKey> sinkReadingSet = new HashSet<PrimaryKey>();
 
 	public SunkPlan(int sinkProcessId, boolean isHereMaster) {
 		this.sinkProcessId = sinkProcessId;
 		this.isHereMaster = isHereMaster;
 	}
 
-	public void addReadingInfo(RecordKey key, long srcTxNum) {
+	public void addReadingInfo(PrimaryKey key, long srcTxNum) {
 		// not need to specify dest, that is the owner tx num
 		if (readingInfoMap == null)
-			readingInfoMap = new HashMap<RecordKey, Long>();
+			readingInfoMap = new HashMap<PrimaryKey, Long>();
 		readingInfoMap.put(key, srcTxNum);
 	}
 
-	public void addPushingInfo(RecordKey key, int targetNodeId, long destTxNum) {
+	public void addPushingInfo(PrimaryKey key, int targetNodeId, long destTxNum) {
 		if (pushingInfoMap == null)
 			pushingInfoMap = new HashMap<Integer, Set<PushInfo>>();
 		Set<PushInfo> pushInfos = pushingInfoMap.get(targetNodeId);
@@ -57,13 +57,13 @@ public class SunkPlan {
 		pushInfos.add(new PushInfo(destTxNum, targetNodeId, key));
 	}
 
-	public void addLocalPassingTarget(RecordKey key, long destTxNum) {
+	public void addLocalPassingTarget(PrimaryKey key, long destTxNum) {
 		if (passToLocalTxns.get(key) == null)
 			passToLocalTxns.put(key, new HashSet<Long>());
 		passToLocalTxns.get(key).add(destTxNum);
 	}
 
-	public void addSinkPushingInfo(RecordKey key, int destNodeId, long destTxNum) {
+	public void addSinkPushingInfo(PrimaryKey key, int destNodeId, long destTxNum) {
 		Set<PushInfo> pushInfos = sinkPushingInfoMap.get(destNodeId);
 		if (pushInfos == null) {
 			pushInfos = new HashSet<PushInfo>();
@@ -72,7 +72,7 @@ public class SunkPlan {
 		pushInfos.add(new PushInfo(destTxNum, destNodeId, key));
 	}
 
-	public void addSinkReadingInfo(RecordKey key) {
+	public void addSinkReadingInfo(PrimaryKey key) {
 		sinkReadingSet.add(key);
 	}
 
@@ -80,11 +80,11 @@ public class SunkPlan {
 		return sinkPushingInfoMap;
 	}
 
-	public Set<RecordKey> getSinkReadingInfo() {
+	public Set<PrimaryKey> getSinkReadingInfo() {
 		return sinkReadingSet;
 	}
 
-	public Long[] getLocalPassingTarget(RecordKey key) {
+	public Long[] getLocalPassingTarget(PrimaryKey key) {
 		Set<Long> set = passToLocalTxns.get(key);
 		return (set == null) ? null : set.toArray(new Long[0]);
 	}
@@ -97,17 +97,17 @@ public class SunkPlan {
 		return isHereMaster;
 	}
 
-	public void addLocalWriteBackInfo(RecordKey key) {
+	public void addLocalWriteBackInfo(PrimaryKey key) {
 		localWriteBackInfo.add(key);
 	}
 	
-	public Set<RecordKey> getReadSet() {
+	public Set<PrimaryKey> getReadSet() {
 		if (readingInfoMap == null)
-			readingInfoMap = new HashMap<RecordKey, Long>();
+			readingInfoMap = new HashMap<PrimaryKey, Long>();
 		return readingInfoMap.keySet();
 	}
 
-	public long getReadSrcTxNum(RecordKey key) {
+	public long getReadSrcTxNum(PrimaryKey key) {
 		return readingInfoMap.get(key);
 	}
 
@@ -115,7 +115,7 @@ public class SunkPlan {
 		return pushingInfoMap;
 	}
 
-	public List<RecordKey> getLocalWriteBackInfo() {
+	public List<PrimaryKey> getLocalWriteBackInfo() {
 		return localWriteBackInfo;
 	}
 
@@ -127,27 +127,27 @@ public class SunkPlan {
 		return sinkPushingInfoMap.size() > 0;
 	}
 
-	public void addCacheInsertion(RecordKey key) {
+	public void addCacheInsertion(PrimaryKey key) {
 		cacheInsertions.add(key);
 	}
 
-	public void addCacheDeletion(RecordKey key) {
+	public void addCacheDeletion(PrimaryKey key) {
 		cacheDeletions.add(key);
 	}
 	
-	public void addStorageInsertion(RecordKey key) {
+	public void addStorageInsertion(PrimaryKey key) {
 		storageInsertions.add(key);
 	}
 
-	public Set<RecordKey> getCacheInsertions() {
+	public Set<PrimaryKey> getCacheInsertions() {
 		return cacheInsertions;
 	}
 
-	public Set<RecordKey> getCacheDeletions() {
+	public Set<PrimaryKey> getCacheDeletions() {
 		return cacheDeletions;
 	}
 	
-	public Set<RecordKey> getStorageInsertions() {
+	public Set<PrimaryKey> getStorageInsertions() {
 		return storageInsertions;
 	}
 	
@@ -200,7 +200,7 @@ public class SunkPlan {
 			iterator = passToLocalTxns.keySet().iterator();
 
 			while (iterator.hasNext()) {
-				RecordKey key = (RecordKey) iterator.next();
+				PrimaryKey key = (PrimaryKey) iterator.next();
 				Set<Long> value = passToLocalTxns.get(key);
 				sb.append(key + " : [");
 				for (Long p : value)

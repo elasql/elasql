@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 
 import org.elasql.migration.planner.MigrationPlanner;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
@@ -22,9 +22,9 @@ public class MigrationSystemController extends Task {
 	public static final int CONTROLLER_NODE_ID = PartitionMetaMgr.NUM_PARTITIONS;
 	
 	protected static class TransactionInfo {
-		public Set<RecordKey> reads, writes;
+		public Set<PrimaryKey> reads, writes;
 		
-		public TransactionInfo(Set<RecordKey> reads, Set<RecordKey> writes) {
+		public TransactionInfo(Set<PrimaryKey> reads, Set<PrimaryKey> writes) {
 			this.reads = reads;
 			this.writes = writes;
 		}
@@ -46,7 +46,7 @@ public class MigrationSystemController extends Task {
 		}
 	}
 	
-	public void monitorTransaction(Set<RecordKey> reads, Set<RecordKey> writes) {
+	public void monitorTransaction(Set<PrimaryKey> reads, Set<PrimaryKey> writes) {
 		if (isAcceptingWorkloadFeeds) {
 			workloadFeeds.add(new TransactionInfo(reads, writes));
 		}

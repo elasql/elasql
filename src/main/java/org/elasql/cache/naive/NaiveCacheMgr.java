@@ -19,24 +19,24 @@ import org.elasql.cache.CachedRecord;
 import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.remote.groupcomm.Tuple;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class NaiveCacheMgr implements RemoteRecordReceiver {
 
-	public CachedRecord read(RecordKey key, Transaction tx) {
+	public CachedRecord read(PrimaryKey key, Transaction tx) {
 		return VanillaCoreCrud.read(key, tx);
 	}
 
-	public void update(RecordKey key, CachedRecord rec, Transaction tx) {
+	public void update(PrimaryKey key, CachedRecord rec, Transaction tx) {
 		VanillaCoreCrud.update(key, rec, tx);
 	}
 
-	public void insert(RecordKey key, CachedRecord rec, Transaction tx) {
+	public void insert(PrimaryKey key, CachedRecord rec, Transaction tx) {
 		VanillaCoreCrud.insert(key, rec, tx);
 	}
 
-	public void delete(RecordKey key, Transaction tx) {
+	public void delete(PrimaryKey key, Transaction tx) {
 		VanillaCoreCrud.delete(key, tx);
 	}
 

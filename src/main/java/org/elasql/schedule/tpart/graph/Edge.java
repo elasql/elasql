@@ -1,13 +1,13 @@
 package org.elasql.schedule.tpart.graph;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class Edge {
 
 	private Node target;
-	private RecordKey resource;
+	private PrimaryKey resource;
 
-	public Edge(Node target, RecordKey res) {
+	public Edge(Node target, PrimaryKey res) {
 		this.target = target;
 		this.resource = res;
 	}
@@ -16,7 +16,7 @@ public class Edge {
 		return target;
 	}
 
-	public RecordKey getResourceKey() {
+	public PrimaryKey getResourceKey() {
 		return resource;
 	}
 

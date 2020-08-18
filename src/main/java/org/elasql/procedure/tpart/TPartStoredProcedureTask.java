@@ -6,7 +6,7 @@ import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class TPartStoredProcedureTask
@@ -64,11 +64,11 @@ public class TPartStoredProcedureTask
 		return txNum;
 	}
 
-	public Set<RecordKey> getReadSet() {
+	public Set<PrimaryKey> getReadSet() {
 		return tsp.getReadSet();
 	}
 
-	public Set<RecordKey> getWriteSet() {
+	public Set<PrimaryKey> getWriteSet() {
 		return tsp.getWriteSet();
 	}
 

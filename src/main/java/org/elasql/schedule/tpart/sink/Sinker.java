@@ -10,7 +10,7 @@ import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class Sinker {
@@ -121,7 +121,7 @@ public class Sinker {
 	protected void generateWritingBackPlans(SunkPlan plan, TxNode node) {
 		for (Edge e : node.getWriteBackEdges()) {
 			int dataWriteBackPos = e.getTarget().getPartId();
-			RecordKey k = e.getResourceKey();
+			PrimaryKey k = e.getResourceKey();
 			
 			// For any node (which may not be the master node),
 			// if it is the destination of a write-back,

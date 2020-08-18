@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.planner.MigrationPlanner;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
@@ -62,7 +62,7 @@ public class ClayPlanner implements MigrationPlanner {
 	}
 
 	@Override
-	public void monitorTransaction(Set<RecordKey> reads, Set<RecordKey> writes) {
+	public void monitorTransaction(Set<PrimaryKey> reads, Set<PrimaryKey> writes) {
 //		seenCount++;
 //		if (seenCount % sampleGate == 0) {
 //			Set<RecordKey> accessedKeys = new HashSet<RecordKey>();
@@ -86,15 +86,15 @@ public class ClayPlanner implements MigrationPlanner {
 //		}
 //		return false;
 		
-		List<RecordKey> accessedPartKeys = new ArrayList<RecordKey>();
-		for (RecordKey k : reads) {
-			RecordKey partKey = partMgr.getPartitioningKey(k);
+		List<PrimaryKey> accessedPartKeys = new ArrayList<PrimaryKey>();
+		for (PrimaryKey k : reads) {
+			PrimaryKey partKey = partMgr.getPartitioningKey(k);
 			int partId = partMgr.getPartition(k);
 			heatGraph.updateWeightOnVertex(partKey, partId);
 			accessedPartKeys.add(partKey);
 		}
-		for (RecordKey k : writes) {
-			RecordKey partKey = partMgr.getPartitioningKey(k);
+		for (PrimaryKey k : writes) {
+			PrimaryKey partKey = partMgr.getPartitioningKey(k);
 			int partId = partMgr.getPartition(k);
 			heatGraph.updateWeightOnVertex(partKey, partId);
 			accessedPartKeys.add(partKey);
@@ -229,7 +229,7 @@ public class ClayPlanner implements MigrationPlanner {
 					return candidateClump;
 				
 				// Expand the clump
-				RecordKey hotKey = currentClump.getHotestNeighbor();
+				PrimaryKey hotKey = currentClump.getHotestNeighbor();
 				addedVertex = heatGraph.getVertex(hotKey);
 				currentClump.expand(addedVertex);
 				

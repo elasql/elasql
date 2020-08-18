@@ -8,7 +8,7 @@ import java.util.Set;
 import org.elasql.cache.CachedRecord;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -17,7 +17,7 @@ public class TPartTxLocalCache {
 	private Transaction tx;
 	private long txNum;
 	private TPartCacheMgr cacheMgr;
-	private Map<RecordKey, CachedRecord> recordCache = new HashMap<RecordKey, CachedRecord>();
+	private Map<PrimaryKey, CachedRecord> recordCache = new HashMap<PrimaryKey, CachedRecord>();
 	private long localStorageId;
 
 	public TPartTxLocalCache(Transaction tx) {
@@ -37,7 +37,7 @@ public class TPartTxLocalCache {
 	 *            the id of the sink where the transaction executes
 	 * @return the specified record
 	 */
-	public CachedRecord readFromSink(RecordKey key) {
+	public CachedRecord readFromSink(PrimaryKey key) {
 
 		CachedRecord rec = null;
 		rec = cacheMgr.readFromSink(key, tx);
@@ -47,8 +47,8 @@ public class TPartTxLocalCache {
 		return rec;
 	}
 	
-	public Map<RecordKey, CachedRecord> batchReadFromSink(Set<RecordKey> keys) {
-		Map<RecordKey, CachedRecord> records = cacheMgr.batchReadFromSink(keys, tx);
+	public Map<PrimaryKey, CachedRecord> batchReadFromSink(Set<PrimaryKey> keys) {
+		Map<PrimaryKey, CachedRecord> records = cacheMgr.batchReadFromSink(keys, tx);
 		
 		for (CachedRecord rec : records.values()) {
 			rec.setSrcTxNum(txNum);
@@ -71,7 +71,7 @@ public class TPartTxLocalCache {
 	 *            caller
 	 * @return the specified record
 	 */
-	public CachedRecord read(RecordKey key, long src) {
+	public CachedRecord read(PrimaryKey key, long src) {
 		
 		CachedRecord rec = recordCache.get(key);
 		if (rec != null)
@@ -83,18 +83,18 @@ public class TPartTxLocalCache {
 		return rec;
 	}
 
-	public void update(RecordKey key, CachedRecord rec) {
+	public void update(PrimaryKey key, CachedRecord rec) {
 		rec.setSrcTxNum(txNum);
 		recordCache.put(key, rec);
 	}
 
-	public void insert(RecordKey key, Map<String, Constant> fldVals) {
+	public void insert(PrimaryKey key, Map<String, Constant> fldVals) {
 		CachedRecord rec = CachedRecord.newRecordForInsertion(key, fldVals);
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		recordCache.put(key, rec);
 	}
 
-	public void delete(RecordKey key) {
+	public void delete(PrimaryKey key) {
 		CachedRecord dummyRec = CachedRecord.newRecordForDeletion(key);
 		dummyRec.setSrcTxNum(tx.getTransactionNumber());
 		recordCache.put(key, dummyRec);
@@ -105,7 +105,7 @@ public class TPartTxLocalCache {
 		
 		// Pass to the transactions
 //		timer.startComponentTimer("Pass to next Tx");
-		for (Map.Entry<RecordKey, CachedRecord> entry : recordCache.entrySet()) {
+		for (Map.Entry<PrimaryKey, CachedRecord> entry : recordCache.entrySet()) {
 			Long[] dests = plan.getLocalPassingTarget(entry.getKey());
 			if (dests != null) {
 				for (long dest : dests) {
@@ -121,7 +121,7 @@ public class TPartTxLocalCache {
 
 //		timer.startComponentTimer("Writeback");
 		// Flush to the local storage (write back)
-		for (RecordKey key : plan.getLocalWriteBackInfo()) {
+		for (PrimaryKey key : plan.getLocalWriteBackInfo()) {
 
 			CachedRecord rec = null;
 			if (plan.isHereMaster()) 
@@ -148,7 +148,7 @@ public class TPartTxLocalCache {
 		
 		// Clean up migrated rec
 //		timer.startComponentTimer("Delete cached records");
-		for (RecordKey key : plan.getCacheDeletions())
+		for (PrimaryKey key : plan.getCacheDeletions())
 			cacheMgr.deleteFromCache(key, txNum);
 //		timer.stopComponentTimer("Delete cached records");
 	}

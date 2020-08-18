@@ -10,7 +10,7 @@ import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
@@ -174,7 +174,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Waiting for the decision from node no." + nodeId);
 
-				RecordKey notKey = NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE);
+				PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE);
 				CachedRecord rec = cacheMgr.readFromRemote(notKey);
 				Constant con = rec.getVal(FIELD_DECISION);
 				boolean isCommitted = con.equals(COMMIT);
@@ -195,7 +195,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 
 	private void otherSendNotification(boolean isCommitted) {
 		// Create a key value set
-		RecordKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
+		PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
 		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE, txNum);
 		notVal.addFldVal(FIELD_DECISION, (isCommitted? COMMIT : ABORT));
 		notVal.addFldVal(FIELD_MESSAGE, new VarcharConstant(abortMessage));
@@ -217,7 +217,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 					logger.fine("Sending the final decision to node no." + nodeId);
 
 				// Create a key value set
-				RecordKey notKey = NotificationPartitionPlan.createRecordKey(MASTER_NODE, nodeId);
+				PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(MASTER_NODE, nodeId);
 				CachedRecord notVal = NotificationPartitionPlan.createRecord(MASTER_NODE, nodeId, txNum);
 				notVal.addFldVal(FIELD_DECISION, (finalDecision? COMMIT : ABORT));
 				notVal.addFldVal(FIELD_MESSAGE, new VarcharConstant(abortMessage));
@@ -231,7 +231,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 	
 	private boolean otherReceiveFinalDecision() {
 		// Create a key value set
-		RecordKey notKey = NotificationPartitionPlan.createRecordKey(MASTER_NODE, Elasql.serverId());
+		PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(MASTER_NODE, Elasql.serverId());
 		CachedRecord rec = cacheMgr.readFromRemote(notKey);
 		boolean isCommitted = rec.getVal(FIELD_DECISION).equals(COMMIT);
 		abortMessage = rec.getVal(FIELD_MESSAGE).toString();

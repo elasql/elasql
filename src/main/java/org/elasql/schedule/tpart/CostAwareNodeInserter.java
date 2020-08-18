@@ -5,7 +5,7 @@ import java.util.List;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
@@ -115,7 +115,7 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 		double crossEdgeCost = 0;
 		
 		// count read edges
-		for (RecordKey key : task.getReadSet()) {
+		for (PrimaryKey key : task.getReadSet()) {
 			
 			// Skip replicated records
 			if (partMgr.isFullyReplicated(key))

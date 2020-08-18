@@ -23,7 +23,7 @@ import java.util.Map;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
@@ -41,8 +41,8 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	protected H paramHelper;
 
 	// Record keys
-	private List<RecordKey> readKeys = new ArrayList<RecordKey>();
-	private List<RecordKey> writeKeys = new ArrayList<RecordKey>();
+	private List<PrimaryKey> readKeys = new ArrayList<PrimaryKey>();
+	private List<PrimaryKey> writeKeys = new ArrayList<PrimaryKey>();
 	private boolean isCommitted = false; 
 	
 	private NaiveCacheMgr cacheMgr = (NaiveCacheMgr) Elasql.remoteRecReceiver();
@@ -63,8 +63,8 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 
 	/**
 	 * Prepare the RecordKey for each record to be used in this stored
-	 * procedure. Use the {@link #addReadKey(RecordKey)},
-	 * {@link #addWriteKey(RecordKey)} method to add keys.
+	 * procedure. Use the {@link #addReadKey(PrimaryKey)},
+	 * {@link #addWriteKey(PrimaryKey)} method to add keys.
 	 */
 	protected abstract void prepareKeys();
 	
@@ -138,23 +138,23 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 		return paramHelper.isReadOnly();
 	}
 	
-	protected void addReadKey(RecordKey readKey) {
+	protected void addReadKey(PrimaryKey readKey) {
 		readKeys.add(readKey);
 	}
 
-	protected void addWriteKey(RecordKey writeKey) {
+	protected void addWriteKey(PrimaryKey writeKey) {
 		writeKeys.add(writeKey);
 	}
 	
-	protected CachedRecord read(RecordKey key) {
+	protected CachedRecord read(PrimaryKey key) {
 		return cacheMgr.read(key, tx);
 	}
 	
-	protected void update(RecordKey key, CachedRecord rec) {
+	protected void update(PrimaryKey key, CachedRecord rec) {
 		cacheMgr.update(key, rec, tx);
 	}
 	
-	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
+	protected void insert(PrimaryKey key, Map<String, Constant> fldVals) {
 		cacheMgr.insert(
 			key,
 			CachedRecord.newRecordForInsertion(key, fldVals),
@@ -162,7 +162,7 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 		);
 	}
 	
-	protected void delete(RecordKey key) {
+	protected void delete(PrimaryKey key) {
 		cacheMgr.delete(key, tx);
 	}
 	

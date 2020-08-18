@@ -6,7 +6,7 @@ import java.util.List;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class LocalFirstNodeInserter implements BatchNodeInserter {
@@ -54,7 +54,7 @@ public class LocalFirstNodeInserter implements BatchNodeInserter {
 	private int countRemoteReadEdge(TGraph graph, TPartStoredProcedureTask task, int partId) {
 		int remoteEdgeCount = 0;
 		
-		for (RecordKey key : task.getReadSet()) {
+		for (PrimaryKey key : task.getReadSet()) {
 			// Skip replicated records
 			if (partMgr.isFullyReplicated(key))
 				continue;

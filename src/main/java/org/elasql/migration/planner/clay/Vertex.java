@@ -5,29 +5,29 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 class Vertex {
 	
-	private HashMap<RecordKey, OutEdge> keyToEdge;
+	private HashMap<PrimaryKey, OutEdge> keyToEdge;
 	private List<OutEdge> edges;
 	private int weight;
-	private RecordKey key;
+	private PrimaryKey key;
 	private int partId;
 
-	Vertex(RecordKey key, int partId) {
+	Vertex(PrimaryKey key, int partId) {
 		this(key, partId, 1);
 	}
 
-	Vertex(RecordKey key, int partId, int weight) {
+	Vertex(PrimaryKey key, int partId, int weight) {
 		this.key = key;
 		this.weight = weight;
 		this.partId = partId;
-		keyToEdge = new HashMap<RecordKey, OutEdge>();
+		keyToEdge = new HashMap<PrimaryKey, OutEdge>();
 		edges = new ArrayList<OutEdge>();
 	}
 
-	RecordKey getKey() {
+	PrimaryKey getKey() {
 		return key;
 	}
 
@@ -85,7 +85,7 @@ class Vertex {
 		return edges.size();
 	}
 	
-	String toMetisFormat(Map<RecordKey, Integer> keyToInt) {
+	String toMetisFormat(Map<PrimaryKey, Integer> keyToInt) {
 		StringBuilder sb = new StringBuilder(weight + " ");
 		for (OutEdge o : edges) {
 			sb.append(String.format("%d %d ", 

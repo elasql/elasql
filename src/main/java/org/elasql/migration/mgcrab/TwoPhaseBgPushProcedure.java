@@ -15,7 +15,7 @@ import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
@@ -30,9 +30,9 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	private MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
 	
-	private Set<RecordKey> pushingKeys = new HashSet<RecordKey>();
-	private	Map<RecordKey, CachedRecord> lastPushedRecords;
-	private Set<RecordKey> lastPushedKeys;
+	private Set<PrimaryKey> pushingKeys = new HashSet<PrimaryKey>();
+	private	Map<PrimaryKey, CachedRecord> lastPushedRecords;
+	private Set<PrimaryKey> lastPushedKeys;
 
 	public TwoPhaseBgPushProcedure(long txNum) {
 		super(txNum, new TwoPhaseBgPushParamHelper());
@@ -74,14 +74,14 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	
 	// Note: only the source and the destination node could execute this method
 	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
-		lastPushedKeys = new HashSet<RecordKey>();
+		lastPushedKeys = new HashSet<PrimaryKey>();
 
 		// For phase One: The source node reads a set of records, then pushes to the
 		// dest node.
 		if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE1 ||
 				paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
 			for (int i = 0; i < paramHelper.getPushingKeyCount(); i++) {
-				RecordKey key = paramHelper.getPushingKey(i);
+				PrimaryKey key = paramHelper.getPushingKey(i);
 				// Important: We only push the un-migrated records to the dest
 				if (!migraMgr.isMigrated(key))
 					pushingKeys.add(key);
@@ -111,8 +111,8 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 			}
 			
 			// Ignore the migrated keys. We only insert the un-migrated records to the dest.
-			Set<RecordKey> migratedKeys = new HashSet<RecordKey>();
-			for (RecordKey key : lastPushedKeys) {
+			Set<PrimaryKey> migratedKeys = new HashSet<PrimaryKey>();
+			for (PrimaryKey key : lastPushedKeys) {
 				if (migraMgr.isMigrated(key))
 					migratedKeys.add(key);
 			}
@@ -136,11 +136,11 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE2 ||
 				paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
 			if (localNodeId == paramHelper.getSourceNodeId()) {
-				for (RecordKey key : lastPushedKeys) {
+				for (PrimaryKey key : lastPushedKeys) {
 					plan.addLocalReadKey(key);
 				}
 			} else if (localNodeId == paramHelper.getDestNodeId()) {
-				for (RecordKey key : lastPushedKeys) {
+				for (PrimaryKey key : lastPushedKeys) {
 					plan.addLocalInsertKey(key);
 				}
 			}
@@ -224,21 +224,21 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		TupleSet ts = new TupleSet(-1);
 
 		// Construct key sets
-		Map<String, Set<RecordKey>> keysPerTables = new HashMap<String, Set<RecordKey>>();
-		for (RecordKey key : pushingKeys) {
-			Set<RecordKey> keys = keysPerTables.get(key.getTableName());
+		Map<String, Set<PrimaryKey>> keysPerTables = new HashMap<String, Set<PrimaryKey>>();
+		for (PrimaryKey key : pushingKeys) {
+			Set<PrimaryKey> keys = keysPerTables.get(key.getTableName());
 			if (keys == null) {
-				keys = new HashSet<RecordKey>();
+				keys = new HashSet<PrimaryKey>();
 				keysPerTables.put(key.getTableName(), keys);
 			}
 			keys.add(key);
 		}
 
 		// Batch read the records per table
-		for (Map.Entry<String, Set<RecordKey>> entry : keysPerTables.entrySet()) {
-			Map<RecordKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), getTransaction());
+		for (Map.Entry<String, Set<PrimaryKey>> entry : keysPerTables.entrySet()) {
+			Map<PrimaryKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), getTransaction());
 
-			for (RecordKey key : entry.getValue()) {
+			for (PrimaryKey key : entry.getValue()) {
 				// System.out.println(key);
 				CachedRecord rec = recordMap.get(key);
 
@@ -263,15 +263,15 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		
 	}
 	
-	private Map<RecordKey, CachedRecord> receiveInDest() {
+	private Map<PrimaryKey, CachedRecord> receiveInDest() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("BG pushing tx. " + txNum + " is receiving " + pushingKeys.size()
 					+ " records from the source node. (Node." + paramHelper.getSourceNodeId() + ")");
 		
-		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
+		Map<PrimaryKey, CachedRecord> recordMap = new HashMap<PrimaryKey, CachedRecord>();
 
 		// Receive the data from the source node and save them
-		for (RecordKey k : pushingKeys) {
+		for (PrimaryKey k : pushingKeys) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			recordMap.put(k, rec);
 		}
@@ -279,13 +279,13 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		return recordMap;
 	}
 	
-	private void insertInDest(Map<RecordKey, CachedRecord> cachedRecords) {
+	private void insertInDest(Map<PrimaryKey, CachedRecord> cachedRecords) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("BG pushing tx. " + txNum + " is storing " + lastPushedKeys.size()
 					+ " records to the local storage.");
 
 		// Store the cached records
-		for (RecordKey key : lastPushedKeys) {
+		for (PrimaryKey key : lastPushedKeys) {
 			CachedRecord rec = cachedRecords.get(key);
 			
 			if (rec == null)
@@ -300,7 +300,7 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	}
 
 	@Override
-	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
+	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
 		// do nothing
 	}
 }

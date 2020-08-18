@@ -32,7 +32,7 @@ import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.SequencerAnalyzer;
 import org.elasql.schedule.calvin.StandardAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
@@ -72,12 +72,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	/**
 	 * Prepare the RecordKey for each record to be used in this stored
-	 * procedure. Use the {@link #addReadKey(RecordKey)},
-	 * {@link #addWriteKey(RecordKey)} method to add keys.
+	 * procedure. Use the {@link #addReadKey(PrimaryKey)},
+	 * {@link #addWriteKey(PrimaryKey)} method to add keys.
 	 */
 	protected abstract void prepareKeys(ReadWriteSetAnalyzer analyzer);
 
-	protected abstract void executeSql(Map<RecordKey, CachedRecord> readings);
+	protected abstract void executeSql(Map<PrimaryKey, CachedRecord> readings);
 
 	/**********************
 	 * implemented methods
@@ -245,7 +245,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 		
 		// Read the migrating records
-		Map<RecordKey, CachedRecord> migratingRecs = performLocalRead(execPlan.getLocalReadsForMigration());
+		Map<PrimaryKey, CachedRecord> migratingRecs = performLocalRead(execPlan.getLocalReadsForMigration());
 		
 		// Push migrating records
 		pushRecordsToRemotes(execPlan.getMigrationPushSets(), migratingRecs);
@@ -264,7 +264,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	protected void executeTransactionLogic() {
 		// Read the local records
 //		Timer.getLocalTimer().startComponentTimer("read local");
-		Map<RecordKey, CachedRecord> readings = performLocalRead(execPlan.getLocalReadKeys());
+		Map<PrimaryKey, CachedRecord> readings = performLocalRead(execPlan.getLocalReadKeys());
 //		Timer.getLocalTimer().stopComponentTimer("read local");
 
 		// Push local records to the needed remote nodes
@@ -291,17 +291,17 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		// Used for clean up or notification.
 	}
 	
-	protected void update(RecordKey key, CachedRecord rec) {
+	protected void update(PrimaryKey key, CachedRecord rec) {
 		if (execPlan.isLocalUpdate(key))
 			cacheMgr.update(key, rec);
 	}
 	
-	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
+	protected void insert(PrimaryKey key, Map<String, Constant> fldVals) {
 		if (execPlan.isLocalInsert(key))
 			cacheMgr.insert(key, fldVals);
 	}
 	
-	protected void delete(RecordKey key) {
+	protected void delete(PrimaryKey key) {
 		if (execPlan.isLocalDelete(key))
 			cacheMgr.delete(key);
 	}
@@ -314,7 +314,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		for (Integer nodeId : targetNodes) {
 			// Construct pushing tuple set
 			TupleSet ts = new TupleSet(-1);
-			RecordKey key = NotificationPartitionPlan.createRecordKey(
+			PrimaryKey key = NotificationPartitionPlan.createRecordKey(
 					Elasql.serverId(), nodeId);
 			CachedRecord dummyRec = NotificationPartitionPlan.createRecord(
 					Elasql.serverId(), nodeId, txNum);
@@ -327,7 +327,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	protected void waitForMigrationPullRequests(Set<Integer> targetNodes) {
 		for (Integer nodeId : targetNodes) {
-			RecordKey key = NotificationPartitionPlan.createRecordKey(
+			PrimaryKey key = NotificationPartitionPlan.createRecordKey(
 					nodeId, Elasql.serverId());
 			CachedRecord rec = cacheMgr.readFromRemote(key);
 			if (rec.getSrcTxNum() != txNum || rec == null)
@@ -335,11 +335,11 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 	}
 
-	private Map<RecordKey, CachedRecord> performLocalRead(Set<RecordKey> readKeys) {
-		Map<RecordKey, CachedRecord> localReadings = new HashMap<RecordKey, CachedRecord>();
+	private Map<PrimaryKey, CachedRecord> performLocalRead(Set<PrimaryKey> readKeys) {
+		Map<PrimaryKey, CachedRecord> localReadings = new HashMap<PrimaryKey, CachedRecord>();
 		
 		// Read local records (for both active or passive participants)
-		for (RecordKey k : readKeys) {
+		for (PrimaryKey k : readKeys) {
 			CachedRecord rec = cacheMgr.readFromLocal(k);
 			if (rec == null)
 				throw new RuntimeException("cannot find the record for " + k + " in the local stroage");
@@ -349,14 +349,14 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		return localReadings;
 	}
 
-	private void pushRecordsToRemotes(Map<Integer, Set<RecordKey>> pushKeys, Map<RecordKey, CachedRecord> records) {
-		for (Map.Entry<Integer, Set<RecordKey>> entry : pushKeys.entrySet()) {
+	private void pushRecordsToRemotes(Map<Integer, Set<PrimaryKey>> pushKeys, Map<PrimaryKey, CachedRecord> records) {
+		for (Map.Entry<Integer, Set<PrimaryKey>> entry : pushKeys.entrySet()) {
 			Integer targetNodeId = entry.getKey();
-			Set<RecordKey> keys = entry.getValue();
+			Set<PrimaryKey> keys = entry.getValue();
 			
 			// Construct pushing tuple set
 			TupleSet ts = new TupleSet(-1);
-			for (RecordKey key : keys) {
+			for (PrimaryKey key : keys) {
 				CachedRecord rec = records.get(key);
 				if (rec == null)
 					throw new RuntimeException("cannot find the record for " + key);
@@ -368,16 +368,16 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 		}
 	}
 
-	private void collectRemoteReadings(Set<RecordKey> keys, Map<RecordKey, CachedRecord> readingCache) {
+	private void collectRemoteReadings(Set<PrimaryKey> keys, Map<PrimaryKey, CachedRecord> readingCache) {
 		// Read remote records
-		for (RecordKey k : keys) {
+		for (PrimaryKey k : keys) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			readingCache.put(k, rec);
 		}
 	}
 	
-	private void performInsertionForMigrations(Set<RecordKey> migratingKeys, Map<RecordKey, CachedRecord> migratingRecords) {
-		for (RecordKey key : migratingKeys) {
+	private void performInsertionForMigrations(Set<PrimaryKey> migratingKeys, Map<PrimaryKey, CachedRecord> migratingRecords) {
+		for (PrimaryKey key : migratingKeys) {
 			cacheMgr.insert(key, migratingRecords.get(key));
 		}
 	}

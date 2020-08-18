@@ -19,7 +19,7 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.squall.SquallAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -67,7 +67,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 			@Override
 			public void run() {
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(
+					Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
 							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
 					// Debug
 					System.out.println("Generated a chunk: " + chunk);
@@ -84,7 +84,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 		}).start();
 	}
 	
-	public void sendBGPushRequest(MigrationRangeUpdate update, Set<RecordKey> chunk,
+	public void sendBGPushRequest(MigrationRangeUpdate update, Set<PrimaryKey> chunk,
 			int sourceNodeId, int destNodeId) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a background push request with " + chunk.size() + " keys.");
@@ -97,7 +97,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 		params[2] = destNodeId;
 		params[3] = chunk.size();
 		int i = 4;
-		for (RecordKey key : chunk)
+		for (PrimaryKey key : chunk)
 			params[i++] = key;
 		
 		// Send a store procedure call
@@ -105,7 +105,7 @@ public class SquallMigrationMgr implements MigrationMgr {
 				SquallStoredProcFactory.SP_BG_PUSH, params);
 	}
 	
-	public void addNewInsertKeyOnSource(RecordKey key) {
+	public void addNewInsertKeyOnSource(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.addKey(key))
 				return;
@@ -144,21 +144,21 @@ public class SquallMigrationMgr implements MigrationMgr {
 		pushRanges.clear();
 	}
 	
-	public boolean isMigratingRecord(RecordKey key) {
+	public boolean isMigratingRecord(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return true;
 		return false;
 	}
 	
-	public boolean isMigrated(RecordKey key) {
+	public boolean isMigrated(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.isMigrated(key);
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public void setMigrated(RecordKey key) {
+	public void setMigrated(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key)) {
 				range.setMigrated(key);
@@ -167,14 +167,14 @@ public class SquallMigrationMgr implements MigrationMgr {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkSourceNode(RecordKey key) {
+	public int checkSourceNode(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.getSourcePartId();
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkDestNode(RecordKey key) {
+	public int checkDestNode(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.getDestPartId();

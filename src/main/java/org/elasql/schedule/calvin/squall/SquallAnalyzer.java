@@ -10,7 +10,7 @@ import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	
@@ -49,11 +49,11 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 		}
 	}
 	
-	private static Set<RecordKey> getKeySet(Map<MigrationPath, Set<RecordKey>> map,
+	private static Set<PrimaryKey> getKeySet(Map<MigrationPath, Set<PrimaryKey>> map,
 			MigrationPath path) {
-		Set<RecordKey> keys = map.get(path);
+		Set<PrimaryKey> keys = map.get(path);
 		if (keys == null) {
-			keys = new HashSet<RecordKey>();
+			keys = new HashSet<PrimaryKey>();
 			map.put(path, keys);
 		}
 		return keys;
@@ -67,20 +67,20 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	private int[] readsPerNodes;
 	
 	private Set<Integer> activeParticipants = new HashSet<Integer>();
-	private Set<RecordKey> fullyRepReadKeys = new HashSet<RecordKey>();
+	private Set<PrimaryKey> fullyRepReadKeys = new HashSet<PrimaryKey>();
 	
 	// Cache the keys until we decide which nodes handle them
-	private Map<MigrationPath, Set<RecordKey>> migratingReadKeys
-		= new HashMap<MigrationPath, Set<RecordKey>>();
-	private Map<MigrationPath, Set<RecordKey>> migratingUpdateKeys
-		= new HashMap<MigrationPath, Set<RecordKey>>();
-	private Map<MigrationPath, Set<RecordKey>> migratingInsertKeys
-		= new HashMap<MigrationPath, Set<RecordKey>>();
-	private Map<MigrationPath, Set<RecordKey>> migratingDeleteKeys
-		= new HashMap<MigrationPath, Set<RecordKey>>();
+	private Map<MigrationPath, Set<PrimaryKey>> migratingReadKeys
+		= new HashMap<MigrationPath, Set<PrimaryKey>>();
+	private Map<MigrationPath, Set<PrimaryKey>> migratingUpdateKeys
+		= new HashMap<MigrationPath, Set<PrimaryKey>>();
+	private Map<MigrationPath, Set<PrimaryKey>> migratingInsertKeys
+		= new HashMap<MigrationPath, Set<PrimaryKey>>();
+	private Map<MigrationPath, Set<PrimaryKey>> migratingDeleteKeys
+		= new HashMap<MigrationPath, Set<PrimaryKey>>();
 	private Map<MigrationPath, Boolean> executeOnDest
 		= new HashMap<MigrationPath, Boolean>();
-	private Map<RecordKey, Boolean> migratingRecords = new HashMap<RecordKey, Boolean>();
+	private Map<PrimaryKey, Boolean> migratingRecords = new HashMap<PrimaryKey, Boolean>();
 	
 	public SquallAnalyzer() {
 		execPlan = new ExecutionPlan();
@@ -109,7 +109,7 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	}
 
 	@Override
-	public void addReadKey(RecordKey readKey) {
+	public void addReadKey(PrimaryKey readKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(readKey)) {
 			// We cache it then check if we should add it to the local read set later
 			fullyRepReadKeys.add(readKey);
@@ -142,7 +142,7 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	@Override
-	public void addUpdateKey(RecordKey updateKey) {
+	public void addUpdateKey(PrimaryKey updateKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(updateKey)) {
 			execPlan.addLocalUpdateKey(updateKey);
 		} else {
@@ -171,7 +171,7 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	@Override
-	public void addInsertKey(RecordKey insertKey) {
+	public void addInsertKey(PrimaryKey insertKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(insertKey)) {
 			execPlan.addLocalInsertKey(insertKey);
 		} else {
@@ -194,7 +194,7 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	@Override
-	public void addDeleteKey(RecordKey deleteKey) {
+	public void addDeleteKey(PrimaryKey deleteKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(deleteKey)) {
 			execPlan.addLocalDeleteKey(deleteKey);
 		} else {
@@ -224,7 +224,7 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 				putMigratingKeysTo(p, p.destId);
 				
 				// Add foreground migrations
-				Set<RecordKey> keys = migratingReadKeys.get(p);
+				Set<PrimaryKey> keys = migratingReadKeys.get(p);
 				if (keys != null)
 					addToForegourndMigration(p, keys);
 				keys = migratingUpdateKeys.get(p);
@@ -234,9 +234,9 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 				putMigratingKeysTo(p, p.sourceId);
 				
 				// New inserted data should be also migrated to the destination node
-				Set<RecordKey> insertKeys = migratingInsertKeys.get(p);
+				Set<PrimaryKey> insertKeys = migratingInsertKeys.get(p);
 				if (insertKeys != null)
-					for (RecordKey key : insertKeys)
+					for (PrimaryKey key : insertKeys)
 						migraMgr.addNewInsertKeyOnSource(key);
 			}
 		}
@@ -245,20 +245,20 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	private void putMigratingKeysTo(MigrationPath p, int executionNodeId) {
 		if (localNodeId == executionNodeId) {
 			if (migratingReadKeys.get(p) != null)
-				for (RecordKey k : migratingReadKeys.get(p))
+				for (PrimaryKey k : migratingReadKeys.get(p))
 					execPlan.addLocalReadKey(k);
 			if (migratingUpdateKeys.get(p) != null)
-				for (RecordKey k : migratingUpdateKeys.get(p))
+				for (PrimaryKey k : migratingUpdateKeys.get(p))
 					execPlan.addLocalUpdateKey(k);
 			if (migratingInsertKeys.get(p) != null)
-				for (RecordKey k : migratingInsertKeys.get(p))
+				for (PrimaryKey k : migratingInsertKeys.get(p))
 					execPlan.addLocalInsertKey(k);
 			if (migratingDeleteKeys.get(p) != null)
-				for (RecordKey k : migratingDeleteKeys.get(p))
+				for (PrimaryKey k : migratingDeleteKeys.get(p))
 					execPlan.addLocalDeleteKey(k);
 		} else {
 			if (migratingReadKeys.get(p) != null)
-				for (RecordKey k : migratingReadKeys.get(p))
+				for (PrimaryKey k : migratingReadKeys.get(p))
 					execPlan.addRemoteReadKey(k);
 		}
 		if (migratingReadKeys.get(p) != null)
@@ -268,8 +268,8 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 			activeParticipants.add(executionNodeId);
 	}
 
-	private void addToForegourndMigration(MigrationPath p, Set<RecordKey> keySet) {
-		for (RecordKey k : keySet) {
+	private void addToForegourndMigration(MigrationPath p, Set<PrimaryKey> keySet) {
+		for (PrimaryKey k : keySet) {
 			if (migratingRecords.containsKey(k)) {
 				migratingRecords.put(k, Boolean.TRUE);
 				if (localNodeId == p.sourceId) {
@@ -310,19 +310,19 @@ public class SquallAnalyzer implements ReadWriteSetAnalyzer {
 	private void generatePushSets() {
 		for (Integer target : activeParticipants) {
 			if (target != localNodeId) {
-				for (RecordKey key : execPlan.getLocalReadKeys())
+				for (PrimaryKey key : execPlan.getLocalReadKeys())
 					execPlan.addPushSet(target, key);
 			}
 		}
 	}
 	
 	private void activePartReadFullyReps() {
-		for (RecordKey key : fullyRepReadKeys)
+		for (PrimaryKey key : fullyRepReadKeys)
 			execPlan.addLocalReadKey(key);
 	}
 	
 	private void updateMigrationStatus() {
-		for (RecordKey key : migratingRecords.keySet())
+		for (PrimaryKey key : migratingRecords.keySet())
 			if (migratingRecords.get(key))
 				migraMgr.setMigrated(key);
 	}

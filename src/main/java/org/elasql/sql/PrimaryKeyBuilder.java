@@ -10,7 +10,7 @@ import java.util.List;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.Type;
 
-public class RecordKeyBuilder implements Serializable {
+public class PrimaryKeyBuilder implements Serializable {
 	
 	private static final long serialVersionUID = 20200206001L;
 	
@@ -18,7 +18,7 @@ public class RecordKeyBuilder implements Serializable {
 	private List<String> fields = new ArrayList<String>();
 	private transient List<Constant> values = new ArrayList<Constant>();
 	
-	public RecordKeyBuilder(String tableName) {
+	public PrimaryKeyBuilder(String tableName) {
 		this.tableName = tableName;
 	}
 	
@@ -36,8 +36,8 @@ public class RecordKeyBuilder implements Serializable {
 		values.set(index, val);
 	}
 	
-	public RecordKey build() {
-		return new RecordKey(tableName,
+	public PrimaryKey build() {
+		return new PrimaryKey(tableName,
 			fields.toArray(new String[fields.size()]),
 			values.toArray(new Constant[fields.size()])
 		);

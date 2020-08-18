@@ -5,22 +5,22 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class ExecutionPlan {
 	
 	public enum ParticipantRole { ACTIVE, PASSIVE, IGNORE };
 	
 	public static class PushSet {
-		Set<RecordKey> keys;
+		Set<PrimaryKey> keys;
 		Set<Integer> nodeIds;
 		
-		public PushSet(Set<RecordKey> keys, Set<Integer> nodeIds) {
+		public PushSet(Set<PrimaryKey> keys, Set<Integer> nodeIds) {
 			this.keys = keys;
 			this.nodeIds = nodeIds;
 		}
 		
-		public Set<RecordKey> getPushKeys() {
+		public Set<PrimaryKey> getPushKeys() {
 			return keys;
 		}
 		
@@ -37,17 +37,17 @@ public class ExecutionPlan {
 	private ParticipantRole role = ParticipantRole.IGNORE;
 	
 	// Record keys for normal operations
-	private Set<RecordKey> localReadKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> remoteReadKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> localUpdateKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> localInsertKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> localDeleteKeys = new HashSet<RecordKey>();
-	private Map<Integer, Set<RecordKey>> pushSets = new HashMap<Integer, Set<RecordKey>>();
+	private Set<PrimaryKey> localReadKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> remoteReadKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> localUpdateKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> localInsertKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> localDeleteKeys = new HashSet<PrimaryKey>();
+	private Map<Integer, Set<PrimaryKey>> pushSets = new HashMap<Integer, Set<PrimaryKey>>();
 	
 	// For foreground migrations
-	private Set<RecordKey> localReadsForMigration = new HashSet<RecordKey>();
-	private Map<Integer, Set<RecordKey>> migrationPushSets = new HashMap<Integer, Set<RecordKey>>();
-	private Set<RecordKey> incomingMigratingKeys = new HashSet<RecordKey>();
+	private Set<PrimaryKey> localReadsForMigration = new HashSet<PrimaryKey>();
+	private Map<Integer, Set<PrimaryKey>> migrationPushSets = new HashMap<Integer, Set<PrimaryKey>>();
+	private Set<PrimaryKey> incomingMigratingKeys = new HashSet<PrimaryKey>();
 	
 	// only for pulling migrations (Squall)
 	private Set<Integer> pullingSources = new HashSet<Integer>();
@@ -55,54 +55,54 @@ public class ExecutionPlan {
 	private boolean forceReadWriteTx = false;
 	private boolean forceRemoteReadEnabled = false;
 
-	public void addLocalReadKey(RecordKey key) {
+	public void addLocalReadKey(PrimaryKey key) {
 		localReadKeys.add(key);
 	}
 	
-	public void addRemoteReadKey(RecordKey key) {
+	public void addRemoteReadKey(PrimaryKey key) {
 		remoteReadKeys.add(key);
 	}
 	
-	public void addLocalUpdateKey(RecordKey key) {
+	public void addLocalUpdateKey(PrimaryKey key) {
 		localUpdateKeys.add(key);
 	}
 
-	public void addLocalInsertKey(RecordKey key) {
+	public void addLocalInsertKey(PrimaryKey key) {
 		localInsertKeys.add(key);
 	}
 
-	public void addLocalDeleteKey(RecordKey key) {
+	public void addLocalDeleteKey(PrimaryKey key) {
 		localDeleteKeys.add(key);
 	}
 	
-	public void addPushSet(Integer targetNodeId, RecordKey key) {
-		Set<RecordKey> keys = pushSets.get(targetNodeId);
+	public void addPushSet(Integer targetNodeId, PrimaryKey key) {
+		Set<PrimaryKey> keys = pushSets.get(targetNodeId);
 		if (keys == null) {
-			keys = new HashSet<RecordKey>();
+			keys = new HashSet<PrimaryKey>();
 			pushSets.put(targetNodeId, keys);
 		}
 		keys.add(key);
 	}
 	
-	public void addReadsForMigration(RecordKey key) {
+	public void addReadsForMigration(PrimaryKey key) {
 		localReadsForMigration.add(key);
 	}
 	
-	public void addMigrationPushSet(Integer targetNodeId, RecordKey key) {
-		Set<RecordKey> keys = migrationPushSets.get(targetNodeId);
+	public void addMigrationPushSet(Integer targetNodeId, PrimaryKey key) {
+		Set<PrimaryKey> keys = migrationPushSets.get(targetNodeId);
 		if (keys == null) {
-			keys = new HashSet<RecordKey>();
+			keys = new HashSet<PrimaryKey>();
 			migrationPushSets.put(targetNodeId, keys);
 		}
 		keys.add(key);
 	}
 	
-	public void addImcomingMigratingKeys(RecordKey key) {
+	public void addImcomingMigratingKeys(PrimaryKey key) {
 		incomingMigratingKeys.add(key);
 	}
 	
-	public void removeFromPushSet(Integer targetNodeId, RecordKey key) {
-		Set<RecordKey> keys = pushSets.get(targetNodeId);
+	public void removeFromPushSet(Integer targetNodeId, PrimaryKey key) {
+		Set<PrimaryKey> keys = pushSets.get(targetNodeId);
 		if (keys != null) {
 			keys.remove(key);
 			
@@ -123,39 +123,39 @@ public class ExecutionPlan {
 		forceRemoteReadEnabled = true;
 	}
 	
-	public Set<RecordKey> getLocalReadKeys() {
+	public Set<PrimaryKey> getLocalReadKeys() {
 		return localReadKeys;
 	}
 	
-	public Set<RecordKey> getRemoteReadKeys() {
+	public Set<PrimaryKey> getRemoteReadKeys() {
 		return remoteReadKeys;
 	}
 	
-	public boolean isLocalUpdate(RecordKey key) {
+	public boolean isLocalUpdate(PrimaryKey key) {
 		return localUpdateKeys.contains(key);
 	}
 	
-	public Set<RecordKey> getLocalUpdateKeys() {
+	public Set<PrimaryKey> getLocalUpdateKeys() {
 		return localUpdateKeys;
 	}
 	
-	public boolean isLocalInsert(RecordKey key) {
+	public boolean isLocalInsert(PrimaryKey key) {
 		return localInsertKeys.contains(key);
 	}
 	
-	public Set<RecordKey> getLocalInsertKeys() {
+	public Set<PrimaryKey> getLocalInsertKeys() {
 		return localInsertKeys;
 	}
 	
-	public boolean isLocalDelete(RecordKey key) {
+	public boolean isLocalDelete(PrimaryKey key) {
 		return localDeleteKeys.contains(key);
 	}
 	
-	public Set<RecordKey> getLocalDeleteKeys() {
+	public Set<PrimaryKey> getLocalDeleteKeys() {
 		return localDeleteKeys;
 	}
 	
-	public Map<Integer, Set<RecordKey>> getPushSets() {
+	public Map<Integer, Set<PrimaryKey>> getPushSets() {
 		return pushSets;
 	}
 	
@@ -164,15 +164,15 @@ public class ExecutionPlan {
 				|| !incomingMigratingKeys.isEmpty();
 	}
 	
-	public Set<RecordKey> getLocalReadsForMigration() {
+	public Set<PrimaryKey> getLocalReadsForMigration() {
 		return localReadsForMigration;
 	}
 	
-	public Map<Integer, Set<RecordKey>> getMigrationPushSets() {
+	public Map<Integer, Set<PrimaryKey>> getMigrationPushSets() {
 		return migrationPushSets;
 	}
 	
-	public Set<RecordKey> getIncomingMigratingKeys() {
+	public Set<PrimaryKey> getIncomingMigratingKeys() {
 		return incomingMigratingKeys;
 	}
 	

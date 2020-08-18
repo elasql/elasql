@@ -1,6 +1,6 @@
 package org.elasql.storage.metadata;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public abstract class PartitionPlan {
 	
@@ -11,7 +11,7 @@ public abstract class PartitionPlan {
 	 *            the key of the record
 	 * @return if the record is fully replicated
 	 */
-	public abstract boolean isFullyReplicated(RecordKey key);
+	public abstract boolean isFullyReplicated(PrimaryKey key);
 
 	/**
 	 * Query the belonging partition.
@@ -20,7 +20,7 @@ public abstract class PartitionPlan {
 	 *            the key of the record
 	 * @return the id of the partition
 	 */
-	public abstract int getPartition(RecordKey key);
+	public abstract int getPartition(PrimaryKey key);
 	
 	public abstract PartitionPlan getBasePlan();
 	
@@ -30,5 +30,5 @@ public abstract class PartitionPlan {
 		return PartitionMetaMgr.NUM_PARTITIONS;
 	}
 	
-	public abstract RecordKey getPartitioningKey(RecordKey key);
+	public abstract PrimaryKey getPartitioningKey(PrimaryKey key);
 }

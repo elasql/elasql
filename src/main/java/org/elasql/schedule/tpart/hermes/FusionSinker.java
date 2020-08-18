@@ -5,7 +5,7 @@ import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.schedule.tpart.sink.SunkPlan;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class FusionSinker extends Sinker {
 	
@@ -44,7 +44,7 @@ public class FusionSinker extends Sinker {
 //		} else { // Normal tx
 			for (Edge e : node.getWriteBackEdges()) {
 				int dataWriteBackPos = e.getTarget().getPartId();
-				RecordKey k = e.getResourceKey();
+				PrimaryKey k = e.getResourceKey();
 				int dataCurrentPos = getRecordCurrentLocation(k);
 				int dataOriginalPos = parMeta.getPartition(k);
 				
@@ -105,7 +105,7 @@ public class FusionSinker extends Sinker {
 //		} // TODO: Uncomment this when the migration module is migrated
 	}
 	
-	private int getRecordCurrentLocation(RecordKey key) {
+	private int getRecordCurrentLocation(PrimaryKey key) {
 		int location = fusionTable.getLocation(key);
 		if (location != -1)
 			return location;
@@ -120,7 +120,7 @@ public class FusionSinker extends Sinker {
 		return parMeta.getPartition(key);
 	}
 	
-	private void setRecordCurrentLocation(RecordKey key, int loc) {
+	private void setRecordCurrentLocation(PrimaryKey key, int loc) {
 		if (parMeta.getPartition(key) == loc && fusionTable.containsKey(key))
 			fusionTable.remove(key);
 		else

@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class IdealTPCCInserter implements BatchNodeInserter {
 	@Override
@@ -12,7 +12,7 @@ public class IdealTPCCInserter implements BatchNodeInserter {
 		for (TPartStoredProcedureTask task : tasks) {
 			int partId = -1;
 			
-			for (RecordKey key : task.getReadSet()) {
+			for (PrimaryKey key : task.getReadSet()) {
 				if (key.getTableName().equals("warehouse")) {
 					int wid = (Integer) key.getVal("w_id").asJavaVal();
 					if (wid <= 18)

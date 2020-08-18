@@ -1,17 +1,17 @@
 package org.elasql.schedule.calvin;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public interface ReadWriteSetAnalyzer {
 	
 	ExecutionPlan generatePlan();
 
-	void addReadKey(RecordKey readKey);
+	void addReadKey(PrimaryKey readKey);
 
-	void addUpdateKey(RecordKey updateKey);
+	void addUpdateKey(PrimaryKey updateKey);
 	
-	void addInsertKey(RecordKey insertKey);
+	void addInsertKey(PrimaryKey insertKey);
 	
-	void addDeleteKey(RecordKey deleteKey);
+	void addDeleteKey(PrimaryKey deleteKey);
 	
 }

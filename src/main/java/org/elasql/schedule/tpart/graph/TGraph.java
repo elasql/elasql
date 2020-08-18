@@ -8,14 +8,14 @@ import java.util.Map.Entry;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class TGraph {
 	
 	protected SinkNode[] sinkNodes;
 	private List<TxNode> txNodes = new LinkedList<TxNode>();
-	protected Map<RecordKey, TxNode> resPos = new HashMap<RecordKey, TxNode>();
+	protected Map<PrimaryKey, TxNode> resPos = new HashMap<PrimaryKey, TxNode>();
 	
 	protected PartitionMetaMgr parMeta;
 	
@@ -47,7 +47,7 @@ public class TGraph {
 		// Establish forward pushing edges
 		if (task.getReadSet() != null) {
 			// create a read edge to the latest txn that writes that resource
-			for (RecordKey res : task.getReadSet()) {
+			for (PrimaryKey res : task.getReadSet()) {
 
 				Node targetNode;
 
@@ -64,7 +64,7 @@ public class TGraph {
 		// Update the resource locations
 		if (task.getWriteSet() != null) {
 			// update the resource position
-			for (RecordKey res : task.getWriteSet())
+			for (PrimaryKey res : task.getWriteSet())
 				resPos.put(res, node);
 		}
 	}
@@ -74,8 +74,8 @@ public class TGraph {
 	 */
 	public void addWriteBackEdge() {
 		// XXX should implement different write back strategy
-		for (Entry<RecordKey, TxNode> resPosPair : resPos.entrySet()) {
-			RecordKey res = resPosPair.getKey();
+		for (Entry<PrimaryKey, TxNode> resPosPair : resPos.entrySet()) {
+			PrimaryKey res = resPosPair.getKey();
 			TxNode node = resPosPair.getValue();
 			node.addWriteBackEdges(new Edge(sinkNodes[parMeta.getPartition(res)], res));
 		}
@@ -102,7 +102,7 @@ public class TGraph {
 	 *         version since last sinking, the partition that own the resource
 	 *         will be return in a Node format.
 	 */
-	public Node getResourcePosition(RecordKey res) {
+	public Node getResourcePosition(PrimaryKey res) {
 		if (resPos.containsKey(res))
 			return resPos.get(res);
 		return sinkNodes[parMeta.getPartition(res)];
@@ -176,8 +176,8 @@ public class TGraph {
 		return totalRemoteSinkReads;
 	}
 	
-	public Map<RecordKey, Node> getResourceNodeMap() {
-		return new HashMap<RecordKey, Node>(resPos);
+	public Map<PrimaryKey, Node> getResourceNodeMap() {
+		return new HashMap<PrimaryKey, Node>(resPos);
 	}
 	
 	public String getStatistics() {

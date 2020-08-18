@@ -13,7 +13,7 @@ import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
@@ -97,7 +97,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 	private int countRemoteReadEdge(TGraph graph, TPartStoredProcedureTask task, int partId) {
 		int remoteEdgeCount = 0;
 		
-		for (RecordKey key : task.getReadSet()) {
+		for (PrimaryKey key : task.getReadSet()) {
 			// Skip replicated records
 			if (partMgr.isFullyReplicated(key))
 				continue;

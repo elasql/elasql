@@ -1,7 +1,7 @@
 package org.elasql.migration.mgcrab;
 
 import org.elasql.migration.MigrationRangeUpdate;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.sql.storedprocedure.SpResultRecord;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
@@ -55,8 +55,8 @@ public class TwoPhaseBgPushParamHelper extends StoredProcedureParamHelper {
 		return pushingKeyCount;
 	}
 	
-	public RecordKey getPushingKey(int index) {
-		return (RecordKey) rawParameters[index + 6];
+	public PrimaryKey getPushingKey(int index) {
+		return (PrimaryKey) rawParameters[index + 6];
 	}
 	
 	@Override

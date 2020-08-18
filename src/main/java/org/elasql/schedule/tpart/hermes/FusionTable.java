@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 import org.elasql.util.PeriodicalJob;
@@ -21,7 +21,7 @@ public class FusionTable {
 	}
 	
 	class LocationRecord {
-		RecordKey key; // null => not used
+		PrimaryKey key; // null => not used
 		int partId;
 		int nextFreeSlotId; // free chain (increase the speed to search free space)
 		boolean referenced; // for clock replacement strategy
@@ -30,8 +30,8 @@ public class FusionTable {
 	private int size;
 	private int firstFreeSlot;
 	private LocationRecord[] locations;
-	private Map<RecordKey, Integer> keyToSlotIds;
-	private Map<RecordKey, Integer> overflowedKeys;
+	private Map<PrimaryKey, Integer> keyToSlotIds;
+	private Map<PrimaryKey, Integer> overflowedKeys;
 	private int nextSlotToReplace;
 	
 	// Tracking
@@ -74,9 +74,9 @@ public class FusionTable {
 			else
 				locations[i].nextFreeSlotId = -1;
 		}
-		keyToSlotIds = new HashMap<RecordKey, Integer>(EXPECTED_MAX_SIZE);
+		keyToSlotIds = new HashMap<PrimaryKey, Integer>(EXPECTED_MAX_SIZE);
 //		keyToSlotIds = new ConcurrentHashMap<RecordKey, Integer>(expMaxSize);
-		overflowedKeys = new HashMap<RecordKey, Integer>();
+		overflowedKeys = new HashMap<PrimaryKey, Integer>();
 		nextSlotToReplace = 0;
 		
 //		new PeriodicalJob(10_000, 1200_000, new Runnable() {
@@ -155,7 +155,7 @@ public class FusionTable {
 //		}).start();
 	}
 	
-	public void setLocation(RecordKey key, int partId) {
+	public void setLocation(PrimaryKey key, int partId) {
 		Integer slotId = keyToSlotIds.get(key);
 		
 		if (slotId != null) {
@@ -173,7 +173,7 @@ public class FusionTable {
 		countsPerParts[partId]++;
 	}
 	
-	public int getLocation(RecordKey key) {
+	public int getLocation(PrimaryKey key) {
 		Integer slotId = keyToSlotIds.get(key);
 		
 		if (slotId != null) {
@@ -192,7 +192,7 @@ public class FusionTable {
 		}
 	}
 	
-	public boolean containsKey(RecordKey key) {
+	public boolean containsKey(PrimaryKey key) {
 		return keyToSlotIds.containsKey(key) || overflowedKeys.containsKey(key);
 	}
 	
@@ -202,7 +202,7 @@ public class FusionTable {
 	 * @param key
 	 * @return the partition id in the record
 	 */
-	public int remove(RecordKey key) {
+	public int remove(PrimaryKey key) {
 		Integer slotId = keyToSlotIds.remove(key);
 		
 		if (slotId != null) {
@@ -231,18 +231,18 @@ public class FusionTable {
 	}
 	
 	@Deprecated
-	public Map<RecordKey, Integer> removeOverflowKeys() {
-		Map<RecordKey, Integer> removedKeys = overflowedKeys;
-		overflowedKeys = new HashMap<RecordKey, Integer>();
+	public Map<PrimaryKey, Integer> removeOverflowKeys() {
+		Map<PrimaryKey, Integer> removedKeys = overflowedKeys;
+		overflowedKeys = new HashMap<PrimaryKey, Integer>();
 		size -= removedKeys.size();
 		return removedKeys;
 	}
 	
-	public Set<RecordKey> getOverflowKeys() {
-		return new HashSet<RecordKey>(overflowedKeys.keySet());
+	public Set<PrimaryKey> getOverflowKeys() {
+		return new HashSet<PrimaryKey>(overflowedKeys.keySet());
 	}
 	
-	private void insertNewRecord(RecordKey key, int partId) {
+	private void insertNewRecord(PrimaryKey key, int partId) {
 		int freeSlot = findFreeSlot();
 		if (freeSlot == -1)
 			freeSlot = swapOutRecord();

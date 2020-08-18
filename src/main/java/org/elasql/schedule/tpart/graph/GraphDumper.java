@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class GraphDumper {
@@ -28,7 +28,7 @@ public class GraphDumper {
 
 		public final long source;
 		public final long dest;
-		public final RecordKey key;
+		public final PrimaryKey key;
 
 		public DumpedEdge(long source, long dest) {
 			this.source = source;
@@ -36,7 +36,7 @@ public class GraphDumper {
 			this.key = null;
 		}
 		
-		public DumpedEdge(long source, long dest, RecordKey key) {
+		public DumpedEdge(long source, long dest, PrimaryKey key) {
 			this.source = source;
 			this.dest = dest;
 			this.key = key;

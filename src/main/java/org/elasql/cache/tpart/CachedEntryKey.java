@@ -15,20 +15,20 @@
  *******************************************************************************/
 package org.elasql.cache.tpart;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class CachedEntryKey {
-	private final RecordKey recKey;
+	private final PrimaryKey recKey;
 	private final long source;
 	private final long dest;
 
-	public CachedEntryKey(RecordKey key, long src, long dest) {
+	public CachedEntryKey(PrimaryKey key, long src, long dest) {
 		recKey = key;
 		source = src;
 		this.dest = dest;
 	}
 
-	public RecordKey getRecordKey() {
+	public PrimaryKey getRecordKey() {
 		return recKey;
 	}
 

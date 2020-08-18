@@ -17,7 +17,7 @@ import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.tpart.sink.PushInfo;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
@@ -40,8 +40,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	protected Transaction tx;
 
 	// Private resource
-	private Set<RecordKey> readKeys = new HashSet<RecordKey>();
-	private Set<RecordKey> writeKeys = new HashSet<RecordKey>();
+	private Set<PrimaryKey> readKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> writeKeys = new HashSet<PrimaryKey>();
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
@@ -62,7 +62,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	protected abstract void prepareKeys();
 
-	protected abstract void executeSql(Map<RecordKey, CachedRecord> readings);
+	protected abstract void executeSql(Map<PrimaryKey, CachedRecord> readings);
 
 	@Override
 	public void prepare(Object... pars) {
@@ -146,11 +146,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		return ProcedureType.NORMAL;
 	}
 
-	public Set<RecordKey> getReadSet() {
+	public Set<PrimaryKey> getReadSet() {
 		return readKeys;
 	}
 
-	public Set<RecordKey> getWriteSet() {
+	public Set<PrimaryKey> getWriteSet() {
 		return writeKeys;
 	}
 	
@@ -166,27 +166,27 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		return plan;
 	}
 
-	protected void addReadKey(RecordKey readKey) {
+	protected void addReadKey(PrimaryKey readKey) {
 		readKeys.add(readKey);
 	}
 
-	protected void addWriteKey(RecordKey writeKey) {
+	protected void addWriteKey(PrimaryKey writeKey) {
 		writeKeys.add(writeKey);
 	}
 
-	protected void addInsertKey(RecordKey insertKey) {
+	protected void addInsertKey(PrimaryKey insertKey) {
 		writeKeys.add(insertKey);
 	}
 
-	protected void update(RecordKey key, CachedRecord rec) {
+	protected void update(PrimaryKey key, CachedRecord rec) {
 		cache.update(key, rec);
 	}
 
-	protected void insert(RecordKey key, Map<String, Constant> fldVals) {
+	protected void insert(PrimaryKey key, Map<String, Constant> fldVals) {
 		cache.insert(key, fldVals);
 	}
 
-	protected void delete(RecordKey key) {
+	protected void delete(PrimaryKey key) {
 		cache.delete(key);
 	}
 
@@ -195,17 +195,17 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 //		Timer timer = Timer.getLocalTimer();
 
 		if (plan.isHereMaster()) {
-			Map<RecordKey, CachedRecord> readings = new HashMap<RecordKey, CachedRecord>();
+			Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
 			// Read the records from the local sink
 //			timer.startComponentTimer("Read from sink");
-			for (RecordKey k : plan.getSinkReadingInfo()) {
+			for (PrimaryKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k));
 			}
 //			timer.stopComponentTimer("Read from sink");
 
 			// Read all needed records
 //			timer.startComponentTimer("Read from cache");
-			for (RecordKey k : plan.getReadSet()) {
+			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
 					long srcTxNum = plan.getReadSrcTxNum(k);
 					readings.put(k, cache.read(k, srcTxNum));

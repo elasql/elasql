@@ -3,27 +3,27 @@ package org.elasql.migration.planner.clay;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
 
 public class ScatterPartitionPlan extends PartitionPlan {
 	
 	private PartitionPlan basePartition;
-	private Map<RecordKey, Integer> scatterPartition; // <Partitioning Key -> Partition ID>
+	private Map<PrimaryKey, Integer> scatterPartition; // <Partitioning Key -> Partition ID>
 	
-	public ScatterPartitionPlan(PartitionPlan basePartition, Map<RecordKey, Integer> scatterPartition) {
+	public ScatterPartitionPlan(PartitionPlan basePartition, Map<PrimaryKey, Integer> scatterPartition) {
 		this.basePartition = basePartition;
 		this.scatterPartition = scatterPartition;
 	}
 
 	@Override
-	public boolean isFullyReplicated(RecordKey key) {
+	public boolean isFullyReplicated(PrimaryKey key) {
 		return basePartition.isFullyReplicated(key);
 	}
 
 	@Override
-	public int getPartition(RecordKey key) {
-		RecordKey partKey = basePartition.getPartitioningKey(key);
+	public int getPartition(PrimaryKey key) {
+		PrimaryKey partKey = basePartition.getPartitioningKey(key);
 		Integer part = scatterPartition.get(partKey);
 		if (part != null)
 			return part;
@@ -40,7 +40,7 @@ public class ScatterPartitionPlan extends PartitionPlan {
 		basePartition = plan;
 	}
 	
-	public Map<RecordKey, Integer> getMapping() {
+	public Map<PrimaryKey, Integer> getMapping() {
 		return scatterPartition;
 	}
 	
@@ -48,12 +48,12 @@ public class ScatterPartitionPlan extends PartitionPlan {
 	public String toString() {
 		// Sample some records
 		StringBuilder sb = new StringBuilder();
-		Iterator<Map.Entry<RecordKey, Integer>> iter = scatterPartition.entrySet().iterator();
+		Iterator<Map.Entry<PrimaryKey, Integer>> iter = scatterPartition.entrySet().iterator();
 		int count = 0;
 		while (count < 5 && iter.hasNext()) {
 			count++;
-			Map.Entry<RecordKey, Integer> entry = iter.next();
-			RecordKey key = entry.getKey();
+			Map.Entry<PrimaryKey, Integer> entry = iter.next();
+			PrimaryKey key = entry.getKey();
 			Integer part = entry.getValue();
 			if (count > 1) {
 				sb.append(", ");
@@ -66,7 +66,7 @@ public class ScatterPartitionPlan extends PartitionPlan {
 	}
 
 	@Override
-	public RecordKey getPartitioningKey(RecordKey key) {
+	public PrimaryKey getPartitioningKey(PrimaryKey key) {
 		return basePartition.getPartitioningKey(key);
 	}
 }

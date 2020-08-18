@@ -24,7 +24,7 @@ import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
@@ -115,7 +115,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Waiting for the notification from node no." + nodeId);
 				
-				RecordKey notKey = NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE);
+				PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE);
 				CachedRecord rec = cacheMgr.readFromRemote(notKey);
 				Constant con = rec.getVal(KEY_FINISH);
 				int value = (int) con.asJavaVal();
@@ -131,7 +131,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	private void sendNotification() {
 		// Create a key value set
-		RecordKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
+		PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
 		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE, txNum);
 		notVal.addFldVal(KEY_FINISH, new IntegerConstant(1));
 

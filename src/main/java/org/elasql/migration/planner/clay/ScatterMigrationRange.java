@@ -7,51 +7,51 @@ import java.util.Set;
 
 import org.elasql.migration.MigrationRange;
 import org.elasql.migration.MigrationRangeUpdate;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class ScatterMigrationRange implements MigrationRange {
 	
 	private int sourcePartId, destPartId;
 	
-	private Set<RecordKey> targetKeys;
-	private Set<RecordKey> unmigratedKeys;
-	private Deque<RecordKey> keysToPush;
+	private Set<PrimaryKey> targetKeys;
+	private Set<PrimaryKey> unmigratedKeys;
+	private Deque<PrimaryKey> keysToPush;
 	
-	public ScatterMigrationRange(int sourcePartId, int destPartId, Set<RecordKey> keys) {
+	public ScatterMigrationRange(int sourcePartId, int destPartId, Set<PrimaryKey> keys) {
 		this.sourcePartId = sourcePartId;
 		this.destPartId = destPartId;
 		this.targetKeys = keys;
-		this.unmigratedKeys = new HashSet<RecordKey>(targetKeys);
-		this.keysToPush = new ArrayDeque<RecordKey>(targetKeys);
+		this.unmigratedKeys = new HashSet<PrimaryKey>(targetKeys);
+		this.keysToPush = new ArrayDeque<PrimaryKey>(targetKeys);
 	}
 
 	@Override
-	public boolean addKey(RecordKey key) {
+	public boolean addKey(PrimaryKey key) {
 		throw new UnsupportedOperationException("A scatter migration range does not support adding keys");
 	}
 
 	@Override
-	public boolean contains(RecordKey key) {
+	public boolean contains(PrimaryKey key) {
 		return targetKeys.contains(key);
 	}
 
 	@Override
-	public boolean isMigrated(RecordKey key) {
+	public boolean isMigrated(PrimaryKey key) {
 		return !unmigratedKeys.contains(key);
 	}
 
 	@Override
-	public void setMigrated(RecordKey key) {
+	public void setMigrated(PrimaryKey key) {
 		if (targetKeys.contains(key))
 			unmigratedKeys.remove(key);
 	}
 
 	@Override
-	public Set<RecordKey> generateNextMigrationChunk(boolean useBytesForSize, int maxChunkSize) {
+	public Set<PrimaryKey> generateNextMigrationChunk(boolean useBytesForSize, int maxChunkSize) {
 		if (useBytesForSize)
 			throw new UnsupportedOperationException("A scatter migration range does not support byte counting");
 		
-		Set<RecordKey> chunk = new HashSet<RecordKey>();
+		Set<PrimaryKey> chunk = new HashSet<PrimaryKey>();
 		while (!keysToPush.isEmpty()) {
 			chunk.add(keysToPush.removeFirst());
 			if (chunk.size() >= maxChunkSize)
@@ -73,7 +73,7 @@ public class ScatterMigrationRange implements MigrationRange {
 	@Override
 	public MigrationRangeUpdate generateStatusUpdate() {
 		return new ScatterMigrationRangeUpdate(sourcePartId, destPartId,
-				new ArrayDeque<RecordKey>(keysToPush));
+				new ArrayDeque<PrimaryKey>(keysToPush));
 	}
 
 	@Override

@@ -18,7 +18,7 @@ package org.elasql.storage.metadata;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.util.ElasqlProperties;
 
 public class PartitionMetaMgr {
@@ -47,7 +47,7 @@ public class PartitionMetaMgr {
 	 *            the key of the record
 	 * @return if the record is fully replicated
 	 */
-	public boolean isFullyReplicated(RecordKey key) {
+	public boolean isFullyReplicated(PrimaryKey key) {
 		return partPlan.isFullyReplicated(key);
 	}
 	
@@ -57,7 +57,7 @@ public class PartitionMetaMgr {
 	 * @param key
 	 * @return
 	 */
-	public int getPartition(RecordKey key) {
+	public int getPartition(PrimaryKey key) {
 		return partPlan.getPartition(key);
 	}
 	
@@ -75,7 +75,7 @@ public class PartitionMetaMgr {
 		return partPlan.numberOfPartitions();
 	}
 	
-	public RecordKey getPartitioningKey(RecordKey key) {
+	public PrimaryKey getPartitioningKey(PrimaryKey key) {
 		return partPlan.getPartitioningKey(key);
 	}
 }

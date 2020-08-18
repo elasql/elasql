@@ -26,7 +26,7 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.albatross.AlbatrossAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -45,9 +45,9 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 	
 	// <Source || Destination> -> <Key Set>
 	// XXX: Assume there is no cycle that a node is both the source and destination for another node.
-	private Map<Integer, Set<RecordKey>> updatedKeys = new HashMap<Integer, Set<RecordKey>>();
-	private Map<Integer, Set<RecordKey>> insertedKeys = new HashMap<Integer, Set<RecordKey>>();
-	private Map<Integer, Set<RecordKey>> deletedKeys = new HashMap<Integer, Set<RecordKey>>();
+	private Map<Integer, Set<PrimaryKey>> updatedKeys = new HashMap<Integer, Set<PrimaryKey>>();
+	private Map<Integer, Set<PrimaryKey>> insertedKeys = new HashMap<Integer, Set<PrimaryKey>>();
+	private Map<Integer, Set<PrimaryKey>> deletedKeys = new HashMap<Integer, Set<PrimaryKey>>();
 	
 	private MigrationComponentFactory comsFactory;
 	
@@ -77,14 +77,14 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		// Initialize change sets
 		for (MigrationRange range : migrationRanges) {
 			if (range.getSourcePartId() == localNodeId) {
-				updatedKeys.put(range.getDestPartId(), new HashSet<RecordKey>());
-				insertedKeys.put(range.getDestPartId(), new HashSet<RecordKey>());
-				deletedKeys.put(range.getDestPartId(), new HashSet<RecordKey>());
+				updatedKeys.put(range.getDestPartId(), new HashSet<PrimaryKey>());
+				insertedKeys.put(range.getDestPartId(), new HashSet<PrimaryKey>());
+				deletedKeys.put(range.getDestPartId(), new HashSet<PrimaryKey>());
 			}
 			if (range.getDestPartId() == localNodeId) {
-				updatedKeys.put(range.getSourcePartId(), new HashSet<RecordKey>());
-				insertedKeys.put(range.getSourcePartId(), new HashSet<RecordKey>());
-				deletedKeys.put(range.getSourcePartId(), new HashSet<RecordKey>());
+				updatedKeys.put(range.getSourcePartId(), new HashSet<PrimaryKey>());
+				insertedKeys.put(range.getSourcePartId(), new HashSet<PrimaryKey>());
+				deletedKeys.put(range.getSourcePartId(), new HashSet<PrimaryKey>());
 			}
 		}
 		
@@ -101,7 +101,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 			@Override
 			public void run() {
 				for (MigrationRange range : pushRanges) {
-					Set<RecordKey> chunk = range.generateNextMigrationChunk(
+					Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
 							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
 					if (chunk.size() > 0) {
 						sendBGPushRequest(range.generateStatusUpdate(), chunk, 
@@ -116,7 +116,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		}).start();
 	}
 	
-	public void sendBGPushRequest(MigrationRangeUpdate update, Set<RecordKey> chunk,
+	public void sendBGPushRequest(MigrationRangeUpdate update, Set<PrimaryKey> chunk,
 			int sourceNodeId, int destNodeId) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("send a background push request with " + chunk.size() + " keys.");
@@ -129,7 +129,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		params[2] = destNodeId;
 		params[3] = chunk.size();
 		int i = 4;
-		for (RecordKey key : chunk)
+		for (PrimaryKey key : chunk)
 			params[i++] = key;
 		
 		// Send a store procedure call
@@ -137,7 +137,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 				AlbatrossStoredProcFactory.SP_BG_PUSH, params);
 	}
 	
-	public void addUpdatedKey(RecordKey key) {
+	public void addUpdatedKey(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges) {
 			if (range.contains(key)) {
 				if (range.getSourcePartId() == localNodeId)
@@ -149,7 +149,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		}
 	}
 	
-	public void addInsertedKey(RecordKey key) {
+	public void addInsertedKey(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges) {
 			if (range.contains(key)) {
 				if (range.getSourcePartId() == localNodeId)
@@ -161,7 +161,7 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		}
 	}
 	
-	public void addDeletedKey(RecordKey key) {
+	public void addDeletedKey(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges) {
 			if (range.contains(key)) {
 				if (range.getSourcePartId() == localNodeId)
@@ -209,21 +209,21 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		pushRanges.clear();
 	}
 	
-	public boolean isMigratingRecord(RecordKey key) {
+	public boolean isMigratingRecord(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return true;
 		return false;
 	}
 	
-	public boolean isMigrated(RecordKey key) {
+	public boolean isMigrated(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.isMigrated(key);
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public void setMigrated(RecordKey key) {
+	public void setMigrated(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key)) {
 				range.setMigrated(key);
@@ -232,14 +232,14 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkSourceNode(RecordKey key) {
+	public int checkSourceNode(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.getSourcePartId();
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkDestNode(RecordKey key) {
+	public int checkDestNode(PrimaryKey key) {
 		for (MigrationRange range : migrationRanges)
 			if (range.contains(key))
 				return range.getDestPartId();
@@ -280,22 +280,22 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		}
 	}
 	
-	private Map<RecordKey, CachedRecord> readRecords(Transaction tx, Set<RecordKey> readKeys) {
-		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
+	private Map<PrimaryKey, CachedRecord> readRecords(Transaction tx, Set<PrimaryKey> readKeys) {
+		Map<PrimaryKey, CachedRecord> recordMap = new HashMap<PrimaryKey, CachedRecord>();
 		
 		// Construct key sets
-		Map<String, Set<RecordKey>> keysPerTables = new HashMap<String, Set<RecordKey>>();
-		for (RecordKey key : readKeys) {
-			Set<RecordKey> keys = keysPerTables.get(key.getTableName());
+		Map<String, Set<PrimaryKey>> keysPerTables = new HashMap<String, Set<PrimaryKey>>();
+		for (PrimaryKey key : readKeys) {
+			Set<PrimaryKey> keys = keysPerTables.get(key.getTableName());
 			if (keys == null) {
-				keys = new HashSet<RecordKey>();
+				keys = new HashSet<PrimaryKey>();
 				keysPerTables.put(key.getTableName(), keys);
 			}
 			keys.add(key);
 		}
 
 		// Batch read the records per table
-		for (Map.Entry<String, Set<RecordKey>> entry : keysPerTables.entrySet())
+		for (Map.Entry<String, Set<PrimaryKey>> entry : keysPerTables.entrySet())
 			recordMap.putAll(VanillaCoreCrud.batchRead(entry.getValue(), tx));
 		
 		return recordMap;
@@ -307,25 +307,25 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		long txNum = tx.getTransactionNumber();
 				
 		// Prepare insert set
-		Set<RecordKey> insertSet = insertedKeys.get(destination);
-		Map<RecordKey, CachedRecord> records = readRecords(tx, insertSet);
-		for (Map.Entry<RecordKey, CachedRecord> entry : records.entrySet()) {
+		Set<PrimaryKey> insertSet = insertedKeys.get(destination);
+		Map<PrimaryKey, CachedRecord> records = readRecords(tx, insertSet);
+		for (Map.Entry<PrimaryKey, CachedRecord> entry : records.entrySet()) {
 			CachedRecord rec = entry.getValue();
 			rec.setNewInserted();
 			ts.addTuple(entry.getKey(), txNum, txNum, rec);
 		}
 		
 		// Note: we do not have to do anything to deleted records on the source node
-		Set<RecordKey> deleteSet = deletedKeys.get(destination);
+		Set<PrimaryKey> deleteSet = deletedKeys.get(destination);
 		deleteSet.removeAll(insertSet);
 		
 		// Prepare update set (excluding inserts and deletes)
-		Set<RecordKey> updateSet = updatedKeys.get(destination);
+		Set<PrimaryKey> updateSet = updatedKeys.get(destination);
 		updateSet.removeAll(insertSet);
 		updateSet.removeAll(deleteSet);
 		records = readRecords(tx, updateSet);
-		for (Map.Entry<RecordKey, CachedRecord> entry : records.entrySet()) {
-			RecordKey key = entry.getKey();
+		for (Map.Entry<PrimaryKey, CachedRecord> entry : records.entrySet()) {
+			PrimaryKey key = entry.getKey();
 			CachedRecord rec = entry.getValue();
 			// We do not record which fields are dirty. So, we simply 
 			// make it update all non-key fields
@@ -343,8 +343,8 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 	
 	private void recieveAndUpdateChanges(Transaction tx, CalvinCacheMgr cacheMgr, int source) {
 		// Read inserted set
-		Set<RecordKey> insertSet = insertedKeys.get(source);
-		for (RecordKey k : insertSet) {
+		Set<PrimaryKey> insertSet = insertedKeys.get(source);
+		for (PrimaryKey k : insertSet) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			
 			if (rec == null)
@@ -355,16 +355,16 @@ public class AlbatrossMigrationMgr implements MigrationMgr {
 		}
 		
 		// Delete records
-		Set<RecordKey> deleteSet = deletedKeys.get(source);
+		Set<PrimaryKey> deleteSet = deletedKeys.get(source);
 		deleteSet.removeAll(insertSet);
-		for (RecordKey k : deleteSet)
+		for (PrimaryKey k : deleteSet)
 			cacheMgr.delete(k);
 		
 		// Read updated set
-		Set<RecordKey> updateSet = updatedKeys.get(source);
+		Set<PrimaryKey> updateSet = updatedKeys.get(source);
 		updateSet.removeAll(insertSet);
 		updateSet.removeAll(deleteSet);
-		for (RecordKey k : updateSet) {
+		for (PrimaryKey k : updateSet) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			
 			if (rec == null)

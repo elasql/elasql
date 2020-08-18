@@ -9,7 +9,7 @@ import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -46,7 +46,7 @@ public class MigrationStartProcedure extends CalvinStoredProcedure<StoredProcedu
 	}
 
 	@Override
-	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
+	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
 		
 	}
 

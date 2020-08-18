@@ -8,7 +8,7 @@ import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class PhaseChangeProcedure extends CalvinStoredProcedure<PhaseChangeParamHelper> {
@@ -40,7 +40,7 @@ public class PhaseChangeProcedure extends CalvinStoredProcedure<PhaseChangeParam
 	}
 
 	@Override
-	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
+	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
 		
 	}
 

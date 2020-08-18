@@ -1,7 +1,7 @@
 package org.elasql.migration;
 
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public interface MigrationMgr {
@@ -10,15 +10,15 @@ public interface MigrationMgr {
 	
 	void finishMigration(Transaction tx, Object[] params);
 	
-	boolean isMigratingRecord(RecordKey key);
+	boolean isMigratingRecord(PrimaryKey key);
 	
-	boolean isMigrated(RecordKey key);
+	boolean isMigrated(PrimaryKey key);
 	
-	void setMigrated(RecordKey key);
+	void setMigrated(PrimaryKey key);
 	
-	int checkSourceNode(RecordKey key);
+	int checkSourceNode(PrimaryKey key);
 	
-	int checkDestNode(RecordKey key);
+	int checkDestNode(PrimaryKey key);
 	
 	boolean isInMigration();
 	

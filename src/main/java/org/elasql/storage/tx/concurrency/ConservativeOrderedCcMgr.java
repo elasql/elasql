@@ -19,7 +19,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedLockTable.LockType;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.record.RecordId;
@@ -43,7 +43,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		writeObjs = new HashSet<Object>();
 	}
 	
-	public void bookReadKey(RecordKey key) {
+	public void bookReadKey(PrimaryKey key) {
 		if (key != null) {
 			// The key needs to be booked only once. 
 			if (!bookedObjs.contains(key))
@@ -60,9 +60,9 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * @param keys
 	 *            the objects which the transaction intends to read
 	 */
-	public void bookReadKeys(Collection<RecordKey> keys) {
+	public void bookReadKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
-			for (RecordKey key : keys) {
+			for (PrimaryKey key : keys) {
 				// The key needs to be booked only once. 
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);
@@ -73,7 +73,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		}
 	}
 	
-	public void bookWriteKey(RecordKey key) {
+	public void bookWriteKey(PrimaryKey key) {
 		if (key != null) {
 			// The key needs to be booked only once. 
 			if (!bookedObjs.contains(key))
@@ -90,9 +90,9 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * @param keys
 	 *             the objects which the transaction intends to write
 	 */
-	public void bookWriteKeys(Collection<RecordKey> keys) {
+	public void bookWriteKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
-			for (RecordKey key : keys) {
+			for (PrimaryKey key : keys) {
 				// The key needs to be booked only once. 
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);

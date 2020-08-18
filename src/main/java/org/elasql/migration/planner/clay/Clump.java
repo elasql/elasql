@@ -5,13 +5,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 class Clump {
 
 	private class Neighbor implements Comparable<Neighbor> {
 		double weight;
-		RecordKey key;
+		PrimaryKey key;
 		int partId;
 
 		Neighbor(OutEdge neighborEdge) {
@@ -36,20 +36,20 @@ class Clump {
 		}
 	}
 
-	private Map<RecordKey, Vertex> vertices;
-	private Map<RecordKey, Neighbor> neighbors;
+	private Map<PrimaryKey, Vertex> vertices;
+	private Map<PrimaryKey, Neighbor> neighbors;
 	private int destPartitionId = -1;
 
 	Clump(Vertex initVertex) {
-		this.vertices = new HashMap<RecordKey, Vertex>();
-		this.neighbors = new HashMap<RecordKey, Neighbor>();
+		this.vertices = new HashMap<PrimaryKey, Vertex>();
+		this.neighbors = new HashMap<PrimaryKey, Neighbor>();
 		
 		addVertex(initVertex);
 	}
 
 	Clump(Clump clump) {
-		this.vertices = new HashMap<RecordKey, Vertex>();
-		this.neighbors = new HashMap<RecordKey, Neighbor>();
+		this.vertices = new HashMap<PrimaryKey, Vertex>();
+		this.neighbors = new HashMap<PrimaryKey, Neighbor>();
 		this.destPartitionId = clump.destPartitionId;
 		
 		for (Vertex v : clump.vertices.values())
@@ -65,7 +65,7 @@ class Clump {
 		addVertex(neighbor);
 	}
 
-	RecordKey getHotestNeighbor() {
+	PrimaryKey getHotestNeighbor() {
 		return Collections.max(neighbors.values()).key;
 	}
 	

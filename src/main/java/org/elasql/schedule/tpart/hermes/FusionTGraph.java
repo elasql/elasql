@@ -8,7 +8,7 @@ import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.Node;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class FusionTGraph extends TGraph {
 	
@@ -24,13 +24,13 @@ public class FusionTGraph extends TGraph {
 	@Override
 	public void addWriteBackEdge() {
 		// Get the overflowed keys that need to be placed back to the original locations
-		Set<RecordKey> overflowedKeys = fusionTable.getOverflowKeys();
+		Set<PrimaryKey> overflowedKeys = fusionTable.getOverflowKeys();
 		if (overflowedKeys != null && overflowedKeys.size() > 0) {
 			
 			// Make each key that will be processed in this graph
 			// be written back to the original location by the last one using it
-			Set<RecordKey> noOneHandledKeys = new HashSet<RecordKey>();
-			for (RecordKey key : overflowedKeys) {
+			Set<PrimaryKey> noOneHandledKeys = new HashSet<PrimaryKey>();
+			for (PrimaryKey key : overflowedKeys) {
 				TxNode handler = resPos.remove(key);
 				if (handler != null) {
 					int originalLocation = parMeta.getPartition(key);
@@ -41,7 +41,7 @@ public class FusionTGraph extends TGraph {
 			
 			// For the keys that on one handles, let the last node read and write them back.
 			TxNode lastNode = getLastInsertedTxNode();
-			for (RecordKey key : noOneHandledKeys) {
+			for (PrimaryKey key : noOneHandledKeys) {
 				int originalLocation = parMeta.getPartition(key);
 				lastNode.addReadEdges(new Edge(getResourcePosition(key), key));
 				lastNode.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
@@ -49,8 +49,8 @@ public class FusionTGraph extends TGraph {
 		}
 		
 		// Handle the rest of written records
-		for (Entry<RecordKey, TxNode> resPosPair : resPos.entrySet()) {
-			RecordKey res = resPosPair.getKey();
+		for (Entry<PrimaryKey, TxNode> resPosPair : resPos.entrySet()) {
+			PrimaryKey res = resPosPair.getKey();
 			TxNode node = resPosPair.getValue();
 			
 			// Quick fix: ignore insert-only tables
@@ -70,7 +70,7 @@ public class FusionTGraph extends TGraph {
 	 * Hermes queries the fusion table to determine the location of the data.
 	 */
 	@Override
-	public Node getResourcePosition(RecordKey res) {
+	public Node getResourcePosition(PrimaryKey res) {
 		if (resPos.containsKey(res))
 			return resPos.get(res);
 		

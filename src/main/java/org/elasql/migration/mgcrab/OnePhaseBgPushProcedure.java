@@ -15,7 +15,7 @@ import org.elasql.schedule.calvin.ExecutionPlan;
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 
@@ -28,7 +28,7 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 	private MgCrabMigrationMgr migraMgr = (MgCrabMigrationMgr) Elasql.migrationMgr();
 	private int localNodeId = Elasql.serverId();
 	
-	private Set<RecordKey> pushingKeys = new HashSet<RecordKey>();
+	private Set<PrimaryKey> pushingKeys = new HashSet<PrimaryKey>();
 
 	public OnePhaseBgPushProcedure(long txNum) {
 		super(txNum, new OnePhaseBgPushParamHelper());
@@ -70,7 +70,7 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 	
 	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
 		for (int i = 0; i < paramHelper.getPushingKeyCount(); i++) {
-			RecordKey key = paramHelper.getPushingKey(i);
+			PrimaryKey key = paramHelper.getPushingKey(i);
 			// Important: We only push the un-migrated records to the dest
 			if (!migraMgr.isMigrated(key))
 				pushingKeys.add(key);
@@ -81,12 +81,12 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 		ExecutionPlan plan = new ExecutionPlan();
 		
 		if (localNodeId == paramHelper.getSourceNodeId()) {
-			for (RecordKey key : pushingKeys) {
+			for (PrimaryKey key : pushingKeys) {
 				plan.setRemoteReadEnabled();
 				plan.addLocalReadKey(key);
 			}
 		} else if (localNodeId == paramHelper.getDestNodeId()) {
-			for (RecordKey key : pushingKeys) {
+			for (PrimaryKey key : pushingKeys) {
 				plan.setRemoteReadEnabled();
 				plan.addLocalInsertKey(key);
 			}
@@ -113,7 +113,7 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 			
 			readAndPushInSource();
 		} else if (localNodeId == paramHelper.getDestNodeId()) {
-			Map<RecordKey, CachedRecord> readCache = receiveInDest();
+			Map<PrimaryKey, CachedRecord> readCache = receiveInDest();
 			insertInDest(readCache);
 		}
 		
@@ -140,21 +140,21 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 		TupleSet ts = new TupleSet(-1);
 
 		// Construct key sets
-		Map<String, Set<RecordKey>> keysPerTables = new HashMap<String, Set<RecordKey>>();
-		for (RecordKey key : pushingKeys) {
-			Set<RecordKey> keys = keysPerTables.get(key.getTableName());
+		Map<String, Set<PrimaryKey>> keysPerTables = new HashMap<String, Set<PrimaryKey>>();
+		for (PrimaryKey key : pushingKeys) {
+			Set<PrimaryKey> keys = keysPerTables.get(key.getTableName());
 			if (keys == null) {
-				keys = new HashSet<RecordKey>();
+				keys = new HashSet<PrimaryKey>();
 				keysPerTables.put(key.getTableName(), keys);
 			}
 			keys.add(key);
 		}
 
 		// Batch read the records per table
-		for (Map.Entry<String, Set<RecordKey>> entry : keysPerTables.entrySet()) {
-			Map<RecordKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), getTransaction());
+		for (Map.Entry<String, Set<PrimaryKey>> entry : keysPerTables.entrySet()) {
+			Map<PrimaryKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), getTransaction());
 
-			for (RecordKey key : entry.getValue()) {
+			for (PrimaryKey key : entry.getValue()) {
 				// System.out.println(key);
 				CachedRecord rec = recordMap.get(key);
 
@@ -179,7 +179,7 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 		
 	}
 	
-	private Map<RecordKey, CachedRecord> receiveInDest() {
+	private Map<PrimaryKey, CachedRecord> receiveInDest() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("BG pushing tx. " + txNum + " is receiving " + pushingKeys.size()
 					+ " records from the source node. (Node." + paramHelper.getSourceNodeId() + ")");
@@ -189,10 +189,10 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 		sources.add(paramHelper.getSourceNodeId());
 		sendMigrationPullRequests(sources);
 		
-		Map<RecordKey, CachedRecord> recordMap = new HashMap<RecordKey, CachedRecord>();
+		Map<PrimaryKey, CachedRecord> recordMap = new HashMap<PrimaryKey, CachedRecord>();
 
 		// Receive the data from the source node and save them
-		for (RecordKey k : pushingKeys) {
+		for (PrimaryKey k : pushingKeys) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			recordMap.put(k, rec);
 		}
@@ -200,13 +200,13 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 		return recordMap;
 	}
 	
-	private void insertInDest(Map<RecordKey, CachedRecord> cachedRecords) {
+	private void insertInDest(Map<PrimaryKey, CachedRecord> cachedRecords) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("BG pushing tx. " + txNum + " is storing " + pushingKeys.size()
 					+ " records to the local storage.");
 
 		// Store the cached records
-		for (RecordKey key : pushingKeys) {
+		for (PrimaryKey key : pushingKeys) {
 			CachedRecord rec = cachedRecords.get(key);
 			
 			if (rec == null)
@@ -221,7 +221,7 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 	}
 
 	@Override
-	protected void executeSql(Map<RecordKey, CachedRecord> readings) {
+	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
 		// do nothing
 	}
 }

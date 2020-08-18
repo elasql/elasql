@@ -1,6 +1,6 @@
 package org.elasql.storage.metadata;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class HashPartitionPlan extends PartitionPlan {
 	
@@ -15,12 +15,12 @@ public class HashPartitionPlan extends PartitionPlan {
 	}
 
 	@Override
-	public boolean isFullyReplicated(RecordKey key) {
+	public boolean isFullyReplicated(PrimaryKey key) {
 		return false;
 	}
 
 	@Override
-	public int getPartition(RecordKey key) {
+	public int getPartition(PrimaryKey key) {
 		return key.hashCode() % numOfParts;
 	}
 	
@@ -40,7 +40,7 @@ public class HashPartitionPlan extends PartitionPlan {
 	}
 	
 	@Override
-	public RecordKey getPartitioningKey(RecordKey key) {
+	public PrimaryKey getPartitioningKey(PrimaryKey key) {
 		return key;
 	}
 }

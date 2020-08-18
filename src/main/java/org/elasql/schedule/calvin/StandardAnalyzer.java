@@ -5,7 +5,7 @@ import java.util.Set;
 
 import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	
@@ -17,7 +17,7 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	private int[] readsPerNodes;
 	
 	private Set<Integer> activeParticipants = new HashSet<Integer>();
-	private Set<RecordKey> fullyRepReadKeys = new HashSet<RecordKey>();
+	private Set<PrimaryKey> fullyRepReadKeys = new HashSet<PrimaryKey>();
 	
 	public StandardAnalyzer() {
 		execPlan = new ExecutionPlan();
@@ -41,7 +41,7 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	}
 
 	@Override
-	public void addReadKey(RecordKey readKey) {
+	public void addReadKey(PrimaryKey readKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(readKey)) {
 			// We cache it then check if we should add it to the local read set later
 			fullyRepReadKeys.add(readKey);
@@ -60,7 +60,7 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	@Override
-	public void addUpdateKey(RecordKey updateKey) {
+	public void addUpdateKey(PrimaryKey updateKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(updateKey)) {
 			execPlan.addLocalUpdateKey(updateKey);
 		} else {
@@ -72,7 +72,7 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	@Override
-	public void addInsertKey(RecordKey insertKey) {
+	public void addInsertKey(PrimaryKey insertKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(insertKey)) {
 			execPlan.addLocalInsertKey(insertKey);
 		} else {
@@ -84,7 +84,7 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	}
 	
 	@Override
-	public void addDeleteKey(RecordKey deleteKey) {
+	public void addDeleteKey(PrimaryKey deleteKey) {
 		if (Elasql.partitionMetaMgr().isFullyReplicated(deleteKey)) {
 			execPlan.addLocalDeleteKey(deleteKey);
 		} else {
@@ -115,14 +115,14 @@ public class StandardAnalyzer implements ReadWriteSetAnalyzer {
 	private void generatePushSets() {
 		for (Integer target : activeParticipants) {
 			if (target != localNodeId) {
-				for (RecordKey key : execPlan.getLocalReadKeys())
+				for (PrimaryKey key : execPlan.getLocalReadKeys())
 					execPlan.addPushSet(target, key);
 			}
 		}
 	}
 	
 	private void activePartReadFullyReps() {
-		for (RecordKey key : fullyRepReadKeys)
+		for (PrimaryKey key : fullyRepReadKeys)
 			execPlan.addLocalReadKey(key);
 	}
 }

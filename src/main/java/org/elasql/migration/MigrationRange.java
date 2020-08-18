@@ -2,19 +2,19 @@ package org.elasql.migration;
 
 import java.util.Set;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public interface MigrationRange {
 	
-	boolean addKey(RecordKey key);
+	boolean addKey(PrimaryKey key);
 	
-	boolean contains(RecordKey key);
+	boolean contains(PrimaryKey key);
 	
-	boolean isMigrated(RecordKey key);
+	boolean isMigrated(PrimaryKey key);
 	
-	void setMigrated(RecordKey key);
+	void setMigrated(PrimaryKey key);
 	
-	Set<RecordKey> generateNextMigrationChunk(boolean useBytesForSize, int maxChunkSize);
+	Set<PrimaryKey> generateNextMigrationChunk(boolean useBytesForSize, int maxChunkSize);
 	
 	int getSourcePartId();
 	

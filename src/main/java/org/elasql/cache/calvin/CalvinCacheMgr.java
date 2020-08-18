@@ -25,7 +25,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -35,10 +35,10 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class CalvinCacheMgr {
 	
 	private static class KeyRecordPair {
-		RecordKey key;
+		PrimaryKey key;
 		CachedRecord record;
 		
-		KeyRecordPair(RecordKey key, CachedRecord record) {
+		KeyRecordPair(PrimaryKey key, CachedRecord record) {
 			this.key = key;
 			this.record = record;
 		}
@@ -46,16 +46,16 @@ public class CalvinCacheMgr {
 	
 	// For single thread
 	private Transaction tx;
-	private Map<RecordKey, CachedRecord> cachedRecords;
-	private Set<RecordKey> writeKeys;
+	private Map<PrimaryKey, CachedRecord> cachedRecords;
+	private Set<PrimaryKey> writeKeys;
 	
 	// For multi-threading
 	private BlockingQueue<KeyRecordPair> inbox;
 
 	CalvinCacheMgr(CalvinPostOffice postOffice, Transaction tx) {
 		this.tx = tx;
-		this.cachedRecords = new HashMap<RecordKey, CachedRecord>();
-		this.writeKeys = new HashSet<RecordKey>();
+		this.cachedRecords = new HashMap<PrimaryKey, CachedRecord>();
+		this.writeKeys = new HashSet<PrimaryKey>();
 	}
 	
 	/**
@@ -78,7 +78,7 @@ public class CalvinCacheMgr {
 		postOffice.notifyTxCommitted(tx.getTransactionNumber());
 	}
 	
-	public CachedRecord readFromLocal(RecordKey key) {
+	public CachedRecord readFromLocal(PrimaryKey key) {
 		CachedRecord rec = cachedRecords.get(key);
 		if (rec != null)
 			return rec;
@@ -92,7 +92,7 @@ public class CalvinCacheMgr {
 		return rec;
 	}
 	
-	public CachedRecord readFromRemote(RecordKey key) {
+	public CachedRecord readFromRemote(PrimaryKey key) {
 		CachedRecord rec = cachedRecords.get(key);
 		if (rec != null)
 			return rec;
@@ -122,27 +122,27 @@ public class CalvinCacheMgr {
 		return rec;
 	}
 
-	public void update(RecordKey key, CachedRecord rec) {
+	public void update(PrimaryKey key, CachedRecord rec) {
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		cachedRecords.put(key, rec);
 		writeKeys.add(key);
 	}
 	
-	public void insert(RecordKey key, CachedRecord rec) {
+	public void insert(PrimaryKey key, CachedRecord rec) {
 		rec.setNewInserted();
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		cachedRecords.put(key, rec);
 		writeKeys.add(key);
 	}
 
-	public void insert(RecordKey key, Map<String, Constant> fldVals) {
+	public void insert(PrimaryKey key, Map<String, Constant> fldVals) {
 		CachedRecord rec = CachedRecord.newRecordForInsertion(key, fldVals);
 		rec.setSrcTxNum(tx.getTransactionNumber());
 		cachedRecords.put(key, rec);
 		writeKeys.add(key);
 	}
 
-	public void delete(RecordKey key) {
+	public void delete(PrimaryKey key) {
 		CachedRecord dummyRec = CachedRecord.newRecordForDeletion(key);
 		dummyRec.setSrcTxNum(tx.getTransactionNumber());
 		cachedRecords.put(key, dummyRec);
@@ -150,7 +150,7 @@ public class CalvinCacheMgr {
 	}
 	
 	public void flush() {
-		for (RecordKey key : writeKeys) {
+		for (PrimaryKey key : writeKeys) {
 			CachedRecord rec = cachedRecords.get(key);
 			
 			if (rec.isDeleted())
@@ -168,7 +168,7 @@ public class CalvinCacheMgr {
 		cachedRecords.clear();
 	}
 	
-	void receiveRemoteRecord(RecordKey key, CachedRecord rec) {
+	void receiveRemoteRecord(PrimaryKey key, CachedRecord rec) {
 		if (inbox == null)
 			throw new RuntimeException("No inbox for " + key + " on Tx." + tx.getTransactionNumber());
 		inbox.add(new KeyRecordPair(key, rec));

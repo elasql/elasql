@@ -16,8 +16,8 @@ public class RecordKeyTest {
 
 	@Test
 	public void testSerializationSingle() throws IOException, ClassNotFoundException {
-		RecordKey key = new RecordKey("test_table", "test_field", new VarcharConstant("test_val"));
-		RecordKey result = null;
+		PrimaryKey key = new PrimaryKey("test_table", "test_field", new VarcharConstant("test_val"));
+		PrimaryKey result = null;
 		byte[] bytes = null;
 		
 		// Serialize the object to a byte array
@@ -32,7 +32,7 @@ public class RecordKeyTest {
 		// Deserialize the byte array
 		try (ByteArrayInputStream bis = new ByteArrayInputStream(bytes)) {
 			try (ObjectInputStream in = new ObjectInputStream(bis)) {
-				result = (RecordKey) in.readObject();
+				result = (PrimaryKey) in.readObject();
 			}
 		}
 		
@@ -41,11 +41,11 @@ public class RecordKeyTest {
 	
 	@Test
 	public void testSerializationMultiple() throws IOException, ClassNotFoundException {
-		RecordKeyBuilder builder = new RecordKeyBuilder("test_table");
+		PrimaryKeyBuilder builder = new PrimaryKeyBuilder("test_table");
 		builder.addFldVal("test_field_int", new IntegerConstant(1));
 		builder.addFldVal("test_field_str", new VarcharConstant("test_val"));
-		RecordKey key = builder.build();
-		RecordKey result = null;
+		PrimaryKey key = builder.build();
+		PrimaryKey result = null;
 		byte[] bytes = null;
 		
 		// Serialize the object to a byte array
@@ -60,7 +60,7 @@ public class RecordKeyTest {
 		// Deserialize the byte array
 		try (ByteArrayInputStream bis = new ByteArrayInputStream(bytes)) {
 			try (ObjectInputStream in = new ObjectInputStream(bis)) {
-				result = (RecordKey) in.readObject();
+				result = (PrimaryKey) in.readObject();
 			}
 		}
 		

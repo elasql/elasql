@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.elasql.sql.FieldNotFoundException;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.Record;
 import org.vanilladb.core.sql.Type;
@@ -38,13 +38,13 @@ public class CachedRecord implements Record, Serializable {
 	private long srcTxNum = -1;
 	private boolean isTemp; // the temporary record will not be flushed.
 	
-	private RecordKey primaryKey;
+	private PrimaryKey primaryKey;
 	// A Constant is non-serializable
 	private transient Map<String, Constant> nonKeyFldVals = 
 			new HashMap<String, Constant>();
 	private List<String> dirtyFlds = new ArrayList<String>();
 	
-	public static CachedRecord newRecordWithFldVals(RecordKey key,
+	public static CachedRecord newRecordWithFldVals(PrimaryKey key,
 			Map<String, Constant> fldVals) {
 		CachedRecord rec = new CachedRecord(key);
 		for (Map.Entry<String, Constant> entry : fldVals.entrySet()) {
@@ -55,7 +55,7 @@ public class CachedRecord implements Record, Serializable {
 		return rec;
 	}
 	
-	public static CachedRecord newRecordForInsertion(RecordKey key,
+	public static CachedRecord newRecordForInsertion(PrimaryKey key,
 			Map<String, Constant> fldVals) {
 		CachedRecord rec = newRecordWithFldVals(key, fldVals);
 		rec.isNewInserted = true;
@@ -63,14 +63,14 @@ public class CachedRecord implements Record, Serializable {
 		return rec;
 	}
 	
-	public static CachedRecord newRecordForDeletion(RecordKey key) {
+	public static CachedRecord newRecordForDeletion(PrimaryKey key) {
 		CachedRecord rec = new CachedRecord(key);
 		rec.isDeleted = true;
 		rec.isDirty = true;
 		return rec;
 	}
 	
-	public CachedRecord(RecordKey primaryKey) {
+	public CachedRecord(PrimaryKey primaryKey) {
 		this.primaryKey = primaryKey;
 	}
 	

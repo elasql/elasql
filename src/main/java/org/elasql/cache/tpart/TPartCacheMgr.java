@@ -13,7 +13,7 @@ import org.elasql.cache.RemoteRecordReceiver;
 import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.schedule.tpart.hermes.FusionTable;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
@@ -35,7 +35,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	private Map<CachedEntryKey, CachedRecord> exchange;
 	
-	private Map<RecordKey, CachedRecord> recordCache;
+	private Map<PrimaryKey, CachedRecord> recordCache;
 
 	private final Object anchors[] = new Object[1009];
 
@@ -44,7 +44,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 			anchors[i] = new Object();
 		}
 		
-		recordCache = new ConcurrentHashMap<RecordKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
+		recordCache = new ConcurrentHashMap<PrimaryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
 		exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
 		
 //		new PeriodicalJob(5000, 600000, new Runnable() {
@@ -76,7 +76,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		return anchors[hash];
 	}
 
-	CachedRecord takeFromTx(RecordKey key, long src, long dest) {
+	CachedRecord takeFromTx(PrimaryKey key, long src, long dest) {
 //		Timer.getLocalTimer().startComponentTimer("Read from Tx");
 //		try {
 			CachedEntryKey k = new CachedEntryKey(key, src, dest);
@@ -103,7 +103,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 //		}
 	}
 
-	void passToTheNextTx(RecordKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
+	void passToTheNextTx(PrimaryKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
 		if (rec == null)
 			throw new NullPointerException(String.format(
 					"The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
@@ -120,7 +120,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, true);
 	}
 	
-	CachedRecord readFromSink(RecordKey key, Transaction tx) {
+	CachedRecord readFromSink(PrimaryKey key, Transaction tx) {
 //		localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
 //		lockTable.sLock(key, tx.getTransactionNumber());
 		
@@ -145,15 +145,15 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		return rec;
 	}
 	
-	Map<RecordKey, CachedRecord> batchReadFromSink(Set<RecordKey> keys, Transaction tx) {
+	Map<PrimaryKey, CachedRecord> batchReadFromSink(Set<PrimaryKey> keys, Transaction tx) {
 //		for (RecordKey key : keys)
 //			lockTable.sLock(key, tx.getTransactionNumber());
 		
-		Map<RecordKey, CachedRecord> records = new HashMap<RecordKey, CachedRecord>();
+		Map<PrimaryKey, CachedRecord> records = new HashMap<PrimaryKey, CachedRecord>();
 		
 		// Check the cache first
-		Set<RecordKey> readFromLocals = new HashSet<RecordKey>();
-		for (RecordKey key : keys) {
+		Set<PrimaryKey> readFromLocals = new HashSet<PrimaryKey>();
+		for (PrimaryKey key : keys) {
 			CachedRecord rec = recordCache.get(key);
 			if (rec != null) {
 				// Copy the record to ensure thread-safety
@@ -166,7 +166,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		
 		// Read from the local storage
 		if (!readFromLocals.isEmpty()) {
-			Map<RecordKey, CachedRecord> localReads =
+			Map<PrimaryKey, CachedRecord> localReads =
 					VanillaCoreCrud.batchRead(readFromLocals, tx);
 			records.putAll(localReads);
 		}
@@ -177,7 +177,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		return records;
 	}
 	
-	void insertToCache(RecordKey key, CachedRecord rec, long txNum) {
+	void insertToCache(PrimaryKey key, CachedRecord rec, long txNum) {
 //		localCcMgr.beforeWriteBack(key, txNum);
 //		lockTable.xLock(key, txNum);
 
@@ -187,7 +187,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 //		lockTable.release(key, txNum, LockType.X_LOCK);
 	}
 	
-	void deleteFromCache(RecordKey key, long txNum) {
+	void deleteFromCache(PrimaryKey key, long txNum) {
 //		localCcMgr.beforeWriteBack(key, txNum);
 //		lockTable.xLock(key, txNum);
 
@@ -198,7 +198,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 //		lockTable.release(key, txNum, LockType.X_LOCK);
 	}
 	
-	void writeBack(RecordKey key, CachedRecord rec, Transaction tx) {
+	void writeBack(PrimaryKey key, CachedRecord rec, Transaction tx) {
 //		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
 //		lockTable.xLock(key, tx.getTransactionNumber());
 		
@@ -214,7 +214,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	}
 	
 	// This is also a type of writeback
-	void insertToLocalStorage(RecordKey key, CachedRecord rec, Transaction tx) {
+	void insertToLocalStorage(PrimaryKey key, CachedRecord rec, Transaction tx) {
 //		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
 //		lockTable.xLock(key, tx.getTransactionNumber());
 		
@@ -240,7 +240,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 //		lockTable.requestLock(key, txNum);
 //	}
 	
-	private void writeToVanillaCore(RecordKey key, CachedRecord rec, Transaction tx) {
+	private void writeToVanillaCore(PrimaryKey key, CachedRecord rec, Transaction tx) {
 		if (rec.isDeleted())
 			VanillaCoreCrud.delete(key, tx);
 		else if (rec.isNewInserted())

@@ -38,7 +38,7 @@ import org.vanilladb.core.storage.index.SearchKey;
  * @author SLMT
  *
  */
-public class RecordKey implements Serializable {
+public class PrimaryKey implements Serializable {
 
 	private static final long serialVersionUID = 20200107001L;
 	
@@ -49,7 +49,7 @@ public class RecordKey implements Serializable {
 	private transient Constant[] values;
 	private int hashCode;
 	
-	public RecordKey(String tableName, String fld, Constant val) {
+	public PrimaryKey(String tableName, String fld, Constant val) {
 		this.tableName = tableName;
 		this.fields = new String[1];
 		this.values = new Constant[1];
@@ -68,7 +68,7 @@ public class RecordKey implements Serializable {
 	 * @param fields
 	 * @param values
 	 */
-	RecordKey(String tableName, String[] fields, Constant[] values) {
+	PrimaryKey(String tableName, String[] fields, Constant[] values) {
 		if (fields.length != values.length)
 			throw new IllegalArgumentException();
 		
@@ -175,9 +175,9 @@ public class RecordKey implements Serializable {
 			return true;
 		if (obj == null)
 			return false;
-		if (obj.getClass() != RecordKey.class)
+		if (obj.getClass() != PrimaryKey.class)
 			return false;
-		RecordKey k = (RecordKey) obj;
+		PrimaryKey k = (PrimaryKey) obj;
 		return k.tableName.equals(this.tableName) && Arrays.equals(k.fields, this.fields)
 				&& Arrays.equals(k.values, this.values);
 	}

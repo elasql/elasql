@@ -23,7 +23,7 @@ import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.vanilladb.core.server.VanillaDb;
@@ -138,7 +138,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 			finishDests = 0;
 			
 			for (MigrationRange range : sourceRanges) {
-				Set<RecordKey> chunk = range.generateNextMigrationChunk(
+				Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
 						MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
 				if (chunk.size() > 0) {
 					readAndPushADataChunk(tx, chunk, range.getDestPartId());
@@ -149,7 +149,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 			}
 			
 			for (MigrationRange range : destRanges) {
-				Set<RecordKey> chunk = range.generateNextMigrationChunk(
+				Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
 						MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, LARGE_CHUNK_SIZE);
 				if (chunk.size() > 0) {
 					receiveAndInsertDataChunk(tx, cacheMgr, chunk);
@@ -168,26 +168,26 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		}
 	}
 	
-	private void readAndPushADataChunk(Transaction tx, Set<RecordKey> pushKeys, int targetNode) {
+	private void readAndPushADataChunk(Transaction tx, Set<PrimaryKey> pushKeys, int targetNode) {
 		// Construct pushing tuple set
 		TupleSet ts = new TupleSet(-1);
 
 		// Construct key sets
-		Map<String, Set<RecordKey>> keysPerTables = new HashMap<String, Set<RecordKey>>();
-		for (RecordKey key : pushKeys) {
-			Set<RecordKey> keys = keysPerTables.get(key.getTableName());
+		Map<String, Set<PrimaryKey>> keysPerTables = new HashMap<String, Set<PrimaryKey>>();
+		for (PrimaryKey key : pushKeys) {
+			Set<PrimaryKey> keys = keysPerTables.get(key.getTableName());
 			if (keys == null) {
-				keys = new HashSet<RecordKey>();
+				keys = new HashSet<PrimaryKey>();
 				keysPerTables.put(key.getTableName(), keys);
 			}
 			keys.add(key);
 		}
 
 		// Batch read the records per table
-		for (Map.Entry<String, Set<RecordKey>> entry : keysPerTables.entrySet()) {
-			Map<RecordKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), tx);
+		for (Map.Entry<String, Set<PrimaryKey>> entry : keysPerTables.entrySet()) {
+			Map<PrimaryKey, CachedRecord> recordMap = VanillaCoreCrud.batchRead(entry.getValue(), tx);
 
-			for (RecordKey key : entry.getValue()) {
+			for (PrimaryKey key : entry.getValue()) {
 				// System.out.println(key);
 				CachedRecord rec = recordMap.get(key);
 
@@ -212,20 +212,20 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 	}
 	
 	private void waitForAck(Transaction tx, CalvinCacheMgr cacheMgr, int targetNode) {
-		RecordKey key = NotificationPartitionPlan.createRecordKey(
+		PrimaryKey key = NotificationPartitionPlan.createRecordKey(
 				targetNode, Elasql.serverId());
 		CachedRecord rec = cacheMgr.readFromRemote(key);
 		if (rec.getSrcTxNum() != tx.getTransactionNumber() || rec == null)
 			throw new RuntimeException("something wrong with the ack: " + key);
 	}
 	
-	private void receiveAndInsertDataChunk(Transaction tx, CalvinCacheMgr cacheMgr, Set<RecordKey> keys) {
+	private void receiveAndInsertDataChunk(Transaction tx, CalvinCacheMgr cacheMgr, Set<PrimaryKey> keys) {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Stop-and-copy is receiving " + keys.size()
 					+ " records from the source node.");
 
 		// Receive the data from the source node and save them
-		for (RecordKey k : keys) {
+		for (PrimaryKey k : keys) {
 			CachedRecord rec = cacheMgr.readFromRemote(k);
 			
 			if (rec == null)
@@ -245,7 +245,7 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 	private void sendAnAck(Transaction tx, int targetNode) {
 		// Construct pushing tuple set
 		TupleSet ts = new TupleSet(-1);
-		RecordKey key = NotificationPartitionPlan.createRecordKey(
+		PrimaryKey key = NotificationPartitionPlan.createRecordKey(
 				Elasql.serverId(), targetNode);
 		CachedRecord dummyRec = NotificationPartitionPlan.createRecord(
 				Elasql.serverId(), targetNode, tx.getTransactionNumber());
@@ -267,23 +267,23 @@ public class StopCopyMigrationMgr implements MigrationMgr {
 		// do nothing
 	}
 	
-	public boolean isMigratingRecord(RecordKey key) {
+	public boolean isMigratingRecord(PrimaryKey key) {
 		return false;
 	}
 	
-	public boolean isMigrated(RecordKey key) {
+	public boolean isMigrated(PrimaryKey key) {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public void setMigrated(RecordKey key) {
+	public void setMigrated(PrimaryKey key) {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkSourceNode(RecordKey key) {
+	public int checkSourceNode(PrimaryKey key) {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
-	public int checkDestNode(RecordKey key) {
+	public int checkDestNode(PrimaryKey key) {
 		throw new RuntimeException(String.format("%s is not a migrating record", key));
 	}
 	
