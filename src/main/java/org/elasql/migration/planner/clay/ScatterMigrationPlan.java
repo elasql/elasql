@@ -10,8 +10,8 @@ import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
 import org.elasql.server.Elasql;
+import org.elasql.sql.PartitioningKey;
 import org.elasql.storage.metadata.PartitionPlan;
-import org.elasql.storage.metadata.PartitioningKey;
 
 public class ScatterMigrationPlan implements MigrationPlan {
 

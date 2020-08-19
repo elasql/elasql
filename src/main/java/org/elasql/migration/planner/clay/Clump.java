@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.elasql.storage.metadata.PartitioningKey;
+import org.elasql.sql.PartitioningKey;
 
 class Clump {
 

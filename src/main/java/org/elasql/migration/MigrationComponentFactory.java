@@ -15,7 +15,7 @@ import org.elasql.migration.squall.SquallStoredProcFactory;
 import org.elasql.migration.stopcopy.StopCopyMigrationMgr;
 import org.elasql.migration.stopcopy.StopCopyStoredProcFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
-import org.elasql.storage.metadata.PartitioningKey;
+import org.elasql.sql.PartitioningKey;
 
 public abstract class MigrationComponentFactory {
 	private static Logger logger = Logger.getLogger(MigrationComponentFactory.class.getName());

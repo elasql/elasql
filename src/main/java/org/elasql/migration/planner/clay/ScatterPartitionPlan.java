@@ -3,9 +3,9 @@ package org.elasql.migration.planner.clay;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.elasql.sql.PartitioningKey;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionPlan;
-import org.elasql.storage.metadata.PartitioningKey;
 
 public class ScatterPartitionPlan extends PartitionPlan {
 	

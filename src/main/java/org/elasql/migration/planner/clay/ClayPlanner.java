@@ -10,9 +10,9 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.planner.MigrationPlanner;
 import org.elasql.server.Elasql;
+import org.elasql.sql.PartitioningKey;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.storage.metadata.PartitioningKey;
 import org.elasql.util.ElasqlProperties;
 
 /**

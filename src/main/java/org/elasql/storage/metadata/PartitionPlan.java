@@ -1,5 +1,6 @@
 package org.elasql.storage.metadata;
 
+import org.elasql.sql.PartitioningKey;
 import org.elasql.sql.PrimaryKey;
 
 public abstract class PartitionPlan {

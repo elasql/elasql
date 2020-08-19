@@ -1,6 +1,7 @@
 package org.elasql.storage.metadata;
 
 import org.elasql.cache.CachedRecord;
+import org.elasql.sql.PartitioningKey;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.sql.PrimaryKeyBuilder;
 import org.vanilladb.core.sql.IntegerConstant;

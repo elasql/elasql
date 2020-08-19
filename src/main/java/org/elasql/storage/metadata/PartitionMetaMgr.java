@@ -18,6 +18,7 @@ package org.elasql.storage.metadata;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.sql.PartitioningKey;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.util.ElasqlProperties;
 

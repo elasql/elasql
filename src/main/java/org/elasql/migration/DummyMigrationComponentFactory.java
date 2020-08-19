@@ -1,6 +1,6 @@
 package org.elasql.migration;
 
-import org.elasql.storage.metadata.PartitioningKey;
+import org.elasql.sql.PartitioningKey;
 
 public class DummyMigrationComponentFactory extends MigrationComponentFactory {
 	

@@ -1,5 +1,6 @@
 package org.elasql.storage.metadata;
 
+import org.elasql.sql.PartitioningKey;
 import org.elasql.sql.PrimaryKey;
 
 public class HashPartitionPlan extends PartitionPlan {
@@ -41,6 +42,6 @@ public class HashPartitionPlan extends PartitionPlan {
 	
 	@Override
 	public PartitioningKey getPartitioningKey(PrimaryKey key) {
-		return new PartitioningKey(key);
+		return PartitioningKey.fromPrimaryKey(key);
 	}
 }
