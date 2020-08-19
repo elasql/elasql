@@ -64,6 +64,7 @@ public class ClayPlanner implements MigrationPlanner {
 
 	@Override
 	public void monitorTransaction(Set<PrimaryKey> reads, Set<PrimaryKey> writes) {
+		// Sample-based (delete this if we don't need it)
 //		seenCount++;
 //		if (seenCount % sampleGate == 0) {
 //			Set<RecordKey> accessedKeys = new HashSet<RecordKey>();
@@ -87,6 +88,7 @@ public class ClayPlanner implements MigrationPlanner {
 //		}
 //		return false;
 		
+		// Consider all transactions
 		List<PartitioningKey> accessedPartKeys = new ArrayList<PartitioningKey>();
 		for (PrimaryKey k : reads) {
 			PartitioningKey partKey = partMgr.getPartitioningKey(k);

@@ -12,6 +12,12 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PartitioningKey;
 import org.elasql.storage.metadata.PartitionPlan;
 
+/**
+ * A migration plan that contains only one partitioning key
+ * from a given source to a given destination.
+ * 
+ * @author yslin
+ */
 public class PointMigrationPlan implements MigrationPlan {
 
 	private static final long serialVersionUID = 20200705001L;

@@ -13,6 +13,13 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PartitioningKey;
 import org.elasql.storage.metadata.PartitionPlan;
 
+/**
+ * A migration plan that contains multiple partitioning keys
+ * that are not continuous and from different sources
+ * to different destinations.
+ * 
+ * @author yslin
+ */
 public class ScatterMigrationPlan implements MigrationPlan {
 
 	private static final long serialVersionUID = 20200628001L;
@@ -80,6 +87,7 @@ public class ScatterMigrationPlan implements MigrationPlan {
 		}
 	}
 	
+	@Override
 	public List<MigrationPlan> splits() {
 //		// Create reverse mapping
 //		Map<Route, Set<RecordKey>> routeToKeys = new HashMap<Route, Set<RecordKey>>();
@@ -107,7 +115,8 @@ public class ScatterMigrationPlan implements MigrationPlan {
 //			plans.add(plan);
 //		}
 //		return plans;
-
+		
+		// Split to PointMigrationPlans
 		List<MigrationPlan> plans = new ArrayList<MigrationPlan>();
 		for (Map.Entry<PartitioningKey, Route> entry : keysToMigrate.entrySet()) {
 			PartitioningKey key = entry.getKey();
