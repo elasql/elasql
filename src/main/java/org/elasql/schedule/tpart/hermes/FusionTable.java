@@ -5,11 +5,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
-import org.elasql.util.PeriodicalJob;
 
 public class FusionTable {
 	
@@ -79,6 +77,7 @@ public class FusionTable {
 		overflowedKeys = new HashMap<PrimaryKey, Integer>();
 		nextSlotToReplace = 0;
 		
+		// Debug: Show the statistics of the fusion table
 //		new PeriodicalJob(10_000, 1200_000, new Runnable() {
 //			@Override
 //			public void run() {
@@ -89,22 +88,24 @@ public class FusionTable {
 //			}
 //		}).start();
 		
-		new PeriodicalJob(3_000, 360_000, new Runnable() {
-			@Override
-			public void run() {
-				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
-				time /= 1000;
-				
-				StringBuffer sb = new StringBuffer();
-				sb.append(String.format("Time: %d seconds - ", time));
-				for (int i = 0; i < countsPerParts.length; i++)
-					sb.append(String.format("%d, ", countsPerParts[i]));
-				sb.delete(sb.length() - 2, sb.length());
-				
-				System.out.println(sb.toString());
-			}
-		}).start();
+		// Debug: Show how many records are cached in each partition
+//		new PeriodicalJob(3_000, 360_000, new Runnable() {
+//			@Override
+//			public void run() {
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				
+//				StringBuffer sb = new StringBuffer();
+//				sb.append(String.format("Time: %d seconds - ", time));
+//				for (int i = 0; i < countsPerParts.length; i++)
+//					sb.append(String.format("%d, ", countsPerParts[i]));
+//				sb.delete(sb.length() - 2, sb.length());
+//				
+//				System.out.println(sb.toString());
+//			}
+//		}).start();
 		
+		// Debug: show how many records are cached in each table
 //		new PeriodicalJob(5_000, 2400_000, new Runnable() {
 //			@Override
 //			public void run() {
@@ -138,6 +139,7 @@ public class FusionTable {
 //			}
 //		}).start();
 		
+		// Debug: show hit rate
 //		new PeriodicalJob(5_000, 360_000, new Runnable() {
 //			@Override
 //			public void run() {
