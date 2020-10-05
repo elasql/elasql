@@ -32,6 +32,9 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private static Logger logger = Logger.getLogger(TPartPartitioner.class.getName());
 
 	private static final int NUM_TASK_PER_SINK;
+	
+	// For demo: to change the batch size dynamically
+	private static final boolean DYNAMIC_BATCHING = false;
 
 	private TPartStoredProcedureFactory factory;
 	
@@ -78,6 +81,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 
 	public void run() {
 		List<TPartStoredProcedureTask> batchedTasks = new LinkedList<TPartStoredProcedureTask>();
+		int batchSize = NUM_TASK_PER_SINK;
 		
 		while (true) {
 			try {
@@ -103,10 +107,17 @@ public class TPartPartitioner extends Task implements Scheduler {
 				}
 				
 				// sink current t-graph if # pending tx exceeds threshold
-				if ((batchingEnabled && batchedTasks.size() >= NUM_TASK_PER_SINK)
+				if ((batchingEnabled && batchedTasks.size() >= batchSize)
 						|| !batchingEnabled) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
+					
+					if (DYNAMIC_BATCHING) {
+						batchSize -= batchSize / 2;
+						if (batchSize < 10) {
+							batchSize = NUM_TASK_PER_SINK;
+						}
+					}
 				}
 
 			} catch (InterruptedException ex) {
