@@ -26,10 +26,11 @@ public class HermesNodeInserter implements BatchNodeInserter {
 	}
 	
 	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
-	private double[] loadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
+	private int[] loadPerPart = new int[PartitionMetaMgr.NUM_PARTITIONS];
 	private Set<Integer> overloadedParts = new HashSet<Integer>();
 	private Set<Integer> saturatedParts = new HashSet<Integer>();
 	private int overloadedThreshold;
+	private List<Integer> ties = new ArrayList<Integer>();
 
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
@@ -75,6 +76,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 	private void insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
 		int bestPartId = 0;
 		int minRemoteEdgeCount = task.getReadSet().size();
+		ties.clear();
 		
 		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++) {
 			
@@ -85,7 +87,17 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			if (remoteEdgeCount < minRemoteEdgeCount) {
 				minRemoteEdgeCount = remoteEdgeCount;
 				bestPartId = partId;
+				ties.clear();
+				ties.add(partId);
+			} else if (remoteEdgeCount == minRemoteEdgeCount) {
+				ties.add(partId);
 			}
+		}
+		
+		// Handle ties if there are some
+		if (ties.size() > 1) {
+			int chooseTiePart = (int) (task.getTxNum() % ties.size());
+			bestPartId = ties.get(chooseTiePart);
 		}
 		
 		graph.insertTxNode(task, bestPartId);
