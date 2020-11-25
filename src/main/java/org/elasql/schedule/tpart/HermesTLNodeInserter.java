@@ -14,7 +14,6 @@ import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.util.ElasqlProperties;
 
 /**
  * A variant of {@link HermesNodeInserter} that considers length of transactions.
@@ -23,12 +22,7 @@ import org.elasql.util.ElasqlProperties;
  */
 public class HermesTLNodeInserter implements BatchNodeInserter {
 	
-	private static final double IMBALANCED_TOLERANCE;
-
-	static {
-		IMBALANCED_TOLERANCE = ElasqlProperties.getLoader()
-				.getPropertyAsDouble(HermesTLNodeInserter.class.getName() + ".IMBALANCED_TOLERANCE", 0.25);
-	}
+	private static final double IMBALANCED_TOLERANCE = HermesNodeInserter.IMBALANCED_TOLERANCE;
 	
 	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 	private double[] loadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];

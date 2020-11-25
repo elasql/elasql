@@ -35,6 +35,8 @@ import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.HermesNodeInserter;
+import org.elasql.schedule.tpart.HermesRsNodeInserter;
+import org.elasql.schedule.tpart.HermesTLNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.TPartPartitioner;
 import org.elasql.schedule.tpart.graph.FusionTGraph;
@@ -237,6 +239,8 @@ public class Elasql extends VanillaDb {
 		case HERMES:
 			graph = new FusionTGraph();
 			inserter = new HermesNodeInserter();
+//			inserter = new HermesTLNodeInserter();
+//			inserter = new HermesRsNodeInserter();
 			isBatching = true;
 			break;
 		case G_STORE:

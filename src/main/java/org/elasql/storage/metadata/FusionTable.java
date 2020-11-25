@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
@@ -133,6 +134,32 @@ public class FusionTable {
 //				StringBuffer sb = new StringBuffer();
 //				sb.append(String.format("Time: %d seconds - ", time));
 //				for (int i = 0; i < tableNames.length; i++)
+//					sb.append(String.format("%d, ", counts[i]));
+//				sb.delete(sb.length() - 2, sb.length());
+//				
+//				System.out.println(sb.toString());
+//			}
+//		}).start();
+		
+		// Record the many records for each table are moved (YCSB-MT)
+//		new PeriodicalJob(5_000, 2400_000, new Runnable() {
+//			@Override
+//			public void run() {
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				
+//				// Coun the records
+//				Set<RecordKey> keys = new HashSet<RecordKey>(keyToSlotIds.keySet());
+//				int[] counts = new int[10];
+//				for (RecordKey key : keys) {
+//					int tableId = Integer.parseInt(key.getTableName().substring(5));
+//					counts[tableId / 2]++;
+//				}
+//				
+//				// Output the result
+//				StringBuffer sb = new StringBuffer();
+//				sb.append(String.format("Time: %d seconds - ", time));
+//				for (int i = 0; i < counts.length; i++)
 //					sb.append(String.format("%d, ", counts[i]));
 //				sb.delete(sb.length() - 2, sb.length());
 //				

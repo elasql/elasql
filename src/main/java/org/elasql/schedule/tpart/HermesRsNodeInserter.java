@@ -14,16 +14,16 @@ import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.RecordKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.util.ElasqlProperties;
 
-public class HermesNodeInserter implements BatchNodeInserter {
+/**
+ * A variant of {@link HermesNodeInserter} that considers size of records.
+ * 
+ * @author yslin
+ */
+public class HermesRsNodeInserter implements BatchNodeInserter {
 	
-	public static final double IMBALANCED_TOLERANCE;
-
-	static {
-		IMBALANCED_TOLERANCE = ElasqlProperties.getLoader()
-				.getPropertyAsDouble(HermesNodeInserter.class.getName() + ".IMBALANCED_TOLERANCE", 0.25);
-	}
+	private static final double IMBALANCED_TOLERANCE = HermesNodeInserter.IMBALANCED_TOLERANCE;
+	private static final double EQUAL_EPSILON = 0.01;
 	
 	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 	private int[] loadPerPart = new int[PartitionMetaMgr.NUM_PARTITIONS];
@@ -75,21 +75,21 @@ public class HermesNodeInserter implements BatchNodeInserter {
 	
 	private void insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
 		int bestPartId = 0;
-		int minRemoteEdgeCount = task.getReadSet().size();
+		double minRemoteEdgeCost = Double.MAX_VALUE;
 		ties.clear();
 		
 		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++) {
 			
 			// Count the number of remote edge
-			int remoteEdgeCount = countRemoteReadEdge(graph, task, partId);
+			double remoteEdgeCost = calculateRemoteReadCost(graph, task, partId);
 			
 			// Find the node in which the tx has fewest remote edges.
-			if (remoteEdgeCount < minRemoteEdgeCount) {
-				minRemoteEdgeCount = remoteEdgeCount;
+			if (remoteEdgeCost < minRemoteEdgeCost) {
+				minRemoteEdgeCost = remoteEdgeCost;
 				bestPartId = partId;
 				ties.clear();
 				ties.add(partId);
-			} else if (remoteEdgeCount == minRemoteEdgeCount) {
+			} else if (Math.abs(remoteEdgeCost - minRemoteEdgeCost) < EQUAL_EPSILON) { // means equals
 				ties.add(partId);
 			}
 		}
@@ -105,8 +105,8 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		loadPerPart[bestPartId]++;
 	}
 	
-	private int countRemoteReadEdge(TGraph graph, TPartStoredProcedureTask task, int partId) {
-		int remoteEdgeCount = 0;
+	private int calculateRemoteReadCost(TGraph graph, TPartStoredProcedureTask task, int partId) {
+		int cost = 0;
 		
 		for (RecordKey key : task.getReadSet()) {
 			// Skip replicated records
@@ -114,11 +114,11 @@ public class HermesNodeInserter implements BatchNodeInserter {
 				continue;
 			
 			if (graph.getResourcePosition(key).getPartId() != partId) {
-				remoteEdgeCount++;
+				cost += getMovingCost(key);
 			}
 		}
 		
-		return remoteEdgeCount;
+		return cost;
 	}
 	
 	private List<TxNode> findTxNodesOnOverloadedParts(TGraph graph, int batchSize) {
@@ -157,8 +157,8 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			if (!overloadedParts.contains(currentPartId))
 				continue;
 			
-			int currentRemoteEdges = countRemoteReadWriteEdges(node, currentPartId);
-			int bestDelta = increaseTolerence + 1;
+			double currentRemoteCost = calculateRemoteReadWriteCost(node, currentPartId);
+			double bestDelta = increaseTolerence + 1.0;
 			int bestPartId = currentPartId;
 			
 			// Find a better partition
@@ -176,11 +176,11 @@ public class HermesNodeInserter implements BatchNodeInserter {
 					continue;
 				
 				// Count remote edges
-				int remoteEdgeCount = countRemoteReadWriteEdges(node, partId);
+				double remoteCost = calculateRemoteReadWriteCost(node, partId);
 				
 				// Calculate the difference
-				int delta = remoteEdgeCount - currentRemoteEdges;
-				if (delta <= increaseTolerence) {
+				double delta = remoteCost - currentRemoteCost;
+				if (delta < increaseTolerence + EQUAL_EPSILON) {
 					// Prefer the machine with lower loadn
 					if ((delta < bestDelta) ||
 							(delta == bestDelta && loadPerPart[partId] < loadPerPart[bestPartId])) {
@@ -217,8 +217,8 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		return nextCandidates;
 	}
 	
-	private int countRemoteReadWriteEdges(TxNode node, int homePartId) {
-		int count = 0;
+	private double calculateRemoteReadWriteCost(TxNode node, int homePartId) {
+		double cost = 0.0;
 		
 		for (Edge readEdge : node.getReadEdges()) {
 			// Skip replicated records
@@ -226,16 +226,23 @@ public class HermesNodeInserter implements BatchNodeInserter {
 				continue;
 			
 			if (readEdge.getTarget().getPartId() != homePartId)
-				count++;
+				cost += getMovingCost(readEdge.getResourceKey());
 		}
 		
 		for (Edge writeEdge : node.getWriteEdges()) {
 			if (writeEdge.getTarget().getPartId() != homePartId)
-				count++;
+				cost += getMovingCost(writeEdge.getResourceKey());
 		}
 		
 		// Note: We do not consider write back edges because Hermes will make it local
 		
-		return count;
+		return cost;
+	}
+	
+	private double getMovingCost(RecordKey key) {
+		// Hardcode for YCSB Multi-Table
+		int tableId = Integer.parseInt(key.getTableName().substring(5));
+		// {0, 1} -> 0.2, {2, 3} -> 0.4, {4, 5} -> 0.6 ...
+		return ((tableId / 2) + 1) * 0.2;
 	}
 }
