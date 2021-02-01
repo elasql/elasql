@@ -73,6 +73,7 @@ public class Sinker {
 			if (plan.shouldExecuteHere()) {
 				// Debug
 //				System.out.println(String.format("Tx.%d plan: %s", node.getTxNum(), plan));
+				
 				node.getTask().decideExceutionPlan(plan);
 				localTasks.add(node.getTask());
 			}

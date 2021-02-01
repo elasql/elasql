@@ -69,8 +69,10 @@ public class SquallMigrationMgr implements MigrationMgr {
 				for (MigrationRange range : pushRanges) {
 					Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
 							MigrationSettings.USE_BYTES_FOR_CHUNK_SIZE, MigrationSettings.CHUNK_SIZE);
+					
 					// Debug
-					System.out.println("Generated a chunk: " + chunk);
+//					System.out.println("Generated a chunk: " + chunk);
+					
 					if (chunk.size() > 0) {
 						sendBGPushRequest(range.generateStatusUpdate(), chunk, 
 								range.getSourcePartId(), range.getDestPartId());

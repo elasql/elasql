@@ -8,14 +8,15 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TimerStatistics;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
 	
 	static {
 		// For Debugging
-//		TimerStatistics.startRecording();
-//		TimerStatistics.startAutoReporting();
+//		TimerStatistics.startReporting();
 	}
 
 	private TPartStoredProcedure<?> tsp;
@@ -55,9 +56,10 @@ public class TPartStoredProcedureTask
 //				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
 //				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
 //			}
+			
+			// For Debugging
 //			timer.addToGlobalStatistics();
 		}
-//		timer.addToGlobalStatistics();
 	}
 
 	public long getTxNum() {

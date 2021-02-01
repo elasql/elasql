@@ -113,7 +113,7 @@ public class ClayPlanner implements MigrationPlanner {
 		int numOfClumpsGenerated = 0;
 		
 		// Debug
-		heatGraph.serializeToFile(new File("/home/db-team/clay-heat.bin"));
+//		heatGraph.serializeToFile(new File("/home/db-team/clay-heat.bin"));
 		
 		if (logger.isLoggable(Level.FINE)) {
 			logger.fine(String.format("%d transactions are seen and %d transactions are sampled", seenCount, sampledCount));
