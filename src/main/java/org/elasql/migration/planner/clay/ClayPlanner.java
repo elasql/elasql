@@ -1,6 +1,5 @@
 package org.elasql.migration.planner.clay;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -166,7 +165,8 @@ public class ClayPlanner implements MigrationPlanner {
 			updateMigratedVertices(clump);
 			
 			if (numOfClumpsGenerated == MAX_CLUMPS) {
-				System.out.println("Reach the limit of the number of clumps");
+				if (logger.isLoggable(Level.WARNING))
+					logger.warning("Reach the limit of the number of clumps");
 				break;
 			}
 		}

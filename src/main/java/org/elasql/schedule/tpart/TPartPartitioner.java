@@ -34,7 +34,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 
 	private TPartStoredProcedureFactory factory;
 	
-	private File dumpDir = new File("batch_dump");
+//	private File dumpDir = new File("batch_dump");
 
 	static {
 		NUM_TASK_PER_SINK = ElasqlProperties.getLoader()
@@ -63,15 +63,19 @@ public class TPartPartitioner extends Task implements Scheduler {
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
 		// Clear the dump dir
-		dumpDir.mkdirs();
-		for (File file : dumpDir.listFiles()) {
-			if (file.isFile())
-				file.delete();
-		}
+//		dumpDir.mkdirs();
+//		for (File file : dumpDir.listFiles()) {
+//			if (file.isFile())
+//				file.delete();
+//		}
 	}
 
 	public void schedule(StoredProcedureCall call) {
-		spcQueue.add(call);
+		try {
+			spcQueue.put(call);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void run() {
