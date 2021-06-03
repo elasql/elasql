@@ -7,10 +7,8 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationPlan;
 import org.elasql.migration.MigrationRange;
-import org.elasql.migration.MigrationSettings;
 import org.elasql.migration.MigrationStoredProcFactory;
 import org.elasql.migration.MigrationSystemController;
-import org.elasql.migration.planner.MigrationPlanner;
 import org.elasql.server.Elasql;
 
 /**
@@ -27,65 +25,37 @@ public class MgCrabSystemController extends MigrationSystemController {
 	}
 	
 	@Override
-	public void run() {
-		// Wait for some time
-		try {
-			Thread.sleep(MigrationSettings.START_MONITOR_TIME);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+	protected void executeMigration(MigrationPlan plan) throws InterruptedException {
+		// Trigger a migration
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info("Triggers a migration. The plan is: " + plan.toString());
 		}
 		
-		// Periodically monitor, plan and trigger migrations
-		MigrationPlanner planner = comsFactory.newMigrationPlanner();
-		while (true) {
+		sendMigrationStartRequest(plan);
+		List<MigrationRange> ranges = plan.getMigrationRanges(comsFactory);
+		numOfRangesToBeMigrated.set(ranges.size());
+		
+		// Caught up phase
+		if (MgcrabSettings.ENABLE_CAUGHT_UP) {
+			// Wait for some time
 			try {
-				// Reset the workload logs
-				workloadFeeds.clear();
-
-				// Monitor transactions
-				long startMonitorTime = System.currentTimeMillis();
-				while (System.currentTimeMillis() - startMonitorTime <
-						MigrationSettings.MIGRATION_PERIOD) {
-					TransactionInfo info = workloadFeeds.take();
-					planner.monitorTransaction(info.reads, info.writes);
-				}
-				
-				// Generate migration plans
-				MigrationPlan plan = planner.generateMigrationPlan();
-				if (plan == null)
-					continue;
-				
-				// Trigger a migration
-				if (logger.isLoggable(Level.INFO))
-					logger.info("Triggers a migration.");
-				
-				sendMigrationStartRequest(plan);
-				List<MigrationRange> ranges = plan.getMigrationRanges(comsFactory);
-				numOfRangesToBeMigrated.set(ranges.size());
-				
-				// Caught up phase
-				if (MgcrabSettings.ENABLE_CAUGHT_UP) {
-					// Wait for some time
-					try {
-						Thread.sleep(MgcrabSettings.START_CAUGHT_UP_DELAY);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					
-					sendCaughtUpModeRequest();
-				}
-				
-				// Wait for finish of migrations
-				while (numOfRangesToBeMigrated.get() > 0) {
-					synchronized (migrationLock) {
-						migrationLock.wait();
-					}
-				}
+				Thread.sleep(MgcrabSettings.START_CAUGHT_UP_DELAY);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
-				return;
+			}
+			
+			sendCaughtUpModeRequest();
+		}
+		
+		// Wait for finish of migrations
+		while (numOfRangesToBeMigrated.get() > 0) {
+			synchronized (migrationLock) {
+				migrationLock.wait();
 			}
 		}
+		
+		// Send the migration finish request
+		sendMigrationFinishRequest();
 	}
 	
 	@Override
@@ -104,7 +74,7 @@ public class MgCrabSystemController extends MigrationSystemController {
 			logger.info("send a caught-up phase request.");
 		
 		// Send a store procedure call
-		Object[] params = new Object[] {Phase.CAUGHT_UP};
+		Object[] params = new Object[] { Phase.CAUGHT_UP };
 		Elasql.connectionMgr().sendStoredProcedureCall(false, 
 				MgCrabStoredProcFactory.SP_PHASE_CHANGE, params);
 	}

@@ -11,5 +11,6 @@ public interface MigrationPlan extends Serializable {
 	
 	List<MigrationRange> getMigrationRanges(MigrationComponentFactory factory);
 	
+	// TODO: Check if we need this
 	List<MigrationPlan> splits();
 }

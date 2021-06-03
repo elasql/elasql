@@ -6,12 +6,11 @@ public final class MigrationSettings {
 	
 	public static final boolean ENABLE_MIGRATION;
 	
-	public static final long START_MONITOR_TIME;
+	public static final long MIGRATION_START_TIME;
 	public static final long MIGRATION_PERIOD;
 	
 	public static final MigrationAlgorithm MIGRATION_ALGORITHM;
 	public static final PlanningAlgorithm PLANNING_ALGORITHM;
-	public static final boolean USE_PREDEFINED_PLAN;
 	
 	public static final boolean USE_BYTES_FOR_CHUNK_SIZE;
 	public static final int CHUNK_SIZE_IN_BYTES;
@@ -21,8 +20,8 @@ public final class MigrationSettings {
 	static {
 		ENABLE_MIGRATION = ElasqlProperties.getLoader().getPropertyAsBoolean(
 				MigrationSettings.class.getName() + ".ENABLE_MIGRATION", false);
-		START_MONITOR_TIME = ElasqlProperties.getLoader().getPropertyAsLong(
-				MigrationSettings.class.getName() + ".START_MONITOR_TIME", 180_000);
+		MIGRATION_START_TIME = ElasqlProperties.getLoader().getPropertyAsLong(
+				MigrationSettings.class.getName() + ".MIGRATION_START_TIME", 180_000);
 		MIGRATION_PERIOD = ElasqlProperties.getLoader().getPropertyAsLong(
 				MigrationSettings.class.getName() + ".MIGRATION_PERIOD", 60_000);
 		int algorithm = ElasqlProperties.getLoader().getPropertyAsInteger(
@@ -31,8 +30,6 @@ public final class MigrationSettings {
 		algorithm = ElasqlProperties.getLoader().getPropertyAsInteger(
 				MigrationSettings.class.getName() + ".PLANNING_ALGORITHM", 0);
 		PLANNING_ALGORITHM = PlanningAlgorithm.fromInteger(algorithm);
-		USE_PREDEFINED_PLAN = ElasqlProperties.getLoader().getPropertyAsBoolean(
-				MigrationSettings.class.getName() + ".USE_PREDEFINED_PLAN", true);
 		
 		// Chunk size
 		USE_BYTES_FOR_CHUNK_SIZE = ElasqlProperties.getLoader().getPropertyAsBoolean(

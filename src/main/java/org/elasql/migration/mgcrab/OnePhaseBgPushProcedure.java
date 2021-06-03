@@ -38,6 +38,10 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 	protected ExecutionPlan analyzeParameters(Object[] pars) {
 		ExecutionPlan plan;
 		
+		// Sequencer skips
+		if (Elasql.isSequencer())
+			return new ExecutionPlan();
+		
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 		

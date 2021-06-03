@@ -58,13 +58,13 @@ public class MigrationSystemController extends Task {
 		
 		// Wait for some time
 		try {
-			Thread.sleep(MigrationSettings.START_MONITOR_TIME);
+			Thread.sleep(MigrationSettings.MIGRATION_START_TIME);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 		
 		// Use either a predefined plan or a migration planner
-		if (MigrationSettings.USE_PREDEFINED_PLAN)
+		if (MigrationSettings.PLANNING_ALGORITHM == PlanningAlgorithm.PREDEFINED_PLANS)
 			executeMigrationWithPredefinedPlan();
 		else
 			runMigrationPlanner();
@@ -110,7 +110,33 @@ public class MigrationSystemController extends Task {
 				MigrationStoredProcFactory.SP_MIGRATION_END, params);
 	}
 	
-	private void runMigrationPlanner() {
+	protected void executeMigrationWithPredefinedPlan() {
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Start a migration with the predefined migration plan");
+		
+		try {
+			MigrationPlan plan = comsFactory.newPredefinedMigrationPlan();
+			
+			// Temporarily remove splits (not sure why we need this)
+			// TODO: Check if we need this, otherwise remove all related code
+//			List<MigrationPlan> subplans = plan.splits();
+//			int count = subplans.size();
+//
+//			if (logger.isLoggable(Level.INFO))
+//				logger.info("" + count + " migrations to go.");
+//			
+//			for (MigrationPlan subplan : subplans)
+//				executeMigration(subplan);
+			executeMigration(plan);
+
+			if (logger.isLoggable(Level.INFO))
+				logger.info("All migrations finishes");
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	protected void runMigrationPlanner() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("The migration controller starts monitoring the workload");
 		
@@ -185,29 +211,7 @@ public class MigrationSystemController extends Task {
 			logger.info("The migration planner stops");
 	}
 	
-	private void executeMigrationWithPredefinedPlan() {
-		if (logger.isLoggable(Level.INFO))
-			logger.info("Start a migration with the predefined migration plan");
-		
-		try {
-			MigrationPlan plan = comsFactory.newPredefinedMigrationPlan();
-			List<MigrationPlan> subplans = plan.splits();
-			int count = subplans.size();
-
-			if (logger.isLoggable(Level.INFO))
-				logger.info("" + count + " migrations to go.");
-			
-			for (MigrationPlan subplan : subplans)
-				executeMigration(subplan);
-
-			if (logger.isLoggable(Level.INFO))
-				logger.info("All migrations finishes");
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private void executeMigration(MigrationPlan plan) throws InterruptedException {
+	protected void executeMigration(MigrationPlan plan) throws InterruptedException {
 		// Trigger a migration
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info("Triggers a migration. The plan is: " + plan.toString());
