@@ -33,6 +33,10 @@ import org.vanilladb.core.storage.tx.Transaction;
  * (1) trace the migration states, 
  * (2) initialize a background push transaction, and 
  * (3) send the finish notification to the main controller on the sequencer node.
+ * 
+ * Note that all the following method will be called by the same thread (the
+ * sequencer thread), so it is no need to ensure thread-safety. (Except the thread
+ * that schedules background pushes.)
  */
 public class MgCrabMigrationMgr implements MigrationMgr {
 	private static Logger logger = Logger.getLogger(MgCrabMigrationMgr.class.getName());
@@ -61,6 +65,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 		this.comsFactory = comsFactory;
 	}
 	
+	@Override
 	public void initializeMigration(Transaction tx, MigrationPlan plan, Object[] params) {
 		PartitionPlan newPartPlan = plan.getNewPart();
 		Phase initialPhase = (Phase) params[0];
@@ -158,7 +163,7 @@ public class MgCrabMigrationMgr implements MigrationMgr {
 					return;
 				}
 				
-				// XXX: If there is multiple ranges to this destinations
+				// XXX: If there are multiple ranges to this destinations,
 				// we should know which range pairs to this transaction number
 				for (MigrationRange range : pushRanges) {
 					Set<PrimaryKey> chunk = range.generateNextMigrationChunk(
