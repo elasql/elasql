@@ -131,7 +131,7 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 	private ExecutionPlan generateExecutionPlan() {
 		ExecutionPlan plan = new ExecutionPlan();
 		
-		// XXX: Should we lock the push keys on the source nodes?
+		// TODO: Should we lock the push keys on the source nodes?
 		if (localNodeId == paramHelper.getDestNodeId()) {
 			plan.setRemoteReadEnabled();
 		}
@@ -175,14 +175,15 @@ public class TwoPhaseBgPushProcedure extends CalvinStoredProcedure<TwoPhaseBgPus
 		if (localNodeId == paramHelper.getSourceNodeId()) {
 			if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE1 ||
 					paramHelper.getCurrentPhase() == BgPushPhases.PIPELINING) {
-				// XXX: I'm not sure if we should do this
-				// Quick fix: Release the locks immediately to prevent blocking the records in the source node
+				// Optimization: release the locks immediately to prevent blocking the records in the source node
+				// If a record is modified during reading, it will be simply discarded on the dest node. 
 				Transaction tx = getTransaction();
 				ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 				ccMgr.onTxCommit(tx);
 				
 				readAndPushInSource();
 			}
+		// The dest node
 		} else if (localNodeId == paramHelper.getDestNodeId()) {
 			
 			if (paramHelper.getCurrentPhase() == BgPushPhases.PHASE2 ||
