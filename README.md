@@ -23,9 +23,7 @@ You will need the following tools to compile and run this project:
 
 ## Getting Started
 
-We recommend to start from our benchmark framework, ElaSQL-Bench, to connect and test ElaSQL. ElaSQL-Bench contains various benchmarks that often used in both academic and industry.
-
-See [ElaSQLBench](https://github.com/elasql/elasqlbench) for more information about benchmarking ElaSQL.
+Please check out our [Getting Started Guide](https://github.com/elasql/documentation/blob/master/doc/getting_started.pdf).
 
 ## System Configurations
 
@@ -47,6 +45,6 @@ If you have any question, you can either open an issue here or contact [elasql@d
 
 ## License
 
-Copyright 2016-2018 elasql.org contributors
+Copyright 2016-2021 elasql.org contributors
 
 Licensed under the [Apache License 2.0](LICENSE)
