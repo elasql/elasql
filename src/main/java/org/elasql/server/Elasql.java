@@ -50,6 +50,7 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.metadata.PartitionPlan;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
+import org.vanilladb.core.storage.tx.recovery.RecoveryMgr;
 
 public class Elasql extends VanillaDb {
 	private static Logger logger = Logger.getLogger(VanillaDb.class.getName());
@@ -160,6 +161,9 @@ public class Elasql extends VanillaDb {
 				migraSysControl = migraComsFactory.newSystemController();
 			return;
 		}
+		
+		// XXX: Disable logging for speeding up
+		RecoveryMgr.enableLogging(false);
 
 		// initialize core modules
 		VanillaDb.init(dirName);
