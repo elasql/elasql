@@ -15,6 +15,8 @@
  *******************************************************************************/
 package org.elasql.remote.groupcomm.client;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,7 +25,8 @@ import java.util.logging.Logger;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.util.ElasqlProperties;
-import org.vanilladb.comm.client.ClientAppl;
+import org.vanilladb.comm.client.VanillaCommClient;
+import org.vanilladb.comm.view.ProcessType;
 
 class BatchSpcSender implements Runnable {
 	private static Logger logger = Logger.getLogger(BatchSpcSender.class.getName());
@@ -40,21 +43,22 @@ class BatchSpcSender implements Runnable {
 
 	private AtomicInteger numOfQueuedSpcs = new AtomicInteger(0);
 	private Queue<StoredProcedureCall> spcQueue = new ConcurrentLinkedQueue<StoredProcedureCall>();
-	private ClientAppl clientAppl;
+	private VanillaCommClient commClient;
 	private long lastSendingTime;
-	private int nodeId;
+	private int nodeId, sequencerId;
 
-	public BatchSpcSender(int id, ClientAppl appl) {
-		clientAppl = appl;
+	public BatchSpcSender(int id, VanillaCommClient client) {
+		commClient = client;
 		lastSendingTime = System.currentTimeMillis();
 		nodeId = id;
+		sequencerId = client.getServerCount() - 1;
 	}
 
 	@Override
 	public void run() {
 		// periodically send batch of requests
 		if (logger.isLoggable(Level.INFO))
-			logger.info("start batching-request worker thread");
+			logger.info("start batching-request worker thread (batch size = " + BATCH_SIZE + ")"); 
 
 		while (true)
 			sendBatchRequestToDb();
@@ -71,7 +75,7 @@ class BatchSpcSender implements Runnable {
 			}
 		}
 	}
-
+	
 	private void sendBatchRequestToDb() {
 		// Waiting for the queue reaching the threshold
 		int size = numOfQueuedSpcs.get();
@@ -93,17 +97,12 @@ class BatchSpcSender implements Runnable {
 		}
 
 		// Send a batch of requests
-		StoredProcedureCall[] batchSpc = new StoredProcedureCall[size];
-		StoredProcedureCall spc;
-		for (int i = 0; i < batchSpc.length; i++) {
-			spc = spcQueue.poll();
-			
-			if (spc == null)
-				throw new RuntimeException("Something wrong");
-			
-			batchSpc[i] = spc;
+		List<StoredProcedureCall> batchSpc = new ArrayList<StoredProcedureCall>(size * 2);
+		while (spcQueue.peek() != null) {
+			StoredProcedureCall spc = spcQueue.poll();
+			batchSpc.add(spc);
 		}
-		numOfQueuedSpcs.addAndGet(-size);
-		clientAppl.sendRequest(batchSpc);
+		numOfQueuedSpcs.addAndGet(-batchSpc.size());
+		commClient.sendP2pMessage(ProcessType.SERVER, sequencerId, batchSpc.toArray(new StoredProcedureCall[0]));
 	}
 }

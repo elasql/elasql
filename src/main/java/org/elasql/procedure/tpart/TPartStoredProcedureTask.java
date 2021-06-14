@@ -1,18 +1,3 @@
-/*******************************************************************************
- * Copyright 2016, 2018 elasql.org contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *******************************************************************************/
 package org.elasql.procedure.tpart;
 
 import java.util.Set;
@@ -21,10 +6,18 @@ import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TimerStatistics;
 
-public class TPartStoredProcedureTask extends StoredProcedureTask {
+public class TPartStoredProcedureTask
+		extends StoredProcedureTask<TPartStoredProcedure<?>> {
+	
+	static {
+		// For Debugging
+//		TimerStatistics.startReporting();
+	}
 
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
@@ -40,37 +33,44 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 
 	@Override
 	public void run() {
-//		Timers.createTimer(txNum);
 		SpResultSet rs = null;
-//		Timers.getTimer().startExecution();
+		
+		Thread.currentThread().setName("Tx." + txNum);
+//		Timer timer = Timer.getLocalTimer();
+//		timer.reset();
+//		timer.startExecution();
 
-		// try {
-		// long start = System.nanoTime();
-		rs = tsp.execute();
-		// long time = System.nanoTime() - start;
-		// System.out.println(time / 1000);
-		// } finally {
-//		Timers.getTimer().stopExecution();
-		// }
+//		try {
+			rs = tsp.execute();
+//		} finally {
+//			timer.stopExecution();
+//		}
 
 		if (tsp.isMaster()) {
-			Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
-			// System.out.println("Commit: " + (System.nanoTime() - startTime));
+			if (clientId != -1)
+				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+
+			// TODO: Uncomment this when the migration module is migrated
+//			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
+//				// Send a notification to the sequencer
+//				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
+//				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
+//			}
+			
+			// For Debugging
+//			timer.addToGlobalStatistics();
 		}
-		// System.out.println("task time:" + (System.nanoTime() -
-		// taskStartTime));
-//		Timers.addToStatstics();
 	}
 
 	public long getTxNum() {
 		return txNum;
 	}
 
-	public Set<RecordKey> getReadSet() {
+	public Set<PrimaryKey> getReadSet() {
 		return tsp.getReadSet();
 	}
 
-	public Set<RecordKey> getWriteSet() {
+	public Set<PrimaryKey> getWriteSet() {
 		return tsp.getWriteSet();
 	}
 
@@ -86,8 +86,12 @@ public class TPartStoredProcedureTask extends StoredProcedureTask {
 		this.parId = parId;
 	}
 
-	public void setSunkPlan(SunkPlan plan) {
-		tsp.setSunkPlan(plan);
+	public void decideExceutionPlan(SunkPlan plan) {
+		tsp.decideExceutionPlan(plan);
+	}
+
+	public TPartStoredProcedure<?> getProcedure() {
+		return tsp;
 	}
 
 	public ProcedureType getProcedureType() {

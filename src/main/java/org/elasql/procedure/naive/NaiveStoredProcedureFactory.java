@@ -17,7 +17,7 @@ package org.elasql.procedure.naive;
 
 import org.elasql.procedure.DdStoredProcedureFactory;
 
-public interface NaiveStoredProcedureFactory extends DdStoredProcedureFactory {
+public interface NaiveStoredProcedureFactory extends DdStoredProcedureFactory<NaiveStoredProcedure<?>> {
 
 	@Override
 	NaiveStoredProcedure<?> getStoredProcedure(int pid, long txNum);

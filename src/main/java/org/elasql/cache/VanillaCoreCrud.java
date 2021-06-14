@@ -15,7 +15,9 @@
  *******************************************************************************/
 package org.elasql.cache;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -23,7 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.server.Elasql;
+import org.elasql.sql.PrimaryKey;
+import org.elasql.sql.PrimaryKeyBuilder;
+import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.vanilladb.core.query.algebra.Plan;
 import org.vanilladb.core.query.algebra.SelectPlan;
 import org.vanilladb.core.query.algebra.SelectScan;
@@ -33,9 +38,13 @@ import org.vanilladb.core.query.algebra.index.IndexSelectPlan;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.ConstantRange;
+import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.storage.index.Index;
 import org.vanilladb.core.storage.index.SearchKey;
+import org.vanilladb.core.storage.index.SearchRange;
+import org.vanilladb.core.storage.metadata.TableInfo;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
+import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -44,7 +53,7 @@ import org.vanilladb.core.storage.tx.Transaction;
  */
 public class VanillaCoreCrud {
 
-	public static CachedRecord read(RecordKey key, Transaction tx) {
+	public static CachedRecord read(PrimaryKey key, Transaction tx) {
 		String tblName = key.getTableName();
 		TablePlan tp = new TablePlan(tblName, tx);
 		Plan selectPlan = null;
@@ -52,36 +61,147 @@ public class VanillaCoreCrud {
 		// Create a IndexSelectPlan if there is matching index in the predicate
 		selectPlan = selectByBestMatchedIndex(tblName, tp, key, tx);
 		if (selectPlan == null)
-			selectPlan = new SelectPlan(tp, key.getPredicate());
+			selectPlan = new SelectPlan(tp, key.toPredicate());
 		else
-			selectPlan = new SelectPlan(selectPlan, key.getPredicate());
+			selectPlan = new SelectPlan(selectPlan, key.toPredicate());
 		
 		SelectScan s = (SelectScan) selectPlan.open();
 		s.beforeFirst();
 		CachedRecord rec = null;
 
 		if (s.next()) {
-			Map<String, Constant> fldVals = new HashMap<String, Constant>();
+			rec = new CachedRecord(key);
 			for (String fld : tp.schema().fields())
-				fldVals.put(fld, s.getVal(fld));
-			rec = new CachedRecord(fldVals);
+				rec.addFldVal(fld, s.getVal(fld));
 		}
 		s.close();
+		
+		tx.endStatement();
 
 		return rec;
 	}
+	
+	public static Map<PrimaryKey, CachedRecord> batchRead(Set<PrimaryKey> keys, Transaction tx) {
+		Map<PrimaryKey, CachedRecord> recordMap = new HashMap<PrimaryKey, CachedRecord>();
+		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 
-	public static void update(RecordKey key, CachedRecord rec, Transaction tx) {
+		// Check if all record keys are in the same table
+		PrimaryKey representative = null;
+		String tblName = null;
+		for (PrimaryKey key : keys) {
+			if (representative == null) {
+				representative = key;
+				tblName = representative.getTableName();
+			} else if (!tblName.equals(key.getTableName()))
+				throw new RuntimeException("request keys are not in the same table");
+		}
+
+		// Open an index
+		IndexInfo ii = null;
+
+		// We only need one index
+		for (int i = 0; i < representative.getNumOfFlds(); i++) {
+			String fldName = representative.getField(i);
+			List<IndexInfo> iis = Elasql.catalogMgr().getIndexInfo(tblName, fldName, tx);
+			if (iis != null && iis.size() > 0) {
+				ii = iis.get(0);
+				break;
+			}
+		}
+		
+		if (ii == null)
+			throw new RuntimeException("cannot find an index for " + representative);
+
+		// Search record ids for record keys
+		// Map<RecordId, Set<RecordKey>> ridToSearchKey = new HashMap<RecordId,
+		// Set<RecordKey>>();
+		Set<RecordId> searchRidSet = new HashSet<RecordId>(50000);
+		List<RecordId> searchRids = new ArrayList<RecordId>();
+		RecordId rid = null;
+
+		for (PrimaryKey key : keys) {
+			SearchKey searchKey = key.toSearchKey(ii.fieldNames());
+			Index index = ii.open(tx);
+			index.beforeFirst(new SearchRange(searchKey));
+
+			if (index.next()) {
+				rid = index.getDataRecordId();
+				searchRidSet.add(rid);
+			} else {
+				throw new RuntimeException("Cannot find a record for " + key);
+			}
+
+			index.close();
+			// If we did not release index locks here, this search would cause deadlock.
+			ccMgr.releaseIndexLocks();
+		}
+		searchRids.addAll(searchRidSet);
+
+		// Sort the record ids
+		Collections.sort(searchRids);
+
+		// Open a record file
+		TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		Schema sch = ti.schema();
+		RecordFile recordFile = ti.open(tx, false);
+		CachedRecord record = null;
+
+		for (RecordId id : searchRids) {
+
+			// Skip the record that has been found
+			// if (recordMap.containsKey(searchKey))
+			// continue;
+
+			// Move to the record
+			recordFile.moveToRecordId(id);
+			
+			// Construct a RecordKey
+			PrimaryKeyBuilder keyBuilder = new PrimaryKeyBuilder(representative.getTableName());
+			for (int i = 0; i < representative.getNumOfFlds(); i++) {
+				String fldName = representative.getField(i);
+				keyBuilder.addFldVal(fldName, recordFile.getVal(fldName));
+			}
+			PrimaryKey targetKey = keyBuilder.build();
+			
+			// Check if the key is included
+			if (keys.contains(targetKey) && !recordMap.containsKey(targetKey)) {
+
+				// Construct a CachedRecord
+				record = new CachedRecord(targetKey);
+				for (String fld : sch.fields()) {
+					if (!targetKey.containsField(fld)) {
+						record.addFldVal(fld, recordFile.getVal(fld));
+					}
+				}
+				record.setSrcTxNum(tx.getTransactionNumber());
+
+				// Put the record to the map
+				recordMap.put(targetKey, record);
+
+			}
+		}
+		recordFile.close();
+		
+		tx.endStatement();
+
+		return recordMap;
+	}
+
+	public static boolean update(PrimaryKey key, CachedRecord rec, Transaction tx) {
+		boolean found = false;
 		String tblName = key.getTableName();
+		
+//		Timer.getLocalTimer().startComponentTimer("Update to table " + tblName);
+		
 		TablePlan tp = new TablePlan(tblName, tx);
 		Plan selectPlan = null;
 		
 		// Create a IndexSelectPlan if there is matching index in the predicate
 		selectPlan = selectByBestMatchedIndex(tblName, tp, key, tx, rec.getDirtyFldNames());
 		if (selectPlan == null)
-			selectPlan = new SelectPlan(tp, key.getPredicate());
+			selectPlan = new SelectPlan(tp, key.toPredicate());
 		else
-			selectPlan = new SelectPlan(selectPlan, key.getPredicate());
+			selectPlan = new SelectPlan(selectPlan, key.toPredicate());
 		
 		// Open all indexes associate with target fields
 		Set<Index> modifiedIndexes = new HashSet<Index>();
@@ -95,6 +215,7 @@ public class VanillaCoreCrud {
 		UpdateScan s = (UpdateScan) selectPlan.open();
 		s.beforeFirst();
 		while (s.next()) {
+			found = true;
 			
 			// Construct a mapping from field names to values
 			Map<String, Constant> oldValMap = new HashMap<String, Constant>();
@@ -146,21 +267,28 @@ public class VanillaCoreCrud {
 		for (Index index : modifiedIndexes)
 			index.close();
 		s.close();
+		
+		tx.endStatement();
+//		Timer.getLocalTimer().stopComponentTimer("Update to table " + tblName);
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
+		
+		return found;
 	}
 
-	public static void insert(RecordKey key, CachedRecord rec, Transaction tx) {
+	public static void insert(PrimaryKey key, CachedRecord rec, Transaction tx) {
 		String tblname = key.getTableName();
+		
+//		Timer.getLocalTimer().startComponentTimer("Insert to table " + tblname);
+		
 		Plan p = new TablePlan(tblname, tx);
 
 		// Insert the record into the record file
 		UpdateScan s = (UpdateScan) p.open();
 		s.insert();
-		for (Map.Entry<String, Constant> fldValPair : rec.getFldValMap().entrySet()) {
-			s.setVal(fldValPair.getKey(), fldValPair.getValue());
-		}
+		for (String fldName : rec.getFldNames())
+			s.setVal(fldName, rec.getVal(fldName));
 		RecordId rid = s.getRecordId();
 		s.close();
 		
@@ -173,15 +301,18 @@ public class VanillaCoreCrud {
 		
 		for (IndexInfo ii : indexes) {
 			Index idx = ii.open(tx);
-			idx.insert(new SearchKey(ii.fieldNames(), rec.getFldValMap()), rid, true);
+			idx.insert(new SearchKey(ii.fieldNames(), rec.toFldValMap()), rid, true);
 			idx.close();
 		}
+		
+		tx.endStatement();
+//		Timer.getLocalTimer().stopComponentTimer("Insert to table " + tblname);
 		
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
 	}
 
-	public static void delete(RecordKey key, Transaction tx) {
+	public static void delete(PrimaryKey key, Transaction tx) {
 		String tblName = key.getTableName();
 		TablePlan tp = new TablePlan(tblName, tx);
 		Plan selectPlan = null;
@@ -190,9 +321,9 @@ public class VanillaCoreCrud {
 		boolean usingIndex = false;
 		selectPlan = selectByBestMatchedIndex(tblName, tp, key, tx);
 		if (selectPlan == null)
-			selectPlan = new SelectPlan(tp, key.getPredicate());
+			selectPlan = new SelectPlan(tp, key.toPredicate());
 		else {
-			selectPlan = new SelectPlan(selectPlan, key.getPredicate());
+			selectPlan = new SelectPlan(selectPlan, key.toPredicate());
 			usingIndex = true;
 		}
 		
@@ -242,18 +373,20 @@ public class VanillaCoreCrud {
 			}
 		}
 		s.close();
+		
+		tx.endStatement();
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
 	}
 	
 	private static IndexSelectPlan selectByBestMatchedIndex(String tblName,
-			TablePlan tablePlan, RecordKey key, Transaction tx) {
+			TablePlan tablePlan, PrimaryKey key, Transaction tx) {
 
 		// Look up candidate indexes
 		Set<IndexInfo> candidates = new HashSet<IndexInfo>();
-		for (String fieldName : key.getKeyFldSet()) {
-			List<IndexInfo> iis = VanillaDb.catalogMgr().getIndexInfo(tblName, fieldName, tx);
+		for (int i = 0; i < key.getNumOfFlds(); i++) {
+			List<IndexInfo> iis = VanillaDb.catalogMgr().getIndexInfo(tblName, key.getField(i), tx);
 			candidates.addAll(iis);
 		}
 		
@@ -261,14 +394,14 @@ public class VanillaCoreCrud {
 	}
 	
 	private static IndexSelectPlan selectByBestMatchedIndex(String tblName,
-			TablePlan tablePlan, RecordKey key, Transaction tx, Collection<String> excludedFields) {
+			TablePlan tablePlan, PrimaryKey key, Transaction tx, Collection<String> excludedFields) {
 		
 		Set<IndexInfo> candidates = new HashSet<IndexInfo>();
-		for (String fieldName : key.getKeyFldSet()) {
-			if (excludedFields.contains(fieldName))
+		for (int i = 0; i < key.getNumOfFlds(); i++) {
+			if (excludedFields.contains(key.getField(i)))
 				continue;
 			
-			List<IndexInfo> iis = VanillaDb.catalogMgr().getIndexInfo(tblName, fieldName, tx);
+			List<IndexInfo> iis = VanillaDb.catalogMgr().getIndexInfo(tblName, key.getField(i), tx);
 			for (IndexInfo ii : iis) {
 				boolean ignored = false;
 				for (String fldName : ii.fieldNames())
@@ -286,7 +419,7 @@ public class VanillaCoreCrud {
 	}
 	
 	private static IndexSelectPlan selectByBestMatchedIndex(Set<IndexInfo> candidates,
-			TablePlan tablePlan, RecordKey key, Transaction tx) {
+			TablePlan tablePlan, PrimaryKey key, Transaction tx) {
 		
 		// Choose the index with the most matched fields in the predicate
 		int matchedCount = 0;
@@ -299,7 +432,7 @@ public class VanillaCoreCrud {
 			
 			Map<String, ConstantRange> ranges = new HashMap<String, ConstantRange>();
 			for (String fieldName : ii.fieldNames()) {
-				Constant val = key.getKeyVal(fieldName);
+				Constant val = key.getVal(fieldName);
 				if (val == null)
 					continue;
 				

@@ -23,8 +23,8 @@ public class GroupCommDriver {
 		myId = id;
 	}
 
-	public GroupCommConnection init() {
-		GroupCommConnection bc = new GroupCommConnection(myId);
+	public GroupCommConnection init(DirectMessageListener messageListener) {
+		GroupCommConnection bc = new GroupCommConnection(myId, messageListener);
 		return bc;
 	}
 }

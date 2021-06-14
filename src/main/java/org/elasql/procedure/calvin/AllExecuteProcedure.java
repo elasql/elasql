@@ -15,24 +15,28 @@
  *******************************************************************************/
 package org.elasql.procedure.calvin;
 
-import java.sql.Connection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.cache.calvin.CalvinPostOffice;
 import org.elasql.remote.groupcomm.TupleSet;
+import org.elasql.schedule.calvin.ExecutionPlan;
+import org.elasql.schedule.calvin.ExecutionPlan.ParticipantRole;
+import org.elasql.schedule.calvin.ReadWriteSetAnalyzer;
 import org.elasql.server.Elasql;
-import org.elasql.sql.RecordKey;
-import org.elasql.storage.metadata.NotificationPartMetaMgr;
-import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.storage.tx.recovery.DdRecoveryMgr;
+import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
+/**
+ * A stored procedure that executes its logic on all the machines.
+ * 
+ * @author SLMT
+ *
+ * @param <H>
+ */
 public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		extends CalvinStoredProcedure<H> {
 	private static Logger logger = Logger.getLogger(AllExecuteProcedure.class
@@ -42,39 +46,49 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	
 	private static final int MASTER_NODE = 0;
 
+	private int localNodeId = Elasql.serverId();
+	private int numOfParts;
+
 	public AllExecuteProcedure(long txNum, H paramHelper) {
 		super(txNum, paramHelper);
-	}
-	
-	public void prepare(Object... pars) {
-		// prepare parameters
-		paramHelper.prepareParameters(pars);
-
-		// create a transaction
-		boolean isReadOnly = paramHelper.isReadOnly();
-		tx = Elasql.txMgr().newTransaction(
-				Connection.TRANSACTION_SERIALIZABLE, isReadOnly, txNum);
-		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
-
-		// prepare keys
-		prepareKeys();
 		
-		// for the cache layer
-		// NOTE: always creates a CacheMgr that can accept remote records
-		CalvinPostOffice postOffice = (CalvinPostOffice) Elasql.remoteRecReceiver();
-		cacheMgr = postOffice.createCacheMgr(tx, true);
+		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
 	}
-	
-	public boolean isParticipated() {
-		// Only return true in order to force all nodes to participate.
-		return true;
+
+	@Override
+	protected ExecutionPlan analyzeParameters(Object[] pars) {
+		ExecutionPlan plan = super.analyzeParameters(pars);
+		return alterExecutionPlan(plan);
 	}
-	
+
+	@Override
 	public boolean willResponseToClients() {
 		// The master node is the only one that will response to the clients.
 		return localNodeId == MASTER_NODE;
 	}
 
+	@Override
+	public boolean isReadOnly() {
+		return false;
+	}
+
+	@Override
+	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
+		// default: do nothing
+	}
+	
+	private ExecutionPlan alterExecutionPlan(ExecutionPlan plan) {
+		if (localNodeId == MASTER_NODE) {
+			for (int nodeId = 0; nodeId < numOfParts; nodeId++)
+				plan.addRemoteReadKey(NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE));
+		}
+		plan.setParticipantRole(ParticipantRole.ACTIVE);
+		plan.setForceReadWriteTx();
+		
+		return plan;
+	}
+
+	@Override
 	protected void executeTransactionLogic() {
 		executeSql(null);
 
@@ -96,12 +110,12 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	private void waitForNotification() {
 		// Wait for notification from other nodes
-		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
+		for (int nodeId = 0; nodeId < numOfParts; nodeId++)
 			if (nodeId != MASTER_NODE) {
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Waiting for the notification from node no." + nodeId);
 				
-				RecordKey notKey = NotificationPartMetaMgr.createRecordKey(nodeId, MASTER_NODE);
+				PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE);
 				CachedRecord rec = cacheMgr.readFromRemote(notKey);
 				Constant con = rec.getVal(KEY_FINISH);
 				int value = (int) con.asJavaVal();
@@ -117,12 +131,9 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	private void sendNotification() {
 		// Create a key value set
-		Map<String, Constant> fldVals = new HashMap<String, Constant>();
-		fldVals.put(KEY_FINISH, new IntegerConstant(1));
-		
-		RecordKey notKey = NotificationPartMetaMgr.createRecordKey(Elasql.serverId(), MASTER_NODE);
-		CachedRecord notVal = NotificationPartMetaMgr.createRecord(Elasql.serverId(), MASTER_NODE,
-				txNum, fldVals);
+		PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
+		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE, txNum);
+		notVal.addFldVal(KEY_FINISH, new IntegerConstant(1));
 
 		TupleSet ts = new TupleSet(-1);
 		// Use node id as source tx number

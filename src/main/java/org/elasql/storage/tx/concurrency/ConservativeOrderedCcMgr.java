@@ -19,7 +19,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedLockTable.LockType;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.record.RecordId;
@@ -31,7 +31,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	
 	// For normal operations - using conservative locking 
 	private Set<Object> bookedObjs, readObjs, writeObjs;
-	
+
 	// For Indexes - using crabbing locking
 	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
 	private Set<BlockId> writtenIndexBlks = new HashSet<BlockId>();
@@ -42,6 +42,17 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		readObjs = new HashSet<Object>();
 		writeObjs = new HashSet<Object>();
 	}
+	
+	public void bookReadKey(PrimaryKey key) {
+		if (key != null) {
+			// The key needs to be booked only once. 
+			if (!bookedObjs.contains(key))
+				lockTbl.requestLock(key, txNum);
+			
+			bookedObjs.add(key);
+			readObjs.add(key);
+		}
+	}
 
 	/**
 	 * Book the read lock of the specified objects.
@@ -49,9 +60,9 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * @param keys
 	 *            the objects which the transaction intends to read
 	 */
-	public void bookReadKeys(Collection<RecordKey> keys) {
+	public void bookReadKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
-			for (RecordKey key : keys) {
+			for (PrimaryKey key : keys) {
 				// The key needs to be booked only once. 
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);
@@ -62,15 +73,26 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		}
 	}
 	
+	public void bookWriteKey(PrimaryKey key) {
+		if (key != null) {
+			// The key needs to be booked only once. 
+			if (!bookedObjs.contains(key))
+				lockTbl.requestLock(key, txNum);
+			
+			bookedObjs.add(key);
+			writeObjs.add(key);
+		}
+	}
+	
 	/**
 	 * Book the write lock of the specified object.
 	 * 
 	 * @param keys
 	 *             the objects which the transaction intends to write
 	 */
-	public void bookWriteKeys(Collection<RecordKey> keys) {
+	public void bookWriteKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
-			for (RecordKey key : keys) {
+			for (PrimaryKey key : keys) {
 				// The key needs to be booked only once. 
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);
@@ -96,17 +118,27 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 			if (!writeObjs.contains(obj))
 				lockTbl.sLock(obj, txNum);
 	}
-
+	
+	@Override
 	public void onTxCommit(Transaction tx) {
+		releaseIndexLocks();
 		releaseLocks();
 	}
-
+	
+	@Override
 	public void onTxRollback(Transaction tx) {
+		releaseIndexLocks();
 		releaseLocks();
 	}
 
+	@Override
 	public void onTxEndStatement(Transaction tx) {
-		// do nothing
+		// Next-key lock algorithm is non-deterministic. It may
+		// cause deadlocks during the execution. Therefore,
+		// we release the locks earlier to prevent deadlocks.
+		// However, phantoms due to update may happen.
+		// TODO: We need a deterministic algorithm to handle this.
+		releaseIndexLocks();
 	}
 
 	@Override

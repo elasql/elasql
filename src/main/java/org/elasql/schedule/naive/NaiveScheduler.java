@@ -18,7 +18,7 @@ package org.elasql.schedule.naive;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.elasql.procedure.DdStoredProcedure;
+import org.elasql.procedure.naive.NaiveStoredProcedure;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -36,11 +36,9 @@ public class NaiveScheduler extends Task implements Scheduler {
 		this.factory = factory;
 	}
 
-	public void schedule(StoredProcedureCall... calls) {
+	public void schedule(StoredProcedureCall call) {
 		try {
-			for (int i = 0; i < calls.length; i++) {
-				spcQueue.put(calls[i]);
-			}
+			spcQueue.put(call);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -56,7 +54,7 @@ public class NaiveScheduler extends Task implements Scheduler {
 					continue;
 
 				// create store procedure and prepare
-				DdStoredProcedure sp = factory.getStoredProcedure(
+				NaiveStoredProcedure<?> sp = factory.getStoredProcedure(
 						call.getPid(), call.getTxNum());
 				sp.prepare(call.getPars());
 

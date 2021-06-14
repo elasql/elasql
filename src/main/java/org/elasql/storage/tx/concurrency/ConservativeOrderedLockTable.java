@@ -1,18 +1,18 @@
 /*******************************************************************************
- * Copyright 2016, 2018 elasql.org contributors
- *
+ * Copyright 2016 vanilladb.org
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *******************************************************************************/
+ ******************************************************************************/
 package org.elasql.storage.tx.concurrency;
 
 import java.util.LinkedList;
@@ -105,7 +105,7 @@ public class ConservativeOrderedLockTable {
 	 */
 	void sLock(Object obj, long txNum) {
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -116,16 +116,29 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+				// For debug
+//				String name = Thread.currentThread().getName();
+				
 				/*
 				 * If this transaction is not the first one requesting this
 				 * object or it cannot get lock on this object, it must wait.
 				 */
 				Long head = lockers.requestQueue.peek();
-				while (!sLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
 
-					anchor.wait();
+					// For debug
+//					if (lockers.xLocker != -1) {
+//						Thread.currentThread().setName(String.format(
+//								"%s waits for slock of %s from tx.%d (xlock holder)",
+//								name, obj, lockers.xLocker));
+//					} else {
+//						Thread.currentThread().setName(String.format(
+//								"%s waits for slock of %s from tx.%d (head of queue)",
+//								name, obj, head));
+//					}
 					
+					anchor.wait();
+
 					// Since a transaction may delete the lockers of an object
 					// after releasing them, it should call prepareLockers()
 					// here, instead of using lockers it obtains earlier.
@@ -133,17 +146,23 @@ public class ConservativeOrderedLockTable {
 					head = lockers.requestQueue.peek();
 				}
 
+				// For debug
+//				Thread.currentThread().setName(name);
+				
+				if (!sLockable(lockers, txNum))
+					throw new LockAbortException();
+
 				// get the s lock
 				lockers.requestQueue.poll();
 				lockers.sLockers.add(txNum);
 
-				// Wake up other waiting transactions (on this object) to let them
+				// Wake up other waiting transactions (on this object) to let
+				// them
 				// fight for the lockers on this object.
 				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}
@@ -161,9 +180,9 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void xLock(Object obj, long txNum) {
-		// See the comments in sLock(..) for the explanation of the algorithm 
+		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getAnchor(obj);
-		
+
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
@@ -173,23 +192,47 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+				// For debug
+//				String name = Thread.currentThread().getName();
+				
+				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
-				while (!xLockable(lockers, txNum)
-						|| (head != null && head.longValue() != txNum)) {
+				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
+				/* && !waitingTooLong(timestamp) */) {
+					
+					// For debug
+//					if (lockers.xLocker != -1) {
+//						Thread.currentThread().setName(String.format(
+//								"%s waits for xlock of %s from tx.%d (xlock holder)",
+//								name, obj, lockers.xLocker));
+//					} else if (!lockers.sLockers.isEmpty()) {
+//						Thread.currentThread().setName(String.format(
+//								"%s waits for xlock of %s from tx.%d (slock holder, %d other holders)",
+//								name, obj, lockers.sLockers.get(0), lockers.sLockers.size() - 1));
+//					} else {
+//						Thread.currentThread().setName(String.format(
+//								"%s waits for xlock of %s from tx.%d (head of queue)",
+//								name, obj, head));
+//					}
+					
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
 
+				// For debug
+//				Thread.currentThread().setName(name);
+				
+				// if (!xLockable(lockers, txNum))
+				// throw new LockAbortException();
 				// get the x lock
 				lockers.requestQueue.poll();
 				lockers.xLocker = txNum;
-				
+
 				// An X lock blocks all other lockers, so it don't need to
 				// wake up anyone.
 			} catch (InterruptedException e) {
-				throw new LockAbortException(
-						"Interrupted when waitting for lock");
+				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
 	}

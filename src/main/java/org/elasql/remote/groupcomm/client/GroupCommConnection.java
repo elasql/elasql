@@ -15,49 +15,46 @@
  *******************************************************************************/
 package org.elasql.remote.groupcomm.client;
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.remote.groupcomm.ClientResponse;
-import org.vanilladb.comm.client.ClientAppl;
-import org.vanilladb.comm.client.ClientNodeFailListener;
-import org.vanilladb.comm.client.ClientP2pMessageListener;
-import org.vanilladb.comm.messages.ChannelType;
-import org.vanilladb.comm.messages.P2pMessage;
-import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.elasql.remote.groupcomm.ElasqlSpResultSet;
+import org.vanilladb.comm.client.VanillaCommClient;
+import org.vanilladb.comm.client.VanillaCommClientListener;
+import org.vanilladb.comm.view.ProcessType;
 
-public class GroupCommConnection implements ClientP2pMessageListener, ClientNodeFailListener {
+public class GroupCommConnection implements VanillaCommClientListener {
 
 	// RTE id -> A blocking queue of responses from servers
 	private Map<Integer, BlockingQueue<ClientResponse>> rteToRespQueue = new ConcurrentHashMap<Integer, BlockingQueue<ClientResponse>>();
 	// RTE id -> The transaction number of the received response last time
 	private Map<Integer, Long> rteToLastTxNum = new ConcurrentHashMap<Integer, Long>();
-
+	
+	private VanillaCommClient commClient;
 	private BatchSpcSender batchSender;
 	private int myId;
+	private DirectMessageListener directMessageListener;
 
-	public GroupCommConnection(int id) {
-		myId = id;
+	public GroupCommConnection(int id, DirectMessageListener directMessageListener) {
+		this.myId = id;
+		this.directMessageListener = directMessageListener;
 
 		// Initialize group communication
-		ClientAppl clientAppl = new ClientAppl(id, this, this);
-		clientAppl.start();
-		// wait for all servers to start up
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		clientAppl.startPFD();
+		commClient = new VanillaCommClient(id, this);
+		
+		// Create a thread for it
+		new Thread(null, commClient, "VanillaComm-Clinet").start();
 
 		// Start the batch sender
-		batchSender = new BatchSpcSender(id, clientAppl);
+		batchSender = new BatchSpcSender(id, commClient);
 		new Thread(null, batchSender, "Batch-Spc-Sender").start();
 	}
 
-	public SpResultSet callStoredProc(int connId, int pid, Object... pars) {
+	public ElasqlSpResultSet callStoredProc(int connId, int pid, Object... pars) {
 		// Check if there is a queue for it
 		BlockingQueue<ClientResponse> respQueue = rteToRespQueue.get(connId);
 		if (respQueue == null) {
@@ -81,7 +78,7 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 			// Record the tx number of the response
 			rteToLastTxNum.put(connId, cr.getTxNum());
 			
-			return (SpResultSet) cr.getResultSet();
+			return cr.getResultSet();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 			throw new RuntimeException("Something wrong");
@@ -89,19 +86,30 @@ public class GroupCommConnection implements ClientP2pMessageListener, ClientNode
 	}
 
 	@Override
-	public void onRecvClientP2pMessage(P2pMessage p2pmsg) {
-		ClientResponse c = (ClientResponse) p2pmsg.getMessage();
-		
-		// Check if this response is for this node
-		if (c.getClientId() == myId) {
-			rteToRespQueue.get(c.getRteId()).add(c);
+	public void onReceiveP2pMessage(ProcessType senderType, int senderId, Serializable message) {
+		if (senderType == ProcessType.SERVER) {
+			ClientResponse c = (ClientResponse) message;
+			
+			// Check if this response is for this node
+			if (c.getClientId() == myId) {
+				rteToRespQueue.get(c.getRteId()).add(c);
+			} else {
+				throw new RuntimeException("Something wrong");
+			}
 		} else {
-			throw new RuntimeException("Something wrong");
+			directMessageListener.onReceivedDirectMessage(message);
 		}
 	}
-
-	@Override
-	public void onNodeFail(int id, ChannelType channelType) {
-		// do nothing
+	
+	public void sendP2pMessageToClientNode(int clientId, Serializable message) {
+		commClient.sendP2pMessage(ProcessType.CLIENT, clientId, message);
+	}
+	
+	public int getServerCount() {
+		return commClient.getServerCount();
+	}
+	
+	public int getClientCount() {
+		return commClient.getClientCount();
 	}
 }

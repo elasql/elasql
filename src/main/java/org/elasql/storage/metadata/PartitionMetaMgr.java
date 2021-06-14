@@ -15,16 +15,30 @@
  *******************************************************************************/
 package org.elasql.storage.metadata;
 
-import org.elasql.sql.RecordKey;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.elasql.sql.PartitioningKey;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.util.ElasqlProperties;
 
-public abstract class PartitionMetaMgr {
+public class PartitionMetaMgr {
+	private static Logger logger = Logger.getLogger(PartitionMetaMgr.class.getName());
 
-	public final static int NUM_PARTITIONS;
+	public static final int NUM_PARTITIONS;
 
 	static {
 		NUM_PARTITIONS = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
+	}
+
+	private PartitionPlan partPlan;
+	
+	public PartitionMetaMgr(PartitionPlan plan) {
+		partPlan = plan;
+		
+		if (logger.isLoggable(Level.INFO))
+			logger.info(String.format("Using '%s'", partPlan));
 	}
 
 	/**
@@ -34,14 +48,35 @@ public abstract class PartitionMetaMgr {
 	 *            the key of the record
 	 * @return if the record is fully replicated
 	 */
-	public abstract boolean isFullyReplicated(RecordKey key);
-
+	public boolean isFullyReplicated(PrimaryKey key) {
+		return partPlan.isFullyReplicated(key);
+	}
+	
 	/**
-	 * Decides the partition of each record.
+	 * Get the original location (may not be the current location)
 	 * 
 	 * @param key
-	 *            the key of the record
-	 * @return the id of the partition where the record is
+	 * @return
 	 */
-	public abstract int getPartition(RecordKey key);
+	public int getPartition(PrimaryKey key) {
+		return partPlan.getPartition(key);
+	}
+	
+	public void setNewPartitionPlan(PartitionPlan newPlan) {
+		// XXX: Bug: If there is a plan warping another plan,
+		// this may make the warping plan disappear.
+		partPlan = newPlan;
+	}
+	
+	public PartitionPlan getPartitionPlan() {
+		return partPlan;
+	}
+	
+	public int getCurrentNumOfParts() {
+		return partPlan.numberOfPartitions();
+	}
+	
+	public PartitioningKey getPartitioningKey(PrimaryKey key) {
+		return partPlan.getPartitioningKey(key);
+	}
 }

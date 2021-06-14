@@ -15,8 +15,10 @@
  *******************************************************************************/
 package org.elasql.procedure;
 
-public interface DdStoredProcedureFactory {
+import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 
-	DdStoredProcedure getStoredProcedure(int pid, long txNum);
+public interface DdStoredProcedureFactory<S extends StoredProcedure<?>> {
+
+	S getStoredProcedure(int pid, long txNum);
 
 }

@@ -34,20 +34,20 @@ public class ClientResponse implements Serializable {
 
 	private int clientId, rteId;
 
-	private SpResultSet result;
+	private ElasqlSpResultSet result;
 
 	public ClientResponse(int clientId, int rteId, long txNum, SpResultSet result) {
 		this.txNum = txNum;
 		this.clientId = clientId;
 		this.rteId = rteId;
-		this.result = result;
+		this.result = new ElasqlSpResultSet(result);
 	}
 
 	public long getTxNum() {
 		return txNum;
 	}
 
-	public SpResultSet getResultSet() {
+	public ElasqlSpResultSet getResultSet() {
 		return result;
 	}
 

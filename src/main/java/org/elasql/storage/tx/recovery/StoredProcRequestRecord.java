@@ -71,7 +71,7 @@ public class StoredProcRequestRecord implements DdLogRecord {
 
 		// FIXME
 		// See writeToLog()
-		this.pars = new Object[0];
+		this.pars = new Object[(Integer) rec.nextVal(INTEGER).asJavaVal()];
 		
 		lsn = rec.getLSN();
 	}
@@ -116,7 +116,10 @@ public class StoredProcRequestRecord implements DdLogRecord {
 		rec.add(new IntegerConstant(clientId));
 		rec.add(new IntegerConstant(connectionId));
 		rec.add(new IntegerConstant(procedureId));
-		rec.add(new VarcharConstant(Arrays.toString(pars)));
+		// XXX: we only record the size of the parameters for now
+		rec.add(new IntegerConstant(pars.length));
+		// Real code
+//		rec.add(new VarcharConstant(Arrays.toString(pars)));
 		return rec;
 	}
 

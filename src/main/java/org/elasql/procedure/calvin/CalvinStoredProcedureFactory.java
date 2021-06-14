@@ -17,7 +17,8 @@ package org.elasql.procedure.calvin;
 
 import org.elasql.procedure.DdStoredProcedureFactory;
 
-public interface CalvinStoredProcedureFactory extends DdStoredProcedureFactory {
+public interface CalvinStoredProcedureFactory
+		extends DdStoredProcedureFactory<CalvinStoredProcedure<?>> {
 	
 	@Override
 	CalvinStoredProcedure<?> getStoredProcedure(int pid, long txNum);

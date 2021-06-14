@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.elasql.cache.CachedRecord;
-import org.elasql.sql.RecordKey;
+import org.elasql.sql.PrimaryKey;
 
 public class TupleSet implements Serializable {
 	/**
@@ -29,22 +29,37 @@ public class TupleSet implements Serializable {
 	private static final long serialVersionUID = 3191495851408477607L;
 	private List<Tuple> tuples;
 	private int sinkId;
+	private Serializable metadata;
 
 	public TupleSet(int sinkId) {
 		this.tuples = new ArrayList<Tuple>();
 		this.sinkId = sinkId;
+	}
+	
+	public void setMetadata(Serializable data){
+		metadata = data;
+	}
+	
+	public Serializable getMetadata(){
+		return metadata;
 	}
 
 	public List<Tuple> getTupleSet() {
 		return tuples;
 	}
 
-	public void addTuple(RecordKey key, long srcTxNum, long destTxNum,
+	public void addTuple(PrimaryKey key, long srcTxNum, long destTxNum,
 			CachedRecord rec) {
+		// Clone the record to prevent concurrent access from communication threads
+		rec = new CachedRecord(rec);
 		tuples.add(new Tuple(key, srcTxNum, destTxNum, rec));
 	}
 
 	public int sinkId() {
 		return sinkId;
+	}
+	
+	public int size() {
+		return tuples.size();
 	}
 }
