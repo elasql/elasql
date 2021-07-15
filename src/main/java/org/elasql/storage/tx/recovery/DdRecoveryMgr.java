@@ -22,6 +22,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.storage.tx.Transaction;
@@ -31,6 +32,8 @@ public class DdRecoveryMgr extends RecoveryMgr {
 
 	private static BlockingQueue<StoredProcedureCall> spcLogQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 
+	public static final boolean DISABLE_STORAGE_LOGGING;
+	
 	private static final Object spcLoggerSyncObj = new Object();
 	private static final Lock spcLoggerLock = new ReentrantLock();
 	private static final Condition spcLoggerCondition = spcLoggerLock.newCondition();
@@ -38,6 +41,12 @@ public class DdRecoveryMgr extends RecoveryMgr {
 	private static long lastLoggedTxn = -1;
 
 	static {
+		DISABLE_STORAGE_LOGGING = ElasqlProperties.getLoader().getPropertyAsBoolean(
+				DdRecoveryMgr.class.getName() + ".DISABLE_STORAGE_LOGGING", false);
+		
+		if (DISABLE_STORAGE_LOGGING)
+			RecoveryMgr.enableLogging(false);
+		
 		VanillaDb.taskMgr().runTask(new Task() {
 			@Override
 			public void run() {

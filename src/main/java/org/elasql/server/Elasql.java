@@ -85,14 +85,16 @@ public class Elasql extends VanillaDb {
 	}
 	
 	public static final ServiceType SERVICE_TYPE;
+	public static final boolean ENABLE_STAND_ALONE_SEQUENCER;
 	
 	public static final long SYSTEM_INIT_TIME_MS = System.currentTimeMillis();
 	
 	static {
-		// read service type properties
-		int type = ElasqlProperties.getLoader().getPropertyAsInteger(Elasql.class.getName() + ".SERVICE_TYPE",
-				ServiceType.NAIVE.ordinal());
+		int type = ElasqlProperties.getLoader().getPropertyAsInteger(
+				Elasql.class.getName() + ".SERVICE_TYPE", ServiceType.NAIVE.ordinal());
 		SERVICE_TYPE = ServiceType.fromInteger(type);
+		ENABLE_STAND_ALONE_SEQUENCER = ElasqlProperties.getLoader().getPropertyAsBoolean(
+				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false);
 	}
 
 	// DD modules
@@ -105,7 +107,6 @@ public class Elasql extends VanillaDb {
 	
 	// Only for the sequencer
 	private static MigrationSystemController migraSysControl;
-	private static boolean isSequencer;
 
 	// connection information
 	private static int myNodeId;
@@ -122,7 +123,7 @@ public class Elasql extends VanillaDb {
 	 * @param isSequencer
 	 *            is this server a sequencer
 	 */
-	public static void init(String dirName, int id, boolean sequencerMode, DdStoredProcedureFactory<?> factory) {
+	public static void init(String dirName, int id, DdStoredProcedureFactory<?> factory) {
 		PartitionPlan partitionPlan = null;
 		Class<?> planCls = ElasqlProperties.getLoader().getPropertyAsClass(
 				Elasql.class.getName() + ".DEFAULT_PARTITION_PLAN", HashPartitionPlan.class,
@@ -136,13 +137,12 @@ public class Elasql extends VanillaDb {
 			throw new RuntimeException();
 		}
 		
-		init(dirName, id, sequencerMode, factory, partitionPlan, null);
+		init(dirName, id, factory, partitionPlan, null);
 	}
 	
-	public static void init(String dirName, int id, boolean sequencerMode, DdStoredProcedureFactory<?> factory,
+	public static void init(String dirName, int id, DdStoredProcedureFactory<?> factory,
 			PartitionPlan partitionPlan, MigrationComponentFactory migraComsFactory) {
 		myNodeId = id;
-		isSequencer = sequencerMode;
 
 		if (logger.isLoggable(Level.INFO))
 			logger.info("ElaSQL initializing...");
@@ -150,10 +150,10 @@ public class Elasql extends VanillaDb {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("using " + SERVICE_TYPE + " type service");
 
-		if (isSequencer) {
-			logger.info("initializing using Sequencer mode");
+		if (isStandAloneSequencer()) {
+			logger.info("initializing as the stand alone sequencer");
 			VanillaDb.initTaskMgr();
-			initConnectionMgr(myNodeId, true);
+			initConnectionMgr(myNodeId);
 			initPartitionMetaMgr(partitionPlan);
 			initScheduler(factory, migraComsFactory);
 			if (migraComsFactory != null)
@@ -168,7 +168,7 @@ public class Elasql extends VanillaDb {
 		initCacheMgr();
 		initPartitionMetaMgr(partitionPlan);
 		initScheduler(factory, migraComsFactory);
-		initConnectionMgr(myNodeId, false);
+		initConnectionMgr(myNodeId);
 		initDdLogMgr();
 		if (migraComsFactory != null)
 			migraMgr = migraComsFactory.newMigrationMgr();
@@ -298,8 +298,8 @@ public class Elasql extends VanillaDb {
 		}
 	}
 
-	public static void initConnectionMgr(int id, boolean isSequencer) {
-		connMgr = new ConnectionMgr(id, isSequencer);
+	public static void initConnectionMgr(int id) {
+		connMgr = new ConnectionMgr(id);
 	}
 
 	public static void initDdLogMgr() {
@@ -338,8 +338,8 @@ public class Elasql extends VanillaDb {
 		return migraSysControl;
 	}
 	
-	public static boolean isSequencer() {
-		return isSequencer;
+	public static boolean isStandAloneSequencer() {
+		return ENABLE_STAND_ALONE_SEQUENCER && (myNodeId == ConnectionMgr.SEQUENCER_ID);
 	}
 
 	// ===============

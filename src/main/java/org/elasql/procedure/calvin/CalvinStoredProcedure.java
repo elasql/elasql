@@ -91,7 +91,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 //		timer.stopComponentTimer(getClass().getSimpleName() + " analyze paramters");
 		
 		// The sequencer only analyzes the parameters
-		if (Elasql.isSequencer()) {
+		if (Elasql.isStandAloneSequencer()) {
 			return;
 		}
 		
@@ -130,7 +130,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 		// analyze read-write set
 		ReadWriteSetAnalyzer analyzer;
-		if (Elasql.isSequencer()) {
+		if (Elasql.isStandAloneSequencer()) {
 			// The sequencer monitors transactions
 			SequencerAnalyzer seqAnalyzer = new SequencerAnalyzer();
 			prepareKeys(seqAnalyzer);

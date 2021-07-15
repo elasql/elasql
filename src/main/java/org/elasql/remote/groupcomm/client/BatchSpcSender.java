@@ -24,6 +24,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.comm.client.VanillaCommClient;
 import org.vanilladb.comm.view.ProcessType;
@@ -45,13 +46,12 @@ class BatchSpcSender implements Runnable {
 	private Queue<StoredProcedureCall> spcQueue = new ConcurrentLinkedQueue<StoredProcedureCall>();
 	private VanillaCommClient commClient;
 	private long lastSendingTime;
-	private int nodeId, sequencerId;
+	private int nodeId;
 
 	public BatchSpcSender(int id, VanillaCommClient client) {
 		commClient = client;
 		lastSendingTime = System.currentTimeMillis();
 		nodeId = id;
-		sequencerId = client.getServerCount() - 1;
 	}
 
 	@Override
@@ -103,6 +103,6 @@ class BatchSpcSender implements Runnable {
 			batchSpc.add(spc);
 		}
 		numOfQueuedSpcs.addAndGet(-batchSpc.size());
-		commClient.sendP2pMessage(ProcessType.SERVER, sequencerId, batchSpc.toArray(new StoredProcedureCall[0]));
+		commClient.sendP2pMessage(ProcessType.SERVER, ConnectionMgr.SEQUENCER_ID, batchSpc.toArray(new StoredProcedureCall[0]));
 	}
 }
