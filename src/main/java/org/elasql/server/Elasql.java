@@ -36,7 +36,7 @@ import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
-import org.elasql.schedule.tpart.TPartPartitioner;
+import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
@@ -278,7 +278,7 @@ public class Elasql extends VanillaDb {
 		
 		// TODO: Uncomment this when the migration module is migrated
 //		factory = new MigrationStoredProcFactory(factory);
-		TPartPartitioner scheduler = new TPartPartitioner(factory,  inserter,
+		TPartScheduler scheduler = new TPartScheduler(factory,  inserter,
 				sinker, graph, isBatching);
 		
 		taskMgr().runTask(scheduler);

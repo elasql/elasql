@@ -32,11 +32,11 @@ import org.vanilladb.comm.view.ProcessType;
 class BatchSpcSender implements Runnable {
 	private static Logger logger = Logger.getLogger(BatchSpcSender.class.getName());
 
-	private final static int BATCH_SIZE;
+	private final static int COMM_BATCH_SIZE;
 	private final static long MAX_WAITING_TIME; // in ms
 
 	static {
-		BATCH_SIZE = ElasqlProperties.getLoader()
+		COMM_BATCH_SIZE = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".BATCH_SIZE", 1);
 		MAX_WAITING_TIME = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".MAX_WAITING_TIME", 1000);
@@ -58,7 +58,7 @@ class BatchSpcSender implements Runnable {
 	public void run() {
 		// periodically send batch of requests
 		if (logger.isLoggable(Level.INFO))
-			logger.info("start batching-request worker thread (batch size = " + BATCH_SIZE + ")"); 
+			logger.info("start batching-request worker thread (batch size = " + COMM_BATCH_SIZE + ")"); 
 
 		while (true)
 			sendBatchRequestToDb();
@@ -69,7 +69,7 @@ class BatchSpcSender implements Runnable {
 		spcQueue.add(spc);
 		int size = numOfQueuedSpcs.incrementAndGet();
 		
-		if (size >= BATCH_SIZE) {
+		if (size >= COMM_BATCH_SIZE) {
 			synchronized (this) {
 				notifyAll();
 			}
@@ -81,7 +81,7 @@ class BatchSpcSender implements Runnable {
 		int size = numOfQueuedSpcs.get();
 		long currentTime = System.currentTimeMillis();
 		try {
-			while (size < BATCH_SIZE && (currentTime - lastSendingTime < MAX_WAITING_TIME || size < 1)) {
+			while (size < COMM_BATCH_SIZE && (currentTime - lastSendingTime < MAX_WAITING_TIME || size < 1)) {
 				
 				synchronized (this) {
 					wait(100);
