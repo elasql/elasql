@@ -18,9 +18,10 @@ package org.elasql.storage.metadata;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.PartitioningKey;
 import org.elasql.sql.PrimaryKey;
-import org.elasql.util.ElasqlProperties;
+import org.vanilladb.comm.server.VanillaCommServer;
 
 public class PartitionMetaMgr {
 	private static Logger logger = Logger.getLogger(PartitionMetaMgr.class.getName());
@@ -28,8 +29,11 @@ public class PartitionMetaMgr {
 	public static final int NUM_PARTITIONS;
 
 	static {
-		NUM_PARTITIONS = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(PartitionMetaMgr.class.getName() + ".NUM_PARTITIONS", 1);
+		if (Elasql.ENABLE_STAND_ALONE_SEQUENCER) {
+			NUM_PARTITIONS = VanillaCommServer.getServerCount() - 1;
+		} else {
+			NUM_PARTITIONS = VanillaCommServer.getServerCount();
+		}
 	}
 
 	private PartitionPlan partPlan;
