@@ -39,7 +39,7 @@ public class BgPushProcedure extends CalvinStoredProcedure<BgPushParamHelper> {
 		ExecutionPlan plan;
 		
 		// Sequencer skips
-		if (Elasql.isSequencer())
+		if (Elasql.isStandAloneSequencer())
 			return new ExecutionPlan();
 		
 		// prepare parameters

@@ -39,7 +39,7 @@ public class OnePhaseBgPushProcedure extends CalvinStoredProcedure<OnePhaseBgPus
 		ExecutionPlan plan;
 		
 		// Sequencer skips
-		if (Elasql.isSequencer())
+		if (Elasql.isStandAloneSequencer())
 			return new ExecutionPlan();
 		
 		// prepare parameters

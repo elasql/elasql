@@ -80,7 +80,7 @@ public class CalvinScheduler extends Task implements Scheduler {
 //				timer.stopComponentTimer(sp.getClass().getSimpleName() + " prepare");
 				
 				// The sequencer does not go further
-				if (Elasql.isSequencer()) 
+				if (Elasql.isStandAloneSequencer()) 
 					continue;
 	
 				// log request

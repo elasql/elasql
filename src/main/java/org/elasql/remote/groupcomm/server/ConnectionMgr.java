@@ -38,14 +38,16 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class ConnectionMgr implements VanillaCommServerListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
+	
+	public static final int SEQUENCER_ID = VanillaCommServer.getServerCount() - 1;
 
 	private VanillaCommServer commServer;
 	private boolean sequencerMode;
 	private BlockingQueue<List<Serializable>> tomSendQueue = new LinkedBlockingQueue<List<Serializable>>();
 	private boolean areAllServersReady = false;
 
-	public ConnectionMgr(int id, boolean seqMode) {
-		sequencerMode = seqMode;
+	public ConnectionMgr(int id) {
+		sequencerMode = Elasql.serverId() == SEQUENCER_ID;
 		commServer = new VanillaCommServer(id, this);
 		new Thread(null, commServer, "VanillaComm-Server").start();
 

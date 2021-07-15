@@ -106,10 +106,10 @@ public class GroupCommConnection implements VanillaCommClientListener {
 	}
 	
 	public int getServerCount() {
-		return commClient.getServerCount();
+		return VanillaCommClient.getServerCount();
 	}
 	
 	public int getClientCount() {
-		return commClient.getClientCount();
+		return VanillaCommClient.getClientCount();
 	}
 }

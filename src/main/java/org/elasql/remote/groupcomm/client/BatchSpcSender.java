@@ -24,6 +24,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.remote.groupcomm.server.ConnectionMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.comm.client.VanillaCommClient;
 import org.vanilladb.comm.view.ProcessType;
@@ -31,11 +32,11 @@ import org.vanilladb.comm.view.ProcessType;
 class BatchSpcSender implements Runnable {
 	private static Logger logger = Logger.getLogger(BatchSpcSender.class.getName());
 
-	private final static int BATCH_SIZE;
+	private final static int COMM_BATCH_SIZE;
 	private final static long MAX_WAITING_TIME; // in ms
 
 	static {
-		BATCH_SIZE = ElasqlProperties.getLoader()
+		COMM_BATCH_SIZE = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".BATCH_SIZE", 1);
 		MAX_WAITING_TIME = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".MAX_WAITING_TIME", 1000);
@@ -45,20 +46,19 @@ class BatchSpcSender implements Runnable {
 	private Queue<StoredProcedureCall> spcQueue = new ConcurrentLinkedQueue<StoredProcedureCall>();
 	private VanillaCommClient commClient;
 	private long lastSendingTime;
-	private int nodeId, sequencerId;
+	private int nodeId;
 
 	public BatchSpcSender(int id, VanillaCommClient client) {
 		commClient = client;
 		lastSendingTime = System.currentTimeMillis();
 		nodeId = id;
-		sequencerId = client.getServerCount() - 1;
 	}
 
 	@Override
 	public void run() {
 		// periodically send batch of requests
 		if (logger.isLoggable(Level.INFO))
-			logger.info("start batching-request worker thread (batch size = " + BATCH_SIZE + ")"); 
+			logger.info("start batching-request worker thread (batch size = " + COMM_BATCH_SIZE + ")"); 
 
 		while (true)
 			sendBatchRequestToDb();
@@ -69,7 +69,7 @@ class BatchSpcSender implements Runnable {
 		spcQueue.add(spc);
 		int size = numOfQueuedSpcs.incrementAndGet();
 		
-		if (size >= BATCH_SIZE) {
+		if (size >= COMM_BATCH_SIZE) {
 			synchronized (this) {
 				notifyAll();
 			}
@@ -81,7 +81,7 @@ class BatchSpcSender implements Runnable {
 		int size = numOfQueuedSpcs.get();
 		long currentTime = System.currentTimeMillis();
 		try {
-			while (size < BATCH_SIZE && (currentTime - lastSendingTime < MAX_WAITING_TIME || size < 1)) {
+			while (size < COMM_BATCH_SIZE && (currentTime - lastSendingTime < MAX_WAITING_TIME || size < 1)) {
 				
 				synchronized (this) {
 					wait(100);
@@ -103,6 +103,6 @@ class BatchSpcSender implements Runnable {
 			batchSpc.add(spc);
 		}
 		numOfQueuedSpcs.addAndGet(-batchSpc.size());
-		commClient.sendP2pMessage(ProcessType.SERVER, sequencerId, batchSpc.toArray(new StoredProcedureCall[0]));
+		commClient.sendP2pMessage(ProcessType.SERVER, ConnectionMgr.SEQUENCER_ID, batchSpc.toArray(new StoredProcedureCall[0]));
 	}
 }

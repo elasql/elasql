@@ -27,18 +27,18 @@ import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
-public class TPartPartitioner extends Task implements Scheduler {
-	private static Logger logger = Logger.getLogger(TPartPartitioner.class.getName());
+public class TPartScheduler extends Task implements Scheduler {
+	private static Logger logger = Logger.getLogger(TPartScheduler.class.getName());
 
-	private static final int NUM_TASK_PER_SINK;
+	private static final int SCHEDULE_BATCH_SIZE;
 
 	private TPartStoredProcedureFactory factory;
 	
 //	private File dumpDir = new File("batch_dump");
 
 	static {
-		NUM_TASK_PER_SINK = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(TPartPartitioner.class.getName() + ".NUM_TASK_PER_SINK", 10);
+		SCHEDULE_BATCH_SIZE = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(TPartScheduler.class.getName() + ".SCHEDULE_BATCH_SIZE", 10);
 	}
 
 	private BlockingQueue<StoredProcedureCall> spcQueue;
@@ -47,12 +47,12 @@ public class TPartPartitioner extends Task implements Scheduler {
 	private TGraph graph;
 	private boolean batchingEnabled = true;
 
-	public TPartPartitioner(TPartStoredProcedureFactory factory, 
+	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
 		this(factory, inserter, sinker, graph, true);
 	}
 	
-	public TPartPartitioner(TPartStoredProcedureFactory factory, 
+	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph,
 			boolean isBatching) {
 		this.factory = factory;
@@ -106,7 +106,7 @@ public class TPartPartitioner extends Task implements Scheduler {
 				}
 				
 				// sink current t-graph if # pending tx exceeds threshold
-				if ((batchingEnabled && batchedTasks.size() >= NUM_TASK_PER_SINK)
+				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
 						|| !batchingEnabled) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
