@@ -1,18 +1,18 @@
 /*******************************************************************************
- * Copyright 2016 vanilladb.org
- * 
+ * Copyright 2016, 2018 elasql.org contributors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
- *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- ******************************************************************************/
+ *******************************************************************************/
 package org.elasql.storage.tx.recovery;
 
 import static org.vanilladb.core.sql.Type.BIGINT;
@@ -33,27 +33,16 @@ import org.vanilladb.core.storage.tx.recovery.LogRecord;
 
 public class StoredProcRequestRecord implements DdLogRecord {
 	private long txNum;
-	private int cid, rteId, pid;
+	private int clientId, connectionId, procedureId;
 	private Object[] pars;
 	private LogSeqNum lsn;
 	
-	/**
-	 * 
-	 * Creates a new stored procedure request log record for the specified
-	 * transaction.
-	 * 
-	 * @param txNum
-	 *            the ID of the specified transaction
-	 * @param cid
-	 * @param pid
-	 * @param pars
-	 */
-	public StoredProcRequestRecord(long txNum, int cid, int rteId, int pid,
+	public StoredProcRequestRecord(long txNum, int cid, int connId, int pid,
 			Object... pars) {
 		this.txNum = txNum;
-		this.cid = cid;
-		this.rteId = rteId;
-		this.pid = pid;
+		this.clientId = cid;
+		this.connectionId = connId;
+		this.procedureId = pid;
 		this.pars = pars;
 	}
 
@@ -65,23 +54,17 @@ public class StoredProcRequestRecord implements DdLogRecord {
 	 */
 	public StoredProcRequestRecord(BasicLogRecord rec) {
 		this.txNum = (Long) rec.nextVal(BIGINT).asJavaVal();
-		this.cid = (Integer) rec.nextVal(INTEGER).asJavaVal();
-		this.rteId = (Integer) rec.nextVal(INTEGER).asJavaVal();
-		this.pid = (Integer) rec.nextVal(INTEGER).asJavaVal();
+		this.clientId = (Integer) rec.nextVal(INTEGER).asJavaVal();
+		this.connectionId = (Integer) rec.nextVal(INTEGER).asJavaVal();
+		this.procedureId = (Integer) rec.nextVal(INTEGER).asJavaVal();
 
 		// FIXME
 		// See writeToLog()
-		this.pars = new Object[0];
+		this.pars = new Object[(Integer) rec.nextVal(INTEGER).asJavaVal()];
 		
 		lsn = rec.getLSN();
 	}
-
-	/**
-	 * Writes a request record to the log. This log record contains the
-	 * {@link LogRecord#OP_REQUEST} operator ID, followed by the transaction ID.
-	 * 
-	 * @return the LSN of the log record
-	 */
+	
 	@Override
 	public LogSeqNum writeToLog() {
 		List<Constant> rec = buildRecord();
@@ -110,7 +93,7 @@ public class StoredProcRequestRecord implements DdLogRecord {
 
 	@Override
 	public String toString() {
-		return "<SP_REQUEST " + txNum + " " + pid + " " + cid + 
+		return "<SP_REQUEST " + txNum + " " + procedureId + " " + clientId + 
 				" " + Arrays.toString(pars) + " >";
 	}
 
@@ -119,10 +102,13 @@ public class StoredProcRequestRecord implements DdLogRecord {
 		List<Constant> rec = new LinkedList<Constant>();
 		rec.add(new IntegerConstant(op()));
 		rec.add(new BigIntConstant(txNum));
-		rec.add(new IntegerConstant(cid));
-		rec.add(new IntegerConstant(rteId));
-		rec.add(new IntegerConstant(pid));
-		rec.add(new VarcharConstant(Arrays.toString(pars)));
+		rec.add(new IntegerConstant(clientId));
+		rec.add(new IntegerConstant(connectionId));
+		rec.add(new IntegerConstant(procedureId));
+		// XXX: we only record the size of the parameters for now
+		rec.add(new IntegerConstant(pars.length));
+		// Real code
+//		rec.add(new VarcharConstant(Arrays.toString(pars)));
 		return rec;
 	}
 
