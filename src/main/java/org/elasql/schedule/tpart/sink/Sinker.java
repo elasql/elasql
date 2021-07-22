@@ -39,14 +39,7 @@ public class Sinker {
 
 		return plans.iterator();
 	}
-
-	/**
-	 * Note: only sink the task that will be executed in this machine to result
-	 * set.
-	 * 
-	 * @param node
-	 * @return
-	 */
+	
 	protected List<TPartStoredProcedureTask> createSunkPlan(TGraph graph) {
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
 

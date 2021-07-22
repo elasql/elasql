@@ -35,15 +35,13 @@ import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
  * 
  * @author SLMT
  *
- * @param <H>
+ * @param <H> the type of parameter helpers for this stored procedure
  */
-public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
-		extends CalvinStoredProcedure<H> {
-	private static Logger logger = Logger.getLogger(AllExecuteProcedure.class
-			.getName());
+public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper> extends CalvinStoredProcedure<H> {
+	private static Logger logger = Logger.getLogger(AllExecuteProcedure.class.getName());
 
 	private static final String KEY_FINISH = "finish";
-	
+
 	private static final int MASTER_NODE = 0;
 
 	private int localNodeId = Elasql.serverId();
@@ -51,7 +49,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 	public AllExecuteProcedure(long txNum, H paramHelper) {
 		super(txNum, paramHelper);
-		
+
 		numOfParts = Elasql.partitionMetaMgr().getCurrentNumOfParts();
 	}
 
@@ -76,7 +74,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 	protected void prepareKeys(ReadWriteSetAnalyzer analyzer) {
 		// default: do nothing
 	}
-	
+
 	private ExecutionPlan alterExecutionPlan(ExecutionPlan plan) {
 		if (localNodeId == MASTER_NODE) {
 			for (int nodeId = 0; nodeId < numOfParts; nodeId++)
@@ -84,7 +82,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 		}
 		plan.setParticipantRole(ParticipantRole.ACTIVE);
 		plan.setForceReadWriteTx();
-		
+
 		return plan;
 	}
 
@@ -99,7 +97,7 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 
 			// Master: Wait for notification from other nodes
 			waitForNotification();
-			
+
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Other servers completion comfirmed.");
 		} else {
@@ -114,15 +112,13 @@ public abstract class AllExecuteProcedure<H extends StoredProcedureParamHelper>
 			if (nodeId != MASTER_NODE) {
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Waiting for the notification from node no." + nodeId);
-				
+
 				PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(nodeId, MASTER_NODE);
 				CachedRecord rec = cacheMgr.readFromRemote(notKey);
 				Constant con = rec.getVal(KEY_FINISH);
 				int value = (int) con.asJavaVal();
 				if (value != 1)
-					throw new RuntimeException(
-							"Notification value error, node no." + nodeId
-									+ " sent " + value);
+					throw new RuntimeException("Notification value error, node no." + nodeId + " sent " + value);
 
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Receive notification from node no." + nodeId);

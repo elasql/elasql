@@ -15,8 +15,8 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
 /**
- * An implementation of Clay [1]. <br />
- * <br />
+ * An implementation of Clay [1]. <br>
+ * <br>
  * [1] Serafini, Marco, et al.
  * "Clay: fine-grained adaptive partitioning for general database schemas."
  * Proceedings of the VLDB Endowment 10.4 (2016): 445-456.

@@ -56,12 +56,6 @@ public class PartitionMetaMgr {
 		return partPlan.isFullyReplicated(key);
 	}
 	
-	/**
-	 * Get the original location (may not be the current location)
-	 * 
-	 * @param key
-	 * @return
-	 */
 	public int getPartition(PrimaryKey key) {
 		return partPlan.getPartition(key);
 	}

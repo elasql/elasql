@@ -120,8 +120,8 @@ public class Elasql extends VanillaDb {
 	 *            the name of the database directory
 	 * @param id
 	 *            the id of the server
-	 * @param isSequencer
-	 *            is this server a sequencer
+	 * @param factory
+	 *            the stored procedure factory
 	 */
 	public static void init(String dirName, int id, DdStoredProcedureFactory<?> factory) {
 		PartitionPlan partitionPlan = null;

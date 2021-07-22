@@ -19,20 +19,19 @@ import org.vanilladb.core.sql.storedprocedure.ManuallyAbortException;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
 /**
- * A stored procedure that executes its logic on all the machines and performs
- * a two phase commit to ensure consistency at the end.<br />
- * <br />
+ * A stored procedure that executes its logic on all the machines and performs a
+ * two phase commit to ensure consistency at the end.<br>
+ * <br>
  * A deterministic database system usually does not need to perform two phase
- * commit to ensure consistency. However, if it is possible for a procedure
- * to perform non-deterministic actions that might cause aborts, two phase
- * commit will be needed.
+ * commit to ensure consistency. However, if it is possible for a procedure to
+ * perform non-deterministic actions that might cause aborts, two phase commit
+ * will be needed.
  * 
  * @author SLMT
  *
- * @param <H>
+ * @param <H> the type of parameter helpers for this stored procedure
  */
-public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelper>
-		extends CalvinStoredProcedure<H> {
+public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelper> extends CalvinStoredProcedure<H> {
 	private static Logger logger = Logger.getLogger(AllExecuteProcedure.class.getName());
 
 	private static final String FIELD_DECISION = "decision";
@@ -113,7 +112,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 		if (!finalDecision) {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("Aborts the transaction");
-			
+
 			if (abortCause != null)
 				throw abortCause;
 			else
@@ -123,32 +122,32 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Commits the transaction.");
 	}
-	
+
 	private boolean performTwoPhaseCommit() {
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Performing two phase commit...");
-		
+
 		// Two Phase Commit
 		boolean decision = (abortCause == null);
 		decision = performPhaseOne(decision);
 		decision = performPhaseTwo(decision);
 		return decision;
 	}
-	
+
 	private boolean performPhaseOne(boolean isCommitted) {
 		if (localNodeId == MASTER_NODE) {
 			// Master node: wait for all the decisions
 			isCommitted = masterWaitForDecisions(isCommitted);
-			
+
 			if (logger.isLoggable(Level.INFO))
-				logger.info("The final decision is: " + (isCommitted? "Commit": "Abort"));
+				logger.info("The final decision is: " + (isCommitted ? "Commit" : "Abort"));
 		} else {
 			// Other node: send its decision
 			otherSendNotification(isCommitted);
 		}
 		return isCommitted;
 	}
-	
+
 	private boolean performPhaseTwo(boolean finalDecision) {
 		if (localNodeId == MASTER_NODE) {
 			// Master node: send the final decision
@@ -167,7 +166,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 			else
 				abortMessage = String.format("aborted by node 0: %s", abortMessage);
 		}
-		
+
 		// Wait for decisions
 		for (int nodeId = 0; nodeId < numOfParts; nodeId++)
 			if (nodeId != MASTER_NODE) {
@@ -186,7 +185,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 					else
 						abortMessage = String.format("aborted by node %d: %s", nodeId, message);
 				}
-				
+
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Receive the decision from node no." + nodeId);
 			}
@@ -197,7 +196,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 		// Create a key value set
 		PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(Elasql.serverId(), MASTER_NODE);
 		CachedRecord notVal = NotificationPartitionPlan.createRecord(Elasql.serverId(), MASTER_NODE, txNum);
-		notVal.addFldVal(FIELD_DECISION, (isCommitted? COMMIT : ABORT));
+		notVal.addFldVal(FIELD_DECISION, (isCommitted ? COMMIT : ABORT));
 		notVal.addFldVal(FIELD_MESSAGE, new VarcharConstant(abortMessage));
 
 		TupleSet ts = new TupleSet(-1);
@@ -208,7 +207,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 		if (logger.isLoggable(Level.FINE))
 			logger.fine("The decision is sent to the master by tx." + txNum);
 	}
-	
+
 	private void masterSendFianlDecision(boolean finalDecision) {
 		// Send decisions
 		for (int nodeId = 0; nodeId < numOfParts; nodeId++)
@@ -219,7 +218,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 				// Create a key value set
 				PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(MASTER_NODE, nodeId);
 				CachedRecord notVal = NotificationPartitionPlan.createRecord(MASTER_NODE, nodeId, txNum);
-				notVal.addFldVal(FIELD_DECISION, (finalDecision? COMMIT : ABORT));
+				notVal.addFldVal(FIELD_DECISION, (finalDecision ? COMMIT : ABORT));
 				notVal.addFldVal(FIELD_MESSAGE, new VarcharConstant(abortMessage));
 
 				TupleSet ts = new TupleSet(-1);
@@ -228,7 +227,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 				Elasql.connectionMgr().pushTupleSet(nodeId, ts);
 			}
 	}
-	
+
 	private boolean otherReceiveFinalDecision() {
 		// Create a key value set
 		PrimaryKey notKey = NotificationPartitionPlan.createRecordKey(MASTER_NODE, Elasql.serverId());
@@ -238,7 +237,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 
 		if (logger.isLoggable(Level.FINE))
 			logger.fine("The decision is sent to the master by tx." + txNum);
-		
+
 		return isCommitted;
 	}
 }

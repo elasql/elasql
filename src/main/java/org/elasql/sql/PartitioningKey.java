@@ -5,11 +5,12 @@ import org.vanilladb.core.sql.Constant;
 public class PartitioningKey extends Key {
 
 	private static final long serialVersionUID = 20200819001L;
-
+	
 	/**
 	 * Use the whole PrimaryKey as a partitioning key.
 	 * 
-	 * @param key
+	 * @param key the primary key
+	 * @return the partitioning key that stores the whole primary key
 	 */
 	public static PartitioningKey fromPrimaryKey(PrimaryKey key) {
 		return new PartitioningKey(key);

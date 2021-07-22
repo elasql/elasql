@@ -28,13 +28,11 @@ public class TPartTxLocalCache {
 	}
 
 	/**
-	 * Reads a CachedRecord with the specified key from a previous sink. A sink
-	 * may be a T-Graph or the local storage.
+	 * Reads a CachedRecord with the specified key from the sink. The sink
+	 * may be the fusion cache or the local storage. 
 	 * 
 	 * @param key
 	 *            the key of the record
-	 * @param mySinkId
-	 *            the id of the sink where the transaction executes
 	 * @return the specified record
 	 */
 	public CachedRecord readFromSink(PrimaryKey key) {

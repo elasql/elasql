@@ -37,17 +37,6 @@ public class StoredProcRequestRecord implements DdLogRecord {
 	private Object[] pars;
 	private LogSeqNum lsn;
 	
-	/**
-	 * 
-	 * Creates a new stored procedure request log record for the specified
-	 * transaction.
-	 * 
-	 * @param txNum
-	 *            the ID of the specified transaction
-	 * @param cid
-	 * @param pid
-	 * @param pars
-	 */
 	public StoredProcRequestRecord(long txNum, int cid, int connId, int pid,
 			Object... pars) {
 		this.txNum = txNum;
