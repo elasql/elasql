@@ -35,7 +35,7 @@ Check out our [configuration instructions](doc/configurations.md).
 <dependency>
   <groupId>org.elasql</groupId>
   <artifactId>elasql</artifactId>
-  <version>0.2.1</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 

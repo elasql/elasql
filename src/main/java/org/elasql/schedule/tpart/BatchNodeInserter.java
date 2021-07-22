@@ -10,8 +10,8 @@ public interface BatchNodeInserter {
 	/**
 	 * Insert a batch of transaction requests into the given T-Graph.
 	 * 
-	 * @param graph
-	 * @param node
+	 * @param graph the graph that the inserter inserts the tasks to
+	 * @param tasks the tasks to be inserted to the graph
 	 */
 	void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks);
 }

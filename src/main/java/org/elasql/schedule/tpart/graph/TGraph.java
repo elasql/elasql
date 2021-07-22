@@ -12,13 +12,13 @@ import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class TGraph {
-	
+
 	protected SinkNode[] sinkNodes;
 	private List<TxNode> txNodes = new LinkedList<TxNode>();
 	protected Map<PrimaryKey, TxNode> resPos = new HashMap<PrimaryKey, TxNode>();
-	
+
 	protected PartitionMetaMgr parMeta;
-	
+
 	// Statistics (lazy evaluation)
 	private boolean isStatsCalculated = false;
 	private int[] numOfNodes;
@@ -36,14 +36,15 @@ public class TGraph {
 	}
 
 	/**
-	 * Insert a new tx node into the t-graph.
+	 * Insert a new transaction node into the t-graph.
 	 * 
-	 * @param node
+	 * @param task           the stored procedure task to be inserted
+	 * @param assignedPartId the destination partition for the task
 	 */
 	public void insertTxNode(TPartStoredProcedureTask task, int assignedPartId) {
 		TxNode node = new TxNode(task, assignedPartId);
 		txNodes.add(node);
-		
+
 		// Establish forward pushing edges
 		if (task.getReadSet() != null) {
 			// create a read edge to the latest txn that writes that resource
@@ -60,7 +61,7 @@ public class TGraph {
 				targetNode.addWriteEdges(new Edge(node, res));
 			}
 		}
-		
+
 		// Update the resource locations
 		if (task.getWriteSet() != null) {
 			// update the resource position
@@ -81,15 +82,15 @@ public class TGraph {
 		}
 		resPos.clear();
 	}
-	
+
 	public void clear() {
 		// clear the edges from sink nodes
 		for (int i = 0; i < sinkNodes.length; i++)
 			sinkNodes[i].getWriteEdges().clear();
-		
+
 		// remove all tx nodes
 		txNodes.clear();
-		
+
 		// reset the statistics
 		isStatsCalculated = false;
 	}
@@ -97,10 +98,10 @@ public class TGraph {
 	/**
 	 * Get the node that produce the latest version of specified resource.
 	 * 
-	 * @param
-	 * @return The desired node. If the resource has not been created a new
-	 *         version since last sinking, the partition that own the resource
-	 *         will be return in a Node format.
+	 * @param res the key of the resource to lookup
+	 * @return The desired node. If the resource has not been created a new version
+	 *         since last sinking, the partition that own the resource will be
+	 *         return in a Node format.
 	 */
 	public Node getResourcePosition(PrimaryKey res) {
 		if (resPos.containsKey(res))
@@ -111,27 +112,27 @@ public class TGraph {
 	public List<TxNode> getTxNodes() {
 		return txNodes;
 	}
-	
+
 	public TxNode getLastInsertedTxNode() {
 		return txNodes.get(txNodes.size() - 1);
 	}
-	
+
 	private void calculateStatistics() {
 		if (isStatsCalculated)
 			return;
-		
+
 		// Count the # of nodes in each partition
 		numOfNodes = new int[PartitionMetaMgr.NUM_PARTITIONS];
-		
+
 		// Count how many remote read edges starting from each partition
 		remoteTxReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		remoteSinkReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
-		
+
 		for (TxNode node : txNodes) {
 			int partId = node.getPartId();
-			
+
 			numOfNodes[partId]++;
-			
+
 			for (Edge edge : node.getReadEdges()) {
 				if (partId != edge.getTarget().getPartId()) {
 					if (edge.getTarget().isSinkNode()) {
@@ -140,16 +141,16 @@ public class TGraph {
 						remoteTxReads[partId]++;
 					}
 				}
-					
+
 			}
 		}
-		
+
 		// Count imbalance distance = sum(|(count - avg)|)
 		imbalDis = 0;
 		int avg = txNodes.size() / PartitionMetaMgr.NUM_PARTITIONS;
 		for (int numOfNode : numOfNodes)
 			imbalDis += Math.abs(numOfNode - avg);
-		
+
 		// Count the total number of remote read edges
 		totalRemoteTxReads = 0;
 		for (int remoteTxRead : remoteTxReads)
@@ -157,34 +158,34 @@ public class TGraph {
 		totalRemoteSinkReads = 0;
 		for (int remoteReadEdge : remoteSinkReads)
 			totalRemoteSinkReads += remoteReadEdge;
-		
+
 		isStatsCalculated = true;
 	}
-	
+
 	public int getImbalancedDis() {
 		calculateStatistics();
 		return imbalDis;
 	}
-	
+
 	public int getRemoteTxReads() {
 		calculateStatistics();
 		return totalRemoteTxReads;
 	}
-	
+
 	public int getRemoteSinkReads() {
 		calculateStatistics();
 		return totalRemoteSinkReads;
 	}
-	
+
 	public Map<PrimaryKey, Node> getResourceNodeMap() {
 		return new HashMap<PrimaryKey, Node>(resPos);
 	}
-	
+
 	public String getStatistics() {
 		StringBuilder sb = new StringBuilder();
-		
+
 		calculateStatistics();
-		
+
 		sb.append("============= T-Graph Statistics ==============\n");
 		sb.append("# of nodes: ");
 		for (int numOfNode : numOfNodes)
@@ -202,17 +203,17 @@ public class TGraph {
 		sb.append("\n");
 		sb.append("Total # of remote sink reads: " + totalRemoteSinkReads + "\n");
 		sb.append("===============================================\n");
-		
+
 		return sb.toString();
 	}
-	
+
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		
+
 		for (Node node : txNodes)
 			sb.append(node + "\n");
-		
+
 		return sb.toString();
 	}
 }
