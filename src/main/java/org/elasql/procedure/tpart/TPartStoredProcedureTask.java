@@ -7,9 +7,9 @@ import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
+import org.elasql.util.TransactionStatisticsRecorder;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.util.Timer;
-import org.vanilladb.core.util.TimerStatistics;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
@@ -17,6 +17,7 @@ public class TPartStoredProcedureTask
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
+		TransactionStatisticsRecorder.startRecording();
 	}
 
 	private TPartStoredProcedure<?> tsp;
@@ -36,16 +37,14 @@ public class TPartStoredProcedureTask
 		SpResultSet rs = null;
 		
 		Thread.currentThread().setName("Tx." + txNum);
-//		Timer timer = Timer.getLocalTimer();
-//		timer.reset();
-//		timer.startExecution();
+		
+		// Initialize a thread-local timer
+		Timer timer = Timer.getLocalTimer();
+		timer.reset();
+		timer.startExecution();
 
-//		try {
-			rs = tsp.execute();
-//		} finally {
-//			timer.stopExecution();
-//		}
-
+		rs = tsp.execute();
+			
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
@@ -60,6 +59,12 @@ public class TPartStoredProcedureTask
 			// For Debugging
 //			timer.addToGlobalStatistics();
 		}
+		
+		// Stop the timer for the whole execution
+		timer.stopExecution();
+		
+		// Record the timer result
+		TransactionStatisticsRecorder.recordResult(txNum, timer);
 	}
 
 	public long getTxNum() {
