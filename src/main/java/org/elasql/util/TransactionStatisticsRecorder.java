@@ -25,9 +25,13 @@ import org.vanilladb.core.util.Timer;
 public class TransactionStatisticsRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionStatisticsRecorder.class.getName());
 	
-	private static final String FILENAME_PREFIX = "transaction-statistics-";
+	private static final String FILENAME_PREFIX = "transaction-statistics";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String FIRST_STATS_COLUMN = "Execution Time";
+	
+	// Set 'ture' to use the same filename for the report.
+	// This is used to avoid create too many files in a series of experiments.
+	private static final boolean USE_SAME_FILENAME = true;
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 
 	private static class StatisticRecord {
@@ -125,7 +129,7 @@ public class TransactionStatisticsRecorder extends Task {
 	
 	private Map<String, Integer> createHeaderToIndexMapping(List<String> header) {
 		Map<String, Integer> columnToIndex = new HashMap<String, Integer>();
-		for (int idx = 0; idx < columnToIndex.size(); idx++)
+		for (int idx = 0; idx < header.size(); idx++)
 			columnToIndex.put(header.get(idx), idx);
 		return columnToIndex;
 	}
@@ -155,6 +159,7 @@ public class TransactionStatisticsRecorder extends Task {
 		String fileName = generateOutputFileName();
 		try (BufferedWriter writer = createOutputFile(fileName)) {
 			sortByFirstColumn(rows);
+			writeHeader(writer, header);
 			for (long[] row : rows)
 				writeRecord(writer, row, columnCount);
 		} catch (IOException e) {
@@ -169,11 +174,18 @@ public class TransactionStatisticsRecorder extends Task {
 	}
 	
 	private String generateOutputFileName() {
-		LocalDateTime datetime = LocalDateTime.now();
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
-		String datetimeStr = datetime.format(formatter);
+		String filename;
 		
-		return String.format("%s-%s.csv", FILENAME_PREFIX, datetimeStr);
+		if (USE_SAME_FILENAME) {
+			filename = String.format("%s.csv", FILENAME_PREFIX);
+		} else {
+			LocalDateTime datetime = LocalDateTime.now();
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+			String datetimeStr = datetime.format(formatter);
+			filename = String.format("%s-%s.csv", FILENAME_PREFIX, datetimeStr);
+		}
+		
+		return filename;
 	}
 	
 	private BufferedWriter createOutputFile(String fileName) throws IOException {
@@ -190,6 +202,19 @@ public class TransactionStatisticsRecorder extends Task {
 		});
 	}
 	
+	private void writeHeader(BufferedWriter writer, List<String> header) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		
+		for (String column : header) {
+			sb.append(column);
+			sb.append(',');
+		}
+		sb.deleteCharAt(sb.length() - 1);
+		sb.append('\n');
+		
+		writer.append(sb.toString());
+	}
+	
 	private void writeRecord(BufferedWriter writer, long[] row, int columnCount) throws IOException {
 		StringBuilder sb = new StringBuilder();
 		
@@ -202,6 +227,7 @@ public class TransactionStatisticsRecorder extends Task {
 			}
 		}
 		sb.deleteCharAt(sb.length() - 1);
+		sb.append('\n');
 		
 		writer.append(sb.toString());
 	}
