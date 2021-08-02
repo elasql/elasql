@@ -29,7 +29,7 @@ public class TransactionStatisticsRecorder extends Task {
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String FIRST_STATS_COLUMN = "Execution Time";
 	
-	// Set 'ture' to use the same filename for the report.
+	// Set 'true' to use the same filename for the report.
 	// This is used to avoid create too many files in a series of experiments.
 	private static final boolean USE_SAME_FILENAME = true;
 	private static final long TIME_TO_FLUSH = 10; // in seconds
