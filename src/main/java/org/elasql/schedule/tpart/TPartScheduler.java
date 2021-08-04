@@ -46,6 +46,8 @@ public class TPartScheduler extends Task implements Scheduler {
 	private Sinker sinker;
 	private TGraph graph;
 	private boolean batchingEnabled = true;
+	private long startTime, sinkStartTime, sinkStopTime, threadInitStartTime;
+	private boolean isFirst = true;
 
 	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
@@ -78,12 +80,8 @@ public class TPartScheduler extends Task implements Scheduler {
 		}
 	}
 
-	private long firstTxStartTime;
 	public void run() {
 		List<TPartStoredProcedureTask> batchedTasks = new LinkedList<TPartStoredProcedureTask>();
-		
-		// Collect first tx start time
-		firstTxStartTime = System.nanoTime();
 		
 		while (true) {
 			try {
@@ -122,8 +120,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			}
 		}
 	}
-	private long startTime, sinkStartTime, sinkStopTime, threadInitStartTime;
-	private boolean isFirst = true;
+	
 	private void processBatch(List<TPartStoredProcedureTask> batchedTasks) {
 
 		startTime = System.nanoTime();
