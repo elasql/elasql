@@ -39,12 +39,18 @@ public class TPartStoredProcedureTask
 //		TransactionStatisticsRecorder.startRecording();
 		VanillaDb.taskMgr().runTask(new WaitingForStartingRecordTask());
 	}
+	
+	private static long firstTxStartTime;
+	
+	public static void setFirstTxStartTime(long firstTxStartTime) {
+		TPartStoredProcedureTask.firstTxStartTime = firstTxStartTime;
+	}
 
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
 	private long txStartTime, sinkStartTime, sinkStopTime, threadInitStartTime;
-	private static long firstTxStartTime;
+
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
@@ -62,10 +68,10 @@ public class TPartStoredProcedureTask
 		// Initialize a thread-local timer
 		Timer timer = Timer.getLocalTimer();
 		timer.reset();
-		timer.setStartExecution(txStartTime);
-		timer.setStartComponentTimer("Generate plan", sinkStartTime);
-		timer.setStopComponentTimer("Generate plan", sinkStopTime);
-		timer.setStartComponentTimer("Init thread", threadInitStartTime);
+		timer.setStartExecutionTime(txStartTime);
+		timer.startComponentTimer("Generate plan", sinkStartTime);
+		timer.stopComponentTimer("Generate plan", sinkStopTime);
+		timer.startComponentTimer("Init thread", threadInitStartTime);
 		timer.stopComponentTimer("Init thread");
 //		timer.startExecution();
 
@@ -144,18 +150,9 @@ public class TPartStoredProcedureTask
 	}
 
 	public void setStartTime(long txStartTime, long sinkStartTime, long sinkStopTime, long threadInitStartTime) {
-//		this.firstTxStartTime = firstTxStartTime;
 		this.txStartTime = txStartTime;
 		this.sinkStartTime = sinkStartTime;
 		this.sinkStopTime = sinkStopTime;
 		this.threadInitStartTime = threadInitStartTime;
-	}
-	
-	public static void setFirstTxStartTime(long firstTxStartTime) {
-		TPartStoredProcedureTask.firstTxStartTime = firstTxStartTime;
-//		this.txStartTime = txStartTime;
-//		this.sinkStartTime = sinkStartTime;
-//		this.sinkStopTime = sinkStopTime;
-//		this.threadInitStartTime = threadInitStartTime;
 	}
 }
