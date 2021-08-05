@@ -7,29 +7,56 @@ import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
+import org.elasql.util.FeatureCollector;
+import org.elasql.util.TransactionFeaturesRecorder;
 import org.elasql.util.TransactionStatisticsRecorder;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.server.VanillaDb;
+import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.util.Timer;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
 	
+	private static class WaitingForStartingRecordTask extends Task {
+//		private static final int WARM_UP_TIME = 100_000;
+		private static final int WARM_UP_TIME = 0; // in milliseconds
+		@Override
+		public void run() {
+			try {
+				Thread.sleep(WARM_UP_TIME);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			TransactionStatisticsRecorder.startRecording();
+			TransactionFeaturesRecorder.startRecording();
+		}
+	}
+	
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
-		TransactionStatisticsRecorder.startRecording();
+//		TransactionStatisticsRecorder.startRecording();
+		VanillaDb.taskMgr().runTask(new WaitingForStartingRecordTask());
+	}
+	
+	private static long firstTxStartTime;
+	
+	public static void setFirstTxStartTime(long firstTxStartTime) {
+		TPartStoredProcedureTask.firstTxStartTime = firstTxStartTime;
 	}
 
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
+	private long txStartTime, sinkStartTime, sinkStopTime, threadInitStartTime;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
-		this.tsp = sp;
+		this.tsp = sp;		
 	}
 
 	@Override
@@ -41,8 +68,21 @@ public class TPartStoredProcedureTask
 		// Initialize a thread-local timer
 		Timer timer = Timer.getLocalTimer();
 		timer.reset();
-		timer.startExecution();
+		timer.setStartExecutionTime(txStartTime);
+		timer.startComponentTimer("Generate plan", sinkStartTime);
+		timer.stopComponentTimer("Generate plan", sinkStopTime);
+		timer.startComponentTimer("Init thread", threadInitStartTime);
+		timer.stopComponentTimer("Init thread");
+//		timer.startExecution();
 
+		// Initialize a thread-local feature collector
+		FeatureCollector collector = FeatureCollector.getLocalFeatureCollector();
+		collector.setFeatureValue(FeatureCollector.keys[0], (txStartTime - firstTxStartTime)/1000);
+		collector.setFeatureValue(FeatureCollector.keys[1], tsp.getReadSet());
+		collector.setFeatureValue(FeatureCollector.keys[2], tsp.getWriteSet());
+		// Record the feature result
+		TransactionFeaturesRecorder.recordResult(txNum, collector);
+		
 		rs = tsp.execute();
 			
 		if (tsp.isMaster()) {
@@ -107,5 +147,12 @@ public class TPartStoredProcedureTask
 
 	public boolean isReadOnly() {
 		return tsp.isReadOnly();
+	}
+
+	public void setStartTime(long txStartTime, long sinkStartTime, long sinkStopTime, long threadInitStartTime) {
+		this.txStartTime = txStartTime;
+		this.sinkStartTime = sinkStartTime;
+		this.sinkStopTime = sinkStopTime;
+		this.threadInitStartTime = threadInitStartTime;
 	}
 }

@@ -46,6 +46,8 @@ public class TPartScheduler extends Task implements Scheduler {
 	private Sinker sinker;
 	private TGraph graph;
 	private boolean batchingEnabled = true;
+	private long startTime, sinkStartTime, sinkStopTime, threadInitStartTime;
+	private boolean isFirst = true;
 
 	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
@@ -120,6 +122,13 @@ public class TPartScheduler extends Task implements Scheduler {
 	}
 	
 	private void processBatch(List<TPartStoredProcedureTask> batchedTasks) {
+
+		startTime = System.nanoTime();
+		if(isFirst) {
+			TPartStoredProcedureTask.setFirstTxStartTime(startTime);
+			isFirst = false;
+		}
+			
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
 		
@@ -132,7 +141,9 @@ public class TPartScheduler extends Task implements Scheduler {
 		
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
+			sinkStartTime = System.nanoTime();
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
+			sinkStopTime  = System.nanoTime();
 			dispatchToTaskMgr(plansTter);
 		}
 	}
@@ -165,6 +176,8 @@ public class TPartScheduler extends Task implements Scheduler {
 	private void dispatchToTaskMgr(Iterator<TPartStoredProcedureTask> plans) {
 		while (plans.hasNext()) {
 			TPartStoredProcedureTask p = plans.next();
+			threadInitStartTime  = System.nanoTime();
+			p.setStartTime(startTime, sinkStartTime, sinkStopTime, threadInitStartTime);
 			VanillaDb.taskMgr().runTask(p);
 		}
 	}
