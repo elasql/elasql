@@ -1,13 +1,7 @@
 package org.elasql.util;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,10 +22,6 @@ public class TransactionStatisticsRecorder extends Task {
 	private static final String FILENAME_PREFIX = "transaction-statistics";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String FIRST_STATS_COLUMN = "Execution Time";
-	
-	// Set 'true' to use the same filename for the report.
-	// This is used to avoid create too many files in a series of experiments.
-	private static final boolean USE_SAME_FILENAME = true;
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 
 	private static class StatisticRecord {
@@ -54,6 +44,29 @@ public class TransactionStatisticsRecorder extends Task {
 		
 		public void addRecord(String name, long time) {
 			records.add(new StatisticRecord(name, time));
+		}
+	}
+	
+	private static class StatisticsRow implements CsvRow, Comparable<StatisticsRow> {
+		
+		private long[] data;
+		
+		public StatisticsRow(long[] data) {
+			this.data = data;
+		}
+
+		@Override
+		public String getVal(int index) {
+			if (index < data.length) {
+				return Long.toString(data[index]);
+			} else {
+				return "0";
+			}
+		}
+
+		@Override
+		public int compareTo(StatisticsRow row) {
+			return Long.compare(data[0], row.data[0]);
 		}
 	}
 	
@@ -94,16 +107,16 @@ public class TransactionStatisticsRecorder extends Task {
 				logger.info("Transaction statistics recorder starts recording statistics");
 			
 			// Save the statistics
-			List<long[]> rows = new ArrayList<long[]>();
+			List<StatisticsRow> rows = new ArrayList<StatisticsRow>();
 			updateHeader(header, columnToIndex, stats);
-			long[] data = convertStatisticsToArray(header, columnToIndex, stats);
-			rows.add(data);
+			StatisticsRow row = convertStatisticsToRow(header, columnToIndex, stats);
+			rows.add(row);
 			
 			// Wait until no more statistics coming in the last 10 seconds
 			while ((stats = queue.poll(TIME_TO_FLUSH, TimeUnit.SECONDS)) != null) {
 				updateHeader(header, columnToIndex, stats);
-				data = convertStatisticsToArray(header, columnToIndex, stats);
-				rows.add(data);
+				row = convertStatisticsToRow(header, columnToIndex, stats);
+				rows.add(row);
 			}
 			
 			if (logger.isLoggable(Level.INFO)) {
@@ -112,8 +125,14 @@ public class TransactionStatisticsRecorder extends Task {
 				logger.info(log);
 			}
 			
+			// Sort by transaction ID
+			Collections.sort(rows);
+			
+			// Save to CSV
+			CsvSaver<StatisticsRow> csvSaver = new CsvSaver<StatisticsRow>(FILENAME_PREFIX);
+			
 			// Generate the output file
-			generateOutputFile(header, rows);
+			csvSaver.generateOutputFile(header, rows);
 			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -144,91 +163,13 @@ public class TransactionStatisticsRecorder extends Task {
 		}
 	}
 	
-	private long[] convertStatisticsToArray(List<String> header, Map<String, Integer> columnToIndex, TransactionStatistics stats) {
+	private StatisticsRow convertStatisticsToRow(List<String> header, Map<String, Integer> columnToIndex, TransactionStatistics stats) {
 		long[] data = new long[header.size()];
 		data[0] = stats.txNum;
 		for (StatisticRecord record : stats.records) {
 			int index = columnToIndex.get(record.name);
 			data[index] = record.time;
 		}
-		return data;
-	}
-	
-	private void generateOutputFile(List<String> header, List<long[]> rows) {
-		int columnCount = header.size();
-		String fileName = generateOutputFileName();
-		try (BufferedWriter writer = createOutputFile(fileName)) {
-			sortByFirstColumn(rows);
-			writeHeader(writer, header);
-			for (long[] row : rows)
-				writeRecord(writer, row, columnCount);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A transaction statistics report is generated at \"%s\"",
-					fileName);
-			logger.info(log);
-		}
-	}
-	
-	private String generateOutputFileName() {
-		String filename;
-		
-		if (USE_SAME_FILENAME) {
-			filename = String.format("%s.csv", FILENAME_PREFIX);
-		} else {
-			LocalDateTime datetime = LocalDateTime.now();
-			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
-			String datetimeStr = datetime.format(formatter);
-			filename = String.format("%s-%s.csv", FILENAME_PREFIX, datetimeStr);
-		}
-		
-		return filename;
-	}
-	
-	private BufferedWriter createOutputFile(String fileName) throws IOException {
-		return new BufferedWriter(new FileWriter(fileName));
-	}
-	
-	private void sortByFirstColumn(List<long[]> rows) {
-		Collections.sort(rows, new Comparator<long[]>() {
-
-			@Override
-			public int compare(long[] row1, long[] row2) {
-				return Long.compare(row1[0], row2[0]);
-			}
-		});
-	}
-	
-	private void writeHeader(BufferedWriter writer, List<String> header) throws IOException {
-		StringBuilder sb = new StringBuilder();
-		
-		for (String column : header) {
-			sb.append(column);
-			sb.append(',');
-		}
-		sb.deleteCharAt(sb.length() - 1);
-		sb.append('\n');
-		
-		writer.append(sb.toString());
-	}
-	
-	private void writeRecord(BufferedWriter writer, long[] row, int columnCount) throws IOException {
-		StringBuilder sb = new StringBuilder();
-		
-		for (int i = 0; i < columnCount; i++) {
-			if (i < row.length) {
-				sb.append(row[i]);
-				sb.append(',');
-			} else {
-				sb.append("0,");
-			}
-		}
-		sb.deleteCharAt(sb.length() - 1);
-		sb.append('\n');
-		
-		writer.append(sb.toString());
+		return new StatisticsRow(data);
 	}
 }

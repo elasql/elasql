@@ -1,13 +1,7 @@
 package org.elasql.util;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -15,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
@@ -24,13 +19,9 @@ public class TransactionFeaturesRecorder extends Task {
 	private static final String FILENAME_PREFIX = "transaction-features";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	
-	// Set 'true' to use the same filename for the report.
-	// This is used to avoid create too many files in a series of experiments.
-	// Because the file may be very large.
-	private static final boolean USE_SAME_FILENAME = true;
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 	
-	private static class TransactionFeatures {
+	private static class TransactionFeatures implements CsvRow, Comparable<TransactionFeatures> {
 		Long txNum;
 		Object[] values = new Object[FeatureCollector.keys.length];
 		int index = 0;
@@ -43,9 +34,18 @@ public class TransactionFeaturesRecorder extends Task {
 			values[index] = value;
 			index += 1;
 		}
-		
-		public Object[] getFeatrueList() {
-			return values;
+
+		@Override
+		public String getVal(int index) {
+			if (index == 0)
+				return Long.toString(txNum);
+			else
+				return values[index - 1].toString();
+		}
+
+		@Override
+		public int compareTo(TransactionFeatures target) {
+			return txNum.compareTo(target.txNum);
 		}
 	}
 	
@@ -100,8 +100,14 @@ public class TransactionFeaturesRecorder extends Task {
 				logger.info(log);
 			}
 			
+			// Sort by transaction ID
+			Collections.sort(rows);
+			
+			// Save to CSV
+			CsvSaver<TransactionFeatures> csvSaver = new CsvSaver<TransactionFeatures>(FILENAME_PREFIX);
+			
 			// Generate the output file
-			generateOutputFile(header, rows);
+			csvSaver.generateOutputFile(header, rows);
 			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -110,83 +116,9 @@ public class TransactionFeaturesRecorder extends Task {
 
 	private List<String> initHeader(TransactionFeatures features) {
 		List<String> header = new ArrayList<String>();
+		header.add(TRANSACTION_ID_COLUMN);
 		for (String key : FeatureCollector.keys) 
 				header.add(key);
 		return header;
-	}
-
-	private void generateOutputFile(List<String> header, List<TransactionFeatures> rows) {
-		String fileName = generateOutputFileName();
-		try (BufferedWriter writer = createOutputFile(fileName)) {
-			sortByFirstColumn(rows);
-			writeHeader(writer, header);
-			for (TransactionFeatures row : rows)
-				writeRecord(writer, row);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A transaction features file is generated at \"%s\"",
-					fileName);
-			logger.info(log);
-		}
-	}
-	
-	private String generateOutputFileName() {
-		String filename;
-		
-		if (USE_SAME_FILENAME) {
-			filename = String.format("%s.csv", FILENAME_PREFIX);
-		} else {
-			LocalDateTime datetime = LocalDateTime.now();
-			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
-			String datetimeStr = datetime.format(formatter);
-			filename = String.format("%s-%s.csv", FILENAME_PREFIX, datetimeStr);
-		}
-		
-		return filename;
-	}
-	
-	private BufferedWriter createOutputFile(String fileName) throws IOException {
-		return new BufferedWriter(new FileWriter(fileName));
-	}
-	
-	// Sort by tx number
-	private void sortByFirstColumn(List<TransactionFeatures> rows) {
-		Collections.sort(rows, new Comparator<TransactionFeatures>() {
-
-			@Override
-			public int compare(TransactionFeatures row1, TransactionFeatures row2) {
-				return row1.txNum.compareTo(row2.txNum);
-			}
-		});
-	}
-	
-	private void writeHeader(BufferedWriter writer, List<String> header) throws IOException {
-		StringBuilder sb = new StringBuilder();
-		sb.append(TRANSACTION_ID_COLUMN);
-		for (String column : header) {
-			sb.append(',');
-			sb.append(column);
-		}
-//		sb.deleteCharAt(sb.length() - 1);
-		sb.append('\n');
-		
-		writer.append(sb.toString());
-	}
-	
-	private void writeRecord(BufferedWriter writer, TransactionFeatures row) throws IOException {
-		StringBuilder sb = new StringBuilder();
-		sb.append(row.txNum);
-		Object[] values = row.getFeatrueList();
-		for (int i = 0; i < values.length; i++) {
-			sb.append(',');
-			sb.append(values[i]);		
-		}
-//		sb.deleteCharAt(sb.length() - 1);
-		sb.append('\n');
-		
-		writer.append(sb.toString());
 	}
 }
