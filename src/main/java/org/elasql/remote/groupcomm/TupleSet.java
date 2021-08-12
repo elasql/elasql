@@ -48,11 +48,18 @@ public class TupleSet implements Serializable {
 		return tuples;
 	}
 
-	public void addTuple(PrimaryKey key, long srcTxNum, long destTxNum,
-			CachedRecord rec) {
+	/**
+	 * Add tuple to the TupleSet and record current time stamp.
+	 * @param key: The record key
+	 * @param srcTxNum: The source transaction ID of remote read
+	 * @param destTxNum: The destination transaction ID of remote read
+	 * @param rec: The required record instance.
+	 */
+	public void addTuple(PrimaryKey key, long srcTxNum, long destTxNum, CachedRecord rec) {
 		// Clone the record to prevent concurrent access from communication threads
 		rec = new CachedRecord(rec);
-		tuples.add(new Tuple(key, srcTxNum, destTxNum, rec));
+		// MODIFIED: Pass current time stamp to destination machine.
+		tuples.add(new Tuple(key, srcTxNum, destTxNum, rec, System.nanoTime() / 1000));
 	}
 
 	public int sinkId() {

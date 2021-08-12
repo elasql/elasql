@@ -1,6 +1,7 @@
 package org.elasql.schedule.tpart.graph;
 
 import org.elasql.sql.PrimaryKey;
+import org.elasql.server.Elasql;
 
 public class Edge {
 
@@ -14,6 +15,15 @@ public class Edge {
 
 	public Node getTarget() {
 		return target;
+	}
+
+	// MODIFIED: Check whether the edge is remote read
+	/**
+	 * Return a boolean indicating whether the edge is remoted or not
+	 * @return
+	 */
+	public Boolean isRemoteRead(){
+		return target.getPartId() == Elasql.serverId();
 	}
 
 	public PrimaryKey getResourceKey() {

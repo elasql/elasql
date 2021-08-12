@@ -3,21 +3,26 @@ package org.elasql.schedule.tpart.sink;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.procedure.tpart.TransactionGraph;
 import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+// import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 
 public class Sinker {
 	
 	protected PartitionMetaMgr parMeta;
 	protected int myId = Elasql.serverId();
 	protected static int sinkProcessId = 0;
+
+	private TransactionGraph txnGraph = Elasql.getTransactionGraph(); 
 
 	public Sinker() {
 		parMeta = Elasql.partitionMetaMgr();
@@ -39,6 +44,49 @@ public class Sinker {
 
 		return plans.iterator();
 	}
+	// MODIFIED:
+	/**
+	 * Generate the dependency graph for current node
+	 * @param node
+	 */
+	private void generateDependencyGraph(TxNode node){
+		// @VERSION1
+		// for(PrimaryKey key : node.getTask().getReadSet()){
+		// 	node.getTask().getProcedure().addDependenTxns(ConservativeOrderedCcMgr.checkPreviousWaitingTxns(key, true));
+		// }
+		
+		// for(PrimaryKey key : node.getTask().getWriteSet()){
+		// 	node.getTask().getProcedure().addDependenTxns(ConservativeOrderedCcMgr.checkPreviousWaitingTxns(key, false));
+		// }
+
+		// @VERSION2
+		// node.getTask().getProcedure().addDependenTxns(txnGraph.checkPreviousWaitingTxnSet(node.getTask().getReadSet(), true));
+		// node.getTask().getProcedure().addDependenTxns(txnGraph.checkPreviousWaitingTxnSet(node.getTask().getWriteSet(), false));
+
+		// @VERSION3
+		Set<Long> dependentSet = txnGraph.generateDependencyGraph(node.getTask().getReadSet(), node.getTask().getWriteSet(), node.getTxNum());
+		node.getTask().getProcedure().addDependenTxns(dependentSet);
+	}
+
+	// MODIFIED:
+	/**
+	 * Add lock requests to queue for building dependency graph.
+	 * @param node
+	 */
+	// private void addRWLockQueue(TxNode node){
+	// 	// @VERSION1
+	// 	// for(PrimaryKey key : node.getTask().getReadSet()){
+	// 	// 	ConservativeOrderedCcMgr.getLockTbl().addSLockRequest(key, node.getTxNum());
+	// 	// }
+
+	// 	// for(PrimaryKey key : node.getTask().getWriteSet()){
+	// 	// 	ConservativeOrderedCcMgr.getLockTbl().addXLockRequest(key, node.getTxNum());
+	// 	// }
+
+	// 	// @VERSION2
+	// 	txnGraph.addSLockRequests(node.getTask().getReadSet(), node.getTxNum());
+	// 	txnGraph.addXLockRequests(node.getTask().getWriteSet(), node.getTxNum());
+	// }
 	
 	protected List<TPartStoredProcedureTask> createSunkPlan(TGraph graph) {
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
@@ -51,23 +99,28 @@ public class Sinker {
 			
 			// Check if this node is the master node
 			boolean isHereMaster = (node.getPartId() == myId);
-			SunkPlan plan = new SunkPlan(sinkProcessId, isHereMaster);
+			// MODIFIED: Correspond to the changes of constructor
+			SunkPlan plan = new SunkPlan(sinkProcessId, isHereMaster, node);
 
 			// Generate reading plans
 			generateReadingPlans(plan, node);
-
+			
 			// Generate writing plans
 			generateWritingPlans(plan, node);
 
 			// Generate write back (to sinks) plans
 			generateWritingBackPlans(plan, node);
 			
+			// MODIFIED: Generate dependency graph and add lock requests to queue for building dependency graph.
+			generateDependencyGraph(node);
+			// addRWLockQueue(node);
+			
+			
 			// Decide if the local node should execute this plan
 			if (plan.shouldExecuteHere()) {
 				// Debug
 //				System.out.println(String.format("Tx.%d plan: %s", node.getTxNum(), plan));
-				
-				node.getTask().decideExceutionPlan(plan);
+				node.getTask().decideExceutionPlan(plan);	
 				localTasks.add(node.getTask());
 			}
 		}

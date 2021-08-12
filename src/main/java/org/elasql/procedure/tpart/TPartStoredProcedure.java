@@ -47,6 +47,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
 	private boolean isCommitted = false;
+	// MODIFIED:
+	private Set<Long> dependentTxns = new HashSet<Long>();
 
 	public TPartStoredProcedure(long txNum, H paramHelper) {
 		super(paramHelper);
@@ -110,19 +112,57 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		ccMgr.requestLocks();
 	}
 
+	// MODIFIED:
+	public void setDependenTxns(Set<Long> dependentTxns){
+		this.dependentTxns = dependentTxns;
+	}
+
+	// MODIFIED:
+	public void addDependenTxns(Set<Long> dependentTxns){
+		this.dependentTxns.addAll(dependentTxns);
+	}
+
+	public Set<Long> getDependenTxns(){
+		return this.dependentTxns;
+	}
+
 	@Override
 	public SpResultSet execute() {
 		Timer timer = Timer.getLocalTimer();
 		try {
+			// MODIFIED: 
+			if(tx.isReadOnly())
+				timer.startComponentTimer("Average Time Of Read-Only Txn");
+			else
+				timer.startComponentTimer("Average Time Of R/W Txn");
+
+			// MODIFIED: 
+			if (plan.isContainRemotePush()) {
+				timer.startComponentTimer("Total Time Remote Read On Slave");
+				timer.startComponentTimer("CCLock Time Remote Read On Slave");
+			}
+
 			timer.startComponentTimer("Get locks");
 			getConservativeLocks();
 			timer.stopComponentTimer("Get locks");
+
+			if (plan.isContainRemotePush())
+				timer.stopComponentTimer("CCLock Time Remote Read On Slave");
 			
+			// record time of executing tx logic in the function
 			executeTransactionLogic();
-			
-			timer.startComponentTimer("Tx commit");
+
+			timer.startComponentTimer("tx commit");
 			tx.commit();
-			timer.stopComponentTimer("Tx commit");
+			timer.stopComponentTimer("tx commit");
+
+			if (plan.isContainRemotePush())
+				timer.stopComponentTimer("Total Time Remote Read On Slave");
+
+			if(tx.isReadOnly())
+				timer.stopComponentTimer("Average Time Of Read-Only Txn");
+			else
+				timer.stopComponentTimer("Average Time Of R/W Txn");
 			
 			isCommitted = true;
 		} catch (Exception e) {
@@ -217,7 +257,9 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
 					long srcTxNum = plan.getReadSrcTxNum(k);
-					readings.put(k, cache.read(k, srcTxNum));
+					// MODIFIED: cache read for timer
+					readings.put(k, cache.read(k, srcTxNum, plan.isRemoteRead(k), plan.isContainRemotePush()));
+					// readings.put(k, cache.read(k, srcTxNum, plan.isRemoteRead(k), plan.isContainRemoteRead()));
 					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
 				}
 			}
@@ -241,7 +283,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					for (PushInfo pushInfo : entry.getValue()) {
 						CachedRecord rec = cache.read(pushInfo.getRecord(), txNum);
 						cachedEntrySet.add(new CachedEntryKey(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum()));
+						// MODIFIED: Pass timestamp
+						// rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
 						rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
+						// rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec, 87);
+
 					}
 
 					// Push to the remote
@@ -285,7 +331,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
 						// TODO deal with null value record
 						rec.setSrcTxNum(sinkTxnNum);
+						// MODIFIED: Pass timestamp
+						// rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
 						rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
+						//rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec, 87);
 					}
 					timer.stopComponentTimer("(Slave) Read from local storage");
 //				}
