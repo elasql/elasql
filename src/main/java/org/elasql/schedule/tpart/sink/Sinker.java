@@ -14,7 +14,6 @@ import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-// import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 
 public class Sinker {
 	
@@ -50,43 +49,9 @@ public class Sinker {
 	 * @param node
 	 */
 	private void generateDependencyGraph(TxNode node){
-		// @VERSION1
-		// for(PrimaryKey key : node.getTask().getReadSet()){
-		// 	node.getTask().getProcedure().addDependenTxns(ConservativeOrderedCcMgr.checkPreviousWaitingTxns(key, true));
-		// }
-		
-		// for(PrimaryKey key : node.getTask().getWriteSet()){
-		// 	node.getTask().getProcedure().addDependenTxns(ConservativeOrderedCcMgr.checkPreviousWaitingTxns(key, false));
-		// }
-
-		// @VERSION2
-		// node.getTask().getProcedure().addDependenTxns(txnGraph.checkPreviousWaitingTxnSet(node.getTask().getReadSet(), true));
-		// node.getTask().getProcedure().addDependenTxns(txnGraph.checkPreviousWaitingTxnSet(node.getTask().getWriteSet(), false));
-
-		// @VERSION3
 		Set<Long> dependentSet = txnGraph.generateDependencyGraph(node.getTask().getReadSet(), node.getTask().getWriteSet(), node.getTxNum());
 		node.getTask().getProcedure().addDependenTxns(dependentSet);
 	}
-
-	// MODIFIED:
-	/**
-	 * Add lock requests to queue for building dependency graph.
-	 * @param node
-	 */
-	// private void addRWLockQueue(TxNode node){
-	// 	// @VERSION1
-	// 	// for(PrimaryKey key : node.getTask().getReadSet()){
-	// 	// 	ConservativeOrderedCcMgr.getLockTbl().addSLockRequest(key, node.getTxNum());
-	// 	// }
-
-	// 	// for(PrimaryKey key : node.getTask().getWriteSet()){
-	// 	// 	ConservativeOrderedCcMgr.getLockTbl().addXLockRequest(key, node.getTxNum());
-	// 	// }
-
-	// 	// @VERSION2
-	// 	txnGraph.addSLockRequests(node.getTask().getReadSet(), node.getTxNum());
-	// 	txnGraph.addXLockRequests(node.getTask().getWriteSet(), node.getTxNum());
-	// }
 	
 	protected List<TPartStoredProcedureTask> createSunkPlan(TGraph graph) {
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
@@ -113,8 +78,6 @@ public class Sinker {
 			
 			// MODIFIED: Generate dependency graph and add lock requests to queue for building dependency graph.
 			generateDependencyGraph(node);
-			// addRWLockQueue(node);
-			
 			
 			// Decide if the local node should execute this plan
 			if (plan.shouldExecuteHere()) {

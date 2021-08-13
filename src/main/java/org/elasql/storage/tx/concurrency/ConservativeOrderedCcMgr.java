@@ -42,11 +42,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		readObjs = new HashSet<Object>();
 		writeObjs = new HashSet<Object>();
 	}
-
-	// MODIFIED: 
-	// public static ConservativeOrderedLockTable getLockTbl(){
-	// 	return lockTbl;
-	// }
 	
 	public void bookReadKey(PrimaryKey key) {
 		if (key != null) {
@@ -105,22 +100,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 			writeObjs.addAll(keys);
 		}
 	}
-
-	// MODIFIED:
-	// public static Set<Long> checkPreviousWaitingTxns(PrimaryKey key, Boolean isReadOnly) {
-	// 	if (key != null)
-	// 		return lockTbl.checkPreviousWaitingTxns(key, isReadOnly);
-	// 	return new HashSet<Long>();
-	// }
-
-	// // MODIFIED:
-	// public static Set<Long> checkPreviousWaitingTxnSet(Collection<PrimaryKey> keys, Boolean isReadOnly) {
-	// 	Set<Long> dependentTxns = new HashSet<Long>();
-	// 	if (keys != null)
-	// 		for(PrimaryKey key : keys)
-	// 			dependentTxns.addAll(lockTbl.checkPreviousWaitingTxns(key, isReadOnly));
-	// 	return dependentTxns;
-	// }
 	
 	/**
 	 * Request (get the locks immediately) the locks which the transaction

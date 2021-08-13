@@ -15,17 +15,12 @@
  ******************************************************************************/
 package org.elasql.storage.tx.concurrency;
 
-// import java.util.Collection;
-// import java.util.HashSet;
-// import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-// import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-// import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
 
 public class ConservativeOrderedLockTable {
@@ -62,23 +57,8 @@ public class ConservativeOrderedLockTable {
 
 	private Map<Object, Lockers> lockerMap = new ConcurrentHashMap<Object, Lockers>();
 
-	// MODIFIED:
-	// class LockInfo {
-	// 	long txNum;
-	// 	Boolean isReadOnly;
-
-	// 	LockInfo(long txNum, Boolean isReadOnly) {
-	// 		this.txNum = txNum;
-	// 		this.isReadOnly = isReadOnly;
-	// 	}
-	// }
-
-	// MODIFIED:
-	// private Map<Object, LinkedList<LockInfo>> rwLockQueueMap = new ConcurrentHashMap<Object, LinkedList<LockInfo>>();
-
 	// Lock-stripping
 	private final Object anchors[] = new Object[NUM_ANCHOR];
-	private final Object anchorsForQueue[] = new Object[NUM_ANCHOR];
 
 	/**
 	 * Create and initialize a conservative ordered lock table.
@@ -87,10 +67,6 @@ public class ConservativeOrderedLockTable {
 		// Initialize anchors
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
-		}
-
-		for (int i = 0; i < anchorsForQueue.length; ++i) {
-			anchorsForQueue[i] = new Object();
 		}
 	}
 
@@ -107,88 +83,6 @@ public class ConservativeOrderedLockTable {
 			lockers.requestQueue.add(txNum);
 		}
 	}
-
-	// // MODIFIED:
-	// public void addSLockRequest(Object obj, long txNum) {
-	// 	synchronized (getAnchorForQueue(obj)) {
-	// 		LinkedList<LockInfo> queue = prepareQueue(obj);
-	// 		LockInfo info = new LockInfo(txNum, true);
-	// 		// if (queue != null) {
-	// 		queue.add(info);
-	// 		// }
-	// 	}
-	// }
-
-	// // MODIFIED:
-	// public void addXLockRequest(Object obj, long txNum) {
-	// 	synchronized (getAnchorForQueue(obj)) {
-	// 		LinkedList<LockInfo> queue = prepareQueue(obj);
-	// 		LockInfo info = new LockInfo(txNum, false);
-	// 		// if (queue != null) {
-	// 		queue.clear();
-	// 		queue.add(info);
-	// 		// }
-	// 	}
-	// }
-
-	// // MODIFIED:
-	// public void addSLockRequests(Collection<PrimaryKey> keys, long txNum) {
-	// 	for(PrimaryKey key : keys){
-	// 		addSLockRequest(key, txNum);
-	// 	}
-	// }
-
-	// // MODIFIED:
-	// public void addXLockRequests(Collection<PrimaryKey> keys, long txNum) {
-	// 	for(PrimaryKey key : keys){
-	// 		addXLockRequest(key, txNum);
-	// 	}
-	// }
-
-	// // MODIFIED:
-	// LinkedList<LockInfo> prepareQueue(Object obj) {
-	// 	LinkedList<LockInfo> queue = rwLockQueueMap.get(obj);
-	// 	if (queue == null) {
-	// 		queue = new LinkedList<LockInfo>();
-	// 		rwLockQueueMap.put(obj, queue);
-	// 	}
-	// 	return queue;
-	// }
-
-	// // MODIFIED:
-	// public Set<Long> checkPreviousWaitingTxns(Object obj, Boolean isReadOnly) {
-	// 	Set<Long> dependentTxns = new HashSet<Long>();
-
-	// 	synchronized (getAnchorForQueue(obj)) {
-	// 		LinkedList<LockInfo> queue = prepareQueue(obj);
-
-	// 		if (queue.size() > 0) {
-	// 			Iterator<LockInfo> iter = queue.descendingIterator();
-	// 			while (iter.hasNext()) {
-	// 				LockInfo info = iter.next();
-
-	// 				if (isReadOnly) {
-	// 					// If Read-Only
-	// 					if (info.isReadOnly == false) {
-	// 						dependentTxns.add(info.txNum);
-	// 						break;
-	// 					}
-	// 				} else {
-	// 					// If R/W
-	// 					if (info.isReadOnly == true) {
-	// 						dependentTxns.add(info.txNum);
-	// 					} else {
-	// 						if(dependentTxns.size() <= 0){}
-	// 							dependentTxns.add(info.txNum);
-	// 						break;
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// 	// If queue is empty
-	// 	return dependentTxns;
-	// }
 
 	/**
 	 * Grants an slock on the specified item. If any conflict lock exists when the
@@ -499,18 +393,6 @@ public class ConservativeOrderedLockTable {
 		int code = obj.hashCode();
 		code = Math.abs(code); // avoid negative value
 		return anchors[code % anchors.length];
-	}
-
-	/**
-	 * Gets the anchor for the specified object.
-	 * 
-	 * @param obj the target object
-	 * @return the anchor for obj
-	 */
-	private Object getAnchorForQueue(Object obj) {
-		int code = obj.hashCode();
-		code = Math.abs(code); // avoid negative value
-		return anchorsForQueue[code % anchorsForQueue.length];
 	}
 
 	private Lockers prepareLockers(Object obj) {
