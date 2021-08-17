@@ -67,6 +67,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);
 			}
+			
 			bookedObjs.addAll(keys);
 			readObjs.addAll(keys);
 		}
@@ -82,7 +83,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 			writeObjs.add(key);
 		}
 	}
-
+	
 	/**
 	 * Book the write lock of the specified object.
 	 * 
@@ -96,6 +97,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 				if (!bookedObjs.contains(key))
 					lockTbl.requestLock(key, txNum);
 			}
+			
 			bookedObjs.addAll(keys);
 			writeObjs.addAll(keys);
 		}
