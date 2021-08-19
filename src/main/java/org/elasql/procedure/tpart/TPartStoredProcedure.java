@@ -25,6 +25,7 @@ import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.ThreadMXBean;
 import org.vanilladb.core.util.Timer;
 
 public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
@@ -113,24 +114,31 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	@Override
 	public SpResultSet execute() {
 		Timer timer = Timer.getLocalTimer();
+		Timer cpuTimer = Timer.getLocalCpuTimer();
 		try {
 			timer.startComponentTimer("Get locks");
+			cpuTimer.startComponentTimer("Get locks", ThreadMXBean.getCpuTime());
 			getConservativeLocks();
 			timer.stopComponentTimer("Get locks");
+			cpuTimer.stopComponentTimer("Get locks", ThreadMXBean.getCpuTime());
 			
 			executeTransactionLogic();
 			
 			timer.startComponentTimer("Tx commit");
+			cpuTimer.startComponentTimer("Tx commit", ThreadMXBean.getCpuTime());
 			tx.commit();
 			timer.stopComponentTimer("Tx commit");
+			cpuTimer.stopComponentTimer("Tx commit", ThreadMXBean.getCpuTime());
 			
 			isCommitted = true;
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("Tx." + txNum + "'s plan: " + plan);
 			timer.startComponentTimer("Tx rollback");
+			cpuTimer.startComponentTimer("Tx rollback", ThreadMXBean.getCpuTime());
 			tx.rollback();
 			timer.stopComponentTimer("Tx rollback");
+			cpuTimer.stopComponentTimer("Tx rollback", ThreadMXBean.getCpuTime());
 		}
 		return new SpResultSet(
 			isCommitted,
@@ -201,19 +209,23 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private void executeTransactionLogic() {
 		int sinkId = plan.sinkProcessId();
 		Timer timer = Timer.getLocalTimer();
+		Timer cpuTimer = Timer.getLocalCpuTimer();
 
 		if (plan.isHereMaster()) {
 			Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
 
 			// Read the records from the local sink
 			timer.startComponentTimer("(Master) Read from local storage");
+			cpuTimer.startComponentTimer("(Master) Read from local storage", ThreadMXBean.getCpuTime());
 			for (PrimaryKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k));
 			}
 			timer.stopComponentTimer("(Master) Read from local storage");
+			cpuTimer.stopComponentTimer("(Master) Read from local storage", ThreadMXBean.getCpuTime());
 
 			// Read all needed records
 			timer.startComponentTimer("(Master) Read from remote");
+			cpuTimer.startComponentTimer("(Master) Read from remote", ThreadMXBean.getCpuTime());
 			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
 					long srcTxNum = plan.getReadSrcTxNum(k);
@@ -222,14 +234,18 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 				}
 			}
 			timer.stopComponentTimer("(Master) Read from remote");
+			cpuTimer.stopComponentTimer("(Master) Read from remote", ThreadMXBean.getCpuTime());
 			
 			// Execute the SQLs defined by users
 			timer.startComponentTimer("(Master) Execute SQL");
+			cpuTimer.startComponentTimer("(Master) Execute SQL", ThreadMXBean.getCpuTime());
 			executeSql(readings);
 			timer.stopComponentTimer("(Master) Execute SQL");
-
+			cpuTimer.stopComponentTimer("(Master) Execute SQL", ThreadMXBean.getCpuTime());
+			
 			// Push the data to where they need at
 			timer.startComponentTimer("(Master) Push");
+			cpuTimer.startComponentTimer("(Master) Push", ThreadMXBean.getCpuTime());
 			Map<Integer, Set<PushInfo>> pi = plan.getPushingInfo();
 			if (pi != null) {
 				// read from local storage and send to remote site
@@ -249,6 +265,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 				}
 			}
 			timer.stopComponentTimer("(Master) Push");
+			cpuTimer.stopComponentTimer("(Master) Push", ThreadMXBean.getCpuTime());
 		} else if (plan.hasSinkPush()) {
 			long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
 			
@@ -280,6 +297,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 //				} else {
 					// Normal transactions
 					timer.startComponentTimer("(Slave) Read from local storage");
+					cpuTimer.startComponentTimer("(Slave) Read from local storage", ThreadMXBean.getCpuTime());
 					for (PushInfo pushInfo : entry.getValue()) {
 						
 						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
@@ -288,18 +306,23 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 						rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
 					}
 					timer.stopComponentTimer("(Slave) Read from local storage");
+					cpuTimer.stopComponentTimer("(Slave) Read from local storage", ThreadMXBean.getCpuTime());
 //				}
 
 				timer.startComponentTimer("(Slave) Push");
+				cpuTimer.startComponentTimer("(Slave) Push", ThreadMXBean.getCpuTime());
 				Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
 				timer.stopComponentTimer("(Slave) Push");
+				cpuTimer.stopComponentTimer("(Slave) Push", ThreadMXBean.getCpuTime());
 			}
 		}
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
 		timer.startComponentTimer("Flush");
+		cpuTimer.startComponentTimer("Flush", ThreadMXBean.getCpuTime());
 		cache.flush(plan,  cachedEntrySet);
 		timer.stopComponentTimer("Flush");
+		cpuTimer.stopComponentTimer("Flush", ThreadMXBean.getCpuTime());
 	}
 }

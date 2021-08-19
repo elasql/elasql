@@ -8,11 +8,13 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.util.FeatureCollector;
+import org.elasql.util.TransactionCpuTimeRecorder;
 import org.elasql.util.TransactionFeaturesRecorder;
 import org.elasql.util.TransactionStatisticsRecorder;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.ThreadMXBean;
 import org.vanilladb.core.util.Timer;
 
 public class TPartStoredProcedureTask
@@ -29,6 +31,7 @@ public class TPartStoredProcedureTask
 				e.printStackTrace();
 			}
 			TransactionStatisticsRecorder.startRecording();
+			TransactionCpuTimeRecorder.startRecording();
 			TransactionFeaturesRecorder.startRecording();
 		}
 	}
@@ -50,6 +53,7 @@ public class TPartStoredProcedureTask
 	private int clientId, connectionId, parId;
 	private long txNum;
 	private long txStartTime, sinkStartTime, sinkStopTime, threadInitStartTime;
+	private long sinkCpuStartTime, sinkCpuStopTime, threadInitCpuStartTime;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
@@ -67,6 +71,7 @@ public class TPartStoredProcedureTask
 		
 		// Initialize a thread-local timer
 		Timer timer = Timer.getLocalTimer();
+//		CpuTimer cpuTimer = CpuTimer.getLocalTimer();
 		timer.reset();
 		timer.setStartExecutionTime(txStartTime);
 		timer.startComponentTimer("Generate plan", sinkStartTime);
@@ -74,7 +79,16 @@ public class TPartStoredProcedureTask
 		timer.startComponentTimer("Init thread", threadInitStartTime);
 		timer.stopComponentTimer("Init thread");
 //		timer.startExecution();
-
+		
+		// Initialize a thread-local CPU timer
+		Timer cpuTimer = Timer.getLocalCpuTimer();
+		cpuTimer.reset();
+		cpuTimer.setStartExecutionTime(ThreadMXBean.getCpuTime()); //set tx CPU start time for current thread
+		cpuTimer.startComponentTimer("Generate plan", sinkCpuStartTime);
+		cpuTimer.stopComponentTimer("Generate plan", sinkCpuStopTime);
+		cpuTimer.startComponentTimer("Init thread", threadInitCpuStartTime);
+		cpuTimer.stopComponentTimer("Init thread",ThreadMXBean.getCpuTime());
+		
 		// Initialize a thread-local feature collector
 		FeatureCollector collector = FeatureCollector.getLocalFeatureCollector();
 		collector.setFeatureValue(FeatureCollector.keys[0], (txStartTime - firstTxStartTime)/1000);
@@ -100,11 +114,13 @@ public class TPartStoredProcedureTask
 //			timer.addToGlobalStatistics();
 		}
 		
+		cpuTimer.setStopExecutionTime(ThreadMXBean.getCpuTime());
 		// Stop the timer for the whole execution
 		timer.stopExecution();
 		
 		// Record the timer result
 		TransactionStatisticsRecorder.recordResult(txNum, timer);
+		TransactionCpuTimeRecorder.recordResult(txNum, cpuTimer);
 	}
 
 	public long getTxNum() {
@@ -154,5 +170,10 @@ public class TPartStoredProcedureTask
 		this.sinkStartTime = sinkStartTime;
 		this.sinkStopTime = sinkStopTime;
 		this.threadInitStartTime = threadInitStartTime;
+	}
+	public void setCpuStartTime(long sinkCpuStartTime, long sinkCpuStopTime, long threadInitCpuStartTime) {
+		this.sinkCpuStartTime = sinkCpuStartTime;
+		this.sinkCpuStopTime = sinkCpuStopTime;
+		this.threadInitCpuStartTime = threadInitCpuStartTime;
 	}
 }

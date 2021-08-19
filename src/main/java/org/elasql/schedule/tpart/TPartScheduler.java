@@ -26,6 +26,7 @@ import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.ThreadMXBean;
 
 public class TPartScheduler extends Task implements Scheduler {
 	private static Logger logger = Logger.getLogger(TPartScheduler.class.getName());
@@ -47,6 +48,7 @@ public class TPartScheduler extends Task implements Scheduler {
 	private TGraph graph;
 	private boolean batchingEnabled = true;
 	private long startTime, sinkStartTime, sinkStopTime, threadInitStartTime;
+	private long cpuStartTime, sinkCpuStartTime, sinkCpuStopTime, threadInitCpuStartTime;
 	private boolean isFirst = true;
 
 	public TPartScheduler(TPartStoredProcedureFactory factory, 
@@ -142,8 +144,10 @@ public class TPartScheduler extends Task implements Scheduler {
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			sinkStartTime = System.nanoTime();
+			sinkCpuStartTime = ThreadMXBean.getCpuTime();
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 			sinkStopTime  = System.nanoTime();
+			sinkCpuStopTime = ThreadMXBean.getCpuTime();
 			dispatchToTaskMgr(plansTter);
 		}
 	}
@@ -177,7 +181,9 @@ public class TPartScheduler extends Task implements Scheduler {
 		while (plans.hasNext()) {
 			TPartStoredProcedureTask p = plans.next();
 			threadInitStartTime  = System.nanoTime();
+			threadInitCpuStartTime = ThreadMXBean.getCpuTime();
 			p.setStartTime(startTime, sinkStartTime, sinkStopTime, threadInitStartTime);
+			p.setCpuStartTime(sinkCpuStartTime, sinkCpuStopTime, threadInitCpuStartTime);
 			VanillaDb.taskMgr().runTask(p);
 		}
 	}

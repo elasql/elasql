@@ -16,15 +16,15 @@ import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.util.Timer;
 
-public class TransactionStatisticsRecorder extends Task {
-	private static Logger logger = Logger.getLogger(TransactionStatisticsRecorder.class.getName());
-	
-	private final static String THREAD_NAME = "Transaction Statistics Recorder";
-	private final static String FILENAME_PREFIX = "transaction-statistics";
+public class TransactionCpuTimeRecorder extends Task {
+	private static Logger logger = Logger.getLogger(TransactionCpuTimeRecorder.class.getName());
+
+	private final static String THREAD_NAME = "Transaction Cpu Time Recorder";
+	private final static String FILENAME_PREFIX = "transaction-cpu-time";
 	private final static String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private final static String FIRST_STATS_COLUMN = "Execution Time";
 	private final static long TIME_TO_FLUSH = 10; // in seconds
-
+	
 	private static class StatisticRecord {
 		String name;
 		long time;
@@ -78,7 +78,7 @@ public class TransactionStatisticsRecorder extends Task {
 	public static void startRecording() {
 		if (!isRecording.getAndSet(true)) {
 			// Note: this should be called only once
-			VanillaDb.taskMgr().runTask(new TransactionStatisticsRecorder());
+			VanillaDb.taskMgr().runTask(new TransactionCpuTimeRecorder());
 		}
 	}
 	
