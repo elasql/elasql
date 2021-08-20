@@ -9,11 +9,13 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.util.FeatureCollector;
 import org.elasql.util.TransactionCpuTimeRecorder;
+import org.elasql.util.TransactionDiskIORecorder;
 import org.elasql.util.TransactionFeaturesRecorder;
 import org.elasql.util.TransactionStatisticsRecorder;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.DiskIOCounter;
 import org.vanilladb.core.util.ThreadMXBean;
 import org.vanilladb.core.util.Timer;
 
@@ -32,6 +34,7 @@ public class TPartStoredProcedureTask
 			}
 			TransactionStatisticsRecorder.startRecording();
 			TransactionCpuTimeRecorder.startRecording();
+			TransactionDiskIORecorder.startRecording();
 			TransactionFeaturesRecorder.startRecording();
 		}
 	}
@@ -97,6 +100,11 @@ public class TPartStoredProcedureTask
 		// Record the feature result
 		TransactionFeaturesRecorder.recordResult(txNum, collector);
 		
+		// Initialize a thread-local CPU timer
+		DiskIOCounter ioCounter = DiskIOCounter.getLocalIOCounter();
+		ioCounter.reset();
+		ioCounter.start();
+		
 		rs = tsp.execute();
 			
 		if (tsp.isMaster()) {
@@ -117,10 +125,12 @@ public class TPartStoredProcedureTask
 		cpuTimer.setStopExecutionTime(ThreadMXBean.getCpuTime());
 		// Stop the timer for the whole execution
 		timer.stopExecution();
+		ioCounter.stop();
 		
 		// Record the timer result
 		TransactionStatisticsRecorder.recordResult(txNum, timer);
 		TransactionCpuTimeRecorder.recordResult(txNum, cpuTimer);
+		TransactionDiskIORecorder.recordResult(txNum, ioCounter);
 	}
 
 	public long getTxNum() {
