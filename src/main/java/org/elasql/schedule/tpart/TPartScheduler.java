@@ -1,6 +1,5 @@
 package org.elasql.schedule.tpart;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -10,6 +9,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.perf.tpart.ai.Estimator;
+import org.elasql.perf.tpart.ai.FeatureCollector;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -48,6 +49,9 @@ public class TPartScheduler extends Task implements Scheduler {
 	private boolean batchingEnabled = true;
 	private long startTime, sinkStartTime, sinkStopTime, threadInitStartTime;
 	private boolean isFirst = true;
+	
+	// For cost estimation
+	private FeatureCollector featureCollector;
 
 	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
@@ -63,6 +67,9 @@ public class TPartScheduler extends Task implements Scheduler {
 		this.graph = graph;
 		this.batchingEnabled = isBatching;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
+		
+		if (Estimator.ENABLE_COLLECTING_DATA)
+			featureCollector = new FeatureCollector();
 		
 		// Clear the dump dir
 //		dumpDir.mkdirs();
@@ -104,7 +111,14 @@ public class TPartScheduler extends Task implements Scheduler {
 //				}
 
 				if (task.getProcedureType() == ProcedureType.NORMAL) {
-					batchedTasks.add(task);
+					if (Elasql.isStandAloneSequencer()) { // The sequencer
+						// Collecting features of transactions for off-line training
+						if (Estimator.ENABLE_COLLECTING_DATA) {
+							featureCollector.collectFeatures(task);
+						}
+					} else { // Normal DB Servers
+						batchedTasks.add(task);
+					}
 				}
 				
 				// sink current t-graph if # pending tx exceeds threshold
@@ -143,8 +157,6 @@ public class TPartScheduler extends Task implements Scheduler {
 		if (graph.getTxNodes().size() != 0) {
 			sinkStartTime = System.nanoTime();
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
-			// MODIFIED: Set up TransactionGraph timer.
-			Elasql.getTransactionGraph().setStartTime(System.nanoTime() / 1000);
 			sinkStopTime  = System.nanoTime();
 			dispatchToTaskMgr(plansTter);
 		}
