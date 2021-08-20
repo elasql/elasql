@@ -11,6 +11,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timer;
 
 public class TPartTxLocalCache {
 
@@ -74,8 +75,59 @@ public class TPartTxLocalCache {
 		CachedRecord rec = recordCache.get(key);
 		if (rec != null)
 			return rec;
-
+		
 		rec = cacheMgr.takeFromTx(key, src, txNum);
+		recordCache.put(key, rec);
+		
+		return rec;
+	}
+
+	/**
+	 * Reads a CachedRecord from the cache. If the specified record does not
+	 * exist, reads from the specified transaction through {@code TPartCacheMgr}
+	 * .
+	 * 
+	 * @param key
+	 *            the key of the record
+	 * @param src
+	 *            the id of the transaction who will pass the record to the
+	 *            caller
+	 * @param isRemoteRead
+	 * 			  the boolean to indicate whether the read is remote or not, for timer used
+	 * 
+	 * @param isPushPlan
+	 * 			  the boolean to indicate whether SunkPlan of the read contains push or not, for timer used
+	 * 
+	 * @return the specified record
+	 */
+	public CachedRecord read(PrimaryKey key, long src, Boolean isKeyRemoteRead, Boolean isPushPlan) {
+		
+		CachedRecord rec = recordCache.get(key);
+		if (rec != null)
+			return rec;
+
+		// MODIFIED: Total Time Remote Read On Master
+		// Start a thread-local timer
+		if(isKeyRemoteRead)
+			Timer.getLocalTimer().startComponentTimer("Total Time Remote Read On Master");
+
+		// MODIFIED: Wait Time For Prev Txn On Slave
+		// Start a thread-local timer	
+		if(isPushPlan)
+			Timer.getLocalTimer().startComponentTimer("Wait Time For Prev Txn On Slave");
+		
+		rec = cacheMgr.takeFromTx(key, src, txNum);
+
+		// MODIFIED: Total Time Remote Read On Master
+		// Stop the timer for the whole execution
+		if(isKeyRemoteRead)
+			Timer.getLocalTimer().stopComponentTimer("Total Time Remote Read On Master");
+
+		// MODIFIED: Wait Time For Prev Txn On Slave
+		// Stop the timer for the whole execution
+		if(isPushPlan)
+			Timer.getLocalTimer().stopComponentTimer("Wait Time For Prev Txn On Slave");
+
 		recordCache.put(key, rec);
 		
 		return rec;

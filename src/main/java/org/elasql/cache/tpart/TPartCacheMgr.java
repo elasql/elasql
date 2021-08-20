@@ -14,7 +14,9 @@ import org.elasql.cache.VanillaCoreCrud;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.sql.PrimaryKey;
+import org.elasql.server.Elasql;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.Timer;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 	private static Logger logger = Logger.getLogger(TPartCacheMgr.class.getName());
@@ -22,50 +24,57 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 	/**
 	 * Looks up the sink id for the specified partition.
 	 * 
-	 * @param partId
-	 *            the id of the specified partition
+	 * @param partId the id of the specified partition
 	 * @return the sink id
 	 */
 	public static long toSinkId(int partId) {
 		return (partId + 1) * -1;
 	}
 
-//	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
-//	private static LocalStorageLockTable lockTable = new LocalStorageLockTable();
+	// private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
+	// private static LocalStorageLockTable lockTable = new LocalStorageLockTable();
 
 	private Map<CachedEntryKey, CachedRecord> exchange;
-	
+
 	private Map<PrimaryKey, CachedRecord> recordCache;
 
+	private Map<CachedEntryKey, Long> timeIntervalMap;
+
+	// private CachedEntryKey time_interval_key;
+	// private AtomicLong time_interval_value;
+
 	private final Object anchors[] = new Object[1009];
+	private final long time_interval_anchors[] = new long[1009];
 
 	public TPartCacheMgr() {
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
 		}
-		
+
 		recordCache = new ConcurrentHashMap<PrimaryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
 		exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
-		
-//		new PeriodicalJob(5000, 600000, new Runnable() {
-//			@Override
-//			public void run() {
-//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
-//				time /= 1000;
-//				System.out.println(String.format("Time: %d seconds, Cache Size: %d, Exchange Size: %d",
-//						time, recordCache.size(), exchange.size()));
-//			}
-//		}).start();
-		
-//		new PeriodicalJob(60_000, 800_000, new Runnable() {
-//			@Override
-//			public void run() {
-//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
-//				time /= 1000;
-//				System.out.println(String.format("Time: %d seconds, suggest to GC.", time));
-//				System.gc();
-//			}
-//		}).start();
+		timeIntervalMap = new ConcurrentHashMap<CachedEntryKey, Long>();
+
+		// new PeriodicalJob(5000, 600000, new Runnable() {
+		// @Override
+		// public void run() {
+		// long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+		// time /= 1000;
+		// System.out.println(String.format("Time: %d seconds, Cache Size: %d, Exchange
+		// Size: %d",
+		// time, recordCache.size(), exchange.size()));
+		// }
+		// }).start();
+
+		// new PeriodicalJob(60_000, 800_000, new Runnable() {
+		// @Override
+		// public void run() {
+		// long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+		// time /= 1000;
+		// System.out.println(String.format("Time: %d seconds, suggest to GC.", time));
+		// System.gc();
+		// }
+		// }).start();
 	}
 
 	private Object prepareAnchor(Object o) {
@@ -75,41 +84,91 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		}
 		return anchors[hash];
 	}
+	// TO DEAL: 
+	private void setTimerIntervalAnchor(Object o, long time_interval) {
+		int hash = o.hashCode() % time_interval_anchors.length;
+		if (hash < 0) {
+			hash += time_interval_anchors.length;
+		}
+
+		time_interval_anchors[hash] = time_interval;
+	}
+
+	private long getTimerIntervalAnchor(Object o) {
+		int hash = o.hashCode() % time_interval_anchors.length;
+		if (hash < 0) {
+			hash += time_interval_anchors.length;
+		}
+
+		return time_interval_anchors[hash];
+	}
 
 	CachedRecord takeFromTx(PrimaryKey key, long src, long dest) {
-//		Timer.getLocalTimer().startComponentTimer("Read from Tx");
-//		try {
-			CachedEntryKey k = new CachedEntryKey(key, src, dest);
-			synchronized (prepareAnchor(k)) {
-				try {
-					// Debug: Tracing the waiting key
-//					Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
-//							+ " from tx." + src);
-					// wait if the record has not delivered
-					while (!exchange.containsKey(k)) {
-						prepareAnchor(k).wait();
-					}
+		// MODIFIED: 
+		Timer.getLocalTimer().startComponentTimer("Read from Tx");
+		// try {
+		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 
-					// Debug: Tracing the waiting key
-//					Thread.currentThread().setName("Tx." + dest);
-					
-					return exchange.remove(k);
-				} catch (InterruptedException e) {
-					throw new RuntimeException();
+		synchronized (prepareAnchor(k)) {
+			try {
+				// Debug: Tracing the waiting key
+				// Thread.currentThread().setName("Tx." + dest + " waits for pushing of " + key
+				// + " from tx." + src);
+				// wait if the record has not delivered
+				while ((!exchange.containsKey(k)) || (!timeIntervalMap.containsKey(k))) {
+					prepareAnchor(k).wait();
 				}
+
+				// Debug: Tracing the waiting key
+				// Thread.currentThread().setName("Tx." + dest);
+				Long time_interval = timeIntervalMap.remove(k);
+				if(time_interval != Long.MIN_VALUE){
+					Timer.getLocalTimer().recordTime("Trans Time Of Remote Read", time_interval);
+					// System.out.printf("[%d] A Time_Interval added to timer: Interval = %d\n", (System.currentTimeMillis() * 1000), time_interval);
+				}
+
+				return exchange.remove(k);
+			} catch (InterruptedException e) {
+				throw new RuntimeException();
+			} finally{
+				Timer.getLocalTimer().stopComponentTimer("Read from Tx");
 			}
-//		} finally {
-//			Timer.getLocalTimer().stopComponentTimer("Read from Tx");
-//		}
+		}
 	}
 
 	void passToTheNextTx(PrimaryKey key, CachedRecord rec, long src, long dest, boolean isRemote) {
 		if (rec == null)
-			throw new NullPointerException(String.format(
-					"The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
-		
+			throw new NullPointerException(
+					String.format("The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
+
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
 		synchronized (prepareAnchor(k)) {
+			Long dummy = Long.MIN_VALUE;
+			timeIntervalMap.put(k, dummy);
+			exchange.put(k, rec);
+			prepareAnchor(k).notifyAll();
+		}
+	}
+
+	void passToTheNextTx(PrimaryKey key, CachedRecord rec, long src, long dest, long TimeStamp, int srcNode, boolean isRemote) {
+		if (rec == null)
+			throw new NullPointerException(
+					String.format("The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
+
+		// MODIFIED: Record transmit interval
+		long transmitInterval;
+		if(Elasql.connectionMgr().serverLatency.get(srcNode) != null)
+			transmitInterval = (System.nanoTime() / 1000) - TimeStamp - Elasql.connectionMgr().serverLatency.get(srcNode);
+		else
+			transmitInterval = (System.nanoTime() / 1000) - TimeStamp;
+
+		CachedEntryKey k = new CachedEntryKey(key, src, dest);
+		synchronized (prepareAnchor(k)) {
+			// MODIFIED: 
+			timeIntervalMap.put(k, transmitInterval);
+			// TO DEAL: Keep up the function or not.
+			setTimerIntervalAnchor(k, transmitInterval);
+			// System.out.printf("[%d] A Time_Interval added to map: Interval = %d\n", (System.nanoTime() / 1000), transmitInterval);
 			exchange.put(k, rec);
 			prepareAnchor(k).notifyAll();
 		}
@@ -117,40 +176,49 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 
 	@Override
 	public void cacheRemoteRecord(Tuple t) {
-		passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, true);
+		if (t.doesHaveTimeStamp()) {
+			passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, t.timestamp, t.srcNodeID, true);
+			// MODIFIED: Log received time stamp
+			if (logger.isLoggable(Level.FINE))
+				logger.fine("Recv timestamp: " + t.timestamp + " From Txn: " + t.srcTxNum + " To Txn: " + t.destTxNum);
+		} else {
+			passToTheNextTx(t.key, t.rec, t.srcTxNum, t.destTxNum, true);
+			// MODIFIED: Print received remote read record
+			if (logger.isLoggable(Level.FINER))
+				logger.finer("Recv Record From Txn: " + t.srcTxNum + " To Txn: " + t.destTxNum);
+		}
 	}
-	
+
 	CachedRecord readFromSink(PrimaryKey key, Transaction tx) {
-//		localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
-//		lockTable.sLock(key, tx.getTransactionNumber());
-		
+		// localCcMgr.beforeSinkRead(key, tx.getTransactionNumber());
+		// lockTable.sLock(key, tx.getTransactionNumber());
+
 		CachedRecord rec = null;
-		
+
 		// Check the cache first
 		rec = recordCache.get(key);
 		if (rec != null) // Copy the record to ensure thread-safety
 			rec = new CachedRecord(rec);
-		
+
 		// Read from the local storage
 		if (rec == null)
 			rec = VanillaCoreCrud.read(key, tx);
-		
-//		localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
-//		lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
-		
+
+		// localCcMgr.afterSinkRead(key, tx.getTransactionNumber());
+		// lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
+
 		if (rec == null)
-			throw new RuntimeException("Tx." + tx.getTransactionNumber()
-				+ " cannot find the record of " + key);
-		
+			throw new RuntimeException("Tx." + tx.getTransactionNumber() + " cannot find the record of " + key);
+
 		return rec;
 	}
-	
+
 	Map<PrimaryKey, CachedRecord> batchReadFromSink(Set<PrimaryKey> keys, Transaction tx) {
-//		for (RecordKey key : keys)
-//			lockTable.sLock(key, tx.getTransactionNumber());
-		
+		// for (RecordKey key : keys)
+		// lockTable.sLock(key, tx.getTransactionNumber());
+
 		Map<PrimaryKey, CachedRecord> records = new HashMap<PrimaryKey, CachedRecord>();
-		
+
 		// Check the cache first
 		Set<PrimaryKey> readFromLocals = new HashSet<PrimaryKey>();
 		for (PrimaryKey key : keys) {
@@ -163,83 +231,82 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 				readFromLocals.add(key);
 			}
 		}
-		
+
 		// Read from the local storage
 		if (!readFromLocals.isEmpty()) {
-			Map<PrimaryKey, CachedRecord> localReads =
-					VanillaCoreCrud.batchRead(readFromLocals, tx);
+			Map<PrimaryKey, CachedRecord> localReads = VanillaCoreCrud.batchRead(readFromLocals, tx);
 			records.putAll(localReads);
 		}
-		
-//		for (RecordKey key : keys)
-//			lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
-		
+
+		// for (RecordKey key : keys)
+		// lockTable.release(key, tx.getTransactionNumber(), LockType.S_LOCK);
+
 		return records;
 	}
-	
+
 	void insertToCache(PrimaryKey key, CachedRecord rec, long txNum) {
-//		localCcMgr.beforeWriteBack(key, txNum);
-//		lockTable.xLock(key, txNum);
+		// localCcMgr.beforeWriteBack(key, txNum);
+		// lockTable.xLock(key, txNum);
 
 		recordCache.put(key, rec);
-		
-//		localCcMgr.afterWriteback(key, txNum);
-//		lockTable.release(key, txNum, LockType.X_LOCK);
+
+		// localCcMgr.afterWriteback(key, txNum);
+		// lockTable.release(key, txNum, LockType.X_LOCK);
 	}
-	
+
 	void deleteFromCache(PrimaryKey key, long txNum) {
-//		localCcMgr.beforeWriteBack(key, txNum);
-//		lockTable.xLock(key, txNum);
+		// localCcMgr.beforeWriteBack(key, txNum);
+		// lockTable.xLock(key, txNum);
 
 		if (recordCache.remove(key) == null)
 			throw new RuntimeException("There is no record for " + key + " in the cache");
-		
-//		localCcMgr.afterWriteback(key, txNum);
-//		lockTable.release(key, txNum, LockType.X_LOCK);
+
+		// localCcMgr.afterWriteback(key, txNum);
+		// lockTable.release(key, txNum, LockType.X_LOCK);
 	}
-	
+
 	void writeBack(PrimaryKey key, CachedRecord rec, Transaction tx) {
-//		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
-//		lockTable.xLock(key, tx.getTransactionNumber());
-		
+		// localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+		// lockTable.xLock(key, tx.getTransactionNumber());
+
 		// Check if there is corresponding keys in the cache
 		if (recordCache.containsKey(key))
 			recordCache.put(key, rec);
-		else 
+		else
 			// If it was not in the cache, write-back to the local storage
 			writeToVanillaCore(key, rec, tx);
-		
-//		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
-//		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
+
+		// localCcMgr.afterWriteback(key, tx.getTransactionNumber());
+		// lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
 	}
-	
+
 	// This is also a type of writeback
 	void insertToLocalStorage(PrimaryKey key, CachedRecord rec, Transaction tx) {
-//		localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
-//		lockTable.xLock(key, tx.getTransactionNumber());
-		
+		// localCcMgr.beforeWriteBack(key, tx.getTransactionNumber());
+		// lockTable.xLock(key, tx.getTransactionNumber());
+
 		// Check if there is corresponding keys in the cache
 		if (recordCache.containsKey(key))
 			recordCache.remove(key);
-		
+
 		// Force insert to local storage
 		rec.setNewInserted();
 		VanillaCoreCrud.insert(key, rec, tx);
-		
-//		localCcMgr.afterWriteback(key, tx.getTransactionNumber());
-//		lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
-	}
-	
-//	public void registerSinkReading(RecordKey key, long txNum) {
-//		localCcMgr.requestSinkRead(key, txNum);
-//		lockTable.requestLock(key, txNum);
-//	}
 
-//	public void registerSinkWriteback(RecordKey key, long txNum) {
-//		localCcMgr.requestWriteBack(key, txNum);
-//		lockTable.requestLock(key, txNum);
-//	}
-	
+		// localCcMgr.afterWriteback(key, tx.getTransactionNumber());
+		// lockTable.release(key, tx.getTransactionNumber(), LockType.X_LOCK);
+	}
+
+	// public void registerSinkReading(RecordKey key, long txNum) {
+	// localCcMgr.requestSinkRead(key, txNum);
+	// lockTable.requestLock(key, txNum);
+	// }
+
+	// public void registerSinkWriteback(RecordKey key, long txNum) {
+	// localCcMgr.requestWriteBack(key, txNum);
+	// lockTable.requestLock(key, txNum);
+	// }
+
 	private void writeToVanillaCore(PrimaryKey key, CachedRecord rec, Transaction tx) {
 		if (rec.isDeleted())
 			VanillaCoreCrud.delete(key, tx);
@@ -248,15 +315,18 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		else if (rec.isDirty()) {
 			if (!VanillaCoreCrud.update(key, rec, tx)) {
 				// XXX: We use this to solve a migration problem
-				// If a hot record was on other machine and belonged to another partition (not local one),
-				// then the partitioning changed, the hot record would not go to the new partition immediately.
-				// It is highly possible the record would be written back to the new partition very soon.
+				// If a hot record was on other machine and belonged to another partition (not
+				// local one),
+				// then the partitioning changed, the hot record would not go to the new
+				// partition immediately.
+				// It is highly possible the record would be written back to the new partition
+				// very soon.
 				// However, we didn't make hot records be inserted to the new partition.
 				// Therefore, they would not be in the database.
 				// In this case, we should insert the record if we could not find it.
 				if (logger.isLoggable(Level.FINE))
 					logger.fine("Insert the record " + key + " since we could not find it.");
-				
+
 				VanillaCoreCrud.insert(key, rec, tx);
 			}
 		}

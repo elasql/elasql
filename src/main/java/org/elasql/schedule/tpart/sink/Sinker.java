@@ -3,9 +3,11 @@ package org.elasql.schedule.tpart.sink;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.procedure.tpart.TransactionGraph;
 import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
@@ -18,6 +20,8 @@ public class Sinker {
 	protected PartitionMetaMgr parMeta;
 	protected int myId = Elasql.serverId();
 	protected static int sinkProcessId = 0;
+
+	private TransactionGraph txnGraph = Elasql.getTransactionGraph(); 
 
 	public Sinker() {
 		parMeta = Elasql.partitionMetaMgr();
@@ -39,6 +43,15 @@ public class Sinker {
 
 		return plans.iterator();
 	}
+	// MODIFIED:
+	/**
+	 * Generate the dependency graph for current node
+	 * @param node
+	 */
+	private void generateDependencyGraph(TxNode node){
+		Set<Long> dependentSet = txnGraph.generateDependencyGraph(node.getTask().getReadSet(), node.getTask().getWriteSet(), node.getTxNum());
+		node.getTask().getProcedure().addDependenTxns(dependentSet);
+	}
 	
 	protected List<TPartStoredProcedureTask> createSunkPlan(TGraph graph) {
 		List<TPartStoredProcedureTask> localTasks = new LinkedList<TPartStoredProcedureTask>();
@@ -51,23 +64,26 @@ public class Sinker {
 			
 			// Check if this node is the master node
 			boolean isHereMaster = (node.getPartId() == myId);
-			SunkPlan plan = new SunkPlan(sinkProcessId, isHereMaster);
+			// MODIFIED: Correspond to the changes of constructor
+			SunkPlan plan = new SunkPlan(sinkProcessId, isHereMaster, node);
 
 			// Generate reading plans
 			generateReadingPlans(plan, node);
-
+			
 			// Generate writing plans
 			generateWritingPlans(plan, node);
 
 			// Generate write back (to sinks) plans
 			generateWritingBackPlans(plan, node);
 			
+			// MODIFIED: Generate dependency graph and add lock requests to queue for building dependency graph.
+			generateDependencyGraph(node);
+			
 			// Decide if the local node should execute this plan
 			if (plan.shouldExecuteHere()) {
 				// Debug
 //				System.out.println(String.format("Tx.%d plan: %s", node.getTxNum(), plan));
-				
-				node.getTask().decideExceutionPlan(plan);
+				node.getTask().decideExceutionPlan(plan);	
 				localTasks.add(node.getTask());
 			}
 		}

@@ -62,17 +62,22 @@ public class TPartStoredProcedureTask
 	@Override
 	public void run() {
 		SpResultSet rs = null;
-		
+
 		Thread.currentThread().setName("Tx." + txNum);
-		
+
 		// Initialize a thread-local timer
 		Timer timer = Timer.getLocalTimer();
 		timer.reset();
-		timer.setStartExecutionTime(txStartTime);
-		timer.startComponentTimer("Generate plan", sinkStartTime);
-		timer.stopComponentTimer("Generate plan", sinkStopTime);
-		timer.startComponentTimer("Init thread", threadInitStartTime);
-		timer.stopComponentTimer("Init thread");
+		timer.startExecution();
+		// MODIFIED:
+		timer.recordTime("Txn Start TimeStamp", System.nanoTime() / 1000);
+
+		// MODIFIED: Cannot be fixed by merge conflict
+		// timer.setStartExecutionTime(txStartTime);
+		// timer.startComponentTimer("Generate plan", sinkStartTime);
+		// timer.stopComponentTimer("Generate plan", sinkStopTime);
+		// timer.startComponentTimer("Init thread", threadInitStartTime);
+		// timer.stopComponentTimer("Init thread");
 //		timer.startExecution();
 
 		// Initialize a thread-local feature collector
@@ -84,25 +89,30 @@ public class TPartStoredProcedureTask
 		TransactionFeaturesRecorder.recordResult(txNum, collector);
 		
 		rs = tsp.execute();
-			
+
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 
 			// TODO: Uncomment this when the migration module is migrated
-//			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
-//				// Send a notification to the sequencer
-//				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
-//				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
-//			}
-			
+			// if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
+			// // Send a notification to the sequencer
+			// TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
+			// Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
+			// }
+
 			// For Debugging
-//			timer.addToGlobalStatistics();
+			// timer.addToGlobalStatistics();
 		}
-		
+
 		// Stop the timer for the whole execution
 		timer.stopExecution();
-		
+		// MODIFIED:
+		timer.recordTime("Txn End TimeStamp", System.nanoTime() / 1000);
+		// MODIFIED:
+		Elasql.getTransactionGraph().addNode(txNum, timer.getExecutionTime(), System.nanoTime() / 1000,
+				tsp.getDependenTxns());
+
 		// Record the timer result
 		TransactionStatisticsRecorder.recordResult(txNum, timer);
 	}
