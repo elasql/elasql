@@ -7,8 +7,6 @@ import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
-import org.elasql.util.FeatureCollector;
-import org.elasql.util.TransactionFeaturesRecorder;
 import org.elasql.util.TransactionStatisticsRecorder;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.server.VanillaDb;
@@ -29,7 +27,6 @@ public class TPartStoredProcedureTask
 				e.printStackTrace();
 			}
 			TransactionStatisticsRecorder.startRecording();
-			TransactionFeaturesRecorder.startRecording();
 		}
 	}
 	
@@ -49,22 +46,25 @@ public class TPartStoredProcedureTask
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
+	// The time that the stored procedure call arrives the system
+	private long arrivedTime;
 	private long txStartTime, sinkStartTime, sinkStopTime, threadInitStartTime;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
+		this.arrivedTime = arrivedTime;
 		this.tsp = sp;		
 	}
 
 	@Override
 	public void run() {
 		SpResultSet rs = null;
-
+		
 		Thread.currentThread().setName("Tx." + txNum);
-
+		
 		// Initialize a thread-local timer
 		Timer timer = Timer.getLocalTimer();
 		timer.reset();
@@ -79,46 +79,37 @@ public class TPartStoredProcedureTask
 		// timer.startComponentTimer("Init thread", threadInitStartTime);
 		// timer.stopComponentTimer("Init thread");
 //		timer.startExecution();
-
-		// Initialize a thread-local feature collector
-		FeatureCollector collector = FeatureCollector.getLocalFeatureCollector();
-		collector.setFeatureValue(FeatureCollector.keys[0], (txStartTime - firstTxStartTime)/1000);
-		collector.setFeatureValue(FeatureCollector.keys[1], tsp.getReadSet());
-		collector.setFeatureValue(FeatureCollector.keys[2], tsp.getWriteSet());
-		// Record the feature result
-		TransactionFeaturesRecorder.recordResult(txNum, collector);
 		
 		rs = tsp.execute();
-
+			
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 
 			// TODO: Uncomment this when the migration module is migrated
-			// if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
-			// // Send a notification to the sequencer
-			// TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
-			// Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
-			// }
-
+//			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
+//				// Send a notification to the sequencer
+//				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
+//				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
+//			}
+			
 			// For Debugging
-			// timer.addToGlobalStatistics();
+//			timer.addToGlobalStatistics();
 		}
-
+		
 		// Stop the timer for the whole execution
 		timer.stopExecution();
-		// MODIFIED:
-		timer.recordTime("Txn End TimeStamp", System.nanoTime() / 1000);
-		// MODIFIED:
-		Elasql.getTransactionGraph().addNode(txNum, timer.getExecutionTime(), System.nanoTime() / 1000,
-				tsp.getDependenTxns());
-
+		
 		// Record the timer result
 		TransactionStatisticsRecorder.recordResult(txNum, timer);
 	}
 
 	public long getTxNum() {
 		return txNum;
+	}
+	
+	public long getArrivedTime() {
+		return arrivedTime;
 	}
 
 	public Set<PrimaryKey> getReadSet() {

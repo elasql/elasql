@@ -17,10 +17,9 @@ package org.elasql.remote.groupcomm.server;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -31,10 +30,9 @@ import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.remote.groupcomm.SyncRequest;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
-import org.elasql.remote.groupcomm.TimeSync;
-import org.elasql.remote.groupcomm.SyncRequest;
 import org.elasql.server.Elasql;
 import org.elasql.server.Elasql.ServiceType;
 import org.vanilladb.comm.server.VanillaCommServer;
@@ -44,7 +42,7 @@ import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 public class ConnectionMgr implements VanillaCommServerListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
-
+	
 	public static final int SEQUENCER_ID = VanillaCommServer.getServerCount() - 1;
 
 	private VanillaCommServer commServer;
@@ -59,6 +57,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	private Map<Integer, Long> sentSync = new HashMap<Integer, Long>();
 	private BlockingQueue<SyncRequest> timeSyncQueue = new LinkedBlockingQueue<SyncRequest>();
 	public boolean startSync = false;
+	
+	private long firstSpcArrivedTime = -1;
 
 	public ConnectionMgr(int id) {
 		sequencerMode = Elasql.serverId() == SEQUENCER_ID;
@@ -104,11 +104,20 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			// Normally, the client will only sends its request to the sequencer.
 			// However, any other server can also send a total order request.
 			// So, we do not need to check if this machine is the sequencer.
-
+			
 			// Transfer the given batch to a list of messages
 			StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
 			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
-			for (StoredProcedureCall spc : spcs)
+			for (StoredProcedureCall spc : spcs) {
+				// Record when the first spc arrives
+				if (firstSpcArrivedTime == -1)
+					firstSpcArrivedTime = System.nanoTime();
+				
+				// Set arrived time
+				long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
+				spc.stampArrivedTime(arrivedTime);
+				
+				// Add to the total order request list
 				tomRequest.add(spc);
 			try {
 				tomSendQueue.put(tomRequest);
@@ -189,16 +198,21 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
-		// The sequencer running with Calvin must receive stored procedure call for
-		// planning migrations
-		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
-			return;
-
 		StoredProcedureCall spc = (StoredProcedureCall) message;
 		spc.setTxNum(serialNumber);
+		
+		// Pass to the performance manager for monitoring the workload
+		if (Elasql.performanceMgr() != null)
+			Elasql.performanceMgr().monitorTransaction(spc);
+		
+		// The sequencer running with Calvin must receive stored procedure call for planning migrations
+		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
+			return;
+		
+		// Pass to the scheduler
 		Elasql.scheduler().schedule(spc);
 	}
-
+	
 	private void createTomSender() {
 		new Thread(new Runnable() {
 			@Override

@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.FeatureExtractor;
 import org.elasql.perf.tpart.ai.TransactionFeatures;
+import org.elasql.perf.tpart.ai.TransactionFeaturesRecorder;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -50,9 +51,6 @@ public class TPartScheduler extends Task implements Scheduler {
 	private boolean batchingEnabled = true;
 	private long startTime, sinkStartTime, sinkStopTime, threadInitStartTime;
 	private boolean isFirst = true;
-	
-	// For cost estimation
-	private FeatureExtractor featureCollector;
 
 	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
@@ -68,9 +66,6 @@ public class TPartScheduler extends Task implements Scheduler {
 		this.graph = graph;
 		this.batchingEnabled = isBatching;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-		
-		if (Estimator.ENABLE_COLLECTING_DATA)
-			featureCollector = new FeatureExtractor();
 		
 		// Clear the dump dir
 //		dumpDir.mkdirs();
@@ -90,6 +85,8 @@ public class TPartScheduler extends Task implements Scheduler {
 
 	public void run() {
 		List<TPartStoredProcedureTask> batchedTasks = new LinkedList<TPartStoredProcedureTask>();
+		
+		Thread.currentThread().setName("T-Part Scheduler");
 		
 		while (true) {
 			try {
@@ -114,10 +111,7 @@ public class TPartScheduler extends Task implements Scheduler {
 				if (task.getProcedureType() == ProcedureType.NORMAL) {
 					if (Elasql.isStandAloneSequencer()) { // The sequencer
 						// Collecting features of transactions for off-line training
-						if (Estimator.ENABLE_COLLECTING_DATA) {
-							TransactionFeatures features = featureCollector.extractFeatures(task);
-							// TODO: Save this features/pass to the estimator
-						}
+						
 					} else { // Normal DB Servers
 						batchedTasks.add(task);
 					}
@@ -177,7 +171,8 @@ public class TPartScheduler extends Task implements Scheduler {
 
 	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call) {
 		if (call.isNoOpStoredProcCall()) {
-			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), null);
+			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
+					call.getTxNum(), call.getArrivedTime(), null);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -185,7 +180,8 @@ public class TPartScheduler extends Task implements Scheduler {
 			if (!sp.isReadOnly())
 				DdRecoveryMgr.logRequest(call);
 
-			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), sp);
+			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
+					call.getTxNum(), call.getArrivedTime(), sp);
 		}
 	}
 

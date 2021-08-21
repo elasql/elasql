@@ -23,9 +23,10 @@ public class FeatureExtractor {
 		// Extract the features
 		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
 		
-		// All features in TransactionFeatures.FEATURE_KEYS must be set
-		
-		// TODO: Get features
+		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
+		builder.addFeature("Start Time", task.getArrivedTime());
+		builder.addFeature("Number of Read Records", task.getReadSet().size());
+		builder.addFeature("Number of Write Records", task.getWriteSet().size());
 		
 		// TODO: Get dependencies
 		

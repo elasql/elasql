@@ -1,4 +1,4 @@
-package org.elasql.util;
+package org.elasql.perf.tpart.ai;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -10,9 +10,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.util.CsvRow;
+import org.elasql.util.CsvSaver;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 
+/**
+ * A recorder to save TransactionFeatures objects to a CSV file.
+ * 
+ * @author Yu-Xuan Lin, Yu-Shan Lin
+ */
 public class TransactionFeaturesRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionFeaturesRecorder.class.getName());
 	
@@ -21,12 +28,12 @@ public class TransactionFeaturesRecorder extends Task {
 	
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 	
-	private static class TransactionFeatures implements CsvRow, Comparable<TransactionFeatures> {
+	private static class FeatureRow implements CsvRow, Comparable<FeatureRow> {
 		Long txNum;
-		Object[] values = new Object[FeatureCollector.keys.length];
+		Object[] values = new Object[TransactionFeatures.FEATURE_KEYS.size()];
 		int index = 0;
 		
-		public TransactionFeatures(Long txNum) {
+		public FeatureRow(Long txNum) {
 			this.txNum = txNum;
 		}
 		
@@ -44,31 +51,30 @@ public class TransactionFeaturesRecorder extends Task {
 		}
 
 		@Override
-		public int compareTo(TransactionFeatures target) {
+		public int compareTo(FeatureRow target) {
 			return txNum.compareTo(target.txNum);
 		}
 	}
 	
-	private static AtomicBoolean isRecording = new AtomicBoolean(false);
-	private static BlockingQueue<TransactionFeatures> queue
-		= new ArrayBlockingQueue<TransactionFeatures>(100000);
+	private AtomicBoolean isRecording = new AtomicBoolean(false);
+	private BlockingQueue<FeatureRow> queue
+		= new ArrayBlockingQueue<FeatureRow>(100000);
 	
-	public static void startRecording() {
+	public void startRecording() {
 		if (!isRecording.getAndSet(true)) {
 			// Note: this should be called only once
-			VanillaDb.taskMgr().runTask(new TransactionFeaturesRecorder());
+			VanillaDb.taskMgr().runTask(this);
 		}
 	}
 	
-	public static void recordResult(long txNum, FeatureCollector featureCollector) {
+	public void record(TransactionFeatures features) {
 		if (!isRecording.get())
 			return;
 			
-		TransactionFeatures features = new TransactionFeatures(txNum);
-		
-		for (int i = 0;i<featureCollector.getKeyCount();i++)
-			features.addValue(featureCollector.getFeatureValue(i));
-		queue.add(features);
+		FeatureRow row = new FeatureRow(features.getTxNum());
+		for (String key : TransactionFeatures.FEATURE_KEYS)
+			row.addValue(features.getFeature(key));
+		queue.add(row);
 	}
 
 	@Override
@@ -77,25 +83,22 @@ public class TransactionFeaturesRecorder extends Task {
 		
 		try {
 			// Wait for receiving the first statistics
-			TransactionFeatures features = queue.take();
-			
-			// Initialize the header
-			List<String> header = initHeader(features);
+			FeatureRow row = queue.take();
 			
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Transaction features recorder starts");
 			
-			// Save the statistics
-			List<TransactionFeatures> rows = new ArrayList<TransactionFeatures>();				
-			rows.add(features);
+			// Save the row
+			List<FeatureRow> rows = new ArrayList<FeatureRow>();				
+			rows.add(row);
 			
 			// Wait until no more statistics coming in the last 10 seconds
-			while ((features = queue.poll(TIME_TO_FLUSH, TimeUnit.SECONDS)) != null) {
-				rows.add(features);
+			while ((row = queue.poll(TIME_TO_FLUSH, TimeUnit.SECONDS)) != null) {
+				rows.add(row);
 			}
 			
 			if (logger.isLoggable(Level.INFO)) {
-				String log = String.format("No more statistics coming in last %d seconds. Start generating a report.",
+				String log = String.format("No more features coming in last %d seconds. Start generating a report.",
 						TIME_TO_FLUSH);
 				logger.info(log);
 			}
@@ -104,21 +107,27 @@ public class TransactionFeaturesRecorder extends Task {
 			Collections.sort(rows);
 			
 			// Save to CSV
-			CsvSaver<TransactionFeatures> csvSaver = new CsvSaver<TransactionFeatures>(FILENAME_PREFIX);
+			CsvSaver<FeatureRow> csvSaver = new CsvSaver<FeatureRow>(FILENAME_PREFIX);
 			
 			// Generate the output file
-			csvSaver.generateOutputFile(header, rows);
+			List<String> header = initHeader();
+			String fileName = csvSaver.generateOutputFile(header, rows);
+			
+			if (logger.isLoggable(Level.INFO)) {
+				String log = String.format("A feature log is generated at \"%s\"", fileName);
+				logger.info(log);
+			}
 			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 	}
 
-	private List<String> initHeader(TransactionFeatures features) {
+	private List<String> initHeader() {
 		List<String> header = new ArrayList<String>();
 		header.add(TRANSACTION_ID_COLUMN);
-		for (String key : FeatureCollector.keys) 
-				header.add(key);
+		for (String key : TransactionFeatures.FEATURE_KEYS) 
+			header.add(key);
 		return header;
 	}
 }
