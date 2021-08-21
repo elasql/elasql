@@ -10,7 +10,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.perf.tpart.ai.Estimator;
-import org.elasql.perf.tpart.ai.FeatureCollector;
+import org.elasql.perf.tpart.ai.FeatureExtractor;
+import org.elasql.perf.tpart.ai.TransactionFeatures;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -51,7 +52,7 @@ public class TPartScheduler extends Task implements Scheduler {
 	private boolean isFirst = true;
 	
 	// For cost estimation
-	private FeatureCollector featureCollector;
+	private FeatureExtractor featureCollector;
 
 	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
@@ -69,7 +70,7 @@ public class TPartScheduler extends Task implements Scheduler {
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
 		if (Estimator.ENABLE_COLLECTING_DATA)
-			featureCollector = new FeatureCollector();
+			featureCollector = new FeatureExtractor();
 		
 		// Clear the dump dir
 //		dumpDir.mkdirs();
@@ -114,7 +115,8 @@ public class TPartScheduler extends Task implements Scheduler {
 					if (Elasql.isStandAloneSequencer()) { // The sequencer
 						// Collecting features of transactions for off-line training
 						if (Estimator.ENABLE_COLLECTING_DATA) {
-							featureCollector.collectFeatures(task);
+							TransactionFeatures features = featureCollector.extractFeatures(task);
+							// TODO: Save this features/pass to the estimator
 						}
 					} else { // Normal DB Servers
 						batchedTasks.add(task);
