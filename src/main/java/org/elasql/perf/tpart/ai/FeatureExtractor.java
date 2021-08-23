@@ -1,5 +1,7 @@
 package org.elasql.perf.tpart.ai;
 
+import java.util.Set;
+
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 
 /**
@@ -11,6 +13,9 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 public class FeatureExtractor {
 	
 	private long lastProcessedTxNum = -1;
+	
+	private TransactionDependencyAnalyzer dependencyAnalyzer =
+			new TransactionDependencyAnalyzer();
 	
 	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task) {
 		// Check if transaction requests are given in the total order
@@ -28,7 +33,11 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
 		
-		// TODO: Get dependencies
+		// Get dependencies
+		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
+				task.getTxNum(), task.getReadSet(), task.getWriteSet());
+		for (Long dependentTx : dependentTxs)
+			builder.addDependency(dependentTx);
 		
 		return builder.build();
 	}

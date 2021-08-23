@@ -6,6 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.FeatureExtractor;
+import org.elasql.perf.tpart.ai.TransactionDependencyRecorder;
 import org.elasql.perf.tpart.ai.TransactionFeatures;
 import org.elasql.perf.tpart.ai.TransactionFeaturesRecorder;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
@@ -21,6 +22,7 @@ public class TPartPerformanceManager extends PerformanceManager {
 	// For cost estimation
 	private FeatureExtractor featureExtractor;
 	private TransactionFeaturesRecorder featureRecorder;
+	private TransactionDependencyRecorder dependencyRecorder;
 	
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory) {
 		this.factory = factory;
@@ -30,6 +32,8 @@ public class TPartPerformanceManager extends PerformanceManager {
 			featureExtractor = new FeatureExtractor();
 			featureRecorder = new TransactionFeaturesRecorder();
 			featureRecorder.startRecording();
+			dependencyRecorder = new TransactionDependencyRecorder();
+			dependencyRecorder.startRecording();
 		}
 	}
 
@@ -47,6 +51,7 @@ public class TPartPerformanceManager extends PerformanceManager {
 				if (Estimator.ENABLE_COLLECTING_DATA) {
 					TransactionFeatures features = featureExtractor.extractFeatures(task);
 					featureRecorder.record(features);
+					dependencyRecorder.record(features);
 				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();

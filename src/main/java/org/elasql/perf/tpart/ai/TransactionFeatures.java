@@ -69,6 +69,9 @@ public class TransactionFeatures {
 					throw new RuntimeException(
 							String.format("Feature '%s' is missing for tx.%d", key, txNum));
 			
+			// Sort the dependencies
+			Collections.sort(dependentTxns);
+			
 			return new TransactionFeatures(txNum, features, dependentTxns);
 		}
 	}
