@@ -1,14 +1,13 @@
 package org.elasql.perf;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
-import org.vanilladb.core.server.task.Task;
 
 /**
  * A manager that collects workload and system metrics.
  * 
  * @author Yu-Shan Lin
  */
-public abstract class PerformanceManager extends Task {
+public interface PerformanceManager {
 	
 	/**
 	 * Analyzes and record the characteristics of a
@@ -17,6 +16,6 @@ public abstract class PerformanceManager extends Task {
 	 * 
 	 * @param spc
 	 */
-	public abstract void monitorTransaction(StoredProcedureCall spc);
+	void monitorTransaction(StoredProcedureCall spc);
 	
 }

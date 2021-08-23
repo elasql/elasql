@@ -175,6 +175,7 @@ public class Elasql extends VanillaDb {
 		initScheduler(factory, migraComsFactory);
 		initConnectionMgr(myNodeId);
 		initDdLogMgr();
+		initPerfMgr(factory);
 		if (migraComsFactory != null)
 			migraMgr = migraComsFactory.newMigrationMgr();
 	}
@@ -313,7 +314,6 @@ public class Elasql extends VanillaDb {
 	}
 
 	public static void initPerfMgr(DdStoredProcedureFactory<?> factory) {
-		System.out.println("Great!");
 		switch (SERVICE_TYPE) {
 		case TPART:
 		case HERMES:
@@ -326,8 +326,6 @@ public class Elasql extends VanillaDb {
 		default:
 			performanceMgr = new DummyPerformanceManager();
 		}
-		
-		taskMgr().runTask(performanceMgr);
 	}
 
 	// ================
