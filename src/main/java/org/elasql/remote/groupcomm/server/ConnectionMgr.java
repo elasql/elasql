@@ -18,6 +18,7 @@ package org.elasql.remote.groupcomm.server;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -28,9 +29,11 @@ import java.util.logging.Logger;
 
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.perf.MetricReport;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.SyncRequest;
+import org.elasql.remote.groupcomm.TimeSync;
 import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
@@ -74,15 +77,20 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 
 	public void sendClientResponse(int clientId, int rteId, long txNum, SpResultSet rs) {
-		commServer.sendP2pMessage(ProcessType.CLIENT, clientId, new ClientResponse(clientId, rteId, txNum, rs));
+		commServer.sendP2pMessage(ProcessType.CLIENT, clientId,
+				new ClientResponse(clientId, rteId, txNum, rs));
 	}
-
+	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
 		commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
 		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
+	}
+	
+	public void sendMetricReport(MetricReport report) {
+		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, report);
 	}
 
 	@Override
@@ -119,6 +127,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				
 				// Add to the total order request list
 				tomRequest.add(spc);
+			}
+			
+			// Send a total order request
 			try {
 				tomSendQueue.put(tomRequest);
 			} catch (InterruptedException e) {
@@ -192,6 +203,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				}
 
 			}
+		} else if (message instanceof MetricReport) {
+			MetricReport report = (MetricReport) message;
+			Elasql.performanceMgr().receiveMetricReport(report);
 		} else
 			throw new IllegalArgumentException();
 	}

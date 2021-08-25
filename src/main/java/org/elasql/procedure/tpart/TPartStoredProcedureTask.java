@@ -2,12 +2,12 @@ package org.elasql.procedure.tpart;
 
 import java.util.Set;
 
+import org.elasql.perf.tpart.TransactionMetricRecorder;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
-import org.elasql.util.TransactionStatisticsRecorder;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
@@ -26,7 +26,6 @@ public class TPartStoredProcedureTask
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
-			TransactionStatisticsRecorder.startRecording();
 		}
 	}
 	
@@ -101,7 +100,8 @@ public class TPartStoredProcedureTask
 		timer.stopExecution();
 		
 		// Record the timer result
-		TransactionStatisticsRecorder.recordResult(txNum, timer);
+		String role = tsp.isMaster()? "Master" : "Slave";
+		Elasql.performanceMgr().addTransactionMetics(txNum, role, timer);
 	}
 
 	public long getTxNum() {

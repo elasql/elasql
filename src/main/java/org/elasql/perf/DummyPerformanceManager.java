@@ -1,6 +1,7 @@
 package org.elasql.perf;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.vanilladb.core.util.Timer;
 
 public class DummyPerformanceManager implements PerformanceManager {
 
@@ -8,5 +9,14 @@ public class DummyPerformanceManager implements PerformanceManager {
 	public void monitorTransaction(StoredProcedureCall spc) {
 		// Do nothing
 	}
-	
+
+	@Override
+	public void addTransactionMetics(long txNum, String role, Timer timer) {
+		// Do nothing
+	}
+
+	@Override
+	public void receiveMetricReport(MetricReport report) {
+		// Do nothing
+	}
 }
