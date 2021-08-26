@@ -9,10 +9,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.perf.tpart.ai.Estimator;
-import org.elasql.perf.tpart.ai.FeatureExtractor;
-import org.elasql.perf.tpart.ai.TransactionFeatures;
-import org.elasql.perf.tpart.ai.TransactionFeaturesRecorder;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -109,12 +105,7 @@ public class TPartScheduler extends Task implements Scheduler {
 //				}
 
 				if (task.getProcedureType() == ProcedureType.NORMAL) {
-					if (Elasql.isStandAloneSequencer()) { // The sequencer
-						// Collecting features of transactions for off-line training
-						
-					} else { // Normal DB Servers
-						batchedTasks.add(task);
-					}
+					batchedTasks.add(task);
 				}
 				
 				// sink current t-graph if # pending tx exceeds threshold

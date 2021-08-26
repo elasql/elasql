@@ -1,13 +1,19 @@
-package org.elasql.perf.tpart;
+package org.elasql.perf.tpart.metric;
 
 import org.elasql.server.Elasql;
 import org.vanilladb.core.util.Timer;
 
-public class LocalMetricCollector {
+/**
+ * A collector that collects system and transaction metrics on
+ * each machine. 
+ * 
+ * @author Yu-Shan Lin
+ */
+public class MetricCollector {
 	
 	private TransactionMetricRecorder metricRecorder;
 	
-	public LocalMetricCollector() {
+	public MetricCollector() {
 		metricRecorder = new TransactionMetricRecorder(Elasql.serverId());
 		metricRecorder.startRecording();
 	}

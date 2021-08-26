@@ -3,6 +3,8 @@ package org.elasql.perf.tpart;
 import org.elasql.perf.MetricReport;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
+import org.elasql.perf.tpart.metric.MetricCollector;
+import org.elasql.perf.tpart.workload.FeatureCollector;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.server.Elasql;
@@ -14,7 +16,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	private FeatureCollector featureCollector;
 	
 	// On each DB machine
-	private LocalMetricCollector localMetricCollector;
+	private MetricCollector localMetricCollector;
 	
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory) {
 		if (Estimator.ENABLE_COLLECTING_DATA) {
@@ -23,7 +25,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 				featureCollector = new FeatureCollector(factory);
 				Elasql.taskMgr().runTask(featureCollector);
 			} else {
-				localMetricCollector = new LocalMetricCollector();
+				localMetricCollector = new MetricCollector();
 			}
 		}
 	}

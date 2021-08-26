@@ -1,4 +1,4 @@
-package org.elasql.perf.tpart.ai;
+package org.elasql.perf.tpart.workload;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -3,6 +3,12 @@ package org.elasql.perf;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.vanilladb.core.util.Timer;
 
+/**
+ * A placeholder for the systems that does not have an implementation
+ * of {@code PerformanceManager}.
+ * 
+ * @author Yu-Shan Lin
+ */
 public class DummyPerformanceManager implements PerformanceManager {
 
 	@Override

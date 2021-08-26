@@ -1,18 +1,19 @@
-package org.elasql.perf.tpart;
+package org.elasql.perf.tpart.workload;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.elasql.perf.tpart.ai.FeatureExtractor;
-import org.elasql.perf.tpart.ai.TransactionDependencyRecorder;
-import org.elasql.perf.tpart.ai.TransactionFeatures;
-import org.elasql.perf.tpart.ai.TransactionFeaturesRecorder;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.vanilladb.core.server.task.Task;
 
+/**
+ * A collector that collects the features of transactions.
+ * 
+ * @author Yu-Shan Lin
+ */
 public class FeatureCollector extends Task {
 
 	private TPartStoredProcedureFactory factory;
@@ -34,7 +35,7 @@ public class FeatureCollector extends Task {
 
 	@Override
 	public void run() {
-		Thread.currentThread().setName("T-Part Feature Collector");
+		Thread.currentThread().setName("feature-collector");
 		
 		while (true) {
 			try {

@@ -2,38 +2,20 @@ package org.elasql.procedure.tpart;
 
 import java.util.Set;
 
-import org.elasql.perf.tpart.TransactionMetricRecorder;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.server.VanillaDb;
-import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.util.Timer;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
 	
-	private static class WaitingForStartingRecordTask extends Task {
-//		private static final int WARM_UP_TIME = 100_000;
-		private static final int WARM_UP_TIME = 0; // in milliseconds
-		@Override
-		public void run() {
-			try {
-				Thread.sleep(WARM_UP_TIME);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-	
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
-//		TransactionStatisticsRecorder.startRecording();
-		VanillaDb.taskMgr().runTask(new WaitingForStartingRecordTask());
 	}
 	
 	private static long firstTxStartTime;

@@ -1,4 +1,4 @@
-package org.elasql.perf.tpart;
+package org.elasql.perf.tpart.metric;
 
 import java.util.ArrayList;
 import java.util.Collections;
