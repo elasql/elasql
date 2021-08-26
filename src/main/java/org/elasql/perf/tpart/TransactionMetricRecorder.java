@@ -12,58 +12,54 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.Timer;
 
 /**
- * A recorder to record the transaction metrics to a CSV file.
+ * A recorder to record the transaction metrics to CSV files.
  * 
  * @author Yu-Shan Lin
  */
 public class TransactionMetricRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionMetricRecorder.class.getName());
 	
-	private static final String FILENAME_PREFIX = "transaction-metrics";
+	private static final String FILENAME_PREFIX = "transaction";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
-	private static final String MASTER_ID_COLUMN = "Master Node ID";
+	private static final String MASTER_ID_COLUMN = "Is Master";
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 	
-	private static class MetricRow implements CsvRow, Comparable<MetricRow> {
+	private static class TransactionMetrics {
+		long txNum;
+		boolean isMaster;
+		List<String> metricNames;
+		Map<String, Long> latencies;
 		
-		private TransactionMetricRecorder recorder;
-		private long txNum;
-		private int masterId = -1;
-		// [Each Server][Each Metric]
-		private Object[][] metricValues;
-		
-		MetricRow(TransactionMetricRecorder recorder, long txNum) {
-			this.recorder = recorder;
+		TransactionMetrics(long txNum, String role, Timer timer) {
 			this.txNum = txNum;
-			this.metricValues = new Object[PartitionMetaMgr.NUM_PARTITIONS][];
+			this.isMaster = role.equals("Master");
+			
+			metricNames = new ArrayList<String>();
+			latencies = new HashMap<String, Long>();
+			for (Object component : timer.getComponents()) {
+				String metricName = component.toString();
+				metricNames.add(metricName);
+				latencies.put(metricName, timer.getComponentTime(component));
+			}
 		}
+	}
+	
+	private static class LatencyRow implements CsvRow, Comparable<LatencyRow> {
+		long txNum;
+		boolean isMaster;
+		long[] values;
 		
-		void addMetricValueForServer(int serverId, boolean isMaster, Object[] metricValues) {
-			// Check if the metrics exist
-			if (this.metricValues[serverId] != null) {
-				throw new RuntimeException(String.format(
-						"Something worng. Metrics for transaction %d on server %d has been added.",
-						txNum, serverId));
-			}
-			
-			// Check if there has been a master
-			if (isMaster) {
-				if (masterId != -1) {
-					throw new RuntimeException(String.format(
-							"Two machines declare itself as masters: %d, %d",
-							masterId, serverId));
-				}
-				this.masterId = serverId;
-			}
-			
-			this.metricValues[serverId] = metricValues;
+		LatencyRow(long txNum, boolean isMaster, long[] values) {
+			this.txNum = txNum;
+			this.isMaster = isMaster;
+			this.values = values;
 		}
 
 		@Override
@@ -71,16 +67,10 @@ public class TransactionMetricRecorder extends Task {
 			if (index == 0) {
 				return Long.toString(txNum);
 			} else if (index == 1) {
-				return Integer.toString(masterId);
+				return Boolean.toString(isMaster);
 			} else {
-				int metricCount = recorder.getMetricNameCount();
-				int serverId = (index - 2) / metricCount;
-				int metricPos = (index - 2) % metricCount;
-				
-				if (metricValues[serverId] != null &&
-						metricValues[serverId].length > metricPos &&
-						metricValues[serverId][metricPos] != null) {
-					return metricValues[serverId][metricPos].toString();
+				if (index - 2 < values.length) {
+					return Long.toString(values[index - 2]);
 				} else {
 					return "";
 				}
@@ -88,7 +78,7 @@ public class TransactionMetricRecorder extends Task {
 		}
 
 		@Override
-		public int compareTo(MetricRow row) {
+		public int compareTo(LatencyRow row) {
 			return Long.compare(txNum, row.txNum);
 		}
 	}
@@ -97,13 +87,17 @@ public class TransactionMetricRecorder extends Task {
 	private BlockingQueue<TransactionMetrics> queue
 		= new ArrayBlockingQueue<TransactionMetrics>(100000);
 	
-	// Data
-	private List<MetricRow> rows = new ArrayList<MetricRow>();
-	private Map<Long, Integer> txToRowPos = new HashMap<Long, Integer>();
-	
 	// Header
-	private List<String> metricNames = new ArrayList<String>();
-	private Map<String, Integer> metricNameToPos = new HashMap<String, Integer>();
+	private int serverId;
+	private List<Object> metricNames = new ArrayList<Object>();
+	private Map<Object, Integer> metricNameToPos = new HashMap<Object, Integer>();
+	
+	// Data
+	private List<LatencyRow> latencyRows = new ArrayList<LatencyRow>();
+	
+	public TransactionMetricRecorder(int serverId) {
+		this.serverId = serverId;
+	}
 	
 	public void startRecording() {
 		if (!isRecording.getAndSet(true)) {
@@ -112,11 +106,11 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
-	public void addTransactionMetrics(TransactionMetrics metrics) {
+	public void addTransactionMetrics(long txNum, String role, Timer timer) {
 		if (!isRecording.get())
 			return;
 		
-		queue.add(metrics);
+		queue.add(new TransactionMetrics(txNum, role, timer));
 	}
 
 	@Override
@@ -131,11 +125,11 @@ public class TransactionMetricRecorder extends Task {
 				logger.info("Transaction metrics recorder starts recording metrics");
 			
 			// Save the metrics
-			addMetricsToRow(metrics);
+			saveMetrics(metrics);
 			
 			// Wait until no more metrics coming in the last 10 seconds
 			while ((metrics = queue.poll(TIME_TO_FLUSH, TimeUnit.SECONDS)) != null) {
-				addMetricsToRow(metrics);
+				saveMetrics(metrics);
 			}
 			
 			if (logger.isLoggable(Level.INFO)) {
@@ -145,27 +139,27 @@ public class TransactionMetricRecorder extends Task {
 			}
 			
 			// Sort by transaction ID
-			Collections.sort(rows);
+			sortRows();
 			
-			// Save to CSV
-			CsvSaver<MetricRow> csvSaver = new CsvSaver<MetricRow>(FILENAME_PREFIX);
-			
-			// Generate the output file
-			List<String> header = generateHeader();
-			csvSaver.generateOutputFile(header, rows);
+			// Save to CSV files
+			saveToCsv();
 			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	private int addNewRow(long txNum) {
-		rows.add(new MetricRow(this, txNum));
-		return rows.size() - 1;
+	private void saveMetrics(TransactionMetrics metrics) {
+		// Update component names
+		updateMetricNames(metrics);
+		
+		// Split the metrics to different types of rows
+		LatencyRow latRow = convertToLatencyRow(metrics);
+		latencyRows.add(latRow);
 	}
 	
-	private void updateMissingMetrics(TransactionMetrics metrics) {
-		for (String metricName : metrics.getMetrics().keySet()) {
+	private void updateMetricNames(TransactionMetrics metrics) {
+		for (String metricName : metrics.metricNames) {
 			if (!metricNameToPos.containsKey(metricName)) {
 				metricNames.add(metricName);
 				metricNameToPos.put(metricName, metricNames.size() - 1);
@@ -173,35 +167,41 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
-	private Object[] convertMetricsToArray(TransactionMetrics metrics) {
-		updateMissingMetrics(metrics);
-		
-		Object[] metricValues = new Object[metricNames.size()];
-		for (Map.Entry<String, Object> metricPair : metrics.getMetrics().entrySet()) {
-			int pos = metricNameToPos.get(metricPair.getKey());
-			metricValues[pos] = metricPair.getValue();
+	private LatencyRow convertToLatencyRow(TransactionMetrics metrics) {
+		long[] values = new long[metricNames.size()];
+		for (Object metricName : metricNames) {
+			Long latency = metrics.latencies.get(metricName);
+			if (latency != null) {
+				int pos = metricNameToPos.get(metricName);
+				values[pos] = latency;
+			}
 		}
-		
-		return metricValues;
+		return new LatencyRow(metrics.txNum, metrics.isMaster, values);
 	}
 	
-	private void addMetricsToRow(TransactionMetrics metrics) {
-		Integer rowPos = txToRowPos.get(metrics.getTxNum());
-		
-		if (rowPos == null) {
-			rowPos = addNewRow(metrics.getTxNum());
-			txToRowPos.put(metrics.getTxNum(), rowPos);
-		}
-		
-		MetricRow row = rows.get(rowPos);
-		Object[] metricValues = convertMetricsToArray(metrics);
-		boolean isMaster = metrics.getRole().equals("Master");
-		row.addMetricValueForServer(metrics.getServerId(), isMaster, metricValues);
+	private void sortRows() {
+		Collections.sort(latencyRows);
 	}
 	
-	private int getMetricNameCount() {
-		return metricNames.size();
+	private void saveToCsv() {
+		// Generate the header
+		List<String> header = generateHeader();
+		
+		// Save to different files
+		saveToLatencyCsv(header);
 	}
+	
+	private void saveToLatencyCsv(List<String> header) {
+		String fileName = String.format("%s-latency-server-%d", FILENAME_PREFIX, serverId);
+		CsvSaver<LatencyRow> csvSaver = new CsvSaver<LatencyRow>(fileName);
+		String path = csvSaver.generateOutputFile(header, latencyRows);
+		
+		if (logger.isLoggable(Level.INFO)) {
+			String log = String.format("A latency log is generated at '%s'", path);
+			logger.info(log);
+		}
+	}
+	
 	
 	private List<String> generateHeader() {
 		List<String> header = new ArrayList<String>();
@@ -209,14 +209,12 @@ public class TransactionMetricRecorder extends Task {
 		// First column: transaction ID
 		header.add(TRANSACTION_ID_COLUMN);
 		
-		// Second column: master node ID
+		// Second column: is master
 		header.add(MASTER_ID_COLUMN);
 		
-		// After: metrics for each node
-		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			for (String metricName : metricNames)
-				header.add(String.format("Server %d - %s", nodeId, metricName));
-		}
+		// After: metrics
+		for (Object metricName : metricNames)
+			header.add(metricName.toString());
 		
 		return header;
 	}

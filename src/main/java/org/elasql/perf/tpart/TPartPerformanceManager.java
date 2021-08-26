@@ -12,7 +12,6 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	// On the sequencer
 	private FeatureCollector featureCollector;
-	private MetricWarehouse metricWarehouse;
 	
 	// On each DB machine
 	private LocalMetricCollector localMetricCollector;
@@ -25,11 +24,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 				Elasql.taskMgr().runTask(featureCollector);
 			} else {
 				localMetricCollector = new LocalMetricCollector();
-				Elasql.taskMgr().runTask(localMetricCollector);
 			}
 		}
-		
-		metricWarehouse = new MetricWarehouse();
 	}
 
 	@Override
@@ -52,6 +48,6 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	@Override
 	public void receiveMetricReport(MetricReport report) {
-		metricWarehouse.receiveMetricReport((TPartMetricReport) report);
+		// TODO: store system metrics for cost estimation and PID control
 	}
 }
