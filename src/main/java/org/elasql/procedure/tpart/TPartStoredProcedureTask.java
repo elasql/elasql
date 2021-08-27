@@ -27,9 +27,13 @@ public class TPartStoredProcedureTask
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
+	
+	// Timestamps
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
-	private long txStartTime, sinkStartTime, sinkStopTime, threadInitStartTime;
+	private long planGenStartTime;
+	private long planGenStopTime;
+	private long threadInitStartTime;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
@@ -49,20 +53,26 @@ public class TPartStoredProcedureTask
 		// Initialize a thread-local timer
 		Timer timer = Timer.getLocalTimer();
 		timer.reset();
-		timer.startExecution();
-		// MODIFIED:
-		timer.recordTime("Txn Start TimeStamp", System.nanoTime() / 1000);
-
-		// MODIFIED: Cannot be fixed by merge conflict
-		// timer.setStartExecutionTime(txStartTime);
-		// timer.startComponentTimer("Generate plan", sinkStartTime);
-		// timer.stopComponentTimer("Generate plan", sinkStopTime);
-		// timer.startComponentTimer("Init thread", threadInitStartTime);
-		// timer.stopComponentTimer("Init thread");
+		
+		// XXX: since we do not count OU0 for now,
+		// so we use the start time of OU1 as the transaction start time.
+		timer.setStartExecutionTime(planGenStartTime);
 //		timer.startExecution();
 		
+		// OU1
+		timer.startComponentTimer("OU1 - Generate Plan", planGenStartTime);
+		timer.stopComponentTimer("OU1 - Generate Plan", planGenStopTime);
+		
+		// OU2
+		timer.startComponentTimer("OU2 - Initialize Thread", threadInitStartTime);
+		timer.stopComponentTimer("OU2 - Initialize Thread");
+		
+		// Transaction Execution
 		rs = tsp.execute();
-			
+
+		// Stop the timer for the whole execution
+		timer.stopExecution();
+		
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
@@ -77,9 +87,6 @@ public class TPartStoredProcedureTask
 			// For Debugging
 //			timer.addToGlobalStatistics();
 		}
-		
-		// Stop the timer for the whole execution
-		timer.stopExecution();
 		
 		// Record the timer result
 		String role = tsp.isMaster()? "Master" : "Slave";
@@ -131,11 +138,16 @@ public class TPartStoredProcedureTask
 	public boolean isReadOnly() {
 		return tsp.isReadOnly();
 	}
-
-	public void setStartTime(long txStartTime, long sinkStartTime, long sinkStopTime, long threadInitStartTime) {
-		this.txStartTime = txStartTime;
-		this.sinkStartTime = sinkStartTime;
-		this.sinkStopTime = sinkStopTime;
-		this.threadInitStartTime = threadInitStartTime;
+	
+	public void recordPlanGenerationStart() {
+		planGenStartTime = System.nanoTime();
+	}
+	
+	public void recordPlanGenerationStop() {
+		planGenStopTime = System.nanoTime();
+	}
+	
+	public void recordThreadInitStart() {
+		threadInitStartTime = System.nanoTime();
 	}
 }

@@ -114,39 +114,15 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public SpResultSet execute() {
 		Timer timer = Timer.getLocalTimer();
 		try {
-			// MODIFIED: 
-			if(tx.isReadOnly())
-				timer.startComponentTimer("Average Time Of Read-Only Txn");
-			else
-				timer.startComponentTimer("Average Time Of R/W Txn");
-
-			// MODIFIED: 
-			if (plan.isContainRemotePush()) {
-				timer.startComponentTimer("Total Time Remote Read On Slave");
-				timer.startComponentTimer("CCLock Time Remote Read On Slave");
-			}
-
-			timer.startComponentTimer("Get locks");
+			timer.startComponentTimer("OU3 - Acquire Locks");
 			getConservativeLocks();
-			timer.stopComponentTimer("Get locks");
-
-			if (plan.isContainRemotePush())
-				timer.stopComponentTimer("CCLock Time Remote Read On Slave");
+			timer.stopComponentTimer("OU3 - Acquire Locks");
 			
-			// record time of executing tx logic in the function
 			executeTransactionLogic();
-
-			timer.startComponentTimer("tx commit");
+			
+			timer.startComponentTimer("OU8 - Commit");
 			tx.commit();
-			timer.stopComponentTimer("tx commit");
-
-			if (plan.isContainRemotePush())
-				timer.stopComponentTimer("Total Time Remote Read On Slave");
-
-			if(tx.isReadOnly())
-				timer.stopComponentTimer("Average Time Of Read-Only Txn");
-			else
-				timer.stopComponentTimer("Average Time Of R/W Txn");
+			timer.stopComponentTimer("OU8 - Commit");
 			
 			isCommitted = true;
 		} catch (Exception e) {
@@ -230,32 +206,30 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
 
 			// Read the records from the local sink
-			timer.startComponentTimer("(Master) Read from local storage");
+			timer.startComponentTimer("OU4 - Read from Local");
 			for (PrimaryKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k));
 			}
-			timer.stopComponentTimer("(Master) Read from local storage");
+			timer.stopComponentTimer("OU4 - Read from Local");
 
 			// Read all needed records
-			timer.startComponentTimer("(Master) Read from remote");
+			timer.startComponentTimer("OU5M - Read from Remote");
 			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
 					long srcTxNum = plan.getReadSrcTxNum(k);
-					// MODIFIED: cache read for timer
-					readings.put(k, cache.read(k, srcTxNum, plan.isRemoteRead(k), plan.isContainRemotePush()));
-					// readings.put(k, cache.read(k, srcTxNum, plan.isRemoteRead(k), plan.isContainRemoteRead()));
+					readings.put(k, cache.read(k, srcTxNum));
 					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
 				}
 			}
-			timer.stopComponentTimer("(Master) Read from remote");
+			timer.stopComponentTimer("OU5M - Read from Remote");
 			
 			// Execute the SQLs defined by users
-			timer.startComponentTimer("(Master) Execute SQL");
+			timer.startComponentTimer("OU6 - Execute Arithmetic Logic");
 			executeSql(readings);
-			timer.stopComponentTimer("(Master) Execute SQL");
+			timer.stopComponentTimer("OU6 - Execute Arithmetic Logic");
 
 			// Push the data to where they need at
-			timer.startComponentTimer("(Master) Push");
+			timer.startComponentTimer("NonOU - Push to Remote");
 			Map<Integer, Set<PushInfo>> pi = plan.getPushingInfo();
 			if (pi != null) {
 				// read from local storage and send to remote site
@@ -267,18 +241,14 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					for (PushInfo pushInfo : entry.getValue()) {
 						CachedRecord rec = cache.read(pushInfo.getRecord(), txNum);
 						cachedEntrySet.add(new CachedEntryKey(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum()));
-						// MODIFIED: Pass timestamp
-						// rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
 						rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
-						// rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec, 87);
-
 					}
 
 					// Push to the remote
 					Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
 				}
 			}
-			timer.stopComponentTimer("(Master) Push");
+			timer.stopComponentTimer("NonOU - Push to Remote");
 		} else if (plan.hasSinkPush()) {
 			long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
 			
@@ -309,30 +279,27 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 //					
 //				} else {
 					// Normal transactions
-					timer.startComponentTimer("(Slave) Read from local storage");
+					timer.startComponentTimer("OU4 - Read from Local");
 					for (PushInfo pushInfo : entry.getValue()) {
 						
 						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
 						// TODO deal with null value record
 						rec.setSrcTxNum(sinkTxnNum);
-						// MODIFIED: Pass timestamp
-						// rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
 						rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
-						//rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec, 87);
 					}
-					timer.stopComponentTimer("(Slave) Read from local storage");
+					timer.stopComponentTimer("OU4 - Read from Local");
 //				}
 
-				timer.startComponentTimer("(Slave) Push");
+				timer.startComponentTimer("OU5S - Push to Remote");
 				Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
-				timer.stopComponentTimer("(Slave) Push");
+				timer.stopComponentTimer("OU5S - Push to Remote");
 			}
 		}
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
-		timer.startComponentTimer("Flush");
+		timer.startComponentTimer("OU7 - Write to Local");
 		cache.flush(plan,  cachedEntrySet);
-		timer.stopComponentTimer("Flush");
+		timer.stopComponentTimer("OU7 - Write to Local");
 	}
 }
