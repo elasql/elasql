@@ -8,9 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.schedule.tpart.graph.Edge;
-import org.elasql.schedule.tpart.graph.TxNode;
-import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 
 public class SunkPlan {
@@ -37,18 +34,9 @@ public class SunkPlan {
 
 	private Set<PrimaryKey> sinkReadingSet = new HashSet<PrimaryKey>();
 
-	// MODIFIED: Add variable to store the Txn node
-	private TxNode node;
-	private Boolean isRemoteReadPlan;
-	private Boolean isRemotePushPlan;
-
-	// MODIFIED: Add variable to pass the TxNode
-	public SunkPlan(int sinkProcessId, boolean isHereMaster, TxNode node) {
+	public SunkPlan(int sinkProcessId, boolean isHereMaster) {
 		this.sinkProcessId = sinkProcessId;
 		this.isHereMaster = isHereMaster;
-		this.node = node;
-		this.isRemoteReadPlan = false;
-		this.isRemotePushPlan = false;
 	}
 
 	public void addReadingInfo(PrimaryKey key, long srcTxNum) {
@@ -56,11 +44,6 @@ public class SunkPlan {
 		if (readingInfoMap == null)
 			readingInfoMap = new HashMap<PrimaryKey, Long>();
 		readingInfoMap.put(key, srcTxNum);
-
-		// MODIFIED: Check whether the plan contains remote read or not.
-		if(isRemoteRead(key)){
-			isRemoteReadPlan = true;
-		}
 	}
 
 	public void addPushingInfo(PrimaryKey key, int targetNodeId, long destTxNum) {
@@ -72,10 +55,6 @@ public class SunkPlan {
 			pushingInfoMap.put(targetNodeId, pushInfos);
 		}
 		pushInfos.add(new PushInfo(destTxNum, targetNodeId, key));
-
-		// MODIFIED: Check whether the plan contains push plan or not.
-		if(targetNodeId != Elasql.serverId())
-			isRemotePushPlan = true;
 	}
 
 	public void addLocalPassingTarget(PrimaryKey key, long destTxNum) {
@@ -91,10 +70,6 @@ public class SunkPlan {
 			sinkPushingInfoMap.put(destNodeId, pushInfos);
 		}
 		pushInfos.add(new PushInfo(destTxNum, destNodeId, key));
-
-		// MODIFIED: Check whether the plan contains push plan or not.
-		if(destNodeId != Elasql.serverId())
-			isRemotePushPlan = true;
 	}
 
 	public void addSinkReadingInfo(PrimaryKey key) {
@@ -178,54 +153,6 @@ public class SunkPlan {
 	
 	public boolean isReadOnly() {
 		return localWriteBackInfo.isEmpty();
-	}
-
-	// MODIFIED: Add new method to return the set of reading edges
-	public Set<Edge> getReadEdges(){
-		return this.node.getReadEdges();
-	}
-
-	// MODIFIED: Add new method to return the partition ID(the machine ID of the source of the record key)
-	public int getSrcParId(PrimaryKey key){
-		for(Edge e : this.node.getReadEdges()){
-			if(e.getResourceKey() == key){
-				return e.getTarget().getPartId();
-			}
-		}
-		return -1;
-	}
-
-	// MODIFIED: Add new method to check whether the record is remote read or not
-	public Boolean isRemoteRead(PrimaryKey key){
-		for(Edge e : this.node.getReadEdges()){
-			if(e.getResourceKey() == key){
-				if(e.getTarget().getPartId() != Elasql.serverId())
-					return true;
-				else
-					return false;
-			}
-		}
-		return false;
-	}
-
-	// MODIFIED: Get the partition ID of the source Txn of specify key.
-	public int getPartIdOfSrcTxn(PrimaryKey key){
-		for(Edge e : this.node.getReadEdges()){
-			if(e.getResourceKey() == key){
-				return e.getTarget().getPartId();
-			}
-		}
-		return -1;
-	}
-
-	// MODIFIED: Return "isRemoteReadPlan"
-	public Boolean isContainRemoteRead(){
-		return isRemoteReadPlan;
-	}
-
-	// MODIFIED: Return "isRemotePushPlan"
-	public Boolean isContainRemotePush(){
-		return isRemotePushPlan;
 	}
 	
 	/*
