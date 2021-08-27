@@ -25,6 +25,9 @@ import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.perf.DummyPerformanceManager;
+import org.elasql.perf.PerformanceManager;
+import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -107,6 +110,7 @@ public class Elasql extends VanillaDb {
 	
 	// Only for the sequencer
 	private static MigrationSystemController migraSysControl;
+	private static PerformanceManager performanceMgr;
 
 	// connection information
 	private static int myNodeId;
@@ -158,6 +162,7 @@ public class Elasql extends VanillaDb {
 			initScheduler(factory, migraComsFactory);
 			if (migraComsFactory != null)
 				migraSysControl = migraComsFactory.newSystemController();
+			initPerfMgr(factory);
 			return;
 		}
 
@@ -170,6 +175,7 @@ public class Elasql extends VanillaDb {
 		initScheduler(factory, migraComsFactory);
 		initConnectionMgr(myNodeId);
 		initDdLogMgr();
+		initPerfMgr(factory);
 		if (migraComsFactory != null)
 			migraMgr = migraComsFactory.newMigrationMgr();
 	}
@@ -278,6 +284,7 @@ public class Elasql extends VanillaDb {
 		
 		// TODO: Uncomment this when the migration module is migrated
 //		factory = new MigrationStoredProcFactory(factory);
+		
 		TPartScheduler scheduler = new TPartScheduler(factory,  inserter,
 				sinker, graph, isBatching);
 		
@@ -304,6 +311,21 @@ public class Elasql extends VanillaDb {
 
 	public static void initDdLogMgr() {
 		ddLogMgr = new DdLogMgr();
+	}
+
+	public static void initPerfMgr(DdStoredProcedureFactory<?> factory) {
+		switch (SERVICE_TYPE) {
+		case TPART:
+		case HERMES:
+		case G_STORE:
+		case LEAP:
+			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			performanceMgr = new TPartPerformanceManager((TPartStoredProcedureFactory) factory);
+			break;
+		default:
+			performanceMgr = new DummyPerformanceManager();
+		}
 	}
 
 	// ================
@@ -336,6 +358,10 @@ public class Elasql extends VanillaDb {
 	
 	public static MigrationSystemController migraSysControl() {
 		return migraSysControl;
+	}
+	
+	public static PerformanceManager performanceMgr() {
+		return performanceMgr;
 	}
 	
 	public static boolean isStandAloneSequencer() {

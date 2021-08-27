@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.perf.MetricReport;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
@@ -45,6 +46,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	private boolean sequencerMode;
 	private BlockingQueue<List<Serializable>> tomSendQueue = new LinkedBlockingQueue<List<Serializable>>();
 	private boolean areAllServersReady = false;
+	
+	private long firstSpcArrivedTime = -1;
 
 	public ConnectionMgr(int id) {
 		sequencerMode = Elasql.serverId() == SEQUENCER_ID;
@@ -70,6 +73,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public void pushTupleSet(int nodeId, TupleSet reading) {
 		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
 	}
+	
+	public void sendMetricReport(MetricReport report) {
+		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, report);
+	}
 
 	@Override
 	public void onServerReady() {
@@ -94,8 +101,20 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			// Transfer the given batch to a list of messages
 			StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
 			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
-			for (StoredProcedureCall spc : spcs)
+			for (StoredProcedureCall spc : spcs) {
+				// Record when the first spc arrives
+				if (firstSpcArrivedTime == -1)
+					firstSpcArrivedTime = System.nanoTime();
+				
+				// Set arrived time
+				long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
+				spc.stampArrivedTime(arrivedTime);
+				
+				// Add to the total order request list
 				tomRequest.add(spc);
+			}
+			
+			// Send a total order request
 			try {
 				tomSendQueue.put(tomRequest);
 			} catch (InterruptedException e) {
@@ -112,18 +131,27 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			
 			for (Tuple t : ts.getTupleSet())
 				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
+		} else if (message instanceof MetricReport) {
+			MetricReport report = (MetricReport) message;
+			Elasql.performanceMgr().receiveMetricReport(report);
 		} else
 			throw new IllegalArgumentException();
 	}
 
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
+		StoredProcedureCall spc = (StoredProcedureCall) message;
+		spc.setTxNum(serialNumber);
+		
+		// Pass to the performance manager for monitoring the workload
+		if (Elasql.performanceMgr() != null)
+			Elasql.performanceMgr().monitorTransaction(spc);
+		
 		// The sequencer running with Calvin must receive stored procedure call for planning migrations
 		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
 			return;
 		
-		StoredProcedureCall spc = (StoredProcedureCall) message;
-		spc.setTxNum(serialNumber);
+		// Pass to the scheduler
 		Elasql.scheduler().schedule(spc);
 	}
 	

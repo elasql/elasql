@@ -34,6 +34,10 @@ public class StoredProcedureCall implements Serializable {
 	private long txNum = -1;
 
 	private int clientId, pid = PID_NO_OPERATION, connectionId = -1;
+	
+	// The timestamp to indicate the time that this request arrives
+	// at the database system. (-1 means 'not set')
+	private long arrivedTime = -1;
 
 	public static StoredProcedureCall getNoOpStoredProcCall(int clienId) {
 		return new StoredProcedureCall(clienId);
@@ -66,6 +70,15 @@ public class StoredProcedureCall implements Serializable {
 
 	public void setTxNum(long txNum) {
 		this.txNum = txNum;
+	}
+	
+	public void stampArrivedTime(long timestamp) {
+		if (arrivedTime == -1)
+			arrivedTime = timestamp;
+	}
+	
+	public long getArrivedTime() {
+		return arrivedTime;
 	}
 
 	public int getClientId() {

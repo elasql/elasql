@@ -6,11 +6,8 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class CsvSaver<R extends CsvRow> {
-	private static Logger logger = Logger.getLogger(CsvSaver.class.getName());
 	
 	// Set 'true' to use the same filename for the report.
 	// This is used to avoid create too many files in a series of experiments.
@@ -22,7 +19,7 @@ public class CsvSaver<R extends CsvRow> {
 		this.filenamePrefix = filenamePrefix;
 	}
 	
-	public void generateOutputFile(List<String> header, List<R> rows) {
+	public String generateOutputFile(List<String> header, List<R> rows) {
 		int columnCount = header.size();
 		String fileName = generateOutputFileName();
 		try (BufferedWriter writer = createOutputFile(fileName)) {
@@ -32,12 +29,7 @@ public class CsvSaver<R extends CsvRow> {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A transaction statistics report is generated at \"%s\"",
-					fileName);
-			logger.info(log);
-		}
+		return fileName;
 	}
 	
 	private String generateOutputFileName() {
