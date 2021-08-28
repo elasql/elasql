@@ -8,6 +8,7 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.ThreadMXBean;
 import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
@@ -28,6 +29,10 @@ public class TPartStoredProcedureTask
 	private long planGenStartTime;
 	private long planGenStopTime;
 	private long threadInitStartTime;
+	
+	private long planGenCpuStartTime;
+	private long planGenCpuStopTime;
+	private long threadInitCpuStartTime;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
@@ -50,15 +55,15 @@ public class TPartStoredProcedureTask
 		
 		// XXX: since we do not count OU0 for now,
 		// so we use the start time of OU1 as the transaction start time.
-		profiler.setStartExecution(planGenStartTime);
+		profiler.setStartExecution(planGenStartTime, planGenCpuStartTime);
 //		timer.startExecution();
 		
 		// OU1
-		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime);
-		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime);
+		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime, planGenCpuStartTime);
+		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime, planGenCpuStopTime);
 		
 		// OU2
-		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime);
+		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime, threadInitCpuStartTime);
 		profiler.stopComponentProfiler("OU2 - Initialize Thread");
 		
 		// Transaction Execution
@@ -135,13 +140,16 @@ public class TPartStoredProcedureTask
 	
 	public void recordPlanGenerationStart() {
 		planGenStartTime = System.nanoTime();
+		planGenCpuStartTime = ThreadMXBean.getCpuTime();
 	}
 	
 	public void recordPlanGenerationStop() {
 		planGenStopTime = System.nanoTime();
+		planGenCpuStopTime = ThreadMXBean.getCpuTime();
 	}
 	
 	public void recordThreadInitStart() {
 		threadInitStartTime = System.nanoTime();
+		threadInitCpuStartTime = ThreadMXBean.getCpuTime();
 	}
 }

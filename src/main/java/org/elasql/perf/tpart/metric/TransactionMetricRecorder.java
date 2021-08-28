@@ -23,7 +23,7 @@ import org.vanilladb.core.util.TransactionProfiler;
  * 
  * @author Yu-Shan Lin
  */
-public class TransactionMetricRecorder extends Task {
+public class TransactionMetricRecorder extends TransactionMetricRow {
 	private static Logger logger = Logger.getLogger(TransactionMetricRecorder.class.getName());
 	
 	private static final String FILENAME_PREFIX = "transaction";
@@ -36,6 +36,8 @@ public class TransactionMetricRecorder extends Task {
 		boolean isMaster;
 		List<String> metricNames;
 		Map<String, Long> latencies;
+		Map<String, Long> cpuTimes;
+		Map<String, Long> diskioCounts;
 		
 		TransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
 			this.txNum = txNum;
@@ -43,43 +45,16 @@ public class TransactionMetricRecorder extends Task {
 			
 			metricNames = new ArrayList<String>();
 			latencies = new HashMap<String, Long>();
+			cpuTimes = new HashMap<String, Long>();
+			diskioCounts = new HashMap<String, Long>();
 			for (Object component : profiler.getComponents()) {
 				String metricName = component.toString();
 				metricNames.add(metricName);
 				latencies.put(metricName, profiler.getComponentTime(component));
+				// FIXME : should have a boolean variable to control this
+				cpuTimes.put(metricName, profiler.getComponentCpuTime(component));
+				diskioCounts.put(metricName, profiler.getComponentIOCount(component));
 			}
-		}
-	}
-	
-	private static class LatencyRow implements CsvRow, Comparable<LatencyRow> {
-		long txNum;
-		boolean isMaster;
-		long[] values;
-		
-		LatencyRow(long txNum, boolean isMaster, long[] values) {
-			this.txNum = txNum;
-			this.isMaster = isMaster;
-			this.values = values;
-		}
-
-		@Override
-		public String getVal(int index) {
-			if (index == 0) {
-				return Long.toString(txNum);
-			} else if (index == 1) {
-				return Boolean.toString(isMaster);
-			} else {
-				if (index - 2 < values.length) {
-					return Long.toString(values[index - 2]);
-				} else {
-					return "";
-				}
-			}
-		}
-
-		@Override
-		public int compareTo(LatencyRow row) {
-			return Long.compare(txNum, row.txNum);
 		}
 	}
 	
@@ -94,6 +69,8 @@ public class TransactionMetricRecorder extends Task {
 	
 	// Data
 	private List<LatencyRow> latencyRows = new ArrayList<LatencyRow>();
+	private List<CpuTimeRow> cpuTimeRows = new ArrayList<CpuTimeRow>();
+	private List<DiskioCountRow> diskioCountRows = new ArrayList<DiskioCountRow>();
 	
 	public TransactionMetricRecorder(int serverId) {
 		this.serverId = serverId;
@@ -156,6 +133,13 @@ public class TransactionMetricRecorder extends Task {
 		// Split the metrics to different types of rows
 		LatencyRow latRow = convertToLatencyRow(metrics);
 		latencyRows.add(latRow);
+		
+		// FIXME
+		CpuTimeRow cpuRow = convertToCpuTimeRow(metrics);
+		cpuTimeRows.add(cpuRow);
+		
+		DiskioCountRow ioRow = convertToLDiskioCountRow(metrics);
+		diskioCountRows.add(ioRow);
 	}
 	
 	private void updateMetricNames(TransactionMetrics metrics) {
@@ -168,19 +152,49 @@ public class TransactionMetricRecorder extends Task {
 	}
 	
 	private LatencyRow convertToLatencyRow(TransactionMetrics metrics) {
-		long[] values = new long[metricNames.size()];
+		long[] latValues = new long[metricNames.size()];
+		
 		for (Object metricName : metricNames) {
 			Long latency = metrics.latencies.get(metricName);
 			if (latency != null) {
 				int pos = metricNameToPos.get(metricName);
-				values[pos] = latency;
+				latValues[pos] = latency;
 			}
 		}
-		return new LatencyRow(metrics.txNum, metrics.isMaster, values);
+		return new LatencyRow(metrics.txNum, metrics.isMaster, latValues);
+	}
+	
+	private CpuTimeRow convertToCpuTimeRow(TransactionMetrics metrics) {
+		long[] cpuValues = new long[metricNames.size()];
+		
+		for (Object metricName : metricNames) {
+			Long cpuTime = metrics.cpuTimes.get(metricName);
+			if (cpuTime != null) {
+				int pos = metricNameToPos.get(metricName);
+				cpuValues[pos] = metrics.cpuTimes.get(metricName);
+			}
+		}
+		return new CpuTimeRow(metrics.txNum, metrics.isMaster, cpuValues);
+	}
+	
+	private DiskioCountRow convertToLDiskioCountRow(TransactionMetrics metrics) {
+		long[] diskioValues = new long[metricNames.size()];
+		
+		for (Object metricName : metricNames) {
+			Long diskioCount = metrics.diskioCounts.get(metricName);
+			if (diskioCount != null) {
+				int pos = metricNameToPos.get(metricName);
+				diskioValues[pos] = metrics.diskioCounts.get(metricName);;
+			}
+		}
+		return new DiskioCountRow(metrics.txNum, metrics.isMaster, diskioValues);
 	}
 	
 	private void sortRows() {
 		Collections.sort(latencyRows);
+		// FIXME
+		Collections.sort(cpuTimeRows);
+		Collections.sort(diskioCountRows);
 	}
 	
 	private void saveToCsv() {
@@ -189,6 +203,9 @@ public class TransactionMetricRecorder extends Task {
 		
 		// Save to different files
 		saveToLatencyCsv(header);
+		// FIXME
+		saveToCpuTimeCsv(header);
+		saveToDiskioCountCsv(header);
 	}
 	
 	private void saveToLatencyCsv(List<String> header) {
@@ -202,6 +219,27 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
+	private void saveToCpuTimeCsv(List<String> header) {
+		String fileName = String.format("%s-cpu-time-server-%d", FILENAME_PREFIX, serverId);
+		CsvSaver<CpuTimeRow> csvSaver = new CsvSaver<CpuTimeRow>(fileName);
+		String path = csvSaver.generateOutputFile(header, cpuTimeRows);
+		
+		if (logger.isLoggable(Level.INFO)) {
+			String log = String.format("A cpu time log is generated at '%s'", path);
+			logger.info(log);
+		}
+	}	
+	
+	private void saveToDiskioCountCsv(List<String> header) {
+		String fileName = String.format("%s-diskio-count-server-%d", FILENAME_PREFIX, serverId);
+		CsvSaver<DiskioCountRow> csvSaver = new CsvSaver<DiskioCountRow>(fileName);
+		String path = csvSaver.generateOutputFile(header, diskioCountRows);
+		
+		if (logger.isLoggable(Level.INFO)) {
+			String log = String.format("A disk io count log is generated at '%s'", path);
+			logger.info(log);
+		}
+	}
 	
 	private List<String> generateHeader() {
 		List<String> header = new ArrayList<String>();
