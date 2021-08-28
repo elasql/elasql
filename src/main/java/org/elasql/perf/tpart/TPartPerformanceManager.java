@@ -8,7 +8,7 @@ import org.elasql.perf.tpart.workload.FeatureCollector;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.server.Elasql;
-import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartPerformanceManager implements PerformanceManager {
 
@@ -40,10 +40,10 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	@Override
-	public void addTransactionMetics(long txNum, String role, Timer timer) {
+	public void addTransactionMetics(long txNum, String role, TransactionProfiler profiler) {
 		if (Estimator.ENABLE_COLLECTING_DATA) {
 			if (!Elasql.isStandAloneSequencer()) {
-				localMetricCollector.addTransactionMetrics(txNum, role, timer);
+				localMetricCollector.addTransactionMetrics(txNum, role, profiler);
 			}
 		}
 	}

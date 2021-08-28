@@ -1,7 +1,7 @@
 package org.elasql.perf;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
-import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * A manager that collects workload and system metrics.
@@ -27,7 +27,7 @@ public interface PerformanceManager {
 	 * @param role the role of this machine for the transaction
 	 * @param timer the metrics for the transaction
 	 */
-	void addTransactionMetics(long txNum, String role, Timer timer);
+	void addTransactionMetics(long txNum, String role, TransactionProfiler profiler);
 	
 	/**
 	 * Receives the metric report coming from other database servers.

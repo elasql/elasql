@@ -8,7 +8,7 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
@@ -16,12 +16,6 @@ public class TPartStoredProcedureTask
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
-	}
-	
-	private static long firstTxStartTime;
-	
-	public static void setFirstTxStartTime(long firstTxStartTime) {
-		TPartStoredProcedureTask.firstTxStartTime = firstTxStartTime;
 	}
 
 	private TPartStoredProcedure<?> tsp;
@@ -51,27 +45,27 @@ public class TPartStoredProcedureTask
 		Thread.currentThread().setName("Tx." + txNum);
 		
 		// Initialize a thread-local timer
-		Timer timer = Timer.getLocalTimer();
-		timer.reset();
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.reset();
 		
 		// XXX: since we do not count OU0 for now,
 		// so we use the start time of OU1 as the transaction start time.
-		timer.setStartExecutionTime(planGenStartTime);
+		profiler.setStartExecution(planGenStartTime);
 //		timer.startExecution();
 		
 		// OU1
-		timer.startComponentTimer("OU1 - Generate Plan", planGenStartTime);
-		timer.stopComponentTimer("OU1 - Generate Plan", planGenStopTime);
+		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime);
+		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime);
 		
 		// OU2
-		timer.startComponentTimer("OU2 - Initialize Thread", threadInitStartTime);
-		timer.stopComponentTimer("OU2 - Initialize Thread");
+		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime);
+		profiler.stopComponentProfiler("OU2 - Initialize Thread");
 		
 		// Transaction Execution
 		rs = tsp.execute();
 
 		// Stop the timer for the whole execution
-		timer.stopExecution();
+		profiler.stopExecution();
 		
 		if (tsp.isMaster()) {
 			if (clientId != -1)
@@ -90,7 +84,7 @@ public class TPartStoredProcedureTask
 		
 		// Record the timer result
 		String role = tsp.isMaster()? "Master" : "Slave";
-		Elasql.performanceMgr().addTransactionMetics(txNum, role, timer);
+		Elasql.performanceMgr().addTransactionMetics(txNum, role, profiler);
 	}
 
 	public long getTxNum() {

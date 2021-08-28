@@ -16,7 +16,7 @@ import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
-import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * A recorder to record the transaction metrics to CSV files.
@@ -37,16 +37,16 @@ public class TransactionMetricRecorder extends Task {
 		List<String> metricNames;
 		Map<String, Long> latencies;
 		
-		TransactionMetrics(long txNum, String role, Timer timer) {
+		TransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
 			this.txNum = txNum;
 			this.isMaster = role.equals("Master");
 			
 			metricNames = new ArrayList<String>();
 			latencies = new HashMap<String, Long>();
-			for (Object component : timer.getComponents()) {
+			for (Object component : profiler.getComponents()) {
 				String metricName = component.toString();
 				metricNames.add(metricName);
-				latencies.put(metricName, timer.getComponentTime(component));
+				latencies.put(metricName, profiler.getComponentTime(component));
 			}
 		}
 	}
@@ -106,11 +106,11 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
-	public void addTransactionMetrics(long txNum, String role, Timer timer) {
+	public void addTransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
 		if (!isRecording.get())
 			return;
 		
-		queue.add(new TransactionMetrics(txNum, role, timer));
+		queue.add(new TransactionMetrics(txNum, role, profiler));
 	}
 
 	@Override
