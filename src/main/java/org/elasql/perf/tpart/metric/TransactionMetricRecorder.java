@@ -12,9 +12,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.server.Elasql;
 import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;
-import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.util.TransactionProfiler;
 
@@ -114,7 +114,7 @@ public class TransactionMetricRecorder extends Task {
 	public void startRecording() {
 		if (!isRecording.getAndSet(true)) {
 			// Note: this should be called only once
-			VanillaDb.taskMgr().runTask(this);
+			Elasql.taskMgr().runTask(this);
 		}
 	}
 	
