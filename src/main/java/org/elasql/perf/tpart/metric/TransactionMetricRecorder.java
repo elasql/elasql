@@ -23,13 +23,15 @@ import org.vanilladb.core.util.TransactionProfiler;
  * 
  * @author Yu-Shan Lin
  */
-public class TransactionMetricRecorder extends TransactionMetricRow {
+public class TransactionMetricRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionMetricRecorder.class.getName());
 	
 	private static final String FILENAME_PREFIX = "transaction";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String MASTER_ID_COLUMN = "Is Master";
 	private static final long TIME_TO_FLUSH = 10; // in seconds
+	private static final boolean ENABLE_CPU_TIMER = TransactionProfiler.ENABLE_CPU_TIMER;
+	private static final boolean ENABLE_DISKIO_COUNTER = TransactionProfiler.ENABLE_DISKIO_COUNTER;
 	
 	private static class TransactionMetrics {
 		long txNum;
@@ -51,9 +53,10 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 				String metricName = component.toString();
 				metricNames.add(metricName);
 				latencies.put(metricName, profiler.getComponentTime(component));
-				// FIXME : should have a boolean variable to control this
-				cpuTimes.put(metricName, profiler.getComponentCpuTime(component));
-				diskioCounts.put(metricName, profiler.getComponentIOCount(component));
+				if (ENABLE_CPU_TIMER)
+					cpuTimes.put(metricName, profiler.getComponentCpuTime(component));
+				if (ENABLE_DISKIO_COUNTER)
+					diskioCounts.put(metricName, profiler.getComponentIOCount(component));
 			}
 		}
 	}
@@ -68,9 +71,41 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 	private Map<Object, Integer> metricNameToPos = new HashMap<Object, Integer>();
 	
 	// Data
-	private List<LatencyRow> latencyRows = new ArrayList<LatencyRow>();
-	private List<CpuTimeRow> cpuTimeRows = new ArrayList<CpuTimeRow>();
-	private List<DiskioCountRow> diskioCountRows = new ArrayList<DiskioCountRow>();
+	private List<LongValueRow> latencyRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> cpuTimeRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> diskioCountRows = new ArrayList<LongValueRow>();
+	
+	private static class LongValueRow implements CsvRow, Comparable<LongValueRow> {
+		long txNum;
+		boolean isMaster;
+		long[] values;
+		
+		LongValueRow(long txNum, boolean isMaster, long[] values) {
+			this.txNum = txNum;
+			this.isMaster = isMaster;
+			this.values = values;
+		}
+
+		@Override
+		public String getVal(int index) {
+			if (index == 0) {
+				return Long.toString(txNum);
+			} else if (index == 1) {
+				return Boolean.toString(isMaster);
+			} else {
+				if (index - 2 < values.length) {
+					return Long.toString(values[index - 2]);
+				} else {
+					return "";
+				}
+			}
+		}
+
+		@Override
+		public int compareTo(LongValueRow row) {
+			return Long.compare(txNum, row.txNum);
+		}
+	}
 	
 	public TransactionMetricRecorder(int serverId) {
 		this.serverId = serverId;
@@ -131,15 +166,18 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 		updateMetricNames(metrics);
 		
 		// Split the metrics to different types of rows
-		LatencyRow latRow = convertToLatencyRow(metrics);
+		LongValueRow latRow = convertToLatencyRow(metrics);
 		latencyRows.add(latRow);
 		
-		// FIXME
-		CpuTimeRow cpuRow = convertToCpuTimeRow(metrics);
-		cpuTimeRows.add(cpuRow);
+		if (ENABLE_CPU_TIMER) {
+			LongValueRow cpuRow = convertToCpuTimeRow(metrics);
+			cpuTimeRows.add(cpuRow);
+		}
+		if (ENABLE_DISKIO_COUNTER) {
+			LongValueRow ioRow = convertToLDiskioCountRow(metrics);
+			diskioCountRows.add(ioRow);
+		}
 		
-		DiskioCountRow ioRow = convertToLDiskioCountRow(metrics);
-		diskioCountRows.add(ioRow);
 	}
 	
 	private void updateMetricNames(TransactionMetrics metrics) {
@@ -151,7 +189,7 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 		}
 	}
 	
-	private LatencyRow convertToLatencyRow(TransactionMetrics metrics) {
+	private LongValueRow convertToLatencyRow(TransactionMetrics metrics) {
 		long[] latValues = new long[metricNames.size()];
 		
 		for (Object metricName : metricNames) {
@@ -161,10 +199,10 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 				latValues[pos] = latency;
 			}
 		}
-		return new LatencyRow(metrics.txNum, metrics.isMaster, latValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, latValues);
 	}
 	
-	private CpuTimeRow convertToCpuTimeRow(TransactionMetrics metrics) {
+	private LongValueRow convertToCpuTimeRow(TransactionMetrics metrics) {
 		long[] cpuValues = new long[metricNames.size()];
 		
 		for (Object metricName : metricNames) {
@@ -174,10 +212,10 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 				cpuValues[pos] = metrics.cpuTimes.get(metricName);
 			}
 		}
-		return new CpuTimeRow(metrics.txNum, metrics.isMaster, cpuValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, cpuValues);
 	}
 	
-	private DiskioCountRow convertToLDiskioCountRow(TransactionMetrics metrics) {
+	private LongValueRow convertToLDiskioCountRow(TransactionMetrics metrics) {
 		long[] diskioValues = new long[metricNames.size()];
 		
 		for (Object metricName : metricNames) {
@@ -187,14 +225,15 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 				diskioValues[pos] = metrics.diskioCounts.get(metricName);;
 			}
 		}
-		return new DiskioCountRow(metrics.txNum, metrics.isMaster, diskioValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, diskioValues);
 	}
 	
 	private void sortRows() {
 		Collections.sort(latencyRows);
-		// FIXME
-		Collections.sort(cpuTimeRows);
-		Collections.sort(diskioCountRows);
+		if (ENABLE_CPU_TIMER)
+			Collections.sort(cpuTimeRows);
+		if (ENABLE_DISKIO_COUNTER)
+			Collections.sort(diskioCountRows);
 	}
 	
 	private void saveToCsv() {
@@ -203,14 +242,15 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 		
 		// Save to different files
 		saveToLatencyCsv(header);
-		// FIXME
-		saveToCpuTimeCsv(header);
-		saveToDiskioCountCsv(header);
+		if (ENABLE_CPU_TIMER)
+			saveToCpuTimeCsv(header);
+		if (ENABLE_DISKIO_COUNTER)
+			saveToDiskioCountCsv(header);
 	}
 	
 	private void saveToLatencyCsv(List<String> header) {
 		String fileName = String.format("%s-latency-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<LatencyRow> csvSaver = new CsvSaver<LatencyRow>(fileName);
+		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
 		String path = csvSaver.generateOutputFile(header, latencyRows);
 		
 		if (logger.isLoggable(Level.INFO)) {
@@ -221,7 +261,7 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 	
 	private void saveToCpuTimeCsv(List<String> header) {
 		String fileName = String.format("%s-cpu-time-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<CpuTimeRow> csvSaver = new CsvSaver<CpuTimeRow>(fileName);
+		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
 		String path = csvSaver.generateOutputFile(header, cpuTimeRows);
 		
 		if (logger.isLoggable(Level.INFO)) {
@@ -232,7 +272,7 @@ public class TransactionMetricRecorder extends TransactionMetricRow {
 	
 	private void saveToDiskioCountCsv(List<String> header) {
 		String fileName = String.format("%s-diskio-count-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<DiskioCountRow> csvSaver = new CsvSaver<DiskioCountRow>(fileName);
+		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
 		String path = csvSaver.generateOutputFile(header, diskioCountRows);
 		
 		if (logger.isLoggable(Level.INFO)) {

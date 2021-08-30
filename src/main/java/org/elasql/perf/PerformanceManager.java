@@ -25,7 +25,7 @@ public interface PerformanceManager {
 	 * 
 	 * @param txNum the transaction number
 	 * @param role the role of this machine for the transaction
-	 * @param timer the metrics for the transaction
+	 * @param profiler the metrics for the transaction
 	 */
 	void addTransactionMetics(long txNum, String role, TransactionProfiler profiler);
 	
