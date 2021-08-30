@@ -33,6 +33,10 @@ public class TPartStoredProcedureTask
 	private long planGenCpuStartTime;
 	private long planGenCpuStopTime;
 	private long threadInitCpuStartTime;
+	
+	private int planGenDiskioStartCount;
+	private int planGenDiskioStopCount;
+	private int threadInitDiskioStartCount;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
@@ -59,11 +63,11 @@ public class TPartStoredProcedureTask
 //		timer.startExecution();
 		
 		// OU1
-		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime, planGenCpuStartTime);
-		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime, planGenCpuStopTime);
+		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime, planGenCpuStartTime, planGenDiskioStartCount);
+		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime, planGenCpuStopTime, planGenDiskioStopCount);
 		
 		// OU2
-		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime, threadInitCpuStartTime);
+		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime, threadInitCpuStartTime, threadInitDiskioStartCount);
 		profiler.stopComponentProfiler("OU2 - Initialize Thread");
 		
 		// Transaction Execution
@@ -141,15 +145,19 @@ public class TPartStoredProcedureTask
 	public void recordPlanGenerationStart() {
 		planGenStartTime = System.nanoTime();
 		planGenCpuStartTime = ThreadMXBean.getCpuTime();
+		planGenDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
 	}
 	
 	public void recordPlanGenerationStop() {
 		planGenStopTime = System.nanoTime();
 		planGenCpuStopTime = ThreadMXBean.getCpuTime();
+		planGenDiskioStopCount = TransactionProfiler.getLocalProfiler().getIoCount();
 	}
 	
 	public void recordThreadInitStart() {
 		threadInitStartTime = System.nanoTime();
 		threadInitCpuStartTime = ThreadMXBean.getCpuTime();
+		threadInitDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
+		TransactionProfiler.getLocalProfiler().reset();
 	}
 }

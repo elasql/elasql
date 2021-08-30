@@ -61,20 +61,6 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
-	private AtomicBoolean isRecording = new AtomicBoolean(false);
-	private BlockingQueue<TransactionMetrics> queue
-		= new ArrayBlockingQueue<TransactionMetrics>(100000);
-	
-	// Header
-	private int serverId;
-	private List<Object> metricNames = new ArrayList<Object>();
-	private Map<Object, Integer> metricNameToPos = new HashMap<Object, Integer>();
-	
-	// Data
-	private List<LongValueRow> latencyRows = new ArrayList<LongValueRow>();
-	private List<LongValueRow> cpuTimeRows = new ArrayList<LongValueRow>();
-	private List<LongValueRow> diskioCountRows = new ArrayList<LongValueRow>();
-	
 	private static class LongValueRow implements CsvRow, Comparable<LongValueRow> {
 		long txNum;
 		boolean isMaster;
@@ -106,6 +92,20 @@ public class TransactionMetricRecorder extends Task {
 			return Long.compare(txNum, row.txNum);
 		}
 	}
+	
+	private AtomicBoolean isRecording = new AtomicBoolean(false);
+	private BlockingQueue<TransactionMetrics> queue
+		= new ArrayBlockingQueue<TransactionMetrics>(100000);
+	
+	// Header
+	private int serverId;
+	private List<Object> metricNames = new ArrayList<Object>();
+	private Map<Object, Integer> metricNameToPos = new HashMap<Object, Integer>();
+	
+	// Data
+	private List<LongValueRow> latencyRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> cpuTimeRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> diskioCountRows = new ArrayList<LongValueRow>();
 	
 	public TransactionMetricRecorder(int serverId) {
 		this.serverId = serverId;
@@ -174,7 +174,7 @@ public class TransactionMetricRecorder extends Task {
 			cpuTimeRows.add(cpuRow);
 		}
 		if (ENABLE_DISKIO_COUNTER) {
-			LongValueRow ioRow = convertToLDiskioCountRow(metrics);
+			LongValueRow ioRow = convertToDiskioCountRow(metrics);
 			diskioCountRows.add(ioRow);
 		}
 		
@@ -215,7 +215,7 @@ public class TransactionMetricRecorder extends Task {
 		return new LongValueRow(metrics.txNum, metrics.isMaster, cpuValues);
 	}
 	
-	private LongValueRow convertToLDiskioCountRow(TransactionMetrics metrics) {
+	private LongValueRow convertToDiskioCountRow(TransactionMetrics metrics) {
 		long[] diskioValues = new long[metricNames.size()];
 		
 		for (Object metricName : metricNames) {
