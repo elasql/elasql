@@ -4,6 +4,8 @@ import org.elasql.perf.MetricReport;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.metric.MetricCollector;
+import org.elasql.perf.tpart.metric.MetricWarehouse;
+import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.workload.FeatureCollector;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -14,6 +16,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	// On the sequencer
 	private FeatureCollector featureCollector;
+	private MetricWarehouse metricWarehouse;
 	
 	// On each DB machine
 	private MetricCollector localMetricCollector;
@@ -21,11 +24,15 @@ public class TPartPerformanceManager implements PerformanceManager {
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory) {
 		if (Estimator.ENABLE_COLLECTING_DATA) {
 			if (Elasql.isStandAloneSequencer()) {
-				// The sequencer maintains a feature collector
+				// The sequencer maintains a feature collector and a warehouse
 				featureCollector = new FeatureCollector(factory);
 				Elasql.taskMgr().runTask(featureCollector);
+				
+				metricWarehouse = new MetricWarehouse();
+				Elasql.taskMgr().runTask(metricWarehouse);
 			} else {
 				localMetricCollector = new MetricCollector();
+				Elasql.taskMgr().runTask(localMetricCollector);
 			}
 		}
 	}
@@ -50,6 +57,6 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	@Override
 	public void receiveMetricReport(MetricReport report) {
-		// TODO: store system metrics for cost estimation and PID control
+		metricWarehouse.receiveMetricReport((TPartSystemMetrics) report);
 	}
 }
