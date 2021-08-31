@@ -26,17 +26,8 @@ public class TPartStoredProcedureTask
 	// Timestamps
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
-	private long planGenStartTime;
-	private long planGenStopTime;
-	private long threadInitStartTime;
-	
-	private long planGenCpuStartTime;
-	private long planGenCpuStopTime;
-	private long threadInitCpuStartTime;
-	
-	private int planGenDiskioStartCount;
-	private int planGenDiskioStopCount;
-	private int threadInitDiskioStartCount;
+	private TransactionProfiler profiler;
+
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
@@ -53,21 +44,22 @@ public class TPartStoredProcedureTask
 		
 		Thread.currentThread().setName("Tx." + txNum);
 		
-		// Initialize a thread-local timer
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-		profiler.reset();
+		// Initialize a thread-local profiler which is from scheduler
+		TransactionProfiler.setProfiler(profiler);
+		TransactionProfiler profiler =  TransactionProfiler.getLocalProfiler();
+//		profiler.reset();
 		
 		// XXX: since we do not count OU0 for now,
 		// so we use the start time of OU1 as the transaction start time.
-		profiler.setStartExecution(planGenStartTime, planGenCpuStartTime);
+//		profiler.setStartExecution(planGenStartTime, planGenCpuStartTime);
 //		timer.startExecution();
 		
 		// OU1
-		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime, planGenCpuStartTime, planGenDiskioStartCount);
-		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime, planGenCpuStopTime, planGenDiskioStopCount);
+//		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime, planGenCpuStartTime, planGenDiskioStartCount);
+//		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime, planGenCpuStopTime, planGenDiskioStopCount);
 		
 		// OU2
-		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime, threadInitCpuStartTime, threadInitDiskioStartCount);
+//		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime, threadInitCpuStartTime, threadInitDiskioStartCount);
 		profiler.stopComponentProfiler("OU2 - Initialize Thread");
 		
 		// Transaction Execution
@@ -142,22 +134,26 @@ public class TPartStoredProcedureTask
 		return tsp.isReadOnly();
 	}
 	
-	public void recordPlanGenerationStart() {
-		planGenStartTime = System.nanoTime();
-		planGenCpuStartTime = ThreadMXBean.getCpuTime();
-		planGenDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
+	public void passProfiler(TransactionProfiler profiler) {
+		this.profiler = profiler;
 	}
 	
-	public void recordPlanGenerationStop() {
-		planGenStopTime = System.nanoTime();
-		planGenCpuStopTime = ThreadMXBean.getCpuTime();
-		planGenDiskioStopCount = TransactionProfiler.getLocalProfiler().getIoCount();
-	}
-	
-	public void recordThreadInitStart() {
-		threadInitStartTime = System.nanoTime();
-		threadInitCpuStartTime = ThreadMXBean.getCpuTime();
-		threadInitDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
-		TransactionProfiler.getLocalProfiler().reset();
-	}
+//	public void recordPlanGenerationStart() {
+//		planGenStartTime = System.nanoTime();
+//		planGenCpuStartTime = ThreadMXBean.getCpuTime();
+//		planGenDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
+//	}
+//	
+//	public void recordPlanGenerationStop() {
+//		planGenStopTime = System.nanoTime();
+//		planGenCpuStopTime = ThreadMXBean.getCpuTime();
+//		planGenDiskioStopCount = TransactionProfiler.getLocalProfiler().getIoCount();
+//	}
+//	
+//	public void recordThreadInitStart() {
+//		threadInitStartTime = System.nanoTime();
+//		threadInitCpuStartTime = ThreadMXBean.getCpuTime();
+//		threadInitDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
+//		TransactionProfiler.getLocalProfiler().reset();
+//	}
 }

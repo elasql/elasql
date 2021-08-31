@@ -25,6 +25,7 @@ import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartScheduler extends Task implements Scheduler {
 	private static Logger logger = Logger.getLogger(TPartScheduler.class.getName());
@@ -124,6 +125,9 @@ public class TPartScheduler extends Task implements Scheduler {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
 		
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.startExecution();
+		
 		// Debug
 //		printGraphStatistics();
 //		System.out.println(graph);
@@ -134,17 +138,20 @@ public class TPartScheduler extends Task implements Scheduler {
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			// Record plan gen start time
-			for (TPartStoredProcedureTask task : batchedTasks) {
-				task.recordPlanGenerationStart();
-			}
+//			for (TPartStoredProcedureTask task : batchedTasks) {
+//				task.recordPlanGenerationStart();
+//			}
+			profiler.startComponentProfiler("OU1 - Generate Plan");
 			
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 			
 			// Record plan gen stop time and thread init time
-			for (TPartStoredProcedureTask task : batchedTasks) {
-				task.recordPlanGenerationStop();
-				task.recordThreadInitStart();
-			}
+//			for (TPartStoredProcedureTask task : batchedTasks) {
+//				task.recordPlanGenerationStop();
+//				task.recordThreadInitStart();
+//			}
+			profiler.stopComponentProfiler("OU1 - Generate Plan");
+			profiler.startComponentProfiler("OU2 - Initialize Thread");
 			
 			dispatchToTaskMgr(plansTter);
 		}
@@ -180,6 +187,8 @@ public class TPartScheduler extends Task implements Scheduler {
 	private void dispatchToTaskMgr(Iterator<TPartStoredProcedureTask> plans) {
 		while (plans.hasNext()) {
 			TPartStoredProcedureTask p = plans.next();
+			TransactionProfiler profiler = TransactionProfiler.takeOut();
+			p.passProfiler(profiler);
 			VanillaDb.taskMgr().runTask(p);
 		}
 	}
