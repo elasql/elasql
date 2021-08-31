@@ -1,7 +1,7 @@
 package org.elasql.perf.tpart.metric;
 
 import org.elasql.server.Elasql;
-import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * A collector that collects system and transaction metrics on
@@ -18,7 +18,7 @@ public class MetricCollector {
 		metricRecorder.startRecording();
 	}
 	
-	public void addTransactionMetrics(long txNum, String role, Timer timer) {
-		metricRecorder.addTransactionMetrics(txNum, role, timer);
+	public void addTransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
+		metricRecorder.addTransactionMetrics(txNum, role, profiler);
 	}
 }

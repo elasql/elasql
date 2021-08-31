@@ -8,7 +8,7 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.util.Timer;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
@@ -16,12 +16,6 @@ public class TPartStoredProcedureTask
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
-	}
-	
-	private static long firstTxStartTime;
-	
-	public static void setFirstTxStartTime(long firstTxStartTime) {
-		TPartStoredProcedureTask.firstTxStartTime = firstTxStartTime;
 	}
 
 	private TPartStoredProcedure<?> tsp;
@@ -31,9 +25,7 @@ public class TPartStoredProcedureTask
 	// Timestamps
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
-	private long planGenStartTime;
-	private long planGenStopTime;
-	private long threadInitStartTime;
+	private TransactionProfiler profiler;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
@@ -50,28 +42,18 @@ public class TPartStoredProcedureTask
 		
 		Thread.currentThread().setName("Tx." + txNum);
 		
-		// Initialize a thread-local timer
-		Timer timer = Timer.getLocalTimer();
-		timer.reset();
-		
-		// XXX: since we do not count OU0 for now,
-		// so we use the start time of OU1 as the transaction start time.
-		timer.setStartExecutionTime(planGenStartTime);
-//		timer.startExecution();
-		
-		// OU1
-		timer.startComponentTimer("OU1 - Generate Plan", planGenStartTime);
-		timer.stopComponentTimer("OU1 - Generate Plan", planGenStopTime);
-		
+		// Initialize a thread-local profiler which is from scheduler
+		TransactionProfiler.setProfiler(profiler);
+		TransactionProfiler profiler =  TransactionProfiler.getLocalProfiler();
+
 		// OU2
-		timer.startComponentTimer("OU2 - Initialize Thread", threadInitStartTime);
-		timer.stopComponentTimer("OU2 - Initialize Thread");
+		profiler.stopComponentProfiler("OU2 - Initialize Thread");
 		
 		// Transaction Execution
 		rs = tsp.execute();
 
-		// Stop the timer for the whole execution
-		timer.stopExecution();
+		// Stop the profiler for the whole execution
+		profiler.stopExecution();
 		
 		if (tsp.isMaster()) {
 			if (clientId != -1)
@@ -88,9 +70,9 @@ public class TPartStoredProcedureTask
 //			timer.addToGlobalStatistics();
 		}
 		
-		// Record the timer result
+		// Record the profiler result
 		String role = tsp.isMaster()? "Master" : "Slave";
-		Elasql.performanceMgr().addTransactionMetics(txNum, role, timer);
+		Elasql.performanceMgr().addTransactionMetics(txNum, role, profiler);
 	}
 
 	public long getTxNum() {
@@ -139,15 +121,7 @@ public class TPartStoredProcedureTask
 		return tsp.isReadOnly();
 	}
 	
-	public void recordPlanGenerationStart() {
-		planGenStartTime = System.nanoTime();
-	}
-	
-	public void recordPlanGenerationStop() {
-		planGenStopTime = System.nanoTime();
-	}
-	
-	public void recordThreadInitStart() {
-		threadInitStartTime = System.nanoTime();
+	public void passProfiler(TransactionProfiler profiler) {
+		this.profiler = profiler;
 	}
 }
