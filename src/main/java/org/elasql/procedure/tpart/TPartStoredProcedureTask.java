@@ -8,7 +8,6 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.util.ThreadMXBean;
 import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
@@ -28,7 +27,6 @@ public class TPartStoredProcedureTask
 	private long arrivedTime;
 	private TransactionProfiler profiler;
 
-
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
@@ -47,25 +45,14 @@ public class TPartStoredProcedureTask
 		// Initialize a thread-local profiler which is from scheduler
 		TransactionProfiler.setProfiler(profiler);
 		TransactionProfiler profiler =  TransactionProfiler.getLocalProfiler();
-//		profiler.reset();
-		
-		// XXX: since we do not count OU0 for now,
-		// so we use the start time of OU1 as the transaction start time.
-//		profiler.setStartExecution(planGenStartTime, planGenCpuStartTime);
-//		timer.startExecution();
-		
-		// OU1
-//		profiler.startComponentProfiler("OU1 - Generate Plan", planGenStartTime, planGenCpuStartTime, planGenDiskioStartCount);
-//		profiler.stopComponentProfiler("OU1 - Generate Plan", planGenStopTime, planGenCpuStopTime, planGenDiskioStopCount);
-		
+
 		// OU2
-//		profiler.startComponentProfiler("OU2 - Initialize Thread", threadInitStartTime, threadInitCpuStartTime, threadInitDiskioStartCount);
 		profiler.stopComponentProfiler("OU2 - Initialize Thread");
 		
 		// Transaction Execution
 		rs = tsp.execute();
 
-		// Stop the timer for the whole execution
+		// Stop the profiler for the whole execution
 		profiler.stopExecution();
 		
 		if (tsp.isMaster()) {
@@ -83,7 +70,7 @@ public class TPartStoredProcedureTask
 //			timer.addToGlobalStatistics();
 		}
 		
-		// Record the timer result
+		// Record the profiler result
 		String role = tsp.isMaster()? "Master" : "Slave";
 		Elasql.performanceMgr().addTransactionMetics(txNum, role, profiler);
 	}
@@ -137,23 +124,4 @@ public class TPartStoredProcedureTask
 	public void passProfiler(TransactionProfiler profiler) {
 		this.profiler = profiler;
 	}
-	
-//	public void recordPlanGenerationStart() {
-//		planGenStartTime = System.nanoTime();
-//		planGenCpuStartTime = ThreadMXBean.getCpuTime();
-//		planGenDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
-//	}
-//	
-//	public void recordPlanGenerationStop() {
-//		planGenStopTime = System.nanoTime();
-//		planGenCpuStopTime = ThreadMXBean.getCpuTime();
-//		planGenDiskioStopCount = TransactionProfiler.getLocalProfiler().getIoCount();
-//	}
-//	
-//	public void recordThreadInitStart() {
-//		threadInitStartTime = System.nanoTime();
-//		threadInitCpuStartTime = ThreadMXBean.getCpuTime();
-//		threadInitDiskioStartCount = TransactionProfiler.getLocalProfiler().getIoCount();
-//		TransactionProfiler.getLocalProfiler().reset();
-//	}
 }

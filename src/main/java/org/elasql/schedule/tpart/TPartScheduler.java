@@ -126,8 +126,9 @@ public class TPartScheduler extends Task implements Scheduler {
 		inserter.insertBatch(graph, batchedTasks);
 		
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.reset();
 		profiler.startExecution();
-		
+
 		// Debug
 //		printGraphStatistics();
 //		System.out.println(graph);
@@ -137,20 +138,14 @@ public class TPartScheduler extends Task implements Scheduler {
 		
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
-			// Record plan gen start time
-//			for (TPartStoredProcedureTask task : batchedTasks) {
-//				task.recordPlanGenerationStart();
-//			}
+			// Record plan gen start time, CPU start time, disk IO count
 			profiler.startComponentProfiler("OU1 - Generate Plan");
 			
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
-			
-			// Record plan gen stop time and thread init time
-//			for (TPartStoredProcedureTask task : batchedTasks) {
-//				task.recordPlanGenerationStop();
-//				task.recordThreadInitStart();
-//			}
+
+			// Record plan gen stop time, CPU stop time, disk IO count
 			profiler.stopComponentProfiler("OU1 - Generate Plan");
+			// Record thread init start time, CPU start time, disk IO count
 			profiler.startComponentProfiler("OU2 - Initialize Thread");
 			
 			dispatchToTaskMgr(plansTter);
@@ -185,10 +180,10 @@ public class TPartScheduler extends Task implements Scheduler {
 	}
 
 	private void dispatchToTaskMgr(Iterator<TPartStoredProcedureTask> plans) {
+		TransactionProfiler profiler = TransactionProfiler.takeOut();
 		while (plans.hasNext()) {
 			TPartStoredProcedureTask p = plans.next();
-			TransactionProfiler profiler = TransactionProfiler.takeOut();
-			p.passProfiler(profiler);
+			p.passProfiler(new TransactionProfiler(profiler));
 			VanillaDb.taskMgr().runTask(p);
 		}
 	}
