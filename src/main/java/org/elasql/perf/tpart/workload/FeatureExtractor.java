@@ -2,7 +2,7 @@ package org.elasql.perf.tpart.workload;
 
 import java.util.Set;
 
-import org.elasql.perf.tpart.metric.MetricWarehouse;
+import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -20,7 +20,7 @@ public class FeatureExtractor {
 	private TransactionDependencyAnalyzer dependencyAnalyzer =
 			new TransactionDependencyAnalyzer();
 	
-	private MetricWarehouse metricWarehouse = Elasql.performanceMgr().getMetricWarehouse();
+	private TpartMetricWarehouse metricWarehouse = (TpartMetricWarehouse) Elasql.performanceMgr().getMetricWarehouse();
 	
 	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task) {
 		// Check if transaction requests are given in the total order

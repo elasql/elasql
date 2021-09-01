@@ -14,18 +14,13 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	
 	// XXX: for demo
 	private Map<Integer, Integer> fakeMetrics;
-	
-<<<<<<< HEAD:src/main/java/org/elasql/perf/tpart/metric/MetricWarehouse.java
 	private Map<Integer, Double> processCpuLoad;
 	private Map<Integer, Double> systemCpuLoad;
 	private Map<Integer, Double> systemLoadAverage;
 	
 	private Map<Integer, Integer> threadActiveCount;
 	
-	public MetricWarehouse() {
-=======
 	public TpartMetricWarehouse() {
->>>>>>> research/hermes-control:src/main/java/org/elasql/perf/tpart/metric/TpartMetricWarehouse.java
 		this.metricQueue = new LinkedBlockingQueue<TPartSystemMetrics>();
 		this.fakeMetrics = new HashMap<Integer, Integer>();
 		
