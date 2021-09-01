@@ -13,6 +13,12 @@ public class TPartSystemMetrics implements MetricReport {
 		// XXX: for demo
 		private int fakeMetric;
 		
+		private double systemCpuLoad;
+		private double processCpuLoad;
+		private double systemLoadAverage;
+		
+		private int threadActiveCount;
+		
 		public Builder(int serverId) {
 			this.serverId = serverId;
 		}
@@ -22,10 +28,33 @@ public class TPartSystemMetrics implements MetricReport {
 			this.fakeMetric = fake;
 		}
 		
+		public void setSystemCpuLoad(double systemCpuLoad) {
+			this.systemCpuLoad = systemCpuLoad;
+		}
+		
+		public void setProcessCpuLoad(double processCpuLoad) {
+			this.processCpuLoad = processCpuLoad;
+		}
+		
+		public void setSystemLoadAverage(double systemLoadAverage) {
+			this.systemLoadAverage = systemLoadAverage;
+		}
+		
+		public void setThreadActiveCount(int threadActiveCount) {
+			this.threadActiveCount = threadActiveCount;
+		}
+		
 		public TPartSystemMetrics build() {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
 			metrics.serverId = serverId;
+			
 			metrics.fakeMetric = fakeMetric;
+			
+			metrics.systemCpuLoad = systemCpuLoad;
+			metrics.processCpuLoad = processCpuLoad;
+			metrics.systemLoadAverage = systemLoadAverage;
+			
+			metrics.threadActiveCount = threadActiveCount;
 			return metrics;
 		}
 	}
@@ -34,6 +63,12 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	// XXX: for demo
 	private int fakeMetric;
+	
+	private double systemCpuLoad;
+	private double processCpuLoad;
+	private double systemLoadAverage;
+	
+	private int threadActiveCount;
 	
 	private TPartSystemMetrics() {
 		// do nothing
@@ -46,5 +81,21 @@ public class TPartSystemMetrics implements MetricReport {
 	// XXX: for demo
 	public int getFakeMetric() {
 		return fakeMetric;
+	}
+	
+	public double getSystemCpuLoad() {
+		return systemCpuLoad;
+	}
+	
+	public double getProcessCpuLoad() {
+		return processCpuLoad;
+	}
+	
+	public double getSystemLoadAverage() {
+		return systemLoadAverage;
+	}
+	
+	public int getThreadActiveCount() {
+		return threadActiveCount;
 	}
 }

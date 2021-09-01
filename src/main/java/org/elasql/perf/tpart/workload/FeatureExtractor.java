@@ -2,7 +2,10 @@ package org.elasql.perf.tpart.workload;
 
 import java.util.Set;
 
+import org.elasql.perf.tpart.metric.MetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.server.Elasql;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 
 /**
  * A processor to extract features from a transaction request. The transaction
@@ -16,6 +19,8 @@ public class FeatureExtractor {
 	
 	private TransactionDependencyAnalyzer dependencyAnalyzer =
 			new TransactionDependencyAnalyzer();
+	
+	private MetricWarehouse metricWarehouse = Elasql.performanceMgr().getMetricWarehouse();
 	
 	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task) {
 		// Check if transaction requests are given in the total order
@@ -33,6 +38,8 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
 		
+		
+		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
 				task.getTxNum(), task.getReadSet(), task.getWriteSet());
@@ -40,5 +47,15 @@ public class FeatureExtractor {
 			builder.addDependency(dependentTx);
 		
 		return builder.build();
+	}
+	
+	private void extractFeaturesFromMetricWarehouse(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		
+		for (int i = 0; i < serverCount; i++) {
+			String featureKey = String.format("System CPU Load - Server %d", i);
+			builder.addFeature(featureKey, metricWarehouse.getSystemCpuLoad(0));
+		}
 	}
 }

@@ -1,5 +1,7 @@
 package org.elasql.perf.tpart.metric;
 
+import java.lang.management.ManagementFactory;
+import com.sun.management.OperatingSystemMXBean;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.util.TransactionProfiler;
@@ -9,11 +11,15 @@ import org.vanilladb.core.util.TransactionProfiler;
  * 
  * @author Yu-Shan Lin
  */
+@SuppressWarnings("restriction")
 public class MetricCollector extends Task {
 
 	private static final int SYSTEM_METRIC_INTERVAL = 1000; // in milliseconds
 
 	private TransactionMetricRecorder metricRecorder;
+	
+	private OperatingSystemMXBean bean = (com.sun.management.OperatingSystemMXBean) ManagementFactory
+		.getOperatingSystemMXBean();
 
 	public MetricCollector() {
 		metricRecorder = new TransactionMetricRecorder(Elasql.serverId());
@@ -55,6 +61,12 @@ public class MetricCollector extends Task {
 
 		// XXX: for demo
 		builder.setFakeMetric(12345);
+		
+		builder.setProcessCpuLoad(bean.getProcessCpuLoad());
+		builder.setSystemCpuLoad(bean.getSystemCpuLoad());
+		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
+		
+		builder.setThreadActiveCount(Thread.activeCount());
 
 		return builder.build();
 	}
