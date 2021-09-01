@@ -1,6 +1,6 @@
 package org.elasql.perf;
 
-import org.elasql.perf.tpart.metric.MetricWarehouse;
+import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.vanilladb.core.util.TransactionProfiler;
 
