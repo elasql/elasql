@@ -5,16 +5,17 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.elasql.perf.MetricWarehouse;
 import org.vanilladb.core.server.task.Task;
 
-public class MetricWarehouse extends Task {
+public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 
 	private BlockingQueue<TPartSystemMetrics> metricQueue;
 	
 	// XXX: for demo
 	private Map<Integer, Integer> fakeMetrics;
 	
-	public MetricWarehouse() {
+	public TpartMetricWarehouse() {
 		this.metricQueue = new LinkedBlockingQueue<TPartSystemMetrics>();
 		this.fakeMetrics = new HashMap<Integer, Integer>();
 	}

@@ -35,4 +35,9 @@ public interface PerformanceManager {
 	 * @param report the metric report
 	 */
 	void receiveMetricReport(MetricReport report);
+	
+	/**
+	 * Get the instance of MetricWarehouse.
+	 */
+	MetricWarehouse getMetricWarehouse();
 }
