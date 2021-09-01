@@ -35,7 +35,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 				Elasql.taskMgr().runTask(localMetricCollector);
 			}
 		}
-	}
+	} 
 
 	@Override
 	public void monitorTransaction(StoredProcedureCall spc) {
@@ -58,5 +58,10 @@ public class TPartPerformanceManager implements PerformanceManager {
 	@Override
 	public void receiveMetricReport(MetricReport report) {
 		metricWarehouse.receiveMetricReport((TPartSystemMetrics) report);
+	}
+	
+	@Override
+	public MetricWarehouse getMetricWarehouse() {
+		return metricWarehouse;
 	}
 }

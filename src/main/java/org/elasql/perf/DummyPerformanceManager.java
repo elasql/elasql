@@ -1,5 +1,6 @@
 package org.elasql.perf;
 
+import org.elasql.perf.tpart.metric.MetricWarehouse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.vanilladb.core.util.TransactionProfiler;
 
@@ -10,7 +11,6 @@ import org.vanilladb.core.util.TransactionProfiler;
  * @author Yu-Shan Lin
  */
 public class DummyPerformanceManager implements PerformanceManager {
-
 	@Override
 	public void monitorTransaction(StoredProcedureCall spc) {
 		// Do nothing
@@ -24,5 +24,10 @@ public class DummyPerformanceManager implements PerformanceManager {
 	@Override
 	public void receiveMetricReport(MetricReport report) {
 		// Do nothing
+	}
+	
+	@Override
+	public MetricWarehouse getMetricWarehouse() {
+		throw new RuntimeException("Invalid function call on a dummy performance manager");
 	}
 }

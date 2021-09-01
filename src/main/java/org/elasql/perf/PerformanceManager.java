@@ -1,5 +1,6 @@
 package org.elasql.perf;
 
+import org.elasql.perf.tpart.metric.MetricWarehouse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.vanilladb.core.util.TransactionProfiler;
 
@@ -35,4 +36,9 @@ public interface PerformanceManager {
 	 * @param report the metric report
 	 */
 	void receiveMetricReport(MetricReport report);
+	
+	/**
+	 * Get the instance of MetricWarehouse.
+	 */
+	MetricWarehouse getMetricWarehouse();
 }
