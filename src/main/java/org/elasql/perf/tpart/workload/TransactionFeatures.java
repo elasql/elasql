@@ -60,6 +60,9 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Write Records");
 		
 		featureKeys.addWithServerCount("System CPU Load");
+		featureKeys.addWithServerCount("Process CPU Load");
+		featureKeys.addWithServerCount("System Load Average");
+		featureKeys.addWithServerCount("Thread Active Count");
 		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys.getList());

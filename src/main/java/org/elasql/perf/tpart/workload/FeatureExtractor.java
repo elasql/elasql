@@ -44,6 +44,9 @@ public class FeatureExtractor {
 
 		// Features below are from the servers
 		extractSystemCpuLoad(builder);
+		extractProcessCpuLoad(builder);
+		extractSystemLoadAverage(builder);
+		extractThreadActiveCount(builder);
 		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -61,6 +64,42 @@ public class FeatureExtractor {
 			builder.addFeatureWithServerId(
 					"System CPU Load",
 					metricWarehouse.getSystemCpuLoad(serverId),
+					serverId
+				);
+		}
+	}
+	
+	private void extractProcessCpuLoad(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"Process CPU Load",
+					metricWarehouse.getProcessCpuLoad(serverId),
+					serverId
+				);
+		}
+	}
+	
+	private void extractSystemLoadAverage(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"System Load Average",
+					metricWarehouse.getSystemLoadAverage(serverId),
+					serverId
+				);
+		}
+	}
+	
+	private void extractThreadActiveCount(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"Thread Active Count",
+					metricWarehouse.getThreadActiveCount(serverId),
 					serverId
 				);
 		}
