@@ -12,17 +12,14 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 
 	private BlockingQueue<TPartSystemMetrics> metricQueue;
 	
-	// XXX: for demo
-	private Map<Integer, Integer> fakeMetrics;
-	private Map<Integer, Double> processCpuLoad;
 	private Map<Integer, Double> systemCpuLoad;
+	private Map<Integer, Double> processCpuLoad;
 	private Map<Integer, Double> systemLoadAverage;
 	
 	private Map<Integer, Integer> threadActiveCount;
 	
 	public TpartMetricWarehouse() {
 		this.metricQueue = new LinkedBlockingQueue<TPartSystemMetrics>();
-		this.fakeMetrics = new HashMap<Integer, Integer>();
 		
 		this.processCpuLoad = new HashMap<Integer, Double>();
 		this.systemCpuLoad = new HashMap<Integer, Double>();
@@ -50,9 +47,6 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	}
 	
 	private synchronized void recordMetric(TPartSystemMetrics metrics) {
-		// XXX: for demo
-		fakeMetrics.put(metrics.getServerId(), metrics.getFakeMetric());
-		
 		processCpuLoad.put(metrics.getServerId(), metrics.getProcessCpuLoad());
 		systemCpuLoad.put(metrics.getServerId(), metrics.getSystemCpuLoad());
 		systemLoadAverage.put(metrics.getServerId(), metrics.getSystemLoadAverage());
@@ -62,11 +56,6 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		// debug code
 		// System.out.println(String.format("Receives a report from server %d with average system load: %f",
 		//	metrics.getServerId(), metrics.getSystemLoadAverage()));
-	}
-	
-	// XXX: for demo
-	public synchronized Integer getFakeMetric(int serverId) {
-		return fakeMetrics.get(serverId);
 	}
 	
 	public synchronized Double getProcessCpuLoad(int serverId) {

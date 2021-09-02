@@ -4,7 +4,6 @@ import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 /**
