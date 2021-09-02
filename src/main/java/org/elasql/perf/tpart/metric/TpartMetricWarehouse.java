@@ -59,8 +59,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		
 		threadActiveCount.put(metrics.getServerId(),  metrics.getThreadActiveCount());
 		
-		System.out.println(String.format("Receives a report from server %d with average system load: %d",
-				metrics.getServerId(), metrics.getSystemLoadAverage()));
+//		System.out.println(String.format("Receives a report from server %d with average system load: %f",
+//				metrics.getServerId(), metrics.getSystemLoadAverage()));
 	}
 	
 	// XXX: for demo

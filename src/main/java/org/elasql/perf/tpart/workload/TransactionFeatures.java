@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.elasql.storage.metadata.PartitionMetaMgr;
+
 /**
  * An object to store the features for a transaction request.
  * 
@@ -16,8 +18,37 @@ public class TransactionFeatures {
 	// Defines a read-only list for feature keys
 	public static final List<String> FEATURE_KEYS;
 	
+	private static class FeatureKeys {
+		private List<String> featureKeys = new ArrayList<String>();
+		private int serverCount; 
+		
+		public FeatureKeys(int serverCount) {
+			this.serverCount = serverCount;
+		}
+		
+		public boolean add(String key) {
+			return featureKeys.add(key);
+		}
+		
+		public void addWithServerCount(String key) {
+			for (int serverId = 0; serverId < serverCount; serverId++) {
+				String keyWithServerId = getKeyWithServerId(key, serverId);
+				featureKeys.add(keyWithServerId);
+			}
+		}
+		
+		public List<String> getList() {
+			return featureKeys;
+		}
+	}
+	
+	public static String getKeyWithServerId(String key, int serverId) {
+		// %-3d means the field width is 3 and it is left justification
+		return String.format("%s - Server %-3d", key, serverId);
+	}
+	
 	static {
-		List<String> featureKeys = new ArrayList<String>();
+		FeatureKeys featureKeys = new FeatureKeys(PartitionMetaMgr.NUM_PARTITIONS);
 
 		// Transaction Features:
 		// (Modify this part to add/remove features)
@@ -28,9 +59,13 @@ public class TransactionFeatures {
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
 		
+		featureKeys.addWithServerCount("System CPU Load");
+		
 		// Convert the list to a read-only list
-		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
+		FEATURE_KEYS = Collections.unmodifiableList(featureKeys.getList());
 	}
+	
+	
 	
 	// Builder Pattern
 	// - avoids passing Map and List from outside
@@ -52,6 +87,13 @@ public class TransactionFeatures {
 				throw new RuntimeException("Unexpected feature: " + key);
 			
 			features.put(key, value);
+		}
+		
+		public void addFeatureWithServerId(String key, Object value, int serverId) {
+			String keyWithServerId = getKeyWithServerId(key, serverId);
+			if (!FEATURE_KEYS.contains(keyWithServerId))
+				throw new RuntimeException("Unexpected feature: " + keyWithServerId);
+			features.put(keyWithServerId, value);
 		}
 		
 		public void addDependency(Long dependentTxNum) {

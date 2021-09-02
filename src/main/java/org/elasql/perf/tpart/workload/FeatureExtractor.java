@@ -20,7 +20,11 @@ public class FeatureExtractor {
 	private TransactionDependencyAnalyzer dependencyAnalyzer =
 			new TransactionDependencyAnalyzer();
 	
-	private TpartMetricWarehouse metricWarehouse = (TpartMetricWarehouse) Elasql.performanceMgr().getMetricWarehouse();
+	private TpartMetricWarehouse metricWarehouse;
+	
+	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
+		this.metricWarehouse = metricWarehouse;
+	}
 	
 	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task) {
 		// Check if transaction requests are given in the total order
@@ -37,8 +41,9 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
-		
-		
+
+		// Features below are from the servers
+		extractSystemCpuLoad(builder);
 		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -49,13 +54,15 @@ public class FeatureExtractor {
 		return builder.build();
 	}
 	
-	private void extractFeaturesFromMetricWarehouse(TransactionFeatures.Builder builder) {
+	private void extractSystemCpuLoad(TransactionFeatures.Builder builder) {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
 		
-		
-		for (int i = 0; i < serverCount; i++) {
-			String featureKey = String.format("System CPU Load - Server %d", i);
-			builder.addFeature(featureKey, metricWarehouse.getSystemCpuLoad(0));
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"System CPU Load",
+					metricWarehouse.getSystemCpuLoad(serverId),
+					serverId
+				);
 		}
 	}
 }
