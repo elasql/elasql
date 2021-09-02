@@ -3,6 +3,7 @@ package org.elasql.perf.tpart.workload;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
@@ -22,11 +23,11 @@ public class FeatureCollector extends Task {
 	private TransactionFeaturesRecorder featureRecorder;
 	private TransactionDependencyRecorder dependencyRecorder;
 	
-	public FeatureCollector(TPartStoredProcedureFactory factory) {
+	public FeatureCollector(TPartStoredProcedureFactory factory, TpartMetricWarehouse metricWarehouse) {
 		this.factory = factory;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
-		featureExtractor = new FeatureExtractor();
+		featureExtractor = new FeatureExtractor(metricWarehouse);
 		featureRecorder = new TransactionFeaturesRecorder();
 		featureRecorder.startRecording();
 		dependencyRecorder = new TransactionDependencyRecorder();

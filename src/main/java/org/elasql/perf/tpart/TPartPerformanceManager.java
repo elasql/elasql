@@ -25,12 +25,12 @@ public class TPartPerformanceManager implements PerformanceManager {
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory) {
 		if (Estimator.ENABLE_COLLECTING_DATA) {
 			if (Elasql.isStandAloneSequencer()) {
-				// The sequencer maintains a feature collector and a warehouse
-				featureCollector = new FeatureCollector(factory);
-				Elasql.taskMgr().runTask(featureCollector);
-				
 				metricWarehouse = new TpartMetricWarehouse();
 				Elasql.taskMgr().runTask(metricWarehouse);
+				
+				// The sequencer maintains a feature collector and a warehouse
+				featureCollector = new FeatureCollector(factory, metricWarehouse);
+				Elasql.taskMgr().runTask(featureCollector);
 			} else {
 				localMetricCollector = new MetricCollector();
 				Elasql.taskMgr().runTask(localMetricCollector);
