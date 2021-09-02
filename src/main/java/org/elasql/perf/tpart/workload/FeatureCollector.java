@@ -26,8 +26,7 @@ public class FeatureCollector extends Task {
 	public FeatureCollector(TPartStoredProcedureFactory factory, TpartMetricWarehouse metricWarehouse) {
 		this.factory = factory;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-		
-		featureExtractor = new FeatureExtractor( metricWarehouse);
+		featureExtractor = new FeatureExtractor(metricWarehouse);
 		featureRecorder = new TransactionFeaturesRecorder();
 		featureRecorder.startRecording();
 		dependencyRecorder = new TransactionDependencyRecorder();
