@@ -7,12 +7,8 @@ public class TPartSystemMetrics implements MetricReport {
 	private static final long serialVersionUID = 20210831001L;
 
 	public static class Builder {
-		
 		private int serverId;
-		
-		// XXX: for demo
-		private int fakeMetric;
-		
+
 		private double systemCpuLoad;
 		private double processCpuLoad;
 		private double systemLoadAverage;
@@ -21,11 +17,6 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		public Builder(int serverId) {
 			this.serverId = serverId;
-		}
-		
-		// XXX: for demo
-		public void setFakeMetric(int fake) {
-			this.fakeMetric = fake;
 		}
 		
 		public void setSystemCpuLoad(double systemCpuLoad) {
@@ -48,8 +39,6 @@ public class TPartSystemMetrics implements MetricReport {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
 			metrics.serverId = serverId;
 			
-			metrics.fakeMetric = fakeMetric;
-			
 			metrics.systemCpuLoad = systemCpuLoad;
 			metrics.processCpuLoad = processCpuLoad;
 			metrics.systemLoadAverage = systemLoadAverage;
@@ -60,10 +49,7 @@ public class TPartSystemMetrics implements MetricReport {
 	}
 	
 	private int serverId;
-	
-	// XXX: for demo
-	private int fakeMetric;
-	
+
 	private double systemCpuLoad;
 	private double processCpuLoad;
 	private double systemLoadAverage;
@@ -76,11 +62,6 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getServerId() {
 		return serverId;
-	}
-	
-	// XXX: for demo
-	public int getFakeMetric() {
-		return fakeMetric;
 	}
 	
 	public double getSystemCpuLoad() {

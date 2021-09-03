@@ -59,9 +59,6 @@ public class MetricCollector extends Task {
 	private TPartSystemMetrics collectSystemMetrics() {
 		TPartSystemMetrics.Builder builder = new TPartSystemMetrics.Builder(Elasql.serverId());
 
-		// XXX: for demo
-		builder.setFakeMetric(12345);
-		
 		builder.setProcessCpuLoad(bean.getProcessCpuLoad());
 		builder.setSystemCpuLoad(bean.getSystemCpuLoad());
 		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
