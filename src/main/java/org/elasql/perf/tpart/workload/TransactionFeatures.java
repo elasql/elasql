@@ -18,37 +18,8 @@ public class TransactionFeatures {
 	// Defines a read-only list for feature keys
 	public static final List<String> FEATURE_KEYS;
 	
-	private static class FeatureKeys {
-		private List<String> featureKeys = new ArrayList<String>();
-		private int serverCount; 
-		
-		public FeatureKeys(int serverCount) {
-			this.serverCount = serverCount;
-		}
-		
-		public boolean add(String key) {
-			return featureKeys.add(key);
-		}
-		
-		public void addWithServerCount(String key) {
-			for (int serverId = 0; serverId < serverCount; serverId++) {
-				String keyWithServerId = getKeyWithServerId(key, serverId);
-				featureKeys.add(keyWithServerId);
-			}
-		}
-		
-		public List<String> getList() {
-			return featureKeys;
-		}
-	}
-	
-	public static String getKeyWithServerId(String key, int serverId) {
-		// %-3d means the field width is 3 and it is left justification
-		return String.format("%s - Server %d", key, serverId);
-	}
-	
 	static {
-		FeatureKeys featureKeys = new FeatureKeys(PartitionMetaMgr.NUM_PARTITIONS);
+		List<String> featureKeys = new ArrayList<String>();
 
 		// Transaction Features:
 		// (Modify this part to add/remove features)
@@ -59,16 +30,28 @@ public class TransactionFeatures {
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
 		
-		featureKeys.addWithServerCount("System CPU Load");
-		featureKeys.addWithServerCount("Process CPU Load");
-		featureKeys.addWithServerCount("System Load Average");
-		featureKeys.addWithServerCount("Thread Active Count");
+		addKeysWithServerCount(featureKeys, "System CPU Load");
+		addKeysWithServerCount(featureKeys, "Process CPU Load");
+		addKeysWithServerCount(featureKeys, "System Load Average");
+		addKeysWithServerCount(featureKeys, "Thread Active Count");
 		
 		// Convert the list to a read-only list
-		FEATURE_KEYS = Collections.unmodifiableList(featureKeys.getList());
+		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
 	}
 	
+	public static final int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
 	
+	public static void addKeysWithServerCount(List<String> list, String key) {
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			String keyWithServerId = getKeyWithServerId(key, serverId);
+			list.add(keyWithServerId);
+		}
+	}
+	
+	public static String getKeyWithServerId(String key, int serverId) {
+		// %-3d means the field width is 3 and it is left justification
+		return String.format("%s - Server %d", key, serverId);
+	}
 	
 	// Builder Pattern
 	// - avoids passing Map and List from outside
