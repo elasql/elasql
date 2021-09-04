@@ -44,7 +44,7 @@ public class TransactionFeatures {
 	
 	public static String getKeyWithServerId(String key, int serverId) {
 		// %-3d means the field width is 3 and it is left justification
-		return String.format("%s - Server %-3d", key, serverId);
+		return String.format("%s - Server %d", key, serverId);
 	}
 	
 	static {
