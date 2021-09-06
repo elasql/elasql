@@ -14,10 +14,12 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	
 	// XXX: for demo
 	private Map<Integer, Integer> fakeMetrics;
+	private Map<Integer, Integer> threadPoolSizes;
 	
 	public TpartMetricWarehouse() {
 		this.metricQueue = new LinkedBlockingQueue<TPartSystemMetrics>();
 		this.fakeMetrics = new HashMap<Integer, Integer>();
+		this.threadPoolSizes = new HashMap<Integer, Integer>();
 	}
 	
 	public void receiveMetricReport(TPartSystemMetrics metrics) {
@@ -48,5 +50,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	// XXX: for demo
 	public synchronized Integer getFakeMetric(int serverId) {
 		return fakeMetrics.get(serverId);
+	}
+	public synchronized Integer getThreadPoolSize(int serverId) {
+		return threadPoolSizes.get(serverId);
 	}
 }

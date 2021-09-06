@@ -4,6 +4,7 @@ import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.server.Elasql;
 
 /**
  * A processor to extract features from a transaction request. The transaction
@@ -39,6 +40,9 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
+		
+		// Some transaction features come from the Matrix WareHouse
+		builder.addFeatures("Thread Pool Size", metricWarehouse.getThreadPoolSize());
 		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(

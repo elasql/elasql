@@ -2,6 +2,8 @@ package org.elasql.perf.tpart.metric;
 
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.server.task.TaskMgr;
+import org.vanilladb.core.util.CoreProperties;
 import org.vanilladb.core.util.TransactionProfiler;
 
 /**
@@ -55,7 +57,9 @@ public class MetricCollector extends Task {
 
 		// XXX: for demo
 		builder.setFakeMetric(12345);
-
+		builder.setThreadPoolSize(TaskMgr.THREAD_POOL_SIZE);
+		
+		
 		return builder.build();
 	}
 }

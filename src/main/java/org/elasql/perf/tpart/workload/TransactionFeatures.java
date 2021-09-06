@@ -28,6 +28,11 @@ public class TransactionFeatures {
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
 		
+		// System Matrix Features:
+		// - Thread pool size
+		featureKeys.add("Thread pool size");
+		
+		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
 	}

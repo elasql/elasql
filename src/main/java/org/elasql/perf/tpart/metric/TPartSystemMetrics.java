@@ -12,6 +12,7 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		// XXX: for demo
 		private int fakeMetric;
+		private int threadPoolSize;
 		
 		public Builder(int serverId) {
 			this.serverId = serverId;
@@ -21,11 +22,15 @@ public class TPartSystemMetrics implements MetricReport {
 		public void setFakeMetric(int fake) {
 			this.fakeMetric = fake;
 		}
-		
+		public void setThreadPoolSize(int threadPoolSize) {
+			this.threadPoolSize = threadPoolSize;
+		}
+
 		public TPartSystemMetrics build() {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
 			metrics.serverId = serverId;
 			metrics.fakeMetric = fakeMetric;
+			metrics.threadPoolSize = threadPoolSize;
 			return metrics;
 		}
 	}
@@ -34,6 +39,7 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	// XXX: for demo
 	private int fakeMetric;
+	private int threadPoolSize;
 	
 	private TPartSystemMetrics() {
 		// do nothing
@@ -47,4 +53,9 @@ public class TPartSystemMetrics implements MetricReport {
 	public int getFakeMetric() {
 		return fakeMetric;
 	}
+	
+	public int getThreadPoolSize() {
+		return threadPoolSize;
+	}
+
 }
