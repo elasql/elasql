@@ -17,6 +17,7 @@ public class TransactionFeatures {
 	
 	// Defines a read-only list for feature keys
 	public static final List<String> FEATURE_KEYS;
+	public static final int SERVER_COUNT = PartitionMetaMgr.NUM_PARTITIONS;
 	
 	static {
 		List<String> featureKeys = new ArrayList<String>();
@@ -39,10 +40,8 @@ public class TransactionFeatures {
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
 	}
 	
-	public static final int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-	
 	public static void addKeysWithServerCount(List<String> list, String key) {
-		for (int serverId = 0; serverId < serverCount; serverId++) {
+		for (int serverId = 0; serverId < SERVER_COUNT; serverId++) {
 			String keyWithServerId = getKeyWithServerId(key, serverId);
 			list.add(keyWithServerId);
 		}
