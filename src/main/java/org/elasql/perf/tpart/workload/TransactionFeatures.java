@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.elasql.storage.metadata.PartitionMetaMgr;
+
 /**
  * An object to store the features for a transaction request.
  * 
@@ -15,6 +17,7 @@ public class TransactionFeatures {
 	
 	// Defines a read-only list for feature keys
 	public static final List<String> FEATURE_KEYS;
+	public static final int SERVER_COUNT = PartitionMetaMgr.NUM_PARTITIONS;
 	
 	static {
 		List<String> featureKeys = new ArrayList<String>();
@@ -28,13 +31,26 @@ public class TransactionFeatures {
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
 		
-		// System Matrix Features:
-		// - Thread pool size
-		featureKeys.add("Thread pool size");
-		
+		addKeysWithServerCount(featureKeys, "System CPU Load");
+		addKeysWithServerCount(featureKeys, "Process CPU Load");
+		addKeysWithServerCount(featureKeys, "System Load Average");
+		addKeysWithServerCount(featureKeys, "Thread Active Count");
+		addKeysWithServerCount(featureKeys, "Thread Pool Size");
 		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
+	}
+	
+	public static void addKeysWithServerCount(List<String> list, String key) {
+		for (int serverId = 0; serverId < SERVER_COUNT; serverId++) {
+			String keyWithServerId = getKeyWithServerId(key, serverId);
+			list.add(keyWithServerId);
+		}
+	}
+	
+	public static String getKeyWithServerId(String key, int serverId) {
+		// %-3d means the field width is 3 and it is left justification
+		return String.format("%s - Server %d", key, serverId);
 	}
 	
 	// Builder Pattern
@@ -57,6 +73,13 @@ public class TransactionFeatures {
 				throw new RuntimeException("Unexpected feature: " + key);
 			
 			features.put(key, value);
+		}
+		
+		public void addFeatureWithServerId(String key, Object value, int serverId) {
+			String keyWithServerId = getKeyWithServerId(key, serverId);
+			if (!FEATURE_KEYS.contains(keyWithServerId))
+				throw new RuntimeException("Unexpected feature: " + keyWithServerId);
+			features.put(keyWithServerId, value);
 		}
 		
 		public void addDependency(Long dependentTxNum) {

@@ -4,7 +4,7 @@ import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.server.Elasql;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 
 /**
  * A processor to extract features from a transaction request. The transaction
@@ -40,9 +40,13 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
-		
-		// Some transaction features come from the Matrix WareHouse
-		builder.addFeatures("Thread Pool Size", metricWarehouse.getThreadPoolSize());
+
+		// Features below are from the servers
+		extractSystemCpuLoad(builder);
+		extractProcessCpuLoad(builder);
+		extractSystemLoadAverage(builder);
+		extractThreadActiveCount(builder);
+		extractThreadPoolSize(builder);
 		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -51,5 +55,64 @@ public class FeatureExtractor {
 			builder.addDependency(dependentTx);
 		
 		return builder.build();
+	}
+	
+	private void extractSystemCpuLoad(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"System CPU Load",
+					metricWarehouse.getSystemCpuLoad(serverId),
+					serverId
+				);
+		}
+	}
+	
+	private void extractProcessCpuLoad(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"Process CPU Load",
+					metricWarehouse.getProcessCpuLoad(serverId),
+					serverId
+				);
+		}
+	}
+	
+	private void extractSystemLoadAverage(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"System Load Average",
+					metricWarehouse.getSystemLoadAverage(serverId),
+					serverId
+				);
+		}
+	}
+	
+	private void extractThreadActiveCount(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"Thread Active Count",
+					metricWarehouse.getThreadActiveCount(serverId),
+					serverId
+				);
+		}
+	}
+	private void extractThreadPoolSize(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"Thread Pool Size",
+					metricWarehouse.getThreadPoolSize(serverId),
+					serverId
+				);
+		}
 	}
 }
