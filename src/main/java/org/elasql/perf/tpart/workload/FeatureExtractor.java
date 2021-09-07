@@ -46,6 +46,7 @@ public class FeatureExtractor {
 		extractProcessCpuLoad(builder);
 		extractSystemLoadAverage(builder);
 		extractThreadActiveCount(builder);
+		extractThreadPoolSize(builder);
 		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -99,6 +100,17 @@ public class FeatureExtractor {
 			builder.addFeatureWithServerId(
 					"Thread Active Count",
 					metricWarehouse.getThreadActiveCount(serverId),
+					serverId
+				);
+		}
+	}
+	private void extractThreadPoolSize(TransactionFeatures.Builder builder) {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) {
+			builder.addFeatureWithServerId(
+					"Thread Pool Size",
+					metricWarehouse.getThreadPoolSize(serverId),
 					serverId
 				);
 		}

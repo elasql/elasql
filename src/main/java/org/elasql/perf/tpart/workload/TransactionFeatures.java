@@ -35,6 +35,7 @@ public class TransactionFeatures {
 		addKeysWithServerCount(featureKeys, "Process CPU Load");
 		addKeysWithServerCount(featureKeys, "System Load Average");
 		addKeysWithServerCount(featureKeys, "Thread Active Count");
+		addKeysWithServerCount(featureKeys, "Thread Pool Size");
 		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);

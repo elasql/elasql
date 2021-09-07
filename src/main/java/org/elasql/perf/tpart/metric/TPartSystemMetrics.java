@@ -12,9 +12,10 @@ public class TPartSystemMetrics implements MetricReport {
 		private double systemCpuLoad;
 		private double processCpuLoad;
 		private double systemLoadAverage;
-		
 		private int threadActiveCount;
-		
+		private int threadPoolSize;
+
+
 		public Builder(int serverId) {
 			this.serverId = serverId;
 		}
@@ -35,15 +36,20 @@ public class TPartSystemMetrics implements MetricReport {
 			this.threadActiveCount = threadActiveCount;
 		}
 		
+		public void setThreadPoolSize(int threadPoolSize) {
+			this.threadPoolSize = threadPoolSize;
+		}
+
 		public TPartSystemMetrics build() {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
 			metrics.serverId = serverId;
-			
+
 			metrics.systemCpuLoad = systemCpuLoad;
 			metrics.processCpuLoad = processCpuLoad;
 			metrics.systemLoadAverage = systemLoadAverage;
-			
 			metrics.threadActiveCount = threadActiveCount;
+			metrics.threadPoolSize = threadPoolSize;
+			
 			return metrics;
 		}
 	}
@@ -53,8 +59,9 @@ public class TPartSystemMetrics implements MetricReport {
 	private double systemCpuLoad;
 	private double processCpuLoad;
 	private double systemLoadAverage;
-	
 	private int threadActiveCount;
+	private int threadPoolSize;
+	
 	
 	private TPartSystemMetrics() {
 		// do nothing
@@ -79,4 +86,9 @@ public class TPartSystemMetrics implements MetricReport {
 	public int getThreadActiveCount() {
 		return threadActiveCount;
 	}
+	
+	public int getThreadPoolSize() {
+		return threadPoolSize;
+	}
+
 }
