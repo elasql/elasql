@@ -64,5 +64,4 @@ public class FeatureCollector extends Task {
 		
 		return null;
 	}
-	
 }
