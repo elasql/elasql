@@ -12,12 +12,11 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 
 	private BlockingQueue<TPartSystemMetrics> metricQueue;
 	
-
 	private Map<Integer, Double> systemCpuLoad;
 	private Map<Integer, Double> processCpuLoad;
 	private Map<Integer, Double> systemLoadAverage;
+	
 	private Map<Integer, Integer> threadActiveCount;
-	private Map<Integer, Integer> threadPoolSizes;
 	
 	public TpartMetricWarehouse() {
 		this.metricQueue = new LinkedBlockingQueue<TPartSystemMetrics>();
@@ -25,9 +24,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		this.processCpuLoad = new HashMap<Integer, Double>();
 		this.systemCpuLoad = new HashMap<Integer, Double>();
 		this.systemLoadAverage = new HashMap<Integer, Double>();
+		
 		this.threadActiveCount = new HashMap<Integer, Integer>();
-		this.threadPoolSizes = new HashMap<Integer, Integer>();
-
 	}
 	
 	public void receiveMetricReport(TPartSystemMetrics metrics) {
@@ -54,7 +52,7 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		systemLoadAverage.put(metrics.getServerId(), metrics.getSystemLoadAverage());
 		
 		threadActiveCount.put(metrics.getServerId(),  metrics.getThreadActiveCount());
-		threadPoolSizes.put(metrics.getServerId(),  metrics.getThreadPoolSize());
+		
 		// debug code
 		// System.out.println(String.format("Receives a report from server %d with average system load: %f",
 		//	metrics.getServerId(), metrics.getSystemLoadAverage()));
@@ -74,9 +72,5 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	
 	public synchronized Integer getThreadActiveCount(int serverId) {
 		return threadActiveCount.get(serverId);
-	}
-	
-	public synchronized Integer getThreadPoolSize(int serverId) {
-		return threadPoolSizes.get(serverId);
 	}
 }

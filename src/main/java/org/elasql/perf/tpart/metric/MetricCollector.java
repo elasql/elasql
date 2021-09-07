@@ -4,7 +4,6 @@ import java.lang.management.ManagementFactory;
 import com.sun.management.OperatingSystemMXBean;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
-import org.vanilladb.core.server.task.TaskMgr;
 import org.vanilladb.core.util.TransactionProfiler;
 
 /**
@@ -65,7 +64,6 @@ public class MetricCollector extends Task {
 		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
 		
 		builder.setThreadActiveCount(getThreadActiveCount());
-		builder.setThreadPoolSize(TaskMgr.THREAD_POOL_SIZE);
 		
 		return builder.build();
 	}
