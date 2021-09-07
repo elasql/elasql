@@ -1,5 +1,7 @@
 package org.elasql.perf.tpart.workload;
 
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -11,8 +13,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.server.Elasql;
-import org.elasql.util.CsvRow;
-import org.elasql.util.CsvSaver;
 import org.vanilladb.core.server.task.Task;
 
 /**
@@ -23,38 +23,25 @@ import org.vanilladb.core.server.task.Task;
 public class TransactionDependencyRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionDependencyRecorder.class.getName());
 	
-	private static final String FILENAME_PREFIX = "transaction-dependencies";
+	private static final String FILENAME = "transaction-dependencies.txt";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
+	private static final String DEPENDENCY_COLUMN = "Dependent Transaction IDs";
 	
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 	
-	private static class DependencyRow implements CsvRow, Comparable<DependencyRow> {
+	private static class DependencyRow implements Comparable<DependencyRow> {
 		Long txNum;
-		Object[] dependencies;
+		Long[] dependencies;
 		int index = 0;
 		
 		public DependencyRow(Long txNum, int length) {
 			this.txNum = txNum;
-			this.dependencies = new Object[length];
+			this.dependencies = new Long[length];
 		}
 		
-		public void addValue(Object value) {
+		public void addValue(Long value) {
 			dependencies[index] = value;
 			index += 1;
-		}
-		
-		public int getColumnCount() {
-			return dependencies.length + 1;
-		}
-
-		@Override
-		public String getVal(int index) {
-			if (index == 0)
-				return Long.toString(txNum);
-			else if (index > dependencies.length)
-				return "";
-			else
-				return dependencies[index - 1].toString();
 		}
 
 		@Override
@@ -114,21 +101,11 @@ public class TransactionDependencyRecorder extends Task {
 			// Sort by transaction ID
 			Collections.sort(rows);
 			
-			// Count the number of columns
-			int columnCount = 1;
-			for (DependencyRow r : rows)
-				if (r.getColumnCount() > columnCount)
-					columnCount = r.getColumnCount();
-			
-			// Save to CSV
-			CsvSaver<DependencyRow> csvSaver = new CsvSaver<DependencyRow>(FILENAME_PREFIX);
-			
-			// Generate the output file
-			List<String> header = initHeader(columnCount);
-			String fileName = csvSaver.generateOutputFile(header, rows);
+			// Save to a file
+			saveToFile(rows);
 			
 			if (logger.isLoggable(Level.INFO)) {
-				String log = String.format("A dependencies log is generated at \"%s\"", fileName);
+				String log = String.format("A dependencies log is generated at \"%s\"", FILENAME);
 				logger.info(log);
 			}
 			
@@ -136,12 +113,41 @@ public class TransactionDependencyRecorder extends Task {
 			e.printStackTrace();
 		}
 	}
+	
+	private void saveToFile(List<DependencyRow> rows) {
+		// Create a file writer
+		try (PrintWriter writer = new PrintWriter(FILENAME)) {
+			
+			// Write the header
+			writeHeader(writer);
 
-	private List<String> initHeader(int columnCount) {
-		List<String> header = new ArrayList<String>();
-		header.add(TRANSACTION_ID_COLUMN);
-		for (int i = 1; i < columnCount; i++)
-			header.add(Integer.toString(i));
-		return header;
+			// Write each row
+			for (DependencyRow row : rows) {
+				writeToFile(writer, row);
+			}
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeHeader(PrintWriter writer) {
+		writer.format("%s => %s", TRANSACTION_ID_COLUMN, DEPENDENCY_COLUMN);
+		writer.println(); // new line
+	}
+	
+	private void writeToFile(PrintWriter writer, DependencyRow row) {
+		if (row.dependencies.length == 0) {
+			writer.format("%d => X", row.txNum);
+		} else if (row.dependencies.length >= 1) {
+			// Write the first dependent transaction
+			writer.format("%d => %d", row.txNum, row.dependencies[0]);
+			
+			// Add other dependent transactions
+			for (int i = 1; i < row.dependencies.length; i++) {
+				writer.format(", %d", row.dependencies[i]);
+			}
+		}
+		writer.println(); // new line
 	}
 }
