@@ -40,6 +40,8 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
+		builder.addFeature("Number of Cache Write", task.getCacheWriteNum());
+		builder.addFeature("Number of Cache Insert", task.getCacheInsertNum());
 
 		// Features below are from the servers
 		extractSystemCpuLoad(builder);
