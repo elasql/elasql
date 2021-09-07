@@ -63,9 +63,14 @@ public class MetricCollector extends Task {
 		builder.setProcessCpuLoad(bean.getProcessCpuLoad());
 		builder.setSystemCpuLoad(bean.getSystemCpuLoad());
 		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
-		builder.setThreadActiveCount(Thread.activeCount());
+		
+		builder.setThreadActiveCount(getThreadActiveCount());
 		builder.setThreadPoolSize(TaskMgr.THREAD_POOL_SIZE);
-
+		
 		return builder.build();
+	}
+	
+	private int getThreadActiveCount() {
+		return Elasql.txMgr().getActiveTxCount();
 	}
 }
