@@ -95,6 +95,14 @@ public class TPartStoredProcedureTask
 		return tsp.getWeight();
 	}
 
+	public int getCacheWriteNum(){
+		return tsp.getCacheWriteNum();
+	}
+
+	public int getCacheInsertNum(){
+		return tsp.getCacheInsertNum();
+	}
+
 	public int getPartitionId() {
 		return parId;
 	}

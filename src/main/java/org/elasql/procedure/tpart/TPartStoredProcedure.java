@@ -61,6 +61,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	public abstract double getWeight();
 
+	public abstract int getCacheWriteNum();
+
+	public abstract int getCacheInsertNum();
+
 	protected abstract void prepareKeys();
 
 	protected abstract void executeSql(Map<PrimaryKey, CachedRecord> readings);
