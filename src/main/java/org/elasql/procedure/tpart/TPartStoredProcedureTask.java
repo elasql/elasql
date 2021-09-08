@@ -124,4 +124,9 @@ public class TPartStoredProcedureTask
 	public void passProfiler(TransactionProfiler profiler) {
 		this.profiler = profiler;
 	}
+
+	// MODIFIED: Get the number of arithmetic operations
+	public int getArithNum(){
+		return tsp.getArithNum();
+	}
 }

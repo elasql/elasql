@@ -41,6 +41,10 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
 
+		// OU6 - Execute SP arithmetic logic
+		builder.addFeature("Number of Arithmetic Operations", task.getArithNum());
+		builder.addFeature("Number of Read Write Records", task.getReadSet().size() + task.getWriteSet().size());
+
 		// Features below are from the servers
 		extractSystemCpuLoad(builder);
 		extractProcessCpuLoad(builder);

@@ -145,6 +145,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		// Because we have overrided execute(), there is no need
 		// to implement this method.
 	}
+	
+	// MODIFIED: Get the number of arithmetic operations
+	public int getArithNum(){
+		throw new UnsupportedOperationException("Not Implement yet");
+	}
 
 	public boolean isMaster() {
 		return plan.isHereMaster();

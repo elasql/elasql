@@ -30,6 +30,11 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Read Records");
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
+
+		// - Number of arithmetic operations of a transaction
+		featureKeys.add("Number of Arithmetic Operations");
+		// - Number of read adn written records
+		featureKeys.add("Number of Read Write Records");
 		
 		addKeysWithServerCount(featureKeys, "System CPU Load");
 		addKeysWithServerCount(featureKeys, "Process CPU Load");
