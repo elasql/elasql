@@ -41,7 +41,8 @@ public class TransactionMetricRecorder extends Task {
 		Map<String, Long> latencies;
 		Map<String, Long> cpuTimes;
 		Map<String, Long> diskioCounts;
-		Map<String, Long> networkioSizes;
+		Map<String, Long> networkinSizes;
+		Map<String, Long> networkoutSizes;
 		
 		TransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
 			this.txNum = txNum;
@@ -51,7 +52,8 @@ public class TransactionMetricRecorder extends Task {
 			latencies = new HashMap<String, Long>();
 			cpuTimes = new HashMap<String, Long>();
 			diskioCounts = new HashMap<String, Long>();
-			networkioSizes = new HashMap<String, Long>();
+			networkinSizes = new HashMap<String, Long>();
+			networkoutSizes = new HashMap<String, Long>();
 			for (Object component : profiler.getComponents()) {
 				String metricName = component.toString();
 				metricNames.add(metricName);
@@ -60,9 +62,9 @@ public class TransactionMetricRecorder extends Task {
 					cpuTimes.put(metricName, profiler.getComponentCpuTime(component));
 				if (ENABLE_DISKIO_COUNTER)
 					diskioCounts.put(metricName, profiler.getComponentDiskIOCount(component));
-				// TODO
-				if (ENABLE_DISKIO_COUNTER) {
-					networkioSizes.put(metricName, profiler.getComponentNetworkOutSize(component));
+				if (ENABLE_NETWORKIO_COUNTER) {
+					networkinSizes.put(metricName, profiler.getComponentNetworkInSize(component));
+					networkoutSizes.put(metricName, profiler.getComponentNetworkOutSize(component));
 				}
 					
 			}
@@ -90,7 +92,7 @@ public class TransactionMetricRecorder extends Task {
 				if (index - 2 < values.length) {
 					return Long.toString(values[index - 2]);
 				} else {
-					return "";
+					return "0";
 				}
 			}
 		}
@@ -114,7 +116,8 @@ public class TransactionMetricRecorder extends Task {
 	private List<LongValueRow> latencyRows = new ArrayList<LongValueRow>();
 	private List<LongValueRow> cpuTimeRows = new ArrayList<LongValueRow>();
 	private List<LongValueRow> diskioCountRows = new ArrayList<LongValueRow>();
-	private List<LongValueRow> networkioSizeRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> networkinSizeRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> networkoutSizeRows = new ArrayList<LongValueRow>();
 	
 	public TransactionMetricRecorder(int serverId) {
 		this.serverId = serverId;
@@ -187,8 +190,10 @@ public class TransactionMetricRecorder extends Task {
 			diskioCountRows.add(diskioRow);
 		}
 		if (ENABLE_NETWORKIO_COUNTER) {
-			LongValueRow networkioRow = convertToNetworkioSizeRow(metrics);
-			networkioSizeRows.add(networkioRow);
+			LongValueRow networkinRow = convertToNetworkinSizeRow(metrics);
+			networkinSizeRows.add(networkinRow);
+			LongValueRow networkoutRow = convertToNetworkoutSizeRow(metrics);
+			networkoutSizeRows.add(networkoutRow);
 		}
 		
 	}
@@ -241,17 +246,30 @@ public class TransactionMetricRecorder extends Task {
 		return new LongValueRow(metrics.txNum, metrics.isMaster, diskioValues);
 	}
 	
-	private LongValueRow convertToNetworkioSizeRow(TransactionMetrics metrics) {
-		long[] networkioValues = new long[metricNames.size()];
+	private LongValueRow convertToNetworkinSizeRow(TransactionMetrics metrics) {
+		long[] networkinValues = new long[metricNames.size()];
 		
 		for (Object metricName : metricNames) {
-			Long networkioSize = metrics.networkioSizes.get(metricName);
-			if (networkioSize != null) {
+			Long networkinSize = metrics.networkinSizes.get(metricName);
+			if (networkinSize != null) {
 				int pos = metricNameToPos.get(metricName);
-				networkioValues[pos] = metrics.networkioSizes.get(metricName);;
+				networkinValues[pos] = metrics.networkinSizes.get(metricName);;
 			}
 		}
-		return new LongValueRow(metrics.txNum, metrics.isMaster, networkioValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, networkinValues);
+	}
+
+	private LongValueRow convertToNetworkoutSizeRow(TransactionMetrics metrics) {
+		long[] networkoutValues = new long[metricNames.size()];
+		
+		for (Object metricName : metricNames) {
+			Long networkoutSize = metrics.networkoutSizes.get(metricName);
+			if (networkoutSize != null) {
+				int pos = metricNameToPos.get(metricName);
+				networkoutValues[pos] = metrics.networkoutSizes.get(metricName);;
+			}
+		}
+		return new LongValueRow(metrics.txNum, metrics.isMaster, networkoutValues);
 	}
 	
 	private void sortRows() {
@@ -260,9 +278,10 @@ public class TransactionMetricRecorder extends Task {
 			Collections.sort(cpuTimeRows);
 		if (ENABLE_DISKIO_COUNTER)
 			Collections.sort(diskioCountRows);
-		if (ENABLE_NETWORKIO_COUNTER)
-			Collections.sort(networkioSizeRows);
-		
+		if (ENABLE_NETWORKIO_COUNTER) {
+			Collections.sort(networkinSizeRows);
+			Collections.sort(networkoutSizeRows);
+		}
 	}
 	
 	private void saveToCsv() {
@@ -275,8 +294,10 @@ public class TransactionMetricRecorder extends Task {
 			saveToCpuTimeCsv(header);
 		if (ENABLE_DISKIO_COUNTER)
 			saveToDiskioCountCsv(header);
-		if (ENABLE_NETWORKIO_COUNTER)
-			saveToNetworkioSizeCsv(header);
+		if (ENABLE_NETWORKIO_COUNTER) {
+			saveToNetworkinSizeCsv(header);
+			saveToNetworkoutSizeCsv(header);
+		}		
 	}
 	
 	private void saveToLatencyCsv(List<String> header) {
@@ -312,13 +333,24 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
-	private void saveToNetworkioSizeCsv(List<String> header) {
-		String fileName = String.format("%s-networkio-size-server-%d", FILENAME_PREFIX, serverId);
+	private void saveToNetworkinSizeCsv(List<String> header) {
+		String fileName = String.format("%s-networkin-size-server-%d", FILENAME_PREFIX, serverId);
 		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
-		String path = csvSaver.generateOutputFile(header, networkioSizeRows);
+		String path = csvSaver.generateOutputFile(header, networkinSizeRows);
 		
 		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A network io size log is generated at '%s'", path);
+			String log = String.format("A network in size log is generated at '%s'", path);
+			logger.info(log);
+		}
+	}
+	
+	private void saveToNetworkoutSizeCsv(List<String> header) {
+		String fileName = String.format("%s-networkout-size-server-%d", FILENAME_PREFIX, serverId);
+		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
+		String path = csvSaver.generateOutputFile(header, networkoutSizeRows);
+		
+		if (logger.isLoggable(Level.INFO)) {
+			String log = String.format("A network out size log is generated at '%s'", path);
 			logger.info(log);
 		}
 	}

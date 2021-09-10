@@ -96,8 +96,6 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	@Override
 	public void onReceiveP2pMessage(ProcessType senderType, int senderId, Serializable message) {
-		// For controller
-		TransactionProfiler.getLocalProfiler().incrementNetworkInSize(message);
 		if (senderType == ProcessType.CLIENT) {
 			// Normally, the client will only sends its request to the sequencer.
 			// However, any other server can also send a total order request.
