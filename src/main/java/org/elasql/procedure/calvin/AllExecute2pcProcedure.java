@@ -151,7 +151,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 	private boolean performPhaseTwo(boolean finalDecision) {
 		if (localNodeId == MASTER_NODE) {
 			// Master node: send the final decision
-			masterSendFianlDecision(finalDecision);
+			masterSendFinalDecision(finalDecision);
 		} else {
 			// Other node: wait for the final decision
 			finalDecision = otherReceiveFinalDecision();
@@ -208,7 +208,7 @@ public abstract class AllExecute2pcProcedure<H extends StoredProcedureParamHelpe
 			logger.fine("The decision is sent to the master by tx." + txNum);
 	}
 
-	private void masterSendFianlDecision(boolean finalDecision) {
+	private void masterSendFinalDecision(boolean finalDecision) {
 		// Send decisions
 		for (int nodeId = 0; nodeId < numOfParts; nodeId++)
 			if (nodeId != MASTER_NODE) {

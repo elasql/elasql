@@ -32,6 +32,7 @@ public class TransactionMetricRecorder extends Task {
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 	private static final boolean ENABLE_CPU_TIMER = TransactionProfiler.ENABLE_CPU_TIMER;
 	private static final boolean ENABLE_DISKIO_COUNTER = TransactionProfiler.ENABLE_DISKIO_COUNTER;
+	private static final boolean ENABLE_NETWORKIO_COUNTER = TransactionProfiler.ENABLE_NETWORKIO_COUNTER;
 	
 	private static class TransactionMetrics {
 		long txNum;
@@ -40,6 +41,8 @@ public class TransactionMetricRecorder extends Task {
 		Map<String, Long> latencies;
 		Map<String, Long> cpuTimes;
 		Map<String, Long> diskioCounts;
+		Map<String, Long> networkinSizes;
+		Map<String, Long> networkoutSizes;
 		
 		TransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
 			this.txNum = txNum;
@@ -49,6 +52,8 @@ public class TransactionMetricRecorder extends Task {
 			latencies = new HashMap<String, Long>();
 			cpuTimes = new HashMap<String, Long>();
 			diskioCounts = new HashMap<String, Long>();
+			networkinSizes = new HashMap<String, Long>();
+			networkoutSizes = new HashMap<String, Long>();
 			for (Object component : profiler.getComponents()) {
 				String metricName = component.toString();
 				metricNames.add(metricName);
@@ -56,7 +61,12 @@ public class TransactionMetricRecorder extends Task {
 				if (ENABLE_CPU_TIMER)
 					cpuTimes.put(metricName, profiler.getComponentCpuTime(component));
 				if (ENABLE_DISKIO_COUNTER)
-					diskioCounts.put(metricName, profiler.getComponentIOCount(component));
+					diskioCounts.put(metricName, profiler.getComponentDiskIOCount(component));
+				if (ENABLE_NETWORKIO_COUNTER) {
+					networkinSizes.put(metricName, profiler.getComponentNetworkInSize(component));
+					networkoutSizes.put(metricName, profiler.getComponentNetworkOutSize(component));
+				}
+					
 			}
 		}
 	}
@@ -82,7 +92,7 @@ public class TransactionMetricRecorder extends Task {
 				if (index - 2 < values.length) {
 					return Long.toString(values[index - 2]);
 				} else {
-					return "";
+					return "0";
 				}
 			}
 		}
@@ -106,6 +116,8 @@ public class TransactionMetricRecorder extends Task {
 	private List<LongValueRow> latencyRows = new ArrayList<LongValueRow>();
 	private List<LongValueRow> cpuTimeRows = new ArrayList<LongValueRow>();
 	private List<LongValueRow> diskioCountRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> networkinSizeRows = new ArrayList<LongValueRow>();
+	private List<LongValueRow> networkoutSizeRows = new ArrayList<LongValueRow>();
 	
 	public TransactionMetricRecorder(int serverId) {
 		this.serverId = serverId;
@@ -174,8 +186,14 @@ public class TransactionMetricRecorder extends Task {
 			cpuTimeRows.add(cpuRow);
 		}
 		if (ENABLE_DISKIO_COUNTER) {
-			LongValueRow ioRow = convertToDiskioCountRow(metrics);
-			diskioCountRows.add(ioRow);
+			LongValueRow diskioRow = convertToDiskioCountRow(metrics);
+			diskioCountRows.add(diskioRow);
+		}
+		if (ENABLE_NETWORKIO_COUNTER) {
+			LongValueRow networkinRow = convertToNetworkinSizeRow(metrics);
+			networkinSizeRows.add(networkinRow);
+			LongValueRow networkoutRow = convertToNetworkoutSizeRow(metrics);
+			networkoutSizeRows.add(networkoutRow);
 		}
 		
 	}
@@ -228,12 +246,42 @@ public class TransactionMetricRecorder extends Task {
 		return new LongValueRow(metrics.txNum, metrics.isMaster, diskioValues);
 	}
 	
+	private LongValueRow convertToNetworkinSizeRow(TransactionMetrics metrics) {
+		long[] networkinValues = new long[metricNames.size()];
+		
+		for (Object metricName : metricNames) {
+			Long networkinSize = metrics.networkinSizes.get(metricName);
+			if (networkinSize != null) {
+				int pos = metricNameToPos.get(metricName);
+				networkinValues[pos] = metrics.networkinSizes.get(metricName);;
+			}
+		}
+		return new LongValueRow(metrics.txNum, metrics.isMaster, networkinValues);
+	}
+
+	private LongValueRow convertToNetworkoutSizeRow(TransactionMetrics metrics) {
+		long[] networkoutValues = new long[metricNames.size()];
+		
+		for (Object metricName : metricNames) {
+			Long networkoutSize = metrics.networkoutSizes.get(metricName);
+			if (networkoutSize != null) {
+				int pos = metricNameToPos.get(metricName);
+				networkoutValues[pos] = metrics.networkoutSizes.get(metricName);;
+			}
+		}
+		return new LongValueRow(metrics.txNum, metrics.isMaster, networkoutValues);
+	}
+	
 	private void sortRows() {
 		Collections.sort(latencyRows);
 		if (ENABLE_CPU_TIMER)
 			Collections.sort(cpuTimeRows);
 		if (ENABLE_DISKIO_COUNTER)
 			Collections.sort(diskioCountRows);
+		if (ENABLE_NETWORKIO_COUNTER) {
+			Collections.sort(networkinSizeRows);
+			Collections.sort(networkoutSizeRows);
+		}
 	}
 	
 	private void saveToCsv() {
@@ -246,6 +294,10 @@ public class TransactionMetricRecorder extends Task {
 			saveToCpuTimeCsv(header);
 		if (ENABLE_DISKIO_COUNTER)
 			saveToDiskioCountCsv(header);
+		if (ENABLE_NETWORKIO_COUNTER) {
+			saveToNetworkinSizeCsv(header);
+			saveToNetworkoutSizeCsv(header);
+		}		
 	}
 	
 	private void saveToLatencyCsv(List<String> header) {
@@ -277,6 +329,28 @@ public class TransactionMetricRecorder extends Task {
 		
 		if (logger.isLoggable(Level.INFO)) {
 			String log = String.format("A disk io count log is generated at '%s'", path);
+			logger.info(log);
+		}
+	}
+	
+	private void saveToNetworkinSizeCsv(List<String> header) {
+		String fileName = String.format("%s-networkin-size-server-%d", FILENAME_PREFIX, serverId);
+		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
+		String path = csvSaver.generateOutputFile(header, networkinSizeRows);
+		
+		if (logger.isLoggable(Level.INFO)) {
+			String log = String.format("A network in size log is generated at '%s'", path);
+			logger.info(log);
+		}
+	}
+	
+	private void saveToNetworkoutSizeCsv(List<String> header) {
+		String fileName = String.format("%s-networkout-size-server-%d", FILENAME_PREFIX, serverId);
+		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
+		String path = csvSaver.generateOutputFile(header, networkoutSizeRows);
+		
+		if (logger.isLoggable(Level.INFO)) {
+			String log = String.format("A network out size log is generated at '%s'", path);
 			logger.info(log);
 		}
 	}
