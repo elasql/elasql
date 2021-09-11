@@ -15,6 +15,7 @@ import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 	private static Logger logger = Logger.getLogger(TPartCacheMgr.class.getName());
@@ -89,11 +90,15 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 					while (!exchange.containsKey(k)) {
 						prepareAnchor(k).wait();
 					}
+					
+					CachedRecord rec = exchange.remove(k);
+					// For controller
+					TransactionProfiler.getLocalProfiler().incrementNetworkInSize(rec);
 
 					// Debug: Tracing the waiting key
 //					Thread.currentThread().setName("Tx." + dest);
 					
-					return exchange.remove(k);
+					return rec;
 				} catch (InterruptedException e) {
 					throw new RuntimeException();
 				}
