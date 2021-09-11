@@ -12,7 +12,6 @@ import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
-import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.util.TransactionProfiler;
 
@@ -26,7 +25,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	private MetricCollector localMetricCollector;
 	
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory, 
-			BatchNodeInserter inserter, Sinker sinker, TGraph graph,
+			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching) {
 		if (Estimator.ENABLE_COLLECTING_DATA) {
 			if (Elasql.isStandAloneSequencer()) {
@@ -35,7 +34,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 				
 				// The sequencer maintains a feature collector and a warehouse
 				featureCollector = new FeatureCollector(factory, inserter,
-						sinker, graph, isBatching, metricWarehouse);
+						graph, isBatching, metricWarehouse);
 				Elasql.taskMgr().runTask(featureCollector);
 			} else {
 				localMetricCollector = new MetricCollector();

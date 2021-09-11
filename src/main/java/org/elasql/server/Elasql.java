@@ -156,11 +156,10 @@ public class Elasql extends VanillaDb {
  
 		if (isStandAloneSequencer()) { 
 			logger.info("initializing as the stand alone sequencer"); 
-			VanillaDb.initTaskMgr(); 
+			VanillaDb.initTaskMgr();
+			initPartitionMetaMgr(partitionPlan); // must be before TPartPerformanceMgr
 			initPerfMgr(factory); 
-			initConnectionMgr(myNodeId); 
-			initPartitionMetaMgr(partitionPlan); 
-			initScheduler(factory, migraComsFactory); 
+			initConnectionMgr(myNodeId);
 			if (migraComsFactory != null) 
 				migraSysControl = migraComsFactory.newSystemController(); 
 			return; 
@@ -330,43 +329,38 @@ public class Elasql extends VanillaDb {
 	
 	private static TPartPerformanceManager newTPartPerfMgr(TPartStoredProcedureFactory factory) {
 		TGraph graph; 
-		BatchNodeInserter inserter; 
-		Sinker sinker; 
+		BatchNodeInserter inserter;
 		FusionTable table; 
 		boolean isBatching = true; 
 		 
 		switch (SERVICE_TYPE) { 
 		case TPART: 
 			graph = new TGraph(); 
-			inserter = new CostAwareNodeInserter(); 
-			sinker = new Sinker(); 
+			inserter = new CostAwareNodeInserter();
 			isBatching = true; 
 			break; 
 		case HERMES: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new HermesNodeInserter(); 
-			sinker = new FusionSinker(table); 
+			inserter = new HermesNodeInserter();
 			isBatching = true; 
 			break; 
 		case G_STORE: 
 			graph = new TGraph(); 
-			inserter = new LocalFirstNodeInserter(); 
-			sinker = new Sinker(); 
+			inserter = new LocalFirstNodeInserter();
 			isBatching = false; 
 			break; 
 		case LEAP: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new LocalFirstNodeInserter(); 
-			sinker = new FusionSinker(table); 
+			inserter = new LocalFirstNodeInserter();
 			isBatching = false; 
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
 		} 
 		 
-		return new TPartPerformanceManager(factory, inserter, sinker, graph, isBatching); 
+		return new TPartPerformanceManager(factory, inserter, graph, isBatching); 
 	}
  
 	// ================ 
