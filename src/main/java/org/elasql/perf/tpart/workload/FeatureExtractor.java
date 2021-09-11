@@ -4,6 +4,7 @@ import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 /**
@@ -25,14 +26,15 @@ public class FeatureExtractor {
 		this.metricWarehouse = metricWarehouse;
 	}
 	
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task) {
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task,
+			SunkPlan executionPlan) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
 					"Transaction requests are not passed to FeatureExtractor "
 					+ "in the total order: %d, last processed tx: %d",
 					task.getTxNum(), lastProcessedTxNum));
-			
+		
 		// Extract the features
 		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
 		
