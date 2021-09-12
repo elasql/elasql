@@ -15,43 +15,43 @@
  *******************************************************************************/ 
 package org.elasql.server; 
  
-import java.util.logging.Level; 
-import java.util.logging.Logger; 
- 
-import org.elasql.cache.RemoteRecordReceiver; 
-import org.elasql.cache.calvin.CalvinPostOffice; 
-import org.elasql.cache.naive.NaiveCacheMgr; 
-import org.elasql.cache.tpart.TPartCacheMgr; 
-import org.elasql.migration.MigrationComponentFactory; 
-import org.elasql.migration.MigrationMgr; 
-import org.elasql.migration.MigrationSystemController; 
-import org.elasql.perf.DummyPerformanceManager; 
-import org.elasql.perf.PerformanceManager; 
-import org.elasql.perf.tpart.TPartPerformanceManager; 
-import org.elasql.procedure.DdStoredProcedureFactory; 
-import org.elasql.procedure.calvin.CalvinStoredProcedureFactory; 
-import org.elasql.procedure.naive.NaiveStoredProcedureFactory; 
-import org.elasql.procedure.tpart.TPartStoredProcedureFactory; 
-import org.elasql.remote.groupcomm.server.ConnectionMgr; 
-import org.elasql.schedule.Scheduler; 
-import org.elasql.schedule.calvin.CalvinScheduler; 
-import org.elasql.schedule.naive.NaiveScheduler; 
-import org.elasql.schedule.tpart.BatchNodeInserter; 
-import org.elasql.schedule.tpart.CostAwareNodeInserter; 
-import org.elasql.schedule.tpart.LocalFirstNodeInserter; 
-import org.elasql.schedule.tpart.TPartScheduler; 
-import org.elasql.schedule.tpart.graph.TGraph; 
-import org.elasql.schedule.tpart.hermes.FusionSinker; 
-import org.elasql.schedule.tpart.hermes.FusionTGraph; 
-import org.elasql.schedule.tpart.hermes.FusionTable; 
-import org.elasql.schedule.tpart.hermes.HermesNodeInserter; 
-import org.elasql.schedule.tpart.sink.Sinker; 
-import org.elasql.storage.log.DdLogMgr; 
-import org.elasql.storage.metadata.HashPartitionPlan; 
-import org.elasql.storage.metadata.NotificationPartitionPlan; 
-import org.elasql.storage.metadata.PartitionMetaMgr; 
-import org.elasql.storage.metadata.PartitionPlan; 
-import org.elasql.util.ElasqlProperties; 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.elasql.cache.RemoteRecordReceiver;
+import org.elasql.cache.calvin.CalvinPostOffice;
+import org.elasql.cache.naive.NaiveCacheMgr;
+import org.elasql.cache.tpart.TPartCacheMgr;
+import org.elasql.migration.MigrationComponentFactory;
+import org.elasql.migration.MigrationMgr;
+import org.elasql.migration.MigrationSystemController;
+import org.elasql.perf.DummyPerformanceManager;
+import org.elasql.perf.PerformanceManager;
+import org.elasql.perf.tpart.TPartPerformanceManager;
+import org.elasql.procedure.DdStoredProcedureFactory;
+import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
+import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
+import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
+import org.elasql.remote.groupcomm.server.ConnectionMgr;
+import org.elasql.schedule.Scheduler;
+import org.elasql.schedule.calvin.CalvinScheduler;
+import org.elasql.schedule.naive.NaiveScheduler;
+import org.elasql.schedule.tpart.BatchNodeInserter;
+import org.elasql.schedule.tpart.CostAwareNodeInserter;
+import org.elasql.schedule.tpart.LocalFirstNodeInserter;
+import org.elasql.schedule.tpart.TPartScheduler;
+import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.hermes.FusionSinker;
+import org.elasql.schedule.tpart.hermes.FusionTGraph;
+import org.elasql.schedule.tpart.hermes.FusionTable;
+import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
+import org.elasql.schedule.tpart.sink.Sinker;
+import org.elasql.storage.log.DdLogMgr;
+import org.elasql.storage.metadata.HashPartitionPlan;
+import org.elasql.storage.metadata.NotificationPartitionPlan;
+import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.storage.metadata.PartitionPlan;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb; 
  
 public class Elasql extends VanillaDb { 
@@ -156,11 +156,10 @@ public class Elasql extends VanillaDb {
  
 		if (isStandAloneSequencer()) { 
 			logger.info("initializing as the stand alone sequencer"); 
-			VanillaDb.initTaskMgr(); 
+			VanillaDb.initTaskMgr();
+			initPartitionMetaMgr(partitionPlan); // must be before TPartPerformanceMgr
 			initPerfMgr(factory); 
-			initConnectionMgr(myNodeId); 
-			initPartitionMetaMgr(partitionPlan); 
-			initScheduler(factory, migraComsFactory); 
+			initConnectionMgr(myNodeId);
 			if (migraComsFactory != null) 
 				migraSysControl = migraComsFactory.newSystemController(); 
 			return; 
@@ -313,20 +312,56 @@ public class Elasql extends VanillaDb {
 		ddLogMgr = new DdLogMgr(); 
 	} 
  
-	public static void initPerfMgr(DdStoredProcedureFactory<?> factory) { 
+	public static void initPerfMgr(DdStoredProcedureFactory<?> factory) {
 		switch (SERVICE_TYPE) { 
-		case TPART: 
-		case HERMES: 
-		case G_STORE: 
-		case LEAP: 
+		case TPART:
+		case HERMES:
+		case G_STORE:
+		case LEAP:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory"); 
-			performanceMgr = new TPartPerformanceManager((TPartStoredProcedureFactory) factory); 
-			break; 
+			performanceMgr = newTPartPerfMgr((TPartStoredProcedureFactory) factory);
+			break;
 		default: 
 			performanceMgr = new DummyPerformanceManager(); 
 		} 
-	} 
+	}
+	
+	private static TPartPerformanceManager newTPartPerfMgr(TPartStoredProcedureFactory factory) {
+		TGraph graph; 
+		BatchNodeInserter inserter;
+		FusionTable table; 
+		boolean isBatching = true; 
+		 
+		switch (SERVICE_TYPE) { 
+		case TPART: 
+			graph = new TGraph(); 
+			inserter = new CostAwareNodeInserter();
+			isBatching = true; 
+			break; 
+		case HERMES: 
+			table = new FusionTable(); 
+			graph = new FusionTGraph(table); 
+			inserter = new HermesNodeInserter();
+			isBatching = true; 
+			break; 
+		case G_STORE: 
+			graph = new TGraph(); 
+			inserter = new LocalFirstNodeInserter();
+			isBatching = false; 
+			break; 
+		case LEAP: 
+			table = new FusionTable(); 
+			graph = new FusionTGraph(table); 
+			inserter = new LocalFirstNodeInserter();
+			isBatching = false; 
+			break; 
+		default: 
+			throw new IllegalArgumentException("Not supported"); 
+		} 
+		 
+		return new TPartPerformanceManager(factory, inserter, graph, isBatching); 
+	}
  
 	// ================ 
 	// Module Getters 

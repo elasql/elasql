@@ -30,7 +30,7 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class TPartScheduler extends Task implements Scheduler {
 	private static Logger logger = Logger.getLogger(TPartScheduler.class.getName());
 
-	private static final int SCHEDULE_BATCH_SIZE;
+	public static final int SCHEDULE_BATCH_SIZE;
 
 	private TPartStoredProcedureFactory factory;
 	
