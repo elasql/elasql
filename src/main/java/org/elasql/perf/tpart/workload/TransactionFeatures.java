@@ -44,18 +44,6 @@ public class TransactionFeatures {
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
 	}
 	
-	public static void addKeysWithServerCount(List<String> list, String key) {
-		for (int serverId = 0; serverId < SERVER_COUNT; serverId++) {
-			String keyWithServerId = getKeyWithServerId(key, serverId);
-			list.add(keyWithServerId);
-		}
-	}
-	
-	public static String getKeyWithServerId(String key, int serverId) {
-		// %-3d means the field width is 3 and it is left justification
-		return String.format("%s - Server %d", key, serverId);
-	}
-	
 	// Builder Pattern
 	// - avoids passing Map and List from outside
 	// - creates immutable TransactionFeatures objects
@@ -76,13 +64,6 @@ public class TransactionFeatures {
 				throw new RuntimeException("Unexpected feature: " + key);
 			
 			features.put(key, value);
-		}
-		
-		public void addFeatureWithServerId(String key, Object value, int serverId) {
-			String keyWithServerId = getKeyWithServerId(key, serverId);
-			if (!FEATURE_KEYS.contains(keyWithServerId))
-				throw new RuntimeException("Unexpected feature: " + keyWithServerId);
-			features.put(keyWithServerId, value);
 		}
 		
 		public void addDependency(Long dependentTxNum) {
