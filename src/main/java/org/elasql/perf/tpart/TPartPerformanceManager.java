@@ -13,9 +13,17 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartPerformanceManager implements PerformanceManager {
+	
+	public static final boolean ENABLE_COLLECTING_DATA;
+
+	static {
+		ENABLE_COLLECTING_DATA = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(Estimator.class.getName() + ".ENABLE_COLLECTING_DATA", false);
+	}
 
 	// On the sequencer
 	private FeatureCollector featureCollector;
@@ -27,7 +35,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching) {
-		if (Estimator.ENABLE_COLLECTING_DATA) {
+		if (ENABLE_COLLECTING_DATA) {
 			if (Elasql.isStandAloneSequencer()) {
 				metricWarehouse = new TpartMetricWarehouse();
 				Elasql.taskMgr().runTask(metricWarehouse);
@@ -45,7 +53,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	@Override
 	public void monitorTransaction(StoredProcedureCall spc) {
-		if (Estimator.ENABLE_COLLECTING_DATA) {
+		if (ENABLE_COLLECTING_DATA) {
 			if (Elasql.isStandAloneSequencer()) {
 				featureCollector.monitorTransaction(spc);
 			}
@@ -54,7 +62,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	@Override
 	public void addTransactionMetics(long txNum, String role, TransactionProfiler profiler) {
-		if (Estimator.ENABLE_COLLECTING_DATA) {
+		if (ENABLE_COLLECTING_DATA) {
 			if (!Elasql.isStandAloneSequencer()) {
 				localMetricCollector.addTransactionMetrics(txNum, role, profiler);
 			}
