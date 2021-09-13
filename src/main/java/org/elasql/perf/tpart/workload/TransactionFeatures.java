@@ -35,10 +35,10 @@ public class TransactionFeatures {
 		// - Number of writes to storage for each server
 		featureKeys.add("Number of Storage Writes per Server");
 		
-		addKeysWithServerCount(featureKeys, "System CPU Load");
-		addKeysWithServerCount(featureKeys, "Process CPU Load");
-		addKeysWithServerCount(featureKeys, "System Load Average");
-		addKeysWithServerCount(featureKeys, "Thread Active Count");
+		featureKeys.add("System CPU Load");
+		featureKeys.add("Process CPU Load");
+		featureKeys.add("System Load Average");
+		featureKeys.add("Thread Active Count");
 		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
