@@ -114,6 +114,10 @@ public class FeatureExtractor {
 		}
 	}
 	
+	private String quoteString(String str)  {
+		return "\"" + str + "\"";
+	}
+	
 	private String extractCacheWrites(TxNode node) {
 		PartitionMetaMgr partMeta = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
@@ -132,7 +136,7 @@ public class FeatureExtractor {
 				counts[partId]++;
 		}
 		
-		return Arrays.toString(counts);
+		return quoteString(Arrays.toString(counts));
 	}
 	
 	private String extractStorageWrites(TxNode node) {
@@ -147,6 +151,6 @@ public class FeatureExtractor {
 				counts[partId]++;
 		}
 		
-		return Arrays.toString(counts);
+		return quoteString(Arrays.toString(counts));
 	}
 }
