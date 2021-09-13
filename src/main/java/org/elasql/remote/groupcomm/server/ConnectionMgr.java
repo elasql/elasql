@@ -36,6 +36,7 @@ import org.vanilladb.comm.server.VanillaCommServer;
 import org.vanilladb.comm.server.VanillaCommServerListener;
 import org.vanilladb.comm.view.ProcessType;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConnectionMgr implements VanillaCommServerListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
@@ -71,6 +72,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
+		// For controller
+		TransactionProfiler.getLocalProfiler().incrementNetworkOutSize(reading);
 		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
 	}
 	
