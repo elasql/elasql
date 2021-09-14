@@ -50,6 +50,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	
 	private long firstSpcArrivedTime = -1;
 
+	// See Note #1 in onReceiveP2pMessage
+	private long nextTransactionId = 1;
+
 	public ConnectionMgr(int id) {
 		sequencerMode = Elasql.serverId() == SEQUENCER_ID;
 		commServer = new VanillaCommServer(id, this);
@@ -113,6 +116,21 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
 				spc.stampArrivedTime(arrivedTime);
 				
+				// Set transaction number
+				// Note #1: the transaction number originally should be dispatched
+				// through Zab. However, in order to estimate the latency and 
+				// the cost of each transaction. We make the sequencer decide
+				// the transaction number before the total ordering, so that
+				// we can estimate the cost before sending the requests to DB
+				// servers.
+				// This method works because there is only one leader in Zab,
+				// and the leader won't change in the experiment.
+				spc.setTxNum(nextTransactionId);
+				nextTransactionId++;
+				
+				// TODO: estimate the cost here
+				
+				
 				// Add to the total order request list
 				tomRequest.add(spc);
 			}
@@ -144,7 +162,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
 		StoredProcedureCall spc = (StoredProcedureCall) message;
-		spc.setTxNum(serialNumber);
+		
+		// See Note #1 in onReceiveP2pMessage
+//		spc.setTxNum(serialNumber);
 		
 		// Pass to the performance manager for monitoring the workload
 		if (Elasql.performanceMgr() != null)
