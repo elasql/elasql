@@ -52,10 +52,10 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Storage Writes per Server", extractStorageWrites(txNode));
 
 		// Features below are from the servers
-		extractSystemCpuLoad(builder);
-		extractProcessCpuLoad(builder);
-		extractSystemLoadAverage(builder);
-		extractThreadActiveCount(builder);
+		builder.addFeature("System CPU Load", extractSystemCpuLoad());
+		builder.addFeature("Process CPU Load", extractProcessCpuLoad());
+		builder.addFeature("System Load Average", extractSystemLoadAverage());
+		builder.addFeature("Thread Active Count", extractThreadActiveCount());
 		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -66,52 +66,46 @@ public class FeatureExtractor {
 		return builder.build();
 	}
 	
-	private void extractSystemCpuLoad(TransactionFeatures.Builder builder) {
-		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		
-		for (int serverId = 0; serverId < serverCount; serverId++) {
-			builder.addFeatureWithServerId(
-					"System CPU Load",
-					metricWarehouse.getSystemCpuLoad(serverId),
-					serverId
-				);
-		}
+	private String quoteString(String str)  {
+		return "\"" + str + "\"";
 	}
 	
-	private void extractProcessCpuLoad(TransactionFeatures.Builder builder) {
+	private String extractSystemCpuLoad() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		
-		for (int serverId = 0; serverId < serverCount; serverId++) {
-			builder.addFeatureWithServerId(
-					"Process CPU Load",
-					metricWarehouse.getProcessCpuLoad(serverId),
-					serverId
-				);
-		}
+		double[] systemLoads = new double[serverCount];
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			systemLoads[serverId] = metricWarehouse.getSystemCpuLoad(serverId);
+		return quoteString(Arrays.toString(systemLoads));
 	}
 	
-	private void extractSystemLoadAverage(TransactionFeatures.Builder builder) {
+	private String extractProcessCpuLoad() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		double[] processLoads = new double[serverCount];
 		
-		for (int serverId = 0; serverId < serverCount; serverId++) {
-			builder.addFeatureWithServerId(
-					"System Load Average",
-					metricWarehouse.getSystemLoadAverage(serverId),
-					serverId
-				);
-		}
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			processLoads[serverId] = metricWarehouse.getProcessCpuLoad(serverId);
+		
+		return quoteString(Arrays.toString(processLoads));
 	}
 	
-	private void extractThreadActiveCount(TransactionFeatures.Builder builder) {
+	private String extractSystemLoadAverage() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		double[] avgLoads = new double[serverCount];
 		
-		for (int serverId = 0; serverId < serverCount; serverId++) {
-			builder.addFeatureWithServerId(
-					"Thread Active Count",
-					metricWarehouse.getThreadActiveCount(serverId),
-					serverId
-				);
-		}
+		for (int serverId = 0; serverId < serverCount; serverId++) 
+			avgLoads[serverId] = metricWarehouse.getSystemLoadAverage(serverId);
+		
+		return quoteString(Arrays.toString(avgLoads));
+	}
+	
+	private String extractThreadActiveCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		int[] counts = new int[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)
+			counts[serverId] = metricWarehouse.getThreadActiveCount(serverId);
+		
+		return quoteString(Arrays.toString(counts));
 	}
 	
 	private String extractCacheWrites(TxNode node) {
@@ -132,7 +126,7 @@ public class FeatureExtractor {
 				counts[partId]++;
 		}
 		
-		return Arrays.toString(counts);
+		return quoteString(Arrays.toString(counts));
 	}
 	
 	private String extractStorageWrites(TxNode node) {
@@ -147,6 +141,6 @@ public class FeatureExtractor {
 				counts[partId]++;
 		}
 		
-		return Arrays.toString(counts);
+		return quoteString(Arrays.toString(counts));
 	}
 }
