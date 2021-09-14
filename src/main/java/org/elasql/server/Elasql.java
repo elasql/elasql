@@ -65,7 +65,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB. 
 	 */ 
 	public enum ServiceType { 
-		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP; 
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL; 
  
 		static ServiceType fromInteger(int index) { 
 			switch (index) { 
@@ -80,7 +80,9 @@ public class Elasql extends VanillaDb {
 			case 4: 
 				return G_STORE; 
 			case 5: 
-				return LEAP; 
+				return LEAP;
+			case 6:
+				return HERMES_CONTROL;
 			default: 
 				throw new RuntimeException("Unsupport service type"); 
 			} 
@@ -194,7 +196,8 @@ public class Elasql extends VanillaDb {
 		case TPART: 
 		case HERMES: 
 		case G_STORE: 
-		case LEAP: 
+		case LEAP:
+		case HERMES_CONTROL:
 			remoteRecReceiver = new TPartCacheMgr(); 
 			break; 
  
@@ -222,6 +225,7 @@ public class Elasql extends VanillaDb {
 		case HERMES: 
 		case G_STORE: 
 		case LEAP: 
+		case HERMES_CONTROL:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory"); 
 			scheduler = initTPartScheduler((TPartStoredProcedureFactory) factory); 
@@ -276,6 +280,13 @@ public class Elasql extends VanillaDb {
 			inserter = new LocalFirstNodeInserter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
+			break;
+		case HERMES_CONTROL:
+			table = new FusionTable(); 
+			graph = new FusionTGraph(table); 
+			inserter = new HermesNodeInserter(); 
+			sinker = new FusionSinker(table); 
+			isBatching = true; 
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
@@ -318,6 +329,7 @@ public class Elasql extends VanillaDb {
 		case HERMES:
 		case G_STORE:
 		case LEAP:
+		case HERMES_CONTROL:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory"); 
 			performanceMgr = newTPartPerfMgr((TPartStoredProcedureFactory) factory);
@@ -355,6 +367,12 @@ public class Elasql extends VanillaDb {
 			graph = new FusionTGraph(table); 
 			inserter = new LocalFirstNodeInserter();
 			isBatching = false; 
+			break; 
+		case HERMES_CONTROL:
+			table = new FusionTable(); 
+			graph = new FusionTGraph(table); 
+			inserter = new HermesNodeInserter();
+			isBatching = true; 
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
