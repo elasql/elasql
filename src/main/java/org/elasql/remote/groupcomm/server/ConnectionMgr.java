@@ -148,6 +148,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		profiler.reset();
+		profiler.startExecution();
 		profiler.startComponentProfiler("OU0 - ROUTE");
 		
 		spc.setTxNum(serialNumber);

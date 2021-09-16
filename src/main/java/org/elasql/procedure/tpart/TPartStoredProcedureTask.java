@@ -27,13 +27,22 @@ public class TPartStoredProcedureTask
 	private long arrivedTime, ou0StartTime;
 	private TransactionProfiler profiler;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, long ou0StartTime, TPartStoredProcedure<?> sp) {
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TransactionProfiler profiler, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
 		this.arrivedTime = arrivedTime;
-		this.ou0StartTime = ou0StartTime;
+		this.profiler = profiler;
+		this.tsp = sp;		
+	}
+	
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
+		super(cid, connId, txNum, sp);
+		this.clientId = cid;
+		this.connectionId = connId;
+		this.txNum = txNum;
+		this.arrivedTime = arrivedTime;
 		this.tsp = sp;		
 	}
 
@@ -116,6 +125,9 @@ public class TPartStoredProcedureTask
 		return tsp;
 	}
 
+	public TransactionProfiler getTxProfiler() {
+		return profiler;
+	}
 	public ProcedureType getProcedureType() {
 		if (tsp == null)
 			return ProcedureType.NOP;

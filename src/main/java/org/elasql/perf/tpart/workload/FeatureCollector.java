@@ -93,7 +93,7 @@ public class FeatureCollector extends Task {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), spc.getOu0StartTime(), sp);
+					spc.getTxNum(), spc.getArrivedTime(), sp);
 		}
 		
 		return null;
