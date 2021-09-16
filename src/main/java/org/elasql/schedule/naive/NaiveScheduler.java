@@ -26,12 +26,14 @@ import org.elasql.schedule.Scheduler;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class NaiveScheduler extends Task implements Scheduler {
 	
 	private NaiveStoredProcedureFactory factory;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-
+	private TransactionProfiler profiler;
+	
 	public NaiveScheduler(NaiveStoredProcedureFactory factory) {
 		this.factory = factory;
 	}
@@ -44,6 +46,10 @@ public class NaiveScheduler extends Task implements Scheduler {
 		}
 	}
 
+	public void passProfiler(TransactionProfiler profiler) {
+		this.profiler = profiler;
+	}
+	
 	@Override
 	public void run() {
 		while (true) {

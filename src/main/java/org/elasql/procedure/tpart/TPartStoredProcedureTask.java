@@ -24,15 +24,16 @@ public class TPartStoredProcedureTask
 	
 	// Timestamps
 	// The time that the stored procedure call arrives the system
-	private long arrivedTime;
+	private long arrivedTime, ou0StartTime;
 	private TransactionProfiler profiler;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, long ou0StartTime, TPartStoredProcedure<?> sp) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
 		this.arrivedTime = arrivedTime;
+		this.ou0StartTime = ou0StartTime;
 		this.tsp = sp;		
 	}
 
@@ -81,6 +82,10 @@ public class TPartStoredProcedureTask
 	
 	public long getArrivedTime() {
 		return arrivedTime;
+	}
+	
+	public long getOu0StartTime() {
+		return ou0StartTime;
 	}
 
 	public Set<PrimaryKey> getReadSet() {

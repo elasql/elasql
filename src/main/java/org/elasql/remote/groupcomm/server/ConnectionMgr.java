@@ -17,6 +17,7 @@ package org.elasql.remote.groupcomm.server;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -100,7 +101,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			// Normally, the client will only sends its request to the sequencer.
 			// However, any other server can also send a total order request.
 			// So, we do not need to check if this machine is the sequencer.
-			
+
 			// Transfer the given batch to a list of messages
 			StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
 			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
@@ -112,7 +113,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				// Set arrived time
 				long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
 				spc.stampArrivedTime(arrivedTime);
-				
+
 				// Add to the total order request list
 				tomRequest.add(spc);
 			}
@@ -144,6 +145,11 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
 		StoredProcedureCall spc = (StoredProcedureCall) message;
+		
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.reset();
+		profiler.startComponentProfiler("OU0 - ROUTE");
+		
 		spc.setTxNum(serialNumber);
 		
 		// Pass to the performance manager for monitoring the workload
@@ -156,6 +162,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		
 		// Pass to the scheduler
 		Elasql.scheduler().schedule(spc);
+		Elasql.scheduler().passProfiler(TransactionProfiler.takeOut());
 	}
 	
 	private void createTomSender() {

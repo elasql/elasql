@@ -42,6 +42,7 @@ public class TPartScheduler extends Task implements Scheduler {
 	}
 
 	private BlockingQueue<StoredProcedureCall> spcQueue;
+	private BlockingQueue<TransactionProfiler> profilerQueue;
 	private BatchNodeInserter inserter;
 	private Sinker sinker;
 	private TGraph graph;
@@ -61,6 +62,7 @@ public class TPartScheduler extends Task implements Scheduler {
 		this.graph = graph;
 		this.batchingEnabled = isBatching;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
+		this.profilerQueue = new LinkedBlockingQueue<TransactionProfiler>();
 		
 		// Clear the dump dir
 //		dumpDir.mkdirs();
@@ -69,10 +71,19 @@ public class TPartScheduler extends Task implements Scheduler {
 //				file.delete();
 //		}
 	}
-
+	
 	public void schedule(StoredProcedureCall call) {
 		try {
 			spcQueue.put(call);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	public void passProfiler(TransactionProfiler profiler) {
+		try {
+			profilerQueue.put(profiler);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -87,6 +98,8 @@ public class TPartScheduler extends Task implements Scheduler {
 			try {
 				// blocked if the queue is empty
 				StoredProcedureCall call = spcQueue.take();
+				TransactionProfiler profiler = profilerQueue.take();
+				
 				TPartStoredProcedureTask task = createStoredProcedureTask(call);
 
 				// schedules the utility procedures directly without T-Part
@@ -107,6 +120,10 @@ public class TPartScheduler extends Task implements Scheduler {
 					batchedTasks.add(task);
 				}
 				
+				TransactionProfiler.setProfiler(profiler);
+				profiler.stopComponentProfiler("OU0 - ROUTE");
+//				System.out.println(String.format("OU0 : %d", (System.nanoTime() - task.getOu0StartTime())));
+				
 				// sink current t-graph if # pending tx exceeds threshold
 				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
 						|| !batchingEnabled) {
@@ -126,7 +143,6 @@ public class TPartScheduler extends Task implements Scheduler {
 		inserter.insertBatch(graph, batchedTasks);
 		
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-		profiler.reset();
 		profiler.startExecution();
 
 		// Debug
@@ -166,7 +182,7 @@ public class TPartScheduler extends Task implements Scheduler {
 	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call) {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), null);
+					call.getTxNum(), call.getArrivedTime(), call.getOu0StartTime(), null);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -175,7 +191,7 @@ public class TPartScheduler extends Task implements Scheduler {
 				DdRecoveryMgr.logRequest(call);
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), sp);
+					call.getTxNum(), call.getArrivedTime(), call.getOu0StartTime(), sp);
 		}
 	}
 

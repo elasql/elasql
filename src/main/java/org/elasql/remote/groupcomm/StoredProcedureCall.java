@@ -37,7 +37,7 @@ public class StoredProcedureCall implements Serializable {
 	
 	// The timestamp to indicate the time that this request arrives
 	// at the database system. (-1 means 'not set')
-	private long arrivedTime = -1;
+	private long arrivedTime = -1, ou0StartTime = -1, ou0StopTime = -1;
 
 	public static StoredProcedureCall getNoOpStoredProcCall(int clienId) {
 		return new StoredProcedureCall(clienId);
@@ -76,9 +76,31 @@ public class StoredProcedureCall implements Serializable {
 		if (arrivedTime == -1)
 			arrivedTime = timestamp;
 	}
+
+	public void stampOu0StartTime(long ou0StartTime) {
+		if (this.ou0StartTime == -1)
+			this.ou0StartTime = ou0StartTime;
+	}
+	
+	public void stampOu0StopTime(long ou0StopTime) {
+		if (this.ou0StopTime == -1)
+			this.ou0StopTime = ou0StopTime;
+	}
+	
+	public long getProfiler() {
+		return arrivedTime;
+	}
 	
 	public long getArrivedTime() {
 		return arrivedTime;
+	}
+	
+	public long getOu0StartTime() {
+		return ou0StartTime;
+	}
+	
+	public long getOu0StopTime() {
+		return ou0StopTime;
 	}
 
 	public int getClientId() {
