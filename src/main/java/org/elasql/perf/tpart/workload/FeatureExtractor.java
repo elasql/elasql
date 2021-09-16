@@ -5,8 +5,6 @@ import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.schedule.tpart.graph.Edge;
-import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -30,16 +28,13 @@ public class FeatureExtractor {
 		this.metricWarehouse = metricWarehouse;
 	}
 	
-	public TransactionFeatures extractFeatures(TxNode txNode) {
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task) {
 		// Check if transaction requests are given in the total order
-		if (txNode.getTxNum() <= lastProcessedTxNum)
+		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
 					"Transaction requests are not passed to FeatureExtractor "
 					+ "in the total order: %d, last processed tx: %d",
-					txNode.getTxNum(), lastProcessedTxNum));
-		
-		// Get the task
-		TPartStoredProcedureTask task = txNode.getTask();
+					task.getTxNum(), lastProcessedTxNum));
 		
 		// Extract the features
 		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
@@ -48,8 +43,7 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
-		builder.addFeature("Number of Cache Writes per Server", extractCacheWrites(txNode));
-		builder.addFeature("Number of Storage Writes per Server", extractStorageWrites(txNode));
+		builder.addFeature("Number of Write per Partition", extractWriteOriginalParts(task.getWriteSet()));
 
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
@@ -108,37 +102,13 @@ public class FeatureExtractor {
 		return quoteString(Arrays.toString(counts));
 	}
 	
-	private String extractCacheWrites(TxNode node) {
+	private String extractWriteOriginalParts(Set<PrimaryKey> writeKeys) {
 		PartitionMetaMgr partMeta = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
-		// Write: pass to the next transactions
-		for (Edge writeEdge : node.getWriteEdges()) {
-			int partId = writeEdge.getTarget().getPartId();
+		for (PrimaryKey writeKey : writeKeys) {
+			int partId = partMeta.getPartition(writeKey);
 			counts[partId]++;
-		}
-		
-		// Writeback: save on the local cache or storage
-		for (Edge writeEdge : node.getWriteBackEdges()) {
-			PrimaryKey key = writeEdge.getResourceKey();
-			int partId = writeEdge.getTarget().getPartId();
-			if (!partMeta.isFullyReplicated(key) && partMeta.getPartition(key) != partId)
-				counts[partId]++;
-		}
-		
-		return quoteString(Arrays.toString(counts));
-	}
-	
-	private String extractStorageWrites(TxNode node) {
-		PartitionMetaMgr partMeta = Elasql.partitionMetaMgr();
-		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
-		
-		// Only writeback write to storage
-		for (Edge writeEdge : node.getWriteBackEdges()) {
-			PrimaryKey key = writeEdge.getResourceKey();
-			int partId = writeEdge.getTarget().getPartId();
-			if (partMeta.isFullyReplicated(key) || partMeta.getPartition(key) == partId)
-				counts[partId]++;
 		}
 		
 		return quoteString(Arrays.toString(counts));

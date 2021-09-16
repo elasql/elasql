@@ -30,10 +30,8 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Read Records");
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
-		// - Number of writes to cache for each server
-		featureKeys.add("Number of Cache Writes per Server");
-		// - Number of writes to storage for each server
-		featureKeys.add("Number of Storage Writes per Server");
+		// - Number of writes from each partition
+		featureKeys.add("Number of Write per Partition");
 		
 		featureKeys.add("System CPU Load");
 		featureKeys.add("Process CPU Load");

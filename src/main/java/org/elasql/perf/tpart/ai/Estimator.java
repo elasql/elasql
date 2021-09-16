@@ -4,10 +4,6 @@ import org.elasql.perf.tpart.workload.TransactionFeatures;
 
 public interface Estimator {
 	
-	double estimateLatency(TransactionFeatures features, int masterId);
-	
-	long estimateMasterCpuCost(TransactionFeatures features, int masterId);
-	
-	long estimateSlaveCpuCost(TransactionFeatures features, int slaveId);
+	TransactionEstimation estimate(TransactionFeatures features);
 	
 }

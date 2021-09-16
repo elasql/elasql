@@ -28,6 +28,10 @@ public class ControlBasedRouter implements BatchNodeInserter {
 
 	public void insert(TGraph graph, TPartStoredProcedureTask task) {
 		TransactionEstimation estimation = task.getEstimation(); 
+		
+		if (estimation == null)
+			throw new IllegalArgumentException("there is no estimation for transaction " + task.getTxNum());
+		
 		int bestMasterId = 0;
 		double highestScore = calculateRoutingScore(estimation, 0);
 		

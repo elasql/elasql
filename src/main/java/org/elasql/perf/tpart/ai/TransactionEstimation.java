@@ -1,8 +1,12 @@
 package org.elasql.perf.tpart.ai;
 
+import java.io.Serializable;
+
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class TransactionEstimation {
+public class TransactionEstimation implements Serializable {
+	
+	private static final long serialVersionUID = 20210916001L;
 	
 	public static class Builder {
 		private double[] latencies;

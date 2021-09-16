@@ -129,6 +129,10 @@ public class TPartStoredProcedureTask
 		this.profiler = profiler;
 	}
 	
+	public void setEstimation(TransactionEstimation estimation) {
+		this.estimation = estimation;
+	}
+	
 	public TransactionEstimation getEstimation() {
 		return estimation;
 	}

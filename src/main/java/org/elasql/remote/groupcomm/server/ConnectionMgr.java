@@ -127,20 +127,22 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				// and the leader won't change in the experiment.
 				spc.setTxNum(nextTransactionId);
 				nextTransactionId++;
-				
-				// TODO: estimate the cost here
-				
-				
-				// Add to the total order request list
-				tomRequest.add(spc);
+
+				// Processes the transaction request
+				// and append some metadata if necessary
+				if (Elasql.performanceMgr() != null)
+					Elasql.performanceMgr().preprocessSpCall(spc);
+				else
+					// Add to the total order request list
+					tomRequest.add(spc);
 			}
 			
-			// Send a total order request
-			try {
-				tomSendQueue.put(tomRequest);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+			// If there is a performance manager,
+			// it will take the responsibility of sending the
+			// requests to total-ordering module.
+			if (Elasql.performanceMgr() == null)
+				sendTotalOrderRequest(tomRequest);
+			
 		} else if (message.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) message;
 			
@@ -158,6 +160,15 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		} else
 			throw new IllegalArgumentException();
 	}
+	
+	public void sendTotalOrderRequest(List<Serializable> requests) {
+		// Send a total order request
+		try {
+			tomSendQueue.put(requests);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
 
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
@@ -165,10 +176,6 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		
 		// See Note #1 in onReceiveP2pMessage
 //		spc.setTxNum(serialNumber);
-		
-		// Pass to the performance manager for monitoring the workload
-		if (Elasql.performanceMgr() != null)
-			Elasql.performanceMgr().monitorTransaction(spc);
 		
 		// The sequencer running with Calvin must receive stored procedure call for planning migrations
 		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)

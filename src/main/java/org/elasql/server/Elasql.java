@@ -28,6 +28,8 @@ import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.DummyPerformanceManager;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
+import org.elasql.perf.tpart.ai.Estimator;
+import org.elasql.perf.tpart.ai.StupidEstimator;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -343,42 +345,48 @@ public class Elasql extends VanillaDb {
 		TGraph graph; 
 		BatchNodeInserter inserter;
 		FusionTable table; 
-		boolean isBatching = true; 
+		boolean isBatching = true;
+		Estimator estimator;
 		 
 		switch (SERVICE_TYPE) { 
 		case TPART: 
 			graph = new TGraph(); 
 			inserter = new CostAwareNodeInserter();
-			isBatching = true; 
+			isBatching = true;
+			estimator = null;
 			break; 
 		case HERMES: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new HermesNodeInserter();
 			isBatching = true; 
+			estimator = null;
 			break; 
 		case G_STORE: 
 			graph = new TGraph(); 
 			inserter = new LocalFirstNodeInserter();
 			isBatching = false; 
+			estimator = null;
 			break; 
 		case LEAP: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new LocalFirstNodeInserter();
 			isBatching = false; 
+			estimator = null;
 			break; 
 		case HERMES_CONTROL:
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new HermesNodeInserter();
 			isBatching = true; 
+			estimator = new StupidEstimator();
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
 		} 
 		 
-		return new TPartPerformanceManager(factory, inserter, graph, isBatching); 
+		return new TPartPerformanceManager(factory, inserter, graph, isBatching, estimator); 
 	}
  
 	// ================ 
