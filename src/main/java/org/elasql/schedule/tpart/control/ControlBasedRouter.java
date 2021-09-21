@@ -3,8 +3,12 @@ package org.elasql.schedule.tpart.control;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.elasql.perf.tpart.ai.TransactionEstimation;
+import org.elasql.perf.tpart.control.ControlParamUpdateParamHelper;
+import org.elasql.perf.tpart.control.ControlParamUpdateProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -13,6 +17,7 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.PeriodicalJob;
 
 public class ControlBasedRouter implements BatchNodeInserter {
+	private static Logger logger = Logger.getLogger(ControlBasedRouter.class.getName());
 	
 	private static final double LATENCY_EXP = 1.0;
 	private static final double TIE_CLOSENESS = 0.0001;
@@ -57,8 +62,27 @@ public class ControlBasedRouter implements BatchNodeInserter {
 
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
-		for (TPartStoredProcedureTask task : tasks)
-			insert(graph, task);
+		for (TPartStoredProcedureTask task : tasks) {
+			if (task.getProcedure().getClass().equals(ControlParamUpdateProcedure.class)) {
+				ControlParamUpdateProcedure procedure = 
+						(ControlParamUpdateProcedure) task.getProcedure();
+				updateParameters(procedure.getParamHelper());
+			} else {
+				insert(graph, task);
+			}
+		}
+	}
+	
+	private void updateParameters(ControlParamUpdateParamHelper paramHelper) {
+		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+			paramAlpha[nodeId] = paramHelper.getAlpha(nodeId);
+			paramBeta[nodeId] = paramHelper.getBeta(nodeId);
+			paramGamma[nodeId] = paramHelper.getGamma(nodeId);
+		}
+		
+		if (logger.isLoggable(Level.INFO))
+			logger.info(String.format("updating routing paramters (tx.%d), alpha: %s, beta: %s, gamma: %s.",
+					Arrays.toString(paramAlpha), Arrays.toString(paramBeta), Arrays.toString(paramGamma)));
 	}
 
 	private void insert(TGraph graph, TPartStoredProcedureTask task) {

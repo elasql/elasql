@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.control;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
@@ -60,7 +61,8 @@ public class RoutingControlActuator extends Task {
 			// Update parameters
 			updateParameters();
 			
-			// TODO: Issue an update transaction
+			// Issue an update transaction
+			issueUpdateTransaction();
 		}
 	}
 	
@@ -95,5 +97,22 @@ public class RoutingControlActuator extends Task {
 	private void updateParameters() {
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
 			alpha[nodeId].updateControlParameters(UPDATE_PERIOD);
+	}
+	
+	private void issueUpdateTransaction() {
+		// Prepare the parameters
+		Object[] params = new Object[PartitionMetaMgr.NUM_PARTITIONS * 3];
+		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+			params[nodeId] = 
+					alpha[nodeId].getControlParameter();
+			params[PartitionMetaMgr.NUM_PARTITIONS + nodeId] = 
+					beta[nodeId].getControlParameter();
+			params[PartitionMetaMgr.NUM_PARTITIONS * 2 + nodeId] = 
+					gamma[nodeId].getControlParameter();
+		}
+		
+		// Send a store procedure call
+		Elasql.connectionMgr().sendStoredProcedureCall(false, 
+				ControlStoredProcedureFactory.SP_CONTROL_PARAM_UPDATE, params);
 	}
 }
