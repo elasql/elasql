@@ -87,10 +87,6 @@ public class StoredProcedureCall implements Serializable {
 			this.ou0StopTime = ou0StopTime;
 	}
 	
-	public long getProfiler() {
-		return arrivedTime;
-	}
-	
 	public long getArrivedTime() {
 		return arrivedTime;
 	}

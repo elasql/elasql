@@ -195,7 +195,6 @@ public class TPartScheduler extends Task implements Scheduler {
 	}
 
 	private void dispatchToTaskMgr(Iterator<TPartStoredProcedureTask> plans) {
-		TransactionProfiler profiler = TransactionProfiler.takeOut();
 		while (plans.hasNext()) {
 			TPartStoredProcedureTask p = plans.next();
 			VanillaDb.taskMgr().runTask(p);

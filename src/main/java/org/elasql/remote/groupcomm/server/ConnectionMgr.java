@@ -27,6 +27,7 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.MetricReport;
+import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
@@ -113,7 +114,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				// Set arrived time
 				long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
 				spc.stampArrivedTime(arrivedTime);
-
+				spc.stampOu0StartTime(System.nanoTime());
+				
 				// Add to the total order request list
 				tomRequest.add(spc);
 			}
@@ -149,6 +151,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		profiler.reset();
 		profiler.startExecution();
+		long broadcastTime = (spc.getOu0StopTime()- spc.getOu0StartTime()) / 1000;
+		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, 0, 0, 0);
 		profiler.startComponentProfiler("OU0 - ROUTE");
 		
 		spc.setTxNum(serialNumber);
@@ -173,6 +177,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				while (true) {
 					try {
 						List<Serializable> messages = tomSendQueue.take();
+						for (int i = messages.size() - 1; i >= 0; i--) {
+							StoredProcedureCall spc = (StoredProcedureCall) messages.get(i);
+							spc.stampOu0StopTime(System.nanoTime());
+						}
 						commServer.sendTotalOrderMessages(messages);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
