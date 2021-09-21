@@ -80,7 +80,6 @@ public class TPartScheduler extends Task implements Scheduler {
 		}
 	}
 	
-	
 	public void passProfiler(TransactionProfiler profiler) {
 		try {
 			profilerQueue.put(profiler);

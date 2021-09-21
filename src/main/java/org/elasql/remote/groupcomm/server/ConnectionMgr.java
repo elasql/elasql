@@ -15,6 +15,7 @@
  ******************************************************************************/
 package org.elasql.remote.groupcomm.server;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -150,7 +151,14 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		profiler.reset();
 		profiler.startExecution();
 		long broadcastTime = (spc.getOu0StopTime()- spc.getOu0StartTime()) / 1000;
-		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, 0, 0, 0);
+		int networkSize = 0;
+		try {
+			networkSize = profiler.getSize(message);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, networkSize, 0, 0);
 		profiler.startComponentProfiler("OU0 - ROUTE");
 		
 		spc.setTxNum(serialNumber);
