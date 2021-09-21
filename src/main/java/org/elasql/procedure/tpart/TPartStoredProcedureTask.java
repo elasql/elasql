@@ -24,7 +24,7 @@ public class TPartStoredProcedureTask
 	
 	// Timestamps
 	// The time that the stored procedure call arrives the system
-	private long arrivedTime, ou0StartTime, ou0StopTime;
+	private long arrivedTime;
 	private TransactionProfiler profiler;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TransactionProfiler profiler, TPartStoredProcedure<?> sp) {
