@@ -2,6 +2,8 @@ package org.elasql.perf.tpart.metric;
 
 import java.lang.management.ManagementFactory;
 import com.sun.management.OperatingSystemMXBean;
+
+import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.util.TransactionProfiler;
@@ -22,11 +24,16 @@ public class MetricCollector extends Task {
 		.getOperatingSystemMXBean();
 
 	public MetricCollector() {
-		metricRecorder = new TransactionMetricRecorder(Elasql.serverId());
-		metricRecorder.startRecording();
+		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
+			metricRecorder = new TransactionMetricRecorder(Elasql.serverId());
+			metricRecorder.startRecording();
+		}
 	}
 
 	public void addTransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
+		if (!TPartPerformanceManager.ENABLE_COLLECTING_DATA)
+			throw new IllegalStateException("cannot collect transaction metrics since ENABLE_COLLECTING_DATA = false");
+		
 		metricRecorder.addTransactionMetrics(txNum, role, profiler);
 	}
 

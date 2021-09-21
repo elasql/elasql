@@ -42,6 +42,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
+import org.elasql.schedule.tpart.control.ControlBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
@@ -286,7 +287,7 @@ public class Elasql extends VanillaDb {
 		case HERMES_CONTROL:
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new HermesNodeInserter(); 
+			inserter = new ControlBasedRouter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = true; 
 			break; 
@@ -378,7 +379,7 @@ public class Elasql extends VanillaDb {
 		case HERMES_CONTROL:
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new HermesNodeInserter();
+			inserter = new ControlBasedRouter();
 			isBatching = true; 
 			estimator = new StupidEstimator();
 			break; 

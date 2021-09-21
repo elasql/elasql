@@ -25,7 +25,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	// On the sequencer
-	private SpCallPreprocessor featureCollector;
+	private SpCallPreprocessor spCallPreprocessor;
 	private TpartMetricWarehouse metricWarehouse;
 	
 	// On each DB machine
@@ -34,26 +34,24 @@ public class TPartPerformanceManager implements PerformanceManager {
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, Estimator estimator) {
-		if (ENABLE_COLLECTING_DATA) {
-			if (Elasql.isStandAloneSequencer()) {
-				metricWarehouse = new TpartMetricWarehouse();
-				Elasql.taskMgr().runTask(metricWarehouse);
-				
-				// The sequencer maintains a feature collector and a warehouse
-				featureCollector = new SpCallPreprocessor(factory, inserter,
-						graph, isBatching, metricWarehouse, estimator);
-				Elasql.taskMgr().runTask(featureCollector);
-			} else {
-				localMetricCollector = new MetricCollector();
-				Elasql.taskMgr().runTask(localMetricCollector);
-			}
+		if (Elasql.isStandAloneSequencer()) {
+			metricWarehouse = new TpartMetricWarehouse();
+			Elasql.taskMgr().runTask(metricWarehouse);
+			
+			// The sequencer maintains a feature collector and a warehouse
+			spCallPreprocessor = new SpCallPreprocessor(factory, inserter,
+					graph, isBatching, metricWarehouse, estimator);
+			Elasql.taskMgr().runTask(spCallPreprocessor);
+		} else {
+			localMetricCollector = new MetricCollector();
+			Elasql.taskMgr().runTask(localMetricCollector);
 		}
 	} 
 
 	@Override
 	public void preprocessSpCall(StoredProcedureCall spc) {
 		if (Elasql.isStandAloneSequencer()) {
-			featureCollector.preprocessSpCall(spc);
+			spCallPreprocessor.preprocessSpCall(spc);
 		}
 	}
 
