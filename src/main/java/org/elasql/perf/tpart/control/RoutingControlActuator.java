@@ -1,4 +1,4 @@
-package org.elasql.perf.tpart;
+package org.elasql.perf.tpart.control;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.storage.metadata.PartitionMetaMgr;

@@ -1,4 +1,4 @@
-package org.elasql.perf.tpart;
+package org.elasql.perf.tpart.control;
 
 public class PidController {
 	

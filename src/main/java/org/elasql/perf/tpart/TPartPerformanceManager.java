@@ -4,6 +4,7 @@ import org.elasql.perf.MetricReport;
 import org.elasql.perf.MetricWarehouse;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
+import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
