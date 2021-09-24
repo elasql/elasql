@@ -58,7 +58,7 @@ public class TransactionFeaturesRecorder extends Task {
 	
 	private AtomicBoolean isRecording = new AtomicBoolean(false);
 	private BlockingQueue<FeatureRow> queue
-		= new ArrayBlockingQueue<FeatureRow>(100000);
+		= new ArrayBlockingQueue<FeatureRow>(1000_000);
 	
 	public void startRecording() {
 		if (!isRecording.getAndSet(true)) {
