@@ -30,6 +30,7 @@ import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.StupidEstimator;
+import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -230,8 +231,10 @@ public class Elasql extends VanillaDb {
 		case LEAP: 
 		case HERMES_CONTROL:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
-				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory"); 
-			scheduler = initTPartScheduler((TPartStoredProcedureFactory) factory); 
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
+			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
+			scheduler = initTPartScheduler(tpartFactory); 
 			break; 
 		default: 
 			throw new UnsupportedOperationException(); 
@@ -334,8 +337,10 @@ public class Elasql extends VanillaDb {
 		case LEAP:
 		case HERMES_CONTROL:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
-				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory"); 
-			performanceMgr = newTPartPerfMgr((TPartStoredProcedureFactory) factory);
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
+			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
+			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
 		default: 
 			performanceMgr = new DummyPerformanceManager(); 
