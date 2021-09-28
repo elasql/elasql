@@ -55,22 +55,38 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		
 		// debug code
 		// System.out.println(String.format("Receives a report from server %d with average system load: %f",
-		//	metrics.getServerId(), metrics.getSystemLoadAverage()));
+		//  metrics.getServerId(), metrics.getSystemLoadAverage()));
 	}
 	
-	public synchronized Double getProcessCpuLoad(int serverId) {
-		return processCpuLoad.get(serverId);
+	public synchronized double getProcessCpuLoad(int serverId) {
+		Double load = processCpuLoad.get(serverId);
+		if (load == null)
+			return 0.0;
+		else
+			return load;
 	}
 	
-	public synchronized Double getSystemCpuLoad(int serverId) {
-		return systemCpuLoad.get(serverId);
+	public synchronized double getSystemCpuLoad(int serverId) {
+		Double load = systemCpuLoad.get(serverId);
+		if (load == null)
+			return 0.0;
+		else
+		return load;
 	}
 	
-	public synchronized Double getSystemLoadAverage(int serverId) {
-		return systemLoadAverage.get(serverId);
+	public synchronized double getSystemLoadAverage(int serverId) {
+		Double load = systemLoadAverage.get(serverId);
+		if (load == null)
+			return 0.0;
+		else
+			return load;
 	}
 	
-	public synchronized Integer getThreadActiveCount(int serverId) {
-		return threadActiveCount.get(serverId);
+	public synchronized int getThreadActiveCount(int serverId) {
+		Integer count = threadActiveCount.get(serverId);
+		if (count == null)
+			return 0;
+		else
+			return count;
 	}
 }

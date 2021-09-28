@@ -81,7 +81,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		}
 		
 		if (logger.isLoggable(Level.INFO))
-			logger.info(String.format("updating routing paramters (tx.%d), alpha: %s, beta: %s, gamma: %s.",
+			logger.info(String.format("updating routing paramters, alpha: %s, beta: %s, gamma: %s.",
 					Arrays.toString(paramAlpha), Arrays.toString(paramBeta), Arrays.toString(paramGamma)));
 	}
 

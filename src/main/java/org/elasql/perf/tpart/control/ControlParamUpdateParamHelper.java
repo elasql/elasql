@@ -13,6 +13,11 @@ public class ControlParamUpdateParamHelper extends StoredProcedureParamHelper {
 
 	@Override
 	public void prepareParameters(Object... pars) {
+		
+		alpha = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		beta = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		gamma = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
 			alpha[nodeId] = (Double) pars[nodeId];
 			beta[nodeId] = (Double) pars[PartitionMetaMgr.NUM_PARTITIONS + nodeId];
