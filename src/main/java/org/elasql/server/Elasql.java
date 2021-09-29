@@ -160,6 +160,7 @@ public class Elasql extends VanillaDb {
 			initPartitionMetaMgr(partitionPlan); // must be before TPartPerformanceMgr
 			initPerfMgr(factory); 
 			initConnectionMgr(myNodeId);
+			initScheduler(factory, migraComsFactory); 
 			if (migraComsFactory != null) 
 				migraSysControl = migraComsFactory.newSystemController(); 
 			return; 
