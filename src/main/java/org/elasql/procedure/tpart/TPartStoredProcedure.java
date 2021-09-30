@@ -47,6 +47,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
 	private boolean isCommitted = false;
+	private boolean isTxDistributed = false;
 
 	public TPartStoredProcedure(long txNum, H paramHelper) {
 		super(paramHelper);
@@ -149,6 +150,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public boolean isMaster() {
 		return plan.isHereMaster();
 	}
+	
+	public boolean isTxDistributed() {
+		return isTxDistributed;
+	}
 
 	public ProcedureType getProcedureType() {
 		return ProcedureType.NORMAL;
@@ -216,6 +221,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			profiler.startComponentProfiler("OU5M - Read from Remote");
 			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
+					isTxDistributed = true;
 					long srcTxNum = plan.getReadSrcTxNum(k);
 					readings.put(k, cache.read(k, srcTxNum));
 					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));

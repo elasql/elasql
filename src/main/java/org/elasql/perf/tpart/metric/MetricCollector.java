@@ -26,8 +26,8 @@ public class MetricCollector extends Task {
 		metricRecorder.startRecording();
 	}
 
-	public void addTransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
-		metricRecorder.addTransactionMetrics(txNum, role, profiler);
+	public void addTransactionMetrics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
+		metricRecorder.addTransactionMetrics(txNum, role, isTxDistributed, profiler);
 	}
 
 	@Override
