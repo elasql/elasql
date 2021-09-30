@@ -152,7 +152,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	}
 	
 	public boolean isTxDistributed() {
-		return isTxDistributed;
+		return plan.isTxDistributed();
 	}
 
 	public ProcedureType getProcedureType() {
@@ -221,7 +221,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			profiler.startComponentProfiler("OU5M - Read from Remote");
 			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
-					isTxDistributed = true;
 					long srcTxNum = plan.getReadSrcTxNum(k);
 					readings.put(k, cache.read(k, srcTxNum));
 					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));

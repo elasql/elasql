@@ -18,7 +18,7 @@ public class Sinker {
 	protected PartitionMetaMgr parMeta;
 	protected int myId = Elasql.serverId();
 	protected static int sinkProcessId = 0;
-
+	
 	public Sinker() {
 		parMeta = Elasql.partitionMetaMgr();
 	}
@@ -76,10 +76,17 @@ public class Sinker {
 	}
 	
 	protected void generateReadingPlans(SunkPlan plan, TxNode node) {
+		boolean isTxDistributed = false;
+		
 		for (Edge e : node.getReadEdges()) {
 			long srcTxn = e.getTarget().getTxNum();
 			boolean isLocalResource = (e.getTarget().getPartId() == myId);
 			
+			if (!isLocalResource && !isTxDistributed) {
+				isTxDistributed = true;
+				plan.setDistributed(true);
+			}
+
 			if (plan.isHereMaster()) {
 				plan.addReadingInfo(e.getResourceKey(), srcTxn);
 				
