@@ -47,7 +47,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
 	private boolean isCommitted = false;
-	private boolean isTxDistributed = false;
 
 	public TPartStoredProcedure(long txNum, H paramHelper) {
 		super(paramHelper);
