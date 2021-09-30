@@ -13,6 +13,7 @@ import org.elasql.sql.PrimaryKey;
 public class SunkPlan {
 	private int sinkProcessId;
 	private boolean isHereMaster;
+	private boolean isTxDistributed;
 
 	// key->srcTxNum
 	private Map<PrimaryKey, Long> readingInfoMap;
@@ -95,6 +96,14 @@ public class SunkPlan {
 
 	public boolean isHereMaster() {
 		return isHereMaster;
+	}
+	
+	public void setDistributed(boolean isTxDistributed) {
+		this.isTxDistributed = isTxDistributed;
+	}
+	
+	public boolean isTxDistributed() {
+		return isTxDistributed;
 	}
 
 	public void addLocalWriteBackInfo(PrimaryKey key) {
