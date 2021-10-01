@@ -344,7 +344,7 @@ public class Elasql extends VanillaDb {
 			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
 		default: 
-			performanceMgr = new DummyPerformanceManager(); 
+			performanceMgr = null; 
 		} 
 	}
 	
