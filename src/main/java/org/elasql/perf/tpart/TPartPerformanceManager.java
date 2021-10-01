@@ -44,7 +44,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 					graph, isBatching, metricWarehouse, estimator);
 			Elasql.taskMgr().runTask(spCallPreprocessor);
 			
-			// Hermes-Control has a control aucuator
+			// Hermes-Control has a control actuator
 			if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
 				Elasql.taskMgr().runTask(new RoutingControlActuator(metricWarehouse));
 			}
