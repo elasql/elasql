@@ -149,6 +149,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public boolean isMaster() {
 		return plan.isHereMaster();
 	}
+	
+	public boolean isTxDistributed() {
+		return plan.isTxDistributed();
+	}
 
 	public ProcedureType getProcedureType() {
 		return ProcedureType.NORMAL;

@@ -29,6 +29,7 @@ public class TransactionMetricRecorder extends Task {
 	private static final String FILENAME_PREFIX = "transaction";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String MASTER_ID_COLUMN = "Is Master";
+	private static final String DISTRIBUTED_TX_COLUMN = "Is Distributed";
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 	private static final boolean ENABLE_CPU_TIMER = TransactionProfiler.ENABLE_CPU_TIMER;
 	private static final boolean ENABLE_DISKIO_COUNTER = TransactionProfiler.ENABLE_DISKIO_COUNTER;
@@ -37,6 +38,7 @@ public class TransactionMetricRecorder extends Task {
 	private static class TransactionMetrics {
 		long txNum;
 		boolean isMaster;
+		boolean isTxDistributed;
 		List<String> metricNames;
 		Map<String, Long> latencies;
 		Map<String, Long> cpuTimes;
@@ -44,9 +46,10 @@ public class TransactionMetricRecorder extends Task {
 		Map<String, Long> networkinSizes;
 		Map<String, Long> networkoutSizes;
 		
-		TransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
+		TransactionMetrics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 			this.txNum = txNum;
 			this.isMaster = role.equals("Master");
+			this.isTxDistributed = isTxDistributed;
 			
 			metricNames = new ArrayList<String>();
 			latencies = new HashMap<String, Long>();
@@ -74,11 +77,13 @@ public class TransactionMetricRecorder extends Task {
 	private static class LongValueRow implements CsvRow, Comparable<LongValueRow> {
 		long txNum;
 		boolean isMaster;
+		boolean isTxDistributed;
 		long[] values;
 		
-		LongValueRow(long txNum, boolean isMaster, long[] values) {
+		LongValueRow(long txNum, boolean isMaster, boolean isTxDistributed, long[] values) {
 			this.txNum = txNum;
 			this.isMaster = isMaster;
+			this.isTxDistributed = isTxDistributed;
 			this.values = values;
 		}
 
@@ -88,9 +93,11 @@ public class TransactionMetricRecorder extends Task {
 				return Long.toString(txNum);
 			} else if (index == 1) {
 				return Boolean.toString(isMaster);
+			} else if (index == 2) {
+				return Boolean.toString(isTxDistributed);
 			} else {
-				if (index - 2 < values.length) {
-					return Long.toString(values[index - 2]);
+				if (index - 3 < values.length) {
+					return Long.toString(values[index - 3]);
 				} else {
 					return "0";
 				}
@@ -130,11 +137,11 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
-	public void addTransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
+	public void addTransactionMetrics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 		if (!isRecording.get())
 			return;
 		
-		queue.add(new TransactionMetrics(txNum, role, profiler));
+		queue.add(new TransactionMetrics(txNum, role, isTxDistributed, profiler));
 	}
 
 	@Override
@@ -217,7 +224,7 @@ public class TransactionMetricRecorder extends Task {
 				latValues[pos] = latency;
 			}
 		}
-		return new LongValueRow(metrics.txNum, metrics.isMaster, latValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, latValues);
 	}
 	
 	private LongValueRow convertToCpuTimeRow(TransactionMetrics metrics) {
@@ -230,7 +237,7 @@ public class TransactionMetricRecorder extends Task {
 				cpuValues[pos] = metrics.cpuTimes.get(metricName);
 			}
 		}
-		return new LongValueRow(metrics.txNum, metrics.isMaster, cpuValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, cpuValues);
 	}
 	
 	private LongValueRow convertToDiskioCountRow(TransactionMetrics metrics) {
@@ -243,7 +250,7 @@ public class TransactionMetricRecorder extends Task {
 				diskioValues[pos] = metrics.diskioCounts.get(metricName);;
 			}
 		}
-		return new LongValueRow(metrics.txNum, metrics.isMaster, diskioValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, diskioValues);
 	}
 	
 	private LongValueRow convertToNetworkinSizeRow(TransactionMetrics metrics) {
@@ -256,7 +263,7 @@ public class TransactionMetricRecorder extends Task {
 				networkinValues[pos] = metrics.networkinSizes.get(metricName);;
 			}
 		}
-		return new LongValueRow(metrics.txNum, metrics.isMaster, networkinValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, networkinValues);
 	}
 
 	private LongValueRow convertToNetworkoutSizeRow(TransactionMetrics metrics) {
@@ -269,7 +276,7 @@ public class TransactionMetricRecorder extends Task {
 				networkoutValues[pos] = metrics.networkoutSizes.get(metricName);;
 			}
 		}
-		return new LongValueRow(metrics.txNum, metrics.isMaster, networkoutValues);
+		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, networkoutValues);
 	}
 	
 	private void sortRows() {
@@ -363,6 +370,9 @@ public class TransactionMetricRecorder extends Task {
 		
 		// Second column: is master
 		header.add(MASTER_ID_COLUMN);
+		
+		// Third column: is tx distributed
+		header.add(DISTRIBUTED_TX_COLUMN);
 		
 		// After: metrics
 		for (Object metricName : metricNames)

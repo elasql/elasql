@@ -76,7 +76,8 @@ public class TPartStoredProcedureTask
 		
 		// Record the profiler result
 		String role = tsp.isMaster()? "Master" : "Slave";
-		Elasql.performanceMgr().addTransactionMetics(txNum, role, profiler);
+		
+		Elasql.performanceMgr().addTransactionMetics(txNum, role, tsp.isTxDistributed(), profiler);
 	}
 
 	public long getTxNum() {

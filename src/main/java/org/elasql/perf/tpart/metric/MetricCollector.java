@@ -30,11 +30,11 @@ public class MetricCollector extends Task {
 		}
 	}
 
-	public void addTransactionMetrics(long txNum, String role, TransactionProfiler profiler) {
+	public void addTransactionMetrics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 		if (!TPartPerformanceManager.ENABLE_COLLECTING_DATA)
 			throw new IllegalStateException("cannot collect transaction metrics since ENABLE_COLLECTING_DATA = false");
-		
-		metricRecorder.addTransactionMetrics(txNum, role, profiler);
+	
+		metricRecorder.addTransactionMetrics(txNum, role, isTxDistributed, profiler);
 	}
 
 	@Override

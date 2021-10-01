@@ -16,7 +16,7 @@ public class DummyPerformanceManager implements PerformanceManager {
 	}
 
 	@Override
-	public void addTransactionMetics(long txNum, String role, TransactionProfiler profiler) {
+	public void addTransactionMetics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 		// Do nothing
 	}
 
