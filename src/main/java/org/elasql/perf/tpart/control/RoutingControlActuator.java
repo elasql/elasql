@@ -14,11 +14,13 @@ import org.vanilladb.core.server.task.Task;
  */
 public class RoutingControlActuator extends Task {
 	
+	private static final long DELAY_START_TIME = 30_000;
+	
 	private static final long UPDATE_PERIOD;
 	
 	static {
 		UPDATE_PERIOD = ElasqlProperties.getLoader().getPropertyAsLong(
-				RoutingControlActuator.class.getName() + ".UPDATE_PERIOD", 60_000);
+				RoutingControlActuator.class.getName() + ".UPDATE_PERIOD", 5_000);
 	}
 	
 	private PidController[] alpha;
@@ -45,12 +47,18 @@ public class RoutingControlActuator extends Task {
 	public void run() {
 		Thread.currentThread().setName("routing-control-aucuator");
 		
-		long startTime = System.currentTimeMillis();
+		waitForStart();
+		
+		long startTimeInMs = System.currentTimeMillis();
 		
 		while (true) {
 			// Wait for the next update
-			waitForUpdate(startTime);
-			startTime = System.currentTimeMillis();
+			waitForUpdate(startTimeInMs);
+			
+			// Get the time offset
+			long currentTimeInMs = System.currentTimeMillis();
+			double timeOffsetInSecs = (currentTimeInMs - startTimeInMs) / 1000.0;
+			startTimeInMs = currentTimeInMs;
 			
 			// Get observation values
 			acquireObservations();
@@ -59,10 +67,18 @@ public class RoutingControlActuator extends Task {
 			updateReferences();
 			
 			// Update parameters
-			updateParameters();
+			updateParameters(timeOffsetInSecs);
 			
 			// Issue an update transaction
 			issueUpdateTransaction();
+		}
+	}
+	
+	private void waitForStart() {
+		try {
+			Thread.sleep(DELAY_START_TIME);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 	
@@ -94,9 +110,11 @@ public class RoutingControlActuator extends Task {
 			alpha[nodeId].setReference(average);
 	}
 	
-	private void updateParameters() {
-		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
-			alpha[nodeId].updateControlParameters(UPDATE_PERIOD);
+	private void updateParameters(double timeOffsetInSecs) {
+		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+			System.out.print("Alaph #" + nodeId + ": ");
+			alpha[nodeId].updateControlParameters(timeOffsetInSecs);
+		}
 	}
 	
 	private void issueUpdateTransaction() {

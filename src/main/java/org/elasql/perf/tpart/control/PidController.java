@@ -32,13 +32,13 @@ public class PidController {
 		this.reference = reference;
 	}
 	
-	public void updateControlParameters(double timeOffset) {
+	public void updateControlParameters(double timeOffsetInSecs) {
 		double error = reference - observation;
 		
 		// Calculate PID values
 		double proportional = error;
-		integral += error * timeOffset;
-		double derivative = (error - previousError) / timeOffset;
+		integral += error * timeOffsetInSecs;
+		double derivative = (error - previousError) / timeOffsetInSecs;
 		
 		// Calculate control signal
 		double controlSignal = K_P * proportional +
@@ -46,6 +46,9 @@ public class PidController {
 		
 		// Update the parameter
 		controlParameter = initialParameter * Math.exp(-controlSignal);
+		
+		System.out.println(String.format("[%f, %f, %f, %f, %f, %f, %f, %f]",
+				reference, observation, error, proportional, integral, derivative, controlSignal, controlParameter));
 		
 		// Record the error
 		previousError = error;
