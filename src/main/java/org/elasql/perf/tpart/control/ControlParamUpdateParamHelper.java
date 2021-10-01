@@ -5,8 +5,14 @@ import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.sql.storedprocedure.SpResultRecord;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
+/**
+ * A helper that carries the latest parameters controlled by {@code RoutingControlActuator}.
+ * 
+ * @author Yu-Shan Lin
+ */
 public class ControlParamUpdateParamHelper extends StoredProcedureParamHelper {
 	
+	// Check {@code RoutingControlActuator} for the meaning of these variables.
 	private double[] alpha;
 	private double[] beta;
 	private double[] gamma;

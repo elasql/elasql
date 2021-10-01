@@ -71,7 +71,7 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		if (load == null)
 			return 0.0;
 		else
-		return load;
+			return load;
 	}
 	
 	public synchronized double getSystemLoadAverage(int serverId) {

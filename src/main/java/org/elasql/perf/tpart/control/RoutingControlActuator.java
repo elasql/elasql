@@ -23,6 +23,9 @@ public class RoutingControlActuator extends Task {
 				RoutingControlActuator.class.getName() + ".UPDATE_PERIOD", 5_000);
 	}
 	
+	// Alpha parameters control the weights of CPU cost
+	// Beta parameters control the weights of disk cost
+	// Gamma parameters control the weights of network cost
 	private PidController[] alpha;
 	private PidController[] beta;
 	private PidController[] gamma;
@@ -45,7 +48,7 @@ public class RoutingControlActuator extends Task {
 	
 	@Override
 	public void run() {
-		Thread.currentThread().setName("routing-control-aucuator");
+		Thread.currentThread().setName("routing-control-actuator");
 		
 		waitForStart();
 		

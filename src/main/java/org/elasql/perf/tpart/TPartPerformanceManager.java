@@ -36,10 +36,10 @@ public class TPartPerformanceManager implements PerformanceManager {
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, Estimator estimator) {
 		if (Elasql.isStandAloneSequencer()) {
+			// The sequencer maintains a SpCallPreprocessor and a warehouse.
 			metricWarehouse = new TpartMetricWarehouse();
 			Elasql.taskMgr().runTask(metricWarehouse);
 			
-			// The sequencer maintains a feature collector and a warehouse
 			spCallPreprocessor = new SpCallPreprocessor(factory, inserter,
 					graph, isBatching, metricWarehouse, estimator);
 			Elasql.taskMgr().runTask(spCallPreprocessor);
