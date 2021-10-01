@@ -3,7 +3,7 @@ package org.elasql.perf.tpart.ai;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class StupidEstimator implements Estimator {
+public class ConstantEstimator implements Estimator {
 	
 	@Override
 	public TransactionEstimation estimate(TransactionFeatures features) {
@@ -22,14 +22,14 @@ public class StupidEstimator implements Estimator {
 	}
 	
 	private double estimateLatency(TransactionFeatures features, int masterId) {
-		return 10.0;
+		return 0.3;
 	}
 	
 	private long estimateMasterCpuCost(TransactionFeatures features, int masterId) {
-		return 1000;
+		return 190;
 	}
 	
 	private long estimateSlaveCpuCost(TransactionFeatures features, int slaveId) {
-		return 500;
+		return 90;
 	}
 }
