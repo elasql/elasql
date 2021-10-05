@@ -1,8 +1,5 @@
 package org.elasql.perf.tpart.control;
 
-import java.util.LinkedList;
-import java.util.List;
-
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -18,7 +15,6 @@ import org.vanilladb.core.server.task.Task;
 public class RoutingControlActuator extends Task {
 	
 	private static final long DELAY_START_TIME = 30_000;
-	private static final long REFERENCE_VALUE_UPDATE_PREIOD = 30_000;
 	
 	private static final long UPDATE_PERIOD;
 	
@@ -34,8 +30,6 @@ public class RoutingControlActuator extends Task {
 	private PidController[] beta;
 	private PidController[] gamma;
 	
-	private List<PidController[]> history;
-	
 	private TpartMetricWarehouse metricWarehouse;
 
 	public RoutingControlActuator(TpartMetricWarehouse metricWarehouse) {
@@ -50,8 +44,6 @@ public class RoutingControlActuator extends Task {
 			beta[nodeId] = new PidController(1.0);
 			gamma[nodeId] = new PidController(1.0);
 		}
-		
-		history = new LinkedList<>();
 	}
 	
 	@Override
@@ -73,8 +65,6 @@ public class RoutingControlActuator extends Task {
 			
 			// Get observation values
 			acquireObservations();
-			
-			setObservations();
 			
 			// Update reference values
 			updateReferences();
@@ -108,25 +98,8 @@ public class RoutingControlActuator extends Task {
 	private void acquireObservations() {
 		// TODO: add disk and network I/O
 		// XXX: right observation?
-		PidController[] tmp = new PidController[PartitionMetaMgr.NUM_PARTITIONS];
-		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			tmp[nodeId] = new PidController(1.0);
-			tmp[nodeId].setObservation(metricWarehouse.getSystemCpuLoad(nodeId));
-		}
-		history.add(tmp);
-	}
-	
-	private void setObservations() {
-		// TODO: add disk and network I/O
-		// XXX: right observation?
-		int times = (int) (REFERENCE_VALUE_UPDATE_PREIOD / UPDATE_PERIOD);
-		double[] systemCpuLoad = new double[PartitionMetaMgr.NUM_PARTITIONS];
-		for (int i = history.size() - 1; i > Math.max(history.size() - times - 1, 0); i--) {
-			for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
-				systemCpuLoad[nodeId] += (history.get(i)[nodeId].getObservation() / times);
-		}
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
-			alpha[nodeId].setObservation(systemCpuLoad[nodeId]);
+			alpha[nodeId].setObservation(metricWarehouse.getAveragedSystemCpuLoad(nodeId, UPDATE_PERIOD));
 	}
 	
 	private void updateReferences() {
