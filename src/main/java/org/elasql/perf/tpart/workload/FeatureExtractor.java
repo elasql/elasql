@@ -5,7 +5,7 @@ import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.server.Elasql;
+import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
@@ -28,7 +28,17 @@ public class FeatureExtractor {
 		this.metricWarehouse = metricWarehouse;
 	}
 	
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task) {
+	/**
+	 * Extracts the features from the stored procedure and the current T-grpah.
+	 * Note that if stored procedures are processed in batches, some stored
+	 * procedures in front of the current one may not yet be inserted to the
+	 * T-graph.
+	 * 
+	 * @param task the analyzed task of the stored procedure
+	 * @param graph the latest T-graph
+	 * @return the features of the stored procedure for cost estimation
+	 */
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
@@ -43,7 +53,7 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
-		builder.addFeature("Number of Write per Partition", extractWriteOriginalParts(task.getWriteSet()));
+		builder.addFeature("Read Data Distribution", extractReadDistribution(task.getReadSet(), graph));
 
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
@@ -102,12 +112,11 @@ public class FeatureExtractor {
 		return quoteString(Arrays.toString(counts));
 	}
 	
-	private String extractWriteOriginalParts(Set<PrimaryKey> writeKeys) {
-		PartitionMetaMgr partMeta = Elasql.partitionMetaMgr();
+	private String extractReadDistribution(Set<PrimaryKey> readKeys, TGraph graph) {
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
-		for (PrimaryKey writeKey : writeKeys) {
-			int partId = partMeta.getPartition(writeKey);
+		for (PrimaryKey readKey : readKeys) {
+			int partId = graph.getResourcePosition(readKey).getPartId();
 			counts[partId]++;
 		}
 		

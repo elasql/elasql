@@ -133,7 +133,7 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		TransactionFeatures features = featureExtractor.extractFeatures(task);
+		TransactionFeatures features = featureExtractor.extractFeatures(task, graph);
 		
 		// Record the feature if necessary
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
