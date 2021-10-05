@@ -7,6 +7,7 @@ import java.util.Set;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
@@ -117,9 +118,14 @@ public class FeatureExtractor {
 	}
 	
 	private String extractReadDistribution(Set<PrimaryKey> readKeys, TGraph graph) {
+		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		for (PrimaryKey readKey : readKeys) {
+			// Skip fully replicated records
+			if (partMgr.isFullyReplicated(readKey))
+				continue;
+			
 			int partId = graph.getResourcePosition(readKey).getPartId();
 			counts[partId]++;
 		}
