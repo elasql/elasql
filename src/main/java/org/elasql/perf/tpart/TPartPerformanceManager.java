@@ -53,10 +53,10 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	@Override
-	public void addTransactionMetics(long txNum, String role, TransactionProfiler profiler) {
+	public void addTransactionMetics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 		if (Estimator.ENABLE_COLLECTING_DATA) {
 			if (!Elasql.isStandAloneSequencer()) {
-				localMetricCollector.addTransactionMetrics(txNum, role, profiler);
+				localMetricCollector.addTransactionMetrics(txNum, role, isTxDistributed, profiler);
 			}
 		}
 	}
