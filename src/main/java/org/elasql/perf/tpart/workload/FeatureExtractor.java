@@ -1,12 +1,12 @@
 package org.elasql.perf.tpart.workload;
 
+import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.schedule.tpart.graph.Edge;
-import org.elasql.schedule.tpart.graph.TxNode;
+import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -20,6 +20,7 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 public class FeatureExtractor {
 	
 	private long lastProcessedTxNum = -1;
+	private static DecimalFormat formatter = new DecimalFormat("#.######");
 	
 	private TransactionDependencyAnalyzer dependencyAnalyzer =
 			new TransactionDependencyAnalyzer();
@@ -30,16 +31,23 @@ public class FeatureExtractor {
 		this.metricWarehouse = metricWarehouse;
 	}
 	
-	public TransactionFeatures extractFeatures(TxNode txNode) {
+	/**
+	 * Extracts the features from the stored procedure and the current T-grpah.
+	 * Note that if stored procedures are processed in batches, some stored
+	 * procedures in front of the current one may not yet be inserted to the
+	 * T-graph.
+	 * 
+	 * @param task the analyzed task of the stored procedure
+	 * @param graph the latest T-graph
+	 * @return the features of the stored procedure for cost estimation
+	 */
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph) {
 		// Check if transaction requests are given in the total order
-		if (txNode.getTxNum() <= lastProcessedTxNum)
+		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
 					"Transaction requests are not passed to FeatureExtractor "
 					+ "in the total order: %d, last processed tx: %d",
-					txNode.getTxNum(), lastProcessedTxNum));
-		
-		// Get the task
-		TPartStoredProcedureTask task = txNode.getTask();
+					task.getTxNum(), lastProcessedTxNum));
 		
 		// Extract the features
 		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
@@ -48,8 +56,7 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Write Records", task.getWriteSet().size());
-		builder.addFeature("Number of Cache Writes per Server", extractCacheWrites(txNode));
-		builder.addFeature("Number of Storage Writes per Server", extractStorageWrites(txNode));
+		builder.addFeature("Read Data Distribution", extractReadDistribution(task.getReadSet(), graph));
 
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
@@ -72,28 +79,30 @@ public class FeatureExtractor {
 	
 	private String extractSystemCpuLoad() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		double[] systemLoads = new double[serverCount];
+		String[] systemLoads = new String[serverCount];
+		
 		for (int serverId = 0; serverId < serverCount; serverId++)	
-			systemLoads[serverId] = metricWarehouse.getSystemCpuLoad(serverId);
+			systemLoads[serverId] = formatter.format(metricWarehouse.getSystemCpuLoad(serverId));
+		
 		return quoteString(Arrays.toString(systemLoads));
 	}
 	
 	private String extractProcessCpuLoad() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		double[] processLoads = new double[serverCount];
+		String[] processLoads = new String[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++)	
-			processLoads[serverId] = metricWarehouse.getProcessCpuLoad(serverId);
+			processLoads[serverId] = formatter.format(metricWarehouse.getProcessCpuLoad(serverId));
 		
 		return quoteString(Arrays.toString(processLoads));
 	}
 	
 	private String extractSystemLoadAverage() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		double[] avgLoads = new double[serverCount];
+		String[] avgLoads = new String[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++) 
-			avgLoads[serverId] = metricWarehouse.getSystemLoadAverage(serverId);
+			avgLoads[serverId] = formatter.format(metricWarehouse.getSystemLoadAverage(serverId));
 		
 		return quoteString(Arrays.toString(avgLoads));
 	}
@@ -108,37 +117,17 @@ public class FeatureExtractor {
 		return quoteString(Arrays.toString(counts));
 	}
 	
-	private String extractCacheWrites(TxNode node) {
-		PartitionMetaMgr partMeta = Elasql.partitionMetaMgr();
+	private String extractReadDistribution(Set<PrimaryKey> readKeys, TGraph graph) {
+		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
-		// Write: pass to the next transactions
-		for (Edge writeEdge : node.getWriteEdges()) {
-			int partId = writeEdge.getTarget().getPartId();
+		for (PrimaryKey readKey : readKeys) {
+			// Skip fully replicated records
+			if (partMgr.isFullyReplicated(readKey))
+				continue;
+			
+			int partId = graph.getResourcePosition(readKey).getPartId();
 			counts[partId]++;
-		}
-		
-		// Writeback: save on the local cache or storage
-		for (Edge writeEdge : node.getWriteBackEdges()) {
-			PrimaryKey key = writeEdge.getResourceKey();
-			int partId = writeEdge.getTarget().getPartId();
-			if (!partMeta.isFullyReplicated(key) && partMeta.getPartition(key) != partId)
-				counts[partId]++;
-		}
-		
-		return quoteString(Arrays.toString(counts));
-	}
-	
-	private String extractStorageWrites(TxNode node) {
-		PartitionMetaMgr partMeta = Elasql.partitionMetaMgr();
-		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
-		
-		// Only writeback write to storage
-		for (Edge writeEdge : node.getWriteBackEdges()) {
-			PrimaryKey key = writeEdge.getResourceKey();
-			int partId = writeEdge.getTarget().getPartId();
-			if (partMeta.isFullyReplicated(key) || partMeta.getPartition(key) == partId)
-				counts[partId]++;
 		}
 		
 		return quoteString(Arrays.toString(counts));

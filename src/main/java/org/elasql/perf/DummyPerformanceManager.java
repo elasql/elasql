@@ -11,12 +11,12 @@ import org.vanilladb.core.util.TransactionProfiler;
  */
 public class DummyPerformanceManager implements PerformanceManager {
 	@Override
-	public void monitorTransaction(StoredProcedureCall spc) {
+	public void preprocessSpCall(StoredProcedureCall spc) {
 		// Do nothing
 	}
 
 	@Override
-	public void addTransactionMetics(long txNum, String role, TransactionProfiler profiler) {
+	public void addTransactionMetics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 		// Do nothing
 	}
 

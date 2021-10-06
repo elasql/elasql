@@ -9,6 +9,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -180,16 +181,19 @@ public class TPartScheduler extends Task implements Scheduler {
 	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call, TransactionProfiler profiler) {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, null);
+					call.getTxNum(), call.getArrivedTime(), profiler, null, null);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
 
 			if (!sp.isReadOnly())
 				DdRecoveryMgr.logRequest(call);
+			
+			// Take out the transaction estimation
+			TransactionEstimation estimation = (TransactionEstimation) call.getMetadata();
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, sp);
+					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation);
 		}
 	}
 

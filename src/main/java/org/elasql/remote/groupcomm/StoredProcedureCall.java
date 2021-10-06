@@ -24,16 +24,18 @@ import java.util.Arrays;
  * 
  */
 public class StoredProcedureCall implements Serializable {
-
-	public static int PID_NO_OPERATION = Integer.MIN_VALUE;
-
+	
 	private static final long serialVersionUID = 8807383803517134106L;
 
+	public static final int PID_NO_OPERATION = Integer.MIN_VALUE;
+
 	private Object[] objs;
-
 	private long txNum = -1;
-
 	private int clientId, pid = PID_NO_OPERATION, connectionId = -1;
+	
+	// Some metadata for the stored procedure call
+	// This currently only used by TPartPerformanceMgr.
+	private Serializable metadata;
 	
 	// The timestamp to indicate the time that this request arrives
 	// at the database system. (-1 means 'not set')
@@ -113,6 +115,14 @@ public class StoredProcedureCall implements Serializable {
 
 	public boolean isNoOpStoredProcCall() {
 		return pid == PID_NO_OPERATION;
+	}
+	
+	public void setMetadata(Serializable metadata) {
+		this.metadata = metadata;
+	}
+	
+	public Serializable getMetadata() {
+		return metadata;
 	}
 	
 	@Override

@@ -3,8 +3,8 @@ package org.elasql.perf.tpart.workload;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -58,7 +58,7 @@ public class TransactionFeaturesRecorder extends Task {
 	
 	private AtomicBoolean isRecording = new AtomicBoolean(false);
 	private BlockingQueue<FeatureRow> queue
-		= new ArrayBlockingQueue<FeatureRow>(100000);
+		= new LinkedBlockingQueue<FeatureRow>();
 	
 	public void startRecording() {
 		if (!isRecording.getAndSet(true)) {
