@@ -129,6 +129,7 @@ public class TPartStoredProcedureTask
 	public TransactionProfiler getTxProfiler() {
 		return profiler;
 	}
+	
 	public ProcedureType getProcedureType() {
 		if (tsp == null)
 			return ProcedureType.NOP;

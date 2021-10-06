@@ -104,7 +104,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			// Normally, the client will only sends its request to the sequencer.
 			// However, any other server can also send a total order request.
 			// So, we do not need to check if this machine is the sequencer.
-
+			
 			// Transfer the given batch to a list of messages
 			StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
 			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
@@ -179,6 +179,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		profiler.reset();
 		profiler.startExecution();
+		
 		long broadcastTime = (spc.getOu0StopTime()- spc.getOu0StartTime()) / 1000;
 		int networkSize = 0;
 		try {

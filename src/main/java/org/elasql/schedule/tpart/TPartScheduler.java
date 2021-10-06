@@ -72,7 +72,7 @@ public class TPartScheduler extends Task implements Scheduler {
 //				file.delete();
 //		}
 	}
-	
+
 	public void schedule(StoredProcedureCall call) {
 		try {
 			spcQueue.put(call);
@@ -121,7 +121,6 @@ public class TPartScheduler extends Task implements Scheduler {
 				}
 				
 				profiler.stopComponentProfiler("OU0 - ROUTE");
-//				System.out.println(String.format("OU0 : %d", (System.nanoTime() - task.getOu0StartTime())));
 				
 				// sink current t-graph if # pending tx exceeds threshold
 				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
