@@ -50,6 +50,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	
 	private long firstSpcArrivedTime = -1;
 
+	// See Note #1 in onReceiveP2pMessage
+	private long nextTransactionId = 1;
+
 	public ConnectionMgr(int id) {
 		sequencerMode = Elasql.serverId() == SEQUENCER_ID;
 		commServer = new VanillaCommServer(id, this);
@@ -113,16 +116,33 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
 				spc.stampArrivedTime(arrivedTime);
 				
-				// Add to the total order request list
-				tomRequest.add(spc);
+				// Set transaction number
+				// Note #1: the transaction number originally should be dispatched
+				// through Zab. However, in order to estimate the latency and 
+				// the cost of each transaction. We make the sequencer decide
+				// the transaction number before the total ordering, so that
+				// we can estimate the cost before sending the requests to DB
+				// servers.
+				// This method works because there is only one leader in Zab,
+				// and the leader won't change in the experiment.
+				spc.setTxNum(nextTransactionId);
+				nextTransactionId++;
+
+				// Processes the transaction request
+				// and append some metadata if necessary
+				if (Elasql.performanceMgr() != null)
+					Elasql.performanceMgr().preprocessSpCall(spc);
+				else
+					// Add to the total order request list
+					tomRequest.add(spc);
 			}
 			
-			// Send a total order request
-			try {
-				tomSendQueue.put(tomRequest);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+			// If there is a performance manager,
+			// it will take the responsibility of sending the
+			// requests to total-ordering module.
+			if (Elasql.performanceMgr() == null)
+				sendTotalOrderRequest(tomRequest);
+			
 		} else if (message.getClass().equals(TupleSet.class)) {
 			TupleSet ts = (TupleSet) message;
 			
@@ -140,15 +160,22 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		} else
 			throw new IllegalArgumentException();
 	}
+	
+	public void sendTotalOrderRequest(List<Serializable> requests) {
+		// Send a total order request
+		try {
+			tomSendQueue.put(requests);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
 
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
 		StoredProcedureCall spc = (StoredProcedureCall) message;
-		spc.setTxNum(serialNumber);
 		
-		// Pass to the performance manager for monitoring the workload
-		if (Elasql.performanceMgr() != null)
-			Elasql.performanceMgr().monitorTransaction(spc);
+		// See Note #1 in onReceiveP2pMessage
+//		spc.setTxNum(serialNumber);
 		
 		// The sequencer running with Calvin must receive stored procedure call for planning migrations
 		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)

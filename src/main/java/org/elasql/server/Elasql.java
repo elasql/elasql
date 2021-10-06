@@ -28,6 +28,9 @@ import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.DummyPerformanceManager;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
+import org.elasql.perf.tpart.ai.Estimator;
+import org.elasql.perf.tpart.ai.ConstantEstimator;
+import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -40,6 +43,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
+import org.elasql.schedule.tpart.control.ControlBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
@@ -65,7 +69,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB. 
 	 */ 
 	public enum ServiceType { 
-		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP; 
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL; 
  
 		static ServiceType fromInteger(int index) { 
 			switch (index) { 
@@ -80,7 +84,9 @@ public class Elasql extends VanillaDb {
 			case 4: 
 				return G_STORE; 
 			case 5: 
-				return LEAP; 
+				return LEAP;
+			case 6:
+				return HERMES_CONTROL;
 			default: 
 				throw new RuntimeException("Unsupport service type"); 
 			} 
@@ -195,7 +201,8 @@ public class Elasql extends VanillaDb {
 		case TPART: 
 		case HERMES: 
 		case G_STORE: 
-		case LEAP: 
+		case LEAP:
+		case HERMES_CONTROL:
 			remoteRecReceiver = new TPartCacheMgr(); 
 			break; 
  
@@ -223,9 +230,12 @@ public class Elasql extends VanillaDb {
 		case HERMES: 
 		case G_STORE: 
 		case LEAP: 
+		case HERMES_CONTROL:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
-				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory"); 
-			scheduler = initTPartScheduler((TPartStoredProcedureFactory) factory); 
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
+			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
+			scheduler = initTPartScheduler(tpartFactory); 
 			break; 
 		default: 
 			throw new UnsupportedOperationException(); 
@@ -277,6 +287,13 @@ public class Elasql extends VanillaDb {
 			inserter = new LocalFirstNodeInserter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
+			break;
+		case HERMES_CONTROL:
+			table = new FusionTable(); 
+			graph = new FusionTGraph(table); 
+			inserter = new ControlBasedRouter(); 
+			sinker = new FusionSinker(table); 
+			isBatching = true; 
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
@@ -319,12 +336,15 @@ public class Elasql extends VanillaDb {
 		case HERMES:
 		case G_STORE:
 		case LEAP:
+		case HERMES_CONTROL:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
-				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory"); 
-			performanceMgr = newTPartPerfMgr((TPartStoredProcedureFactory) factory);
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
+			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
+			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
 		default: 
-			performanceMgr = new DummyPerformanceManager(); 
+			performanceMgr = null; 
 		} 
 	}
 	
@@ -332,36 +352,48 @@ public class Elasql extends VanillaDb {
 		TGraph graph; 
 		BatchNodeInserter inserter;
 		FusionTable table; 
-		boolean isBatching = true; 
+		boolean isBatching = true;
+		Estimator estimator;
 		 
 		switch (SERVICE_TYPE) { 
 		case TPART: 
 			graph = new TGraph(); 
 			inserter = new CostAwareNodeInserter();
-			isBatching = true; 
+			isBatching = true;
+			estimator = null;
 			break; 
 		case HERMES: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new HermesNodeInserter();
 			isBatching = true; 
+			estimator = null;
 			break; 
 		case G_STORE: 
 			graph = new TGraph(); 
 			inserter = new LocalFirstNodeInserter();
 			isBatching = false; 
+			estimator = null;
 			break; 
 		case LEAP: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new LocalFirstNodeInserter();
 			isBatching = false; 
+			estimator = null;
+			break; 
+		case HERMES_CONTROL:
+			table = new FusionTable(); 
+			graph = new FusionTGraph(table); 
+			inserter = new ControlBasedRouter();
+			isBatching = true; 
+			estimator = new ConstantEstimator();
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
 		} 
 		 
-		return new TPartPerformanceManager(factory, inserter, graph, isBatching); 
+		return new TPartPerformanceManager(factory, inserter, graph, isBatching, estimator); 
 	}
  
 	// ================ 

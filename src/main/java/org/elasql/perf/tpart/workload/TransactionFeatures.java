@@ -24,16 +24,14 @@ public class TransactionFeatures {
 
 		// Transaction Features:
 		// (Modify this part to add/remove features)
-		// - Transaction start time (the time entering the system)
+		// - Transaction start time (the time entering the system) 
 		featureKeys.add("Start Time");
 		// - Number of read records
 		featureKeys.add("Number of Read Records");
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
-		// - Number of writes to cache for each server
-		featureKeys.add("Number of Cache Writes per Server");
-		// - Number of writes to storage for each server
-		featureKeys.add("Number of Storage Writes per Server");
+		// - Read data distribution
+		featureKeys.add("Read Data Distribution");
 		
 		featureKeys.add("System CPU Load");
 		featureKeys.add("Process CPU Load");

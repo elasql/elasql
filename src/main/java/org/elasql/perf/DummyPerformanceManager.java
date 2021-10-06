@@ -11,7 +11,7 @@ import org.vanilladb.core.util.TransactionProfiler;
  */
 public class DummyPerformanceManager implements PerformanceManager {
 	@Override
-	public void monitorTransaction(StoredProcedureCall spc) {
+	public void preprocessSpCall(StoredProcedureCall spc) {
 		// Do nothing
 	}
 

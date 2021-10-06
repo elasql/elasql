@@ -2,6 +2,7 @@ package org.elasql.procedure.tpart;
 
 import java.util.Set;
 
+import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
@@ -25,15 +26,18 @@ public class TPartStoredProcedureTask
 	// Timestamps
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
+	private TransactionEstimation estimation;
 	private TransactionProfiler profiler;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp) {
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
+			TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
 		this.arrivedTime = arrivedTime;
 		this.tsp = sp;		
+		this.estimation = estimation;
 	}
 
 	@Override
@@ -124,5 +128,13 @@ public class TPartStoredProcedureTask
 	
 	public void passProfiler(TransactionProfiler profiler) {
 		this.profiler = profiler;
+	}
+	
+	public void setEstimation(TransactionEstimation estimation) {
+		this.estimation = estimation;
+	}
+	
+	public TransactionEstimation getEstimation() {
+		return estimation;
 	}
 }
