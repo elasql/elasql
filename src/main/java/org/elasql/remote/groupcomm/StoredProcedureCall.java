@@ -18,6 +18,8 @@ package org.elasql.remote.groupcomm;
 import java.io.Serializable;
 import java.util.Arrays;
 
+import org.vanilladb.core.util.TransactionProfiler;
+
 /**
  * 
  * This class defines a stored procedure call.
@@ -40,6 +42,8 @@ public class StoredProcedureCall implements Serializable {
 	// The timestamp to indicate the time that this request arrives
 	// at the database system. (-1 means 'not set')
 	private long arrivedTime = -1, ou0StartTime = -1, ou0StopTime = -1;
+	
+	private transient TransactionProfiler profiler;
 
 	public static StoredProcedureCall getNoOpStoredProcCall(int clienId) {
 		return new StoredProcedureCall(clienId);
@@ -72,6 +76,14 @@ public class StoredProcedureCall implements Serializable {
 
 	public void setTxNum(long txNum) {
 		this.txNum = txNum;
+	}
+	
+	public TransactionProfiler getProfiler() {
+		return profiler;
+	}
+	
+	public void setProfiler(TransactionProfiler profiler) {
+		this.profiler = profiler;
 	}
 	
 	public void stampArrivedTime(long timestamp) {

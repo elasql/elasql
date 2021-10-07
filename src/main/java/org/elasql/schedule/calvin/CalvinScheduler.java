@@ -30,7 +30,6 @@ import org.elasql.server.Elasql;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
-import org.vanilladb.core.util.TransactionProfiler;
 
 public class CalvinScheduler extends Task implements Scheduler {
 	private static Logger logger = Logger.getLogger(CalvinScheduler.class.getName());
@@ -39,7 +38,6 @@ public class CalvinScheduler extends Task implements Scheduler {
 	
 	private CalvinStoredProcedureFactory factory;
 	private BlockingQueue<StoredProcedureCall> spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-	private TransactionProfiler profiler;
 
 	public CalvinScheduler(CalvinStoredProcedureFactory factory) {
 		this.factory = factory;
@@ -52,10 +50,6 @@ public class CalvinScheduler extends Task implements Scheduler {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-	}
-	
-	public void passProfiler(TransactionProfiler profiler) {
-		this.profiler = profiler;
 	}
 
 	@Override

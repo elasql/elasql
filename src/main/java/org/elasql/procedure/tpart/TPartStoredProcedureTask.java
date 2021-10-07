@@ -29,7 +29,8 @@ public class TPartStoredProcedureTask
 	private TransactionEstimation estimation;
 	private TransactionProfiler profiler;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
+			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
@@ -37,16 +38,6 @@ public class TPartStoredProcedureTask
 		this.arrivedTime = arrivedTime;
 		this.profiler = profiler;
 		this.tsp = sp;
-		this.estimation = estimation;
-	}
-	
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
-		super(cid, connId, txNum, sp);
-		this.clientId = cid;
-		this.connectionId = connId;
-		this.txNum = txNum;
-		this.arrivedTime = arrivedTime;
-		this.tsp = sp;		
 		this.estimation = estimation;
 	}
 
@@ -138,10 +129,6 @@ public class TPartStoredProcedureTask
 
 	public boolean isReadOnly() {
 		return tsp.isReadOnly();
-	}
-	
-	public void passProfiler(TransactionProfiler profiler) {
-		this.profiler = profiler;
 	}
 	
 	public void setEstimation(TransactionEstimation estimation) {

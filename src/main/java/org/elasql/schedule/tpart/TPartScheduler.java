@@ -43,7 +43,6 @@ public class TPartScheduler extends Task implements Scheduler {
 	}
 
 	private BlockingQueue<StoredProcedureCall> spcQueue;
-	private BlockingQueue<TransactionProfiler> profilerQueue;
 	private BatchNodeInserter inserter;
 	private Sinker sinker;
 	private TGraph graph;
@@ -63,7 +62,6 @@ public class TPartScheduler extends Task implements Scheduler {
 		this.graph = graph;
 		this.batchingEnabled = isBatching;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-		this.profilerQueue = new LinkedBlockingQueue<TransactionProfiler>();
 		
 		// Clear the dump dir
 //		dumpDir.mkdirs();
@@ -81,14 +79,6 @@ public class TPartScheduler extends Task implements Scheduler {
 		}
 	}
 	
-	public void passProfiler(TransactionProfiler profiler) {
-		try {
-			profilerQueue.put(profiler);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-
 	public void run() {
 		List<TPartStoredProcedureTask> batchedTasks = new LinkedList<TPartStoredProcedureTask>();
 		
@@ -98,7 +88,8 @@ public class TPartScheduler extends Task implements Scheduler {
 			try {
 				// blocked if the queue is empty
 				StoredProcedureCall call = spcQueue.take();
-				TransactionProfiler profiler = profilerQueue.take();
+				TransactionProfiler.setProfiler(call.getProfiler());
+				TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 				
 				TPartStoredProcedureTask task = createStoredProcedureTask(call, profiler);
 

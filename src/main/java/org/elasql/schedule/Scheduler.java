@@ -16,11 +16,9 @@
 package org.elasql.schedule;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
-import org.vanilladb.core.util.TransactionProfiler;
 
 public interface Scheduler {
 
 	void schedule(StoredProcedureCall call);
-
-	void passProfiler(TransactionProfiler profiler);
+	
 }

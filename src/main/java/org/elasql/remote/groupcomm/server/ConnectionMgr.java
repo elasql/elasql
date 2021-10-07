@@ -176,6 +176,20 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
 		StoredProcedureCall spc = (StoredProcedureCall) message;
 		
+		profileBroadcast(spc, message);
+		
+		// See Note #1 in onReceiveP2pMessage
+//		spc.setTxNum(serialNumber);
+		
+		// The sequencer running with Calvin must receive stored procedure call for planning migrations
+		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
+			return;
+		
+		// Pass to the scheduler
+		Elasql.scheduler().schedule(spc);
+	}
+	
+	private void profileBroadcast(StoredProcedureCall spc, Serializable message) {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		profiler.reset();
 		profiler.startExecution();
@@ -190,18 +204,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, networkSize, 0, 0);
 		profiler.startComponentProfiler("OU0 - ROUTE");
 		
-		spc.setTxNum(serialNumber);
-		
-		// See Note #1 in onReceiveP2pMessage
-//		spc.setTxNum(serialNumber);
-		
-		// The sequencer running with Calvin must receive stored procedure call for planning migrations
-		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
-			return;
-		
-		// Pass to the scheduler
-		Elasql.scheduler().schedule(spc);
-		Elasql.scheduler().passProfiler(TransactionProfiler.takeOut());
+		spc.setProfiler(TransactionProfiler.takeOut());
 	}
 	
 	private void createTomSender() {
