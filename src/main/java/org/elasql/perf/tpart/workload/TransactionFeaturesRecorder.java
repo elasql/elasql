@@ -1,6 +1,8 @@
 package org.elasql.perf.tpart.workload;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -11,6 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.server.Elasql;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;
 import org.vanilladb.core.server.task.Task;
@@ -29,6 +32,8 @@ public class TransactionFeaturesRecorder extends Task {
 	private static final long TIME_TO_FLUSH = 10; // in seconds
 	
 	private static class FeatureRow implements CsvRow, Comparable<FeatureRow> {
+		
+		private static DecimalFormat formatter = new DecimalFormat("#.######");
 		Long txNum;
 		Object[] values = new Object[TransactionFeatures.FEATURE_KEYS.size()];
 		int index = 0;
@@ -46,8 +51,28 @@ public class TransactionFeaturesRecorder extends Task {
 		public String getVal(int index) {
 			if (index == 0)
 				return Long.toString(txNum);
-			else
-				return values[index - 1].toString();
+			else {
+				Object val = values[index - 1];
+				if (val.getClass().isArray())
+					if (val instanceof Double[]) {
+						int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+						String[] StringVals = new String[serverCount];
+						
+						for (int serverId = 0; serverId < serverCount; serverId++)	
+							StringVals[serverId] = formatter.format(((Double[]) val)[serverId]);
+						
+						return quoteString(Arrays.toString(StringVals));
+					}
+					else {
+						return quoteString(Arrays.toString((Object[]) val));
+					}
+				else
+					return val.toString();
+			}
+		}
+		
+		private String quoteString(String str)  {
+			return "\"" + str + "\"";
 		}
 
 		@Override

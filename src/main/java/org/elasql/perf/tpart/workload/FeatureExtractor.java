@@ -1,6 +1,5 @@
 package org.elasql.perf.tpart.workload;
 
-import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.Set;
 
@@ -20,7 +19,6 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 public class FeatureExtractor {
 	
 	private long lastProcessedTxNum = -1;
-	private static DecimalFormat formatter = new DecimalFormat("#.######");
 	
 	private TransactionDependencyAnalyzer dependencyAnalyzer =
 			new TransactionDependencyAnalyzer();
@@ -73,51 +71,47 @@ public class FeatureExtractor {
 		return builder.build();
 	}
 	
-	private String quoteString(String str)  {
-		return "\"" + str + "\"";
-	}
-	
-	private String extractSystemCpuLoad() {
+	private Double[] extractSystemCpuLoad() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		String[] systemLoads = new String[serverCount];
+		Double[] systemLoads = new Double[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++)	
-			systemLoads[serverId] = formatter.format(metricWarehouse.getSystemCpuLoad(serverId));
+			systemLoads[serverId] = metricWarehouse.getSystemCpuLoad(serverId);
 		
-		return quoteString(Arrays.toString(systemLoads));
+		return systemLoads;
 	}
 	
-	private String extractProcessCpuLoad() {
+	private Double[] extractProcessCpuLoad() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		String[] processLoads = new String[serverCount];
+		Double[] processLoads = new Double[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++)	
-			processLoads[serverId] = formatter.format(metricWarehouse.getProcessCpuLoad(serverId));
+			processLoads[serverId] = metricWarehouse.getProcessCpuLoad(serverId);
 		
-		return quoteString(Arrays.toString(processLoads));
+		return processLoads;
 	}
 	
-	private String extractSystemLoadAverage() {
+	private Double[] extractSystemLoadAverage() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		String[] avgLoads = new String[serverCount];
+		Double[] avgLoads = new Double[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++) 
-			avgLoads[serverId] = formatter.format(metricWarehouse.getSystemLoadAverage(serverId));
+			avgLoads[serverId] = metricWarehouse.getSystemLoadAverage(serverId);
 		
-		return quoteString(Arrays.toString(avgLoads));
+		return avgLoads;
 	}
 	
-	private String extractThreadActiveCount() {
+	private Integer[] extractThreadActiveCount() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-		int[] counts = new int[serverCount];
+		Integer[] counts = new Integer[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++)
 			counts[serverId] = metricWarehouse.getThreadActiveCount(serverId);
 		
-		return quoteString(Arrays.toString(counts));
+		return counts;
 	}
 	
-	private String extractReadDistribution(Set<PrimaryKey> readKeys, TGraph graph) {
+	private Integer[] extractReadDistribution(Set<PrimaryKey> readKeys, TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
@@ -130,6 +124,9 @@ public class FeatureExtractor {
 			counts[partId]++;
 		}
 		
-		return quoteString(Arrays.toString(counts));
+		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
+	    Arrays.setAll(newCounts, i -> counts[i]);
+	    
+		return newCounts;
 	}
 }
