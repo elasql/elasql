@@ -20,4 +20,5 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 public interface Scheduler {
 
 	void schedule(StoredProcedureCall call);
+	
 }

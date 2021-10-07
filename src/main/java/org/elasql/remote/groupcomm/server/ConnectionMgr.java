@@ -15,6 +15,7 @@
  ******************************************************************************/
 package org.elasql.remote.groupcomm.server;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -115,6 +116,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				// Set arrived time
 				long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
 				spc.stampArrivedTime(arrivedTime);
+				spc.stampOu0StartTime(System.nanoTime());
 				
 				// Set transaction number
 				// Note #1: the transaction number originally should be dispatched
@@ -174,6 +176,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
 		StoredProcedureCall spc = (StoredProcedureCall) message;
 		
+		profileBroadcast(spc, message);
+		
 		// See Note #1 in onReceiveP2pMessage
 //		spc.setTxNum(serialNumber);
 		
@@ -185,6 +189,24 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		Elasql.scheduler().schedule(spc);
 	}
 	
+	private void profileBroadcast(StoredProcedureCall spc, Serializable message) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.reset();
+		profiler.startExecution();
+		
+		long broadcastTime = (spc.getOu0StopTime()- spc.getOu0StartTime()) / 1000;
+		int networkSize = 0;
+		try {
+			networkSize = TransactionProfiler.getMessageSize(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, networkSize, 0, 0);
+		profiler.startComponentProfiler("OU0 - ROUTE");
+		
+		spc.setProfiler(TransactionProfiler.takeOut());
+	}
+	
 	private void createTomSender() {
 		new Thread(new Runnable() {
 			@Override
@@ -192,6 +214,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				while (true) {
 					try {
 						List<Serializable> messages = tomSendQueue.take();
+						for (int i = messages.size() - 1; i >= 0; i--) {
+							StoredProcedureCall spc = (StoredProcedureCall) messages.get(i);
+							spc.stampOu0StopTime(System.nanoTime());
+						}
 						commServer.sendTotalOrderMessages(messages);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
