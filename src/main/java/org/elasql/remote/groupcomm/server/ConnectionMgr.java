@@ -197,7 +197,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		long broadcastTime = (spc.getOu0StopTime()- spc.getOu0StartTime()) / 1000;
 		int networkSize = 0;
 		try {
-			networkSize = profiler.getMessageSize(message);
+			networkSize = TransactionProfiler.getMessageSize(message);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
