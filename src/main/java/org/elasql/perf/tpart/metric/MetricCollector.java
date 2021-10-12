@@ -1,12 +1,17 @@
 package org.elasql.perf.tpart.metric;
 
 import java.lang.management.ManagementFactory;
-import com.sun.management.OperatingSystemMXBean;
 
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.util.TransactionProfiler;
+
+import com.sun.management.OperatingSystemMXBean;
+
+import oshi.SystemInfo;
+import oshi.hardware.CentralProcessor;
+import oshi.hardware.HardwareAbstractionLayer;
 
 /**
  * A collector that collects system and transaction metrics on each machine.
@@ -19,6 +24,9 @@ public class MetricCollector extends Task {
 	private static final int SYSTEM_METRIC_INTERVAL = 100; // in milliseconds
 
 	private TransactionMetricRecorder metricRecorder;
+	
+	private CentralProcessor cpu;
+	private long[] cpuTicks;
 	
 	private OperatingSystemMXBean bean = (com.sun.management.OperatingSystemMXBean) ManagementFactory
 		.getOperatingSystemMXBean();
@@ -41,6 +49,8 @@ public class MetricCollector extends Task {
 	public void run() {
 		Thread.currentThread().setName("metric-collector");
 		long startTime;
+		
+		setupInterfaces();
 
 		try {
 			while (true) {
@@ -62,14 +72,21 @@ public class MetricCollector extends Task {
 			e.printStackTrace();
 		}
 	}
+	
+	private void setupInterfaces() {
+		SystemInfo si = new SystemInfo();
+		HardwareAbstractionLayer hal = si.getHardware();
+		cpu = hal.getProcessor();
+		cpuTicks = cpu.getSystemCpuLoadTicks();
+	}
 
 	private TPartSystemMetrics collectSystemMetrics() {
 		TPartSystemMetrics.Builder builder = new TPartSystemMetrics.Builder(Elasql.serverId());
 
 		builder.setProcessCpuLoad(bean.getProcessCpuLoad());
-		builder.setSystemCpuLoad(bean.getSystemCpuLoad());
+		builder.setSystemCpuLoad(cpu.getSystemCpuLoadBetweenTicks(cpuTicks));
+		cpuTicks = cpu.getSystemCpuLoadTicks();
 		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
-		
 		builder.setThreadActiveCount(getThreadActiveCount());
 		
 		return builder.build();

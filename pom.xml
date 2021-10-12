@@ -5,7 +5,8 @@
 	under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES 
 	OR CONDITIONS OF ANY KIND, either express or implied. See the License for 
 	the specific language governing permissions and limitations under the License. -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
@@ -88,6 +89,11 @@
 			<artifactId>comm</artifactId>
 			<version>0.2.5</version>
 		</dependency>
+		<dependency>
+			<groupId>com.github.oshi</groupId>
+			<artifactId>oshi-core</artifactId>
+			<version>5.8.2</version>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -126,7 +132,7 @@
 					</execution>
 				</executions>
 			</plugin>
-			
+
 			<!-- Generate the source jar -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -158,10 +164,10 @@
 			</plugin>
 		</plugins>
 	</build>
-	
+
 	<profiles>
-		<!-- Make sure release only happening when I need it
-			(To avoid error when others try to run 'mvn install', like Travis CI) -->
+		<!-- Make sure release only happening when I need it (To avoid error when 
+			others try to run 'mvn install', like Travis CI) -->
 		<profile>
 			<id>release-sign-artifacts</id>
 			<activation>
