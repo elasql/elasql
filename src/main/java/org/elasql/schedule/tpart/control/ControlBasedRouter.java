@@ -12,44 +12,23 @@ import org.elasql.perf.tpart.control.ControlParamUpdateProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
-import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
-import org.elasql.util.PeriodicalJob;
 
 public class ControlBasedRouter implements BatchNodeInserter {
 	private static Logger logger = Logger.getLogger(ControlBasedRouter.class.getName());
 	
 	private static final double LATENCY_EXP = 1.0;
 	private static final double TIE_CLOSENESS = 0.0001;
-
-	// Debug: show the distribution of assign masters
-	private static int[] assignedCounts;
-	static {
-		assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
-		new PeriodicalJob(5_000, 360_000, new Runnable() {
-			@Override
-			public void run() {
-				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
-				time /= 1000;
-				
-				StringBuffer sb = new StringBuffer();
-				sb.append(String.format("Time: %d seconds - ", time));
-				for (int i = 0; i < assignedCounts.length; i++) {
-					sb.append(String.format("%d, ", assignedCounts[i]));
-					assignedCounts[i] = 0;
-				}
-				sb.delete(sb.length() - 2, sb.length());
-				
-				System.out.println(sb.toString());
-			}
-		}).start();
-	}
 	
 	private double[] paramAlpha;
 	private double[] paramBeta;
 	private double[] paramGamma;
 
 	private List<Integer> ties = new ArrayList<Integer>();
+
+	// Debug: show the distribution of assigned masters
+	private long lastReportTime = -1;
+	private int[] assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 	
 	public ControlBasedRouter() {
 		paramAlpha = new double[PartitionMetaMgr.NUM_PARTITIONS];
@@ -69,6 +48,9 @@ public class ControlBasedRouter implements BatchNodeInserter {
 				updateParameters(procedure.getParamHelper());
 			} else {
 				insert(graph, task);
+
+				// Debug: show the distribution of assigned masters
+				reportRoutingDistribution(task.getArrivedTime());
 			}
 		}
 	}
@@ -126,5 +108,25 @@ public class ControlBasedRouter implements BatchNodeInserter {
 				estimation.estimateSlaveCpuCost(masterId);
 		// TODO: Disk I/O Factor and Network I/O Factor
 		return e - paramAlpha[masterId] * cpuFactor;
+	}
+
+	// Debug: show the distribution of assigned masters
+	private void reportRoutingDistribution(long currentTime) {
+		if (lastReportTime == -1) {
+			lastReportTime = currentTime;
+		} else if (currentTime - lastReportTime > 5_000_000) {
+			StringBuffer sb = new StringBuffer();
+			
+			sb.append(String.format("Time: %d seconds - ", currentTime / 1_000_000));
+			for (int i = 0; i < assignedCounts.length; i++) {
+				sb.append(String.format("%d, ", assignedCounts[i]));
+				assignedCounts[i] = 0;
+			}
+			sb.delete(sb.length() - 2, sb.length());
+			
+			System.out.println(sb.toString());
+			
+			lastReportTime = currentTime;
+		}
 	}
 }
