@@ -3,7 +3,7 @@ package org.elasql.perf.tpart.ai;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class ConstantEstimatorWithLookupTable implements Estimator {
+public class ReadCountEstimator implements Estimator {
 	
 	private static int[] masterCpuTime = new int[] {35, 123, 204};
 	private static int[] slaveCpuTime = new int[] {42, 130, 137};

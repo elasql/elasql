@@ -30,7 +30,7 @@ import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ConstantEstimator;
-import org.elasql.perf.tpart.ai.ConstantEstimatorWithLookupTable;
+import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
@@ -388,7 +388,7 @@ public class Elasql extends VanillaDb {
 			graph = new FusionTGraph(table); 
 			inserter = new ControlBasedRouter();
 			isBatching = true; 
-			estimator = new ConstantEstimatorWithLookupTable();
+			estimator = new ReadCountEstimator();
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
