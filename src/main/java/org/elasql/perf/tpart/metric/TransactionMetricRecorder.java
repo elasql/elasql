@@ -5,8 +5,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -112,7 +112,7 @@ public class TransactionMetricRecorder extends Task {
 	
 	private AtomicBoolean isRecording = new AtomicBoolean(false);
 	private BlockingQueue<TransactionMetrics> queue
-		= new ArrayBlockingQueue<TransactionMetrics>(100000);
+		= new LinkedBlockingQueue<TransactionMetrics>();
 	
 	// Header
 	private int serverId;
