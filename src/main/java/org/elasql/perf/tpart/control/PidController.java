@@ -1,10 +1,21 @@
 package org.elasql.perf.tpart.control;
 
+import org.elasql.util.ElasqlProperties;
+
 public class PidController {
 	
-	private static final double K_P = 1.0;
-	private static final double K_I = 1.0;
-	private static final double K_D = 1.0;
+	private static final double K_P;
+	private static final double K_I;
+	private static final double K_D;
+	
+	static {
+		K_P = ElasqlProperties.getLoader().getPropertyAsDouble(
+				PidController.class.getName() + ".K_P", 1.0);
+		K_I = ElasqlProperties.getLoader().getPropertyAsDouble(
+				PidController.class.getName() + ".K_I", 0.0);
+		K_D = ElasqlProperties.getLoader().getPropertyAsDouble(
+				PidController.class.getName() + ".K_D", 0.0);
+	}
 	
 	private double initialParameter;
 	private double controlParameter;
