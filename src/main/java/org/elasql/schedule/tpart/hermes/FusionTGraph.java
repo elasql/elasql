@@ -81,4 +81,24 @@ public class FusionTGraph extends TGraph {
 		
 		return sinkNodes[parMeta.getPartition(res)];
 	}
+
+	@Override
+	public void clear() {
+		for (TxNode node : getTxNodes()) {
+			for (Edge e : node.getWriteBackEdges()) {
+				PrimaryKey key = e.getResourceKey();
+				int writeBackPos = e.getTarget().getPartId();
+				setRecordCurrentLocation(key, writeBackPos);
+			}
+		}
+		
+		super.clear();
+	}
+	
+	private void setRecordCurrentLocation(PrimaryKey key, int loc) {
+		if (parMeta.getPartition(key) == loc && fusionTable.containsKey(key))
+			fusionTable.remove(key);
+		else
+			fusionTable.setLocation(key, loc);
+	}
 }
