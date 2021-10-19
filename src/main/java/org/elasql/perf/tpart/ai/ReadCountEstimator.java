@@ -5,9 +5,6 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class ReadCountEstimator implements Estimator {
 	
-//	private static int[] masterCpuTime = new int[] {35, 123, 204};
-//	private static int[] slaveCpuTime = new int[] {42, 130, 137};
-	
 	private static double[] latency = new double[] {10, 7.423, 4.765};
 	
 	private static int[] masterCpuTime = new int[] {60, 90, 120};
