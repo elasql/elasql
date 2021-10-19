@@ -72,19 +72,21 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		
 		if (estimation == null)
 			throw new IllegalArgumentException("there is no estimation for transaction " + task.getTxNum());
-		
+
 		int bestMasterId = 0;
 		double highestScore = calculateRoutingScore(estimation, 0);
+		ties.clear();
 		ties.add(bestMasterId);
 		
 		for (int masterId = 1; masterId < PartitionMetaMgr.NUM_PARTITIONS; masterId++) {
 			double score = calculateRoutingScore(estimation, masterId);
-			if (score > highestScore) {
+			
+			if (Math.abs(score - highestScore) < TIE_CLOSENESS) { // Ties
+				ties.add(masterId);
+			} else if (score > highestScore) {
 				bestMasterId = masterId;
 				highestScore = score;
 				ties.clear();
-				ties.add(masterId);
-			} else if (Math.abs(score - highestScore) < TIE_CLOSENESS) { // Ties
 				ties.add(masterId);
 			}
 		}
