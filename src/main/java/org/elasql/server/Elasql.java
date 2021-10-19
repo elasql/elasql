@@ -96,7 +96,7 @@ public class Elasql extends VanillaDb {
 	 
 	public static final ServiceType SERVICE_TYPE; 
 	public static final boolean ENABLE_STAND_ALONE_SEQUENCER; 
-	 
+	public static final int ESTIMATOR_TYPE;
 	public static final long SYSTEM_INIT_TIME_MS = System.currentTimeMillis(); 
 	 
 	static { 
@@ -104,7 +104,9 @@ public class Elasql extends VanillaDb {
 				Elasql.class.getName() + ".SERVICE_TYPE", ServiceType.NAIVE.ordinal()); 
 		SERVICE_TYPE = ServiceType.fromInteger(type); 
 		ENABLE_STAND_ALONE_SEQUENCER = ElasqlProperties.getLoader().getPropertyAsBoolean( 
-				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false); 
+				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false);
+		ESTIMATOR_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger( 
+				Elasql.class.getName() + ".ESTIMATOR_TYPE", 0);
 	} 
  
 	// DD modules 
@@ -388,7 +390,16 @@ public class Elasql extends VanillaDb {
 			graph = new FusionTGraph(table); 
 			inserter = new ControlBasedRouter();
 			isBatching = true; 
-			estimator = new ReadCountEstimator();
+			switch (ESTIMATOR_TYPE) {
+			case 0:
+				estimator = new ConstantEstimator();
+				break;
+			case 1:	
+				estimator = new ReadCountEstimator();
+				break;
+			default: 
+				throw new IllegalArgumentException("Not supported");
+			}
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 

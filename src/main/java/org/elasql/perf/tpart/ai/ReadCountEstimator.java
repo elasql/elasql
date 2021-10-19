@@ -5,8 +5,13 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class ReadCountEstimator implements Estimator {
 	
-	private static int[] masterCpuTime = new int[] {35, 123, 204};
-	private static int[] slaveCpuTime = new int[] {42, 130, 137};
+//	private static int[] masterCpuTime = new int[] {35, 123, 204};
+//	private static int[] slaveCpuTime = new int[] {42, 130, 137};
+	
+	private static int[] latency = new int[] {10000, 7423, 4765};
+	
+	private static int[] masterCpuTime = new int[] {60, 90, 120};
+	private static int[] slaveCpuTime = new int[] {22, 52, 82};
 	
 	@Override
 	public TransactionEstimation estimate(TransactionFeatures features) {
@@ -25,16 +30,20 @@ public class ReadCountEstimator implements Estimator {
 	}
 	
 	private double estimateLatency(TransactionFeatures features, int masterId) {
-		return 0.3;
+		Integer[] readDistribution = (Integer[]) features.getFeature("Read Data Distribution");
+		int readCount = readDistribution[masterId].intValue();
+		return latency[readCount];
 	}
 	
 	private long estimateMasterCpuCost(TransactionFeatures features, int masterId) {
 		Integer[] readDistribution = (Integer[]) features.getFeature("Read Data Distribution");
-		return masterCpuTime[readDistribution[masterId].intValue()];
+		int readCount = readDistribution[masterId].intValue();
+		return masterCpuTime[readCount];
 	}
 	
 	private long estimateSlaveCpuCost(TransactionFeatures features, int slaveId) {
 		Integer[] readDistribution = (Integer[]) features.getFeature("Read Data Distribution");
-		return slaveCpuTime[readDistribution[slaveId].intValue()];
+		int readCount = readDistribution[slaveId].intValue();
+		return slaveCpuTime[readCount];
 	}
 }
