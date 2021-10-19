@@ -60,4 +60,24 @@ public class TransactionEstimation implements Serializable {
 	public long estimateSlaveCpuCost(int slaveId) {
 		return slaveCpus[slaveId];
 	}
+	
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		
+		sb.append("{latency:[");
+		for (double latency : latencies) 
+			sb.append(String.format("%f,", latency));
+		sb.deleteCharAt(sb.length() - 1);
+		sb.append("], masterCpus:[");
+		for (long masterCpu : masterCpus) 
+			sb.append(String.format("%d,", masterCpu));
+		sb.deleteCharAt(sb.length() - 1);
+		sb.append("], slaveCpus:[");
+		for (long slaveCpu : slaveCpus) 
+			sb.append(String.format("%d,", slaveCpu));
+		sb.deleteCharAt(sb.length() - 1);
+		sb.append("]}");
+
+		return sb.toString();
+	}
 }

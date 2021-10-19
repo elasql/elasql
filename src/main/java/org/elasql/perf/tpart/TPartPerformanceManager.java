@@ -3,7 +3,9 @@ package org.elasql.perf.tpart;
 import org.elasql.perf.MetricReport;
 import org.elasql.perf.MetricWarehouse;
 import org.elasql.perf.PerformanceManager;
+import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
+import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
@@ -19,10 +21,14 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class TPartPerformanceManager implements PerformanceManager {
 	
 	public static final boolean ENABLE_COLLECTING_DATA;
+	public static final int ESTIMATOR_TYPE;
 
 	static {
 		ENABLE_COLLECTING_DATA = ElasqlProperties.getLoader()
-				.getPropertyAsBoolean(Estimator.class.getName() + ".ENABLE_COLLECTING_DATA", false);
+				.getPropertyAsBoolean(TPartPerformanceManager.class.getName()
+						+ ".ENABLE_COLLECTING_DATA", false);
+		ESTIMATOR_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger( 
+				TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
 	}
 
 	// On the sequencer
@@ -34,14 +40,14 @@ public class TPartPerformanceManager implements PerformanceManager {
 	
 	public TPartPerformanceManager(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
-			boolean isBatching, Estimator estimator) {
+			boolean isBatching) {
 		if (Elasql.isStandAloneSequencer()) {
 			// The sequencer maintains a SpCallPreprocessor and a warehouse.
 			metricWarehouse = new TpartMetricWarehouse();
 			Elasql.taskMgr().runTask(metricWarehouse);
 			
 			spCallPreprocessor = new SpCallPreprocessor(factory, inserter,
-					graph, isBatching, metricWarehouse, estimator);
+					graph, isBatching, metricWarehouse, getEstimator());
 			Elasql.taskMgr().runTask(spCallPreprocessor);
 			
 			// Hermes-Control has a control actuator
@@ -78,5 +84,20 @@ public class TPartPerformanceManager implements PerformanceManager {
 	@Override
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
+	}
+	
+	private Estimator getEstimator() {
+		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_CONTROL) {
+			return null;
+		}
+		
+		switch (ESTIMATOR_TYPE) {
+		case 0:
+			return new ConstantEstimator();
+		case 1:	
+			return new ReadCountEstimator();
+		default: 
+			throw new IllegalArgumentException("Not supported");
+		}
 	}
 }
