@@ -61,6 +61,7 @@ public class TransactionEstimation implements Serializable {
 		return slaveCpus[slaveId];
 	}
 	
+	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		

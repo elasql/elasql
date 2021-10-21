@@ -64,16 +64,6 @@ public class HermesNodeInserter implements BatchNodeInserter {
 				throw new RuntimeException("Something wrong");
 		}
 		
-		// XXX: Debug
-		for (TxNode node : graph.getTxNodes()) {
-			if (node.getTxNum() % 10000 == 0) {
-				String log = String.format("Tx.%d is routed to node %d", node.getTxNum(), node.getPartId());
-				System.out.println(log);
-			}
-		}
-		
-					
-		
 //		System.out.println(String.format("Final loads: %s", Arrays.toString(loadPerPart)));
 	}
 	
@@ -91,13 +81,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			
 			// Count the number of remote edge
 			int remoteEdgeCount = countRemoteReadEdge(graph, task, partId);
-			
-			// XXX: Debug
-			if (task.getTxNum() % 10000 == 0) {
-				String log = String.format("Tx.%d has %d remotes at node %d", task.getTxNum(), remoteEdgeCount, partId);
-				System.out.println(log);
-			}
-			
+
 			// Find the node in which the tx has fewest remote edges.
 			if (remoteEdgeCount < minRemoteEdgeCount) {
 				minRemoteEdgeCount = remoteEdgeCount;
