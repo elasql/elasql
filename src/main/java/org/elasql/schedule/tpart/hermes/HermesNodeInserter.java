@@ -81,7 +81,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			
 			// Count the number of remote edge
 			int remoteEdgeCount = countRemoteReadEdge(graph, task, partId);
-			
+
 			// Find the node in which the tx has fewest remote edges.
 			if (remoteEdgeCount < minRemoteEdgeCount) {
 				minRemoteEdgeCount = remoteEdgeCount;

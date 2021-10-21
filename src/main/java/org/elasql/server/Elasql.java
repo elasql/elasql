@@ -25,11 +25,8 @@ import org.elasql.cache.tpart.TPartCacheMgr;
 import org.elasql.migration.MigrationComponentFactory;
 import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
-import org.elasql.perf.DummyPerformanceManager;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
-import org.elasql.perf.tpart.ai.Estimator;
-import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
@@ -95,7 +92,6 @@ public class Elasql extends VanillaDb {
 	 
 	public static final ServiceType SERVICE_TYPE; 
 	public static final boolean ENABLE_STAND_ALONE_SEQUENCER; 
-	 
 	public static final long SYSTEM_INIT_TIME_MS = System.currentTimeMillis(); 
 	 
 	static { 
@@ -103,7 +99,7 @@ public class Elasql extends VanillaDb {
 				Elasql.class.getName() + ".SERVICE_TYPE", ServiceType.NAIVE.ordinal()); 
 		SERVICE_TYPE = ServiceType.fromInteger(type); 
 		ENABLE_STAND_ALONE_SEQUENCER = ElasqlProperties.getLoader().getPropertyAsBoolean( 
-				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false); 
+				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false);
 	} 
  
 	// DD modules 
@@ -353,47 +349,41 @@ public class Elasql extends VanillaDb {
 		BatchNodeInserter inserter;
 		FusionTable table; 
 		boolean isBatching = true;
-		Estimator estimator;
 		 
 		switch (SERVICE_TYPE) { 
 		case TPART: 
 			graph = new TGraph(); 
 			inserter = new CostAwareNodeInserter();
 			isBatching = true;
-			estimator = null;
 			break; 
 		case HERMES: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new HermesNodeInserter();
-			isBatching = true; 
-			estimator = null;
+			isBatching = true;
 			break; 
 		case G_STORE: 
 			graph = new TGraph(); 
 			inserter = new LocalFirstNodeInserter();
-			isBatching = false; 
-			estimator = null;
+			isBatching = false;
 			break; 
 		case LEAP: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new LocalFirstNodeInserter();
-			isBatching = false; 
-			estimator = null;
+			isBatching = false;
 			break; 
 		case HERMES_CONTROL:
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new ControlBasedRouter();
-			isBatching = true; 
-			estimator = new ConstantEstimator();
+			isBatching = true;
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
 		} 
 		 
-		return new TPartPerformanceManager(factory, inserter, graph, isBatching, estimator); 
+		return new TPartPerformanceManager(factory, inserter, graph, isBatching); 
 	}
  
 	// ================ 

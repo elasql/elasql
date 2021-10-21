@@ -14,7 +14,7 @@ import org.vanilladb.core.server.task.Task;
  */
 public class RoutingControlActuator extends Task {
 	
-	private static final long DELAY_START_TIME = 30_000;
+	private static final long DELAY_START_TIME = 60_000;
 	
 	private static final long UPDATE_PERIOD;
 	
