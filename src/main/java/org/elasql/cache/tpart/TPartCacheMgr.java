@@ -34,7 +34,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 //	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
 //	private static LocalStorageLockTable lockTable = new LocalStorageLockTable();
 
-	private Map<CachedEntryKey, CachedRecord> exchange;
+	private Map<CachedEntryKey, EnhanceCachedRecord> exchange;
 	
 	private Map<PrimaryKey, CachedRecord> recordCache;
 
@@ -46,7 +46,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		}
 		
 		recordCache = new ConcurrentHashMap<PrimaryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
-		exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
+		exchange = new ConcurrentHashMap<CachedEntryKey, EnhanceCachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
 		
 //		new PeriodicalJob(5000, 600000, new Runnable() {
 //			@Override
@@ -91,10 +91,12 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 						prepareAnchor(k).wait();
 					}
 					
-					CachedRecord rec = exchange.remove(k);
+					EnhanceCachedRecord r = exchange.remove(k);
+					CachedRecord rec = r.getCachedRecord();
+					
 					// For controller
 					TransactionProfiler.getLocalProfiler().incrementNetworkInSize(rec);
-
+					
 					// Debug: Tracing the waiting key
 //					Thread.currentThread().setName("Tx." + dest);
 					
@@ -114,8 +116,10 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 					"The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
 		
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
+		EnhanceCachedRecord r = new EnhanceCachedRecord(rec, isRemote);
+		
 		synchronized (prepareAnchor(k)) {
-			exchange.put(k, rec);
+			exchange.put(k, r);
 			prepareAnchor(k).notifyAll();
 		}
 	}
