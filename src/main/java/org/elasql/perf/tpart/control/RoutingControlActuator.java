@@ -1,5 +1,8 @@
 package org.elasql.perf.tpart.control;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -13,8 +16,7 @@ import org.vanilladb.core.server.task.Task;
  * @author Yu-Shan Lin
  */
 public class RoutingControlActuator extends Task {
-	
-	private static final long DELAY_START_TIME = 60_000;
+	private static Logger logger = Logger.getLogger(RoutingControlActuator.class.getName());
 	
 	private static final long UPDATE_PERIOD;
 	
@@ -50,7 +52,10 @@ public class RoutingControlActuator extends Task {
 	public void run() {
 		Thread.currentThread().setName("routing-control-actuator");
 		
-		waitForStart();
+		waitForServersReady();
+		
+		if (logger.isLoggable(Level.INFO))
+			logger.info("Starting the routing control actuator");
 		
 		long startTimeInMs = System.currentTimeMillis();
 		
@@ -77,11 +82,13 @@ public class RoutingControlActuator extends Task {
 		}
 	}
 	
-	private void waitForStart() {
-		try {
-			Thread.sleep(DELAY_START_TIME);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+	private void waitForServersReady() {
+		while (!Elasql.connectionMgr().areAllServersReady()) {
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 	

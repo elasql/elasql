@@ -160,8 +160,9 @@ public class Elasql extends VanillaDb {
 			logger.info("initializing as the stand alone sequencer"); 
 			VanillaDb.initTaskMgr();
 			initPartitionMetaMgr(partitionPlan); // must be before TPartPerformanceMgr
-			initPerfMgr(factory); 
 			initConnectionMgr(myNodeId);
+			initPerfMgr(factory); 
+			startNetworkConnection();
 			initScheduler(factory, migraComsFactory); 
 			if (migraComsFactory != null) 
 				migraSysControl = migraComsFactory.newSystemController(); 
@@ -172,11 +173,12 @@ public class Elasql extends VanillaDb {
 		VanillaDb.init(dirName); 
  
 		// initialize DD modules 
+		initConnectionMgr(myNodeId);
 		initPerfMgr(factory); 
 		initCacheMgr(); 
 		initPartitionMetaMgr(partitionPlan); 
 		initScheduler(factory, migraComsFactory); 
-		initConnectionMgr(myNodeId); 
+		startNetworkConnection();
 		initDdLogMgr(); 
 		if (migraComsFactory != null) 
 			migraMgr = migraComsFactory.newMigrationMgr(); 
@@ -319,8 +321,12 @@ public class Elasql extends VanillaDb {
 	} 
  
 	public static void initConnectionMgr(int id) { 
-		connMgr = new ConnectionMgr(id); 
-	} 
+		connMgr = new ConnectionMgr(id);
+	}
+	
+	public static void startNetworkConnection() {
+		connMgr.start();
+	}
  
 	public static void initDdLogMgr() { 
 		ddLogMgr = new DdLogMgr(); 
