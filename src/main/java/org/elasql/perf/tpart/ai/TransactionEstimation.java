@@ -1,12 +1,22 @@
 package org.elasql.perf.tpart.ai;
 
-import java.io.Serializable;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class TransactionEstimation implements Serializable {
-	
-	private static final long serialVersionUID = 20210916001L;
+/**
+ * A set of estimation for a particular transaction.<br>
+ * <br>
+ * Note that we convert the instance of this class by manually
+ * serialize it to bytes when we send it through the network.
+ * This is because we found that the default serialization
+ * creates a much bigger message than we thought it would be.
+ */
+public class TransactionEstimation {
 	
 	public static class Builder {
 		private double[] latencies;
@@ -35,6 +45,24 @@ public class TransactionEstimation implements Serializable {
 			return new TransactionEstimation(latencies, masterCpus, slaveCpus);
 		}
 	}
+	
+	public static TransactionEstimation fromBytes(byte[] bytes)
+			throws IOException {
+		double[] latencies = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		long[] masterCpus = new long[PartitionMetaMgr.NUM_PARTITIONS];
+		long[] slaveCpus = new long[PartitionMetaMgr.NUM_PARTITIONS];
+		
+		ByteArrayInputStream bi = new ByteArrayInputStream(bytes);
+		ObjectInputStream in = new ObjectInputStream(bi);
+		
+		for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++) {
+			latencies[i] = in.readDouble();
+			masterCpus[i] = in.readLong();
+			slaveCpus[i] = in.readLong();
+		}
+		
+		return new TransactionEstimation(latencies, masterCpus, slaveCpus);
+	}
 
 	private double[] latencies;
 	private long[] masterCpus;
@@ -59,6 +87,26 @@ public class TransactionEstimation implements Serializable {
 	
 	public long estimateSlaveCpuCost(int slaveId) {
 		return slaveCpus[slaveId];
+	}
+	
+	public byte[] toBytes() {
+		try {
+			ByteArrayOutputStream bo = new ByteArrayOutputStream();
+			ObjectOutputStream out = new ObjectOutputStream(bo);
+			
+			for (int i = 0; i < PartitionMetaMgr.NUM_PARTITIONS; i++) {
+				out.writeDouble(latencies[i]);
+				out.writeLong(masterCpus[i]);
+				out.writeLong(slaveCpus[i]);
+			}
+			
+			out.flush();
+			
+			return bo.toByteArray();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 	
 	@Override
