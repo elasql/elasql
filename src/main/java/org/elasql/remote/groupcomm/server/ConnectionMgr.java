@@ -58,6 +58,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public ConnectionMgr(int id) {
 		isSequencer = Elasql.serverId() == SEQUENCER_ID;
 		commServer = new VanillaCommServer(id, this);
+	}
+	
+	public void start() {
 		new Thread(null, commServer, "VanillaComm-Server").start();
 
 		// Only the sequencer needs to wait for all servers ready
@@ -170,6 +173,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		Elasql.scheduler().schedule(spc);
 	}
 	
+	public boolean areAllServersReady() {
+		return areAllServersReady;
+	}
+	
 	private void onReceivedSpCall(StoredProcedureCall spc) {
 		// Record when the first spc arrives
 		if (firstSpcArrivedTime == -1)
@@ -213,7 +220,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		profiler.reset();
 		profiler.startExecution();
 		
-		long broadcastTime = (spc.getOu0StopTime()- spc.getOu0StartTime()) / 1000;
+		long broadcastTime = (spc.getOu0StopTime() - spc.getOu0StartTime()) / 1000;
 		int networkSize = 0;
 		try {
 			networkSize = TransactionProfiler.getMessageSize(message);

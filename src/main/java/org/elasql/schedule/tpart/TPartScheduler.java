@@ -1,5 +1,6 @@
 package org.elasql.schedule.tpart;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -120,7 +121,7 @@ public class TPartScheduler extends Task implements Scheduler {
 					batchedTasks.clear();
 				}
 
-			} catch (InterruptedException ex) {
+			} catch (InterruptedException | IOException ex) {
 				if (logger.isLoggable(Level.SEVERE))
 					logger.severe("fail to dequeue task");
 			}
@@ -168,7 +169,8 @@ public class TPartScheduler extends Task implements Scheduler {
 //		dispatchToTaskMgr(plansTter);
 //	}
 
-	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call, TransactionProfiler profiler) {
+	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call, TransactionProfiler profiler)
+			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
 					call.getTxNum(), call.getArrivedTime(), profiler, null, null);
@@ -180,7 +182,13 @@ public class TPartScheduler extends Task implements Scheduler {
 				DdRecoveryMgr.logRequest(call);
 			
 			// Take out the transaction estimation
-			TransactionEstimation estimation = (TransactionEstimation) call.getMetadata();
+			TransactionEstimation estimation = null;
+			if (call.getMetadata() != null) {
+				if (call.getMetadata().getClass().equals(byte[].class)) {
+					byte[] data = (byte[]) call.getMetadata();
+					estimation = TransactionEstimation.fromBytes(data);
+				}
+			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
 					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation);

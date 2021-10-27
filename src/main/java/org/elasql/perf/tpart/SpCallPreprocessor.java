@@ -18,6 +18,7 @@ import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.remote.groupcomm.client.BatchSpcSender;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -104,13 +105,15 @@ public class SpCallPreprocessor extends Task {
 					batchedTasks.add(task);
 				}
 				
-				// Process the batch as TPartScheduler does
-				if ((isBatching && batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE)
-						|| !isBatching) {
+				if (sendingList.size() >= BatchSpcSender.COMM_BATCH_SIZE) {
 					// Send the SP call batch to total ordering
 					Elasql.connectionMgr().sendTotalOrderRequest(sendingList);
 					sendingList = new ArrayList<Serializable>();
-					
+				}
+				
+				// Process the batch as TPartScheduler does
+				if ((isBatching && batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE)
+						|| !isBatching) {
 					// Route the task batch
 					routeBatch(batchedTasks);
 					batchedTasks.clear();
@@ -146,7 +149,7 @@ public class SpCallPreprocessor extends Task {
 			TransactionEstimation estimation = performanceEstimator.estimate(features);
 			
 			// Save the estimation
-			spc.setMetadata(estimation);
+			spc.setMetadata(estimation.toBytes());
 			task.setEstimation(estimation);
 		}
 	}
