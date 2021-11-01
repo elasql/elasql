@@ -30,8 +30,13 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Read Records");
 		// - Number of written records
 		featureKeys.add("Number of Write Records");
-		// - Read data distribution
+		
+		featureKeys.add("Number of Update Records");
+		featureKeys.add("Number of Insert Records");
+		featureKeys.add("Number of Fully Replicated Records");
+		// - Data distribution
 		featureKeys.add("Read Data Distribution");
+		featureKeys.add("Update Data Distribution");
 		
 		featureKeys.add("System CPU Load");
 		featureKeys.add("Process CPU Load");
