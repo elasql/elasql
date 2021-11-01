@@ -63,9 +63,12 @@ public class TGraph {
 		}
 
 		// Update the resource locations
-		if (task.getWriteSet() != null) {
-			// update the resource position
-			for (PrimaryKey res : task.getWriteSet())
+		if (task.getUpdateSet() != null) {
+			for (PrimaryKey res : task.getUpdateSet())
+				resPos.put(res, node);
+		}
+		if (task.getInsertSet() != null) {
+			for (PrimaryKey res : task.getInsertSet())
 				resPos.put(res, node);
 		}
 	}

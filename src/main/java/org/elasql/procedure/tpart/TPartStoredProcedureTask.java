@@ -1,5 +1,6 @@
 package org.elasql.procedure.tpart;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.ai.TransactionEstimation;
@@ -92,9 +93,12 @@ public class TPartStoredProcedureTask
 	public Set<PrimaryKey> getReadSet() {
 		return tsp.getReadSet();
 	}
-
+	
 	public Set<PrimaryKey> getWriteSet() {
-		return tsp.getWriteSet();
+		Set<PrimaryKey> writeSet = new HashSet<PrimaryKey>();
+		writeSet.addAll(tsp.getUpdateSet());
+		writeSet.addAll(tsp.getInsertSet());
+		return writeSet;
 	}
 	
 	public Set<PrimaryKey> getUpdateSet() {
