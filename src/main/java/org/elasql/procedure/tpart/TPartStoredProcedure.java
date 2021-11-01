@@ -43,6 +43,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	// Private resource
 	private Set<PrimaryKey> readKeys = new HashSet<PrimaryKey>();
 	private Set<PrimaryKey> writeKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> updateKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> insertKeys = new HashSet<PrimaryKey>();
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
@@ -166,6 +168,14 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		return writeKeys;
 	}
 	
+	public Set<PrimaryKey> getUpdateSet() {
+		return updateKeys;
+	}
+	
+	public Set<PrimaryKey> getInsertSet() {
+		return insertKeys;
+	}
+	
 	public boolean isReadOnly() {
 		return paramHelper.isReadOnly();
 	}
@@ -184,10 +194,12 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	protected void addWriteKey(PrimaryKey writeKey) {
 		writeKeys.add(writeKey);
+		updateKeys.add(writeKey);
 	}
 
 	protected void addInsertKey(PrimaryKey insertKey) {
 		writeKeys.add(insertKey);
+		insertKeys.add(insertKey);
 	}
 
 	protected void update(PrimaryKey key, CachedRecord rec) {

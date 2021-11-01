@@ -96,6 +96,14 @@ public class TPartStoredProcedureTask
 	public Set<PrimaryKey> getWriteSet() {
 		return tsp.getWriteSet();
 	}
+	
+	public Set<PrimaryKey> getUpdateSet() {
+		return tsp.getUpdateSet();
+	}
+	
+	public Set<PrimaryKey> getInsertSet() {
+		return tsp.getInsertSet();
+	}
 
 	public double getWeight() {
 		return tsp.getWeight();
