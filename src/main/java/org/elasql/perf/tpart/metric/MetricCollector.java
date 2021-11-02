@@ -28,7 +28,6 @@ public class MetricCollector extends Task {
 	
 	private CentralProcessor cpu;
 	private long[] cpuTicks;
-	private double avgPinCount;
 	
 	private OperatingSystemMXBean bean = (com.sun.management.OperatingSystemMXBean) ManagementFactory
 		.getOperatingSystemMXBean();
@@ -60,7 +59,6 @@ public class MetricCollector extends Task {
 
 				// Collect the metrics
 				TPartSystemMetrics metrics = collectSystemMetrics();
-				avgPinCount =  BufferPoolMonitor.getAvgPinCount();
 				
 				// Send to the sequencer
 				if (Elasql.connectionMgr() != null)
@@ -87,7 +85,7 @@ public class MetricCollector extends Task {
 		TPartSystemMetrics.Builder builder = new TPartSystemMetrics.Builder(Elasql.serverId());
 
 		builder.setBufferHitRate(BufferPoolMonitor.getHitRate());
-		builder.setBufferAvgPinCount(avgPinCount);
+		builder.setBufferAvgPinCount(BufferPoolMonitor.getAvgPinCount());
 		builder.setPinnedBufferCount(BufferPoolMonitor.getPinnedBufferCount());
 		
 		builder.setProcessCpuLoad(bean.getProcessCpuLoad());
