@@ -26,11 +26,8 @@ public class TransactionFeatures {
 		// (Modify this part to add/remove features)
 		// - Transaction start time (the time entering the system) 
 		featureKeys.add("Start Time");
-		// - Number of read records
+		// - Number of records
 		featureKeys.add("Number of Read Records");
-		// - Number of written records
-		featureKeys.add("Number of Write Records");
-		
 		featureKeys.add("Number of Update Records");
 		featureKeys.add("Number of Insert Records");
 		featureKeys.add("Number of Fully Replicated Records");

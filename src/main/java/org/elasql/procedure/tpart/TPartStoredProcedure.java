@@ -42,9 +42,9 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	// Private resource
 	private Set<PrimaryKey> readKeys = new HashSet<PrimaryKey>();
-	private Set<PrimaryKey> writeKeys = new HashSet<PrimaryKey>();
 	private Set<PrimaryKey> updateKeys = new HashSet<PrimaryKey>();
 	private Set<PrimaryKey> insertKeys = new HashSet<PrimaryKey>();
+	
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
@@ -163,10 +163,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public Set<PrimaryKey> getReadSet() {
 		return readKeys;
 	}
-
-	public Set<PrimaryKey> getWriteSet() {
-		return writeKeys;
-	}
 	
 	public Set<PrimaryKey> getUpdateSet() {
 		return updateKeys;
@@ -192,13 +188,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		readKeys.add(readKey);
 	}
 
-	protected void addWriteKey(PrimaryKey writeKey) {
-		writeKeys.add(writeKey);
+	protected void addUpdateKey(PrimaryKey writeKey) {
 		updateKeys.add(writeKey);
 	}
 
 	protected void addInsertKey(PrimaryKey insertKey) {
-		writeKeys.add(insertKey);
 		insertKeys.add(insertKey);
 	}
 
@@ -208,10 +202,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	protected void insert(PrimaryKey key, Map<String, Constant> fldVals) {
 		cache.insert(key, fldVals);
-	}
-
-	protected void delete(PrimaryKey key) {
-		cache.delete(key);
 	}
 
 	private void executeTransactionLogic() {

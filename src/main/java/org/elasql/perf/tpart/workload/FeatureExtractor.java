@@ -53,7 +53,6 @@ public class FeatureExtractor {
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
-		builder.addFeature("Number of Write Records", task.getWriteSet().size());
 		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
 		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
 		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
