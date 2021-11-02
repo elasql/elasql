@@ -60,6 +60,10 @@ public class FeatureExtractor {
 		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
 		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
 
+		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
+		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
+		builder.addFeature("Pinned Buffer Count", extractPinnedBufferCount());
+
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
 		builder.addFeature("Process CPU Load", extractProcessCpuLoad());
@@ -73,6 +77,36 @@ public class FeatureExtractor {
 			builder.addDependency(dependentTx);
 		
 		return builder.build();
+	}
+	
+	private Double[] extractBufferHitRate() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Double[] bufferHitRates = new Double[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			bufferHitRates[serverId] = metricWarehouse.getBufferHitRate(serverId);
+		
+		return bufferHitRates;
+	}
+	
+	private Double[] extractBufferAvgPinCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Double[] bufferAvgPinCounts = new Double[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			bufferAvgPinCounts[serverId] = metricWarehouse.getBufferAvgPinCount(serverId);
+		
+		return bufferAvgPinCounts;
+	}
+	
+	private Integer[] extractPinnedBufferCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] pinnedBufferCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			pinnedBufferCounts[serverId] = metricWarehouse.getPinnedBufferCount(serverId);
+		
+		return pinnedBufferCounts;
 	}
 	
 	private Double[] extractSystemCpuLoad() {
