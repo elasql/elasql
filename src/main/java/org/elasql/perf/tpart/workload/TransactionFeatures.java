@@ -35,6 +35,10 @@ public class TransactionFeatures {
 		featureKeys.add("Read Data Distribution");
 		featureKeys.add("Update Data Distribution");
 		
+		featureKeys.add("Buffer Hit Rate");
+		featureKeys.add("Avg Pin Count");
+		featureKeys.add("Pinned Buffer Count");
+		
 		featureKeys.add("System CPU Load");
 		featureKeys.add("Process CPU Load");
 		featureKeys.add("System Load Average");

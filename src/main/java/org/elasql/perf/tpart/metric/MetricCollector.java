@@ -5,6 +5,7 @@ import java.lang.management.ManagementFactory;
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.storage.buffer.BufferPoolMonitor;
 import org.vanilladb.core.util.TransactionProfiler;
 
 import com.sun.management.OperatingSystemMXBean;
@@ -58,7 +59,7 @@ public class MetricCollector extends Task {
 
 				// Collect the metrics
 				TPartSystemMetrics metrics = collectSystemMetrics();
-
+				
 				// Send to the sequencer
 				if (Elasql.connectionMgr() != null)
 					Elasql.connectionMgr().sendMetricReport(metrics);
@@ -83,6 +84,10 @@ public class MetricCollector extends Task {
 	private TPartSystemMetrics collectSystemMetrics() {
 		TPartSystemMetrics.Builder builder = new TPartSystemMetrics.Builder(Elasql.serverId());
 
+		builder.setBufferHitRate(BufferPoolMonitor.getHitRate());
+		builder.setBufferAvgPinCount(BufferPoolMonitor.getAvgPinCount());
+		builder.setPinnedBufferCount(BufferPoolMonitor.getPinnedBufferCount());
+		
 		builder.setProcessCpuLoad(bean.getProcessCpuLoad());
 		builder.setSystemCpuLoad(cpu.getSystemCpuLoadBetweenTicks(cpuTicks));
 		cpuTicks = cpu.getSystemCpuLoadTicks();

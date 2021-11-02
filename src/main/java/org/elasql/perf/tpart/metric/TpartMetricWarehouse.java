@@ -24,6 +24,11 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	}
 	
 	private BlockingQueue<TPartSystemMetrics> metricQueue;
+
+	// Buffer metrics
+	private Map<Integer, List<StampedMetric<Double>>> bufferHitRate;
+	private Map<Integer, List<StampedMetric<Double>>> bufferAvgPinCount;
+	private Map<Integer, List<StampedMetric<Integer>>> pinnedBufferCount;
 	
 	// Load metrics
 	private Map<Integer, List<StampedMetric<Double>>> systemCpuLoad;
@@ -36,12 +41,19 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	public TpartMetricWarehouse() {
 		metricQueue = new LinkedBlockingQueue<TPartSystemMetrics>();
 		
+		bufferHitRate = new HashMap<Integer, List<StampedMetric<Double>>>();
+		bufferAvgPinCount = new HashMap<Integer, List<StampedMetric<Double>>>();
+		pinnedBufferCount = new HashMap<Integer, List<StampedMetric<Integer>>>();
+		
 		processCpuLoad = new HashMap<Integer, List<StampedMetric<Double>>>();
 		systemCpuLoad = new HashMap<Integer, List<StampedMetric<Double>>>();
 		systemLoadAverage = new HashMap<Integer, List<StampedMetric<Double>>>();
 		threadActiveCount = new HashMap<Integer, List<StampedMetric<Integer>>>();
 		
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+			bufferHitRate.put(nodeId, new ArrayList<StampedMetric<Double>>());
+			bufferAvgPinCount.put(nodeId, new ArrayList<StampedMetric<Double>>());
+			pinnedBufferCount.put(nodeId, new ArrayList<StampedMetric<Integer>>());
 			processCpuLoad.put(nodeId, new ArrayList<StampedMetric<Double>>());
 			systemCpuLoad.put(nodeId, new ArrayList<StampedMetric<Double>>());
 			systemLoadAverage.put(nodeId, new ArrayList<StampedMetric<Double>>());
@@ -70,6 +82,12 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	private synchronized void recordMetric(TPartSystemMetrics metrics) {
 		long timestamp = System.currentTimeMillis();
 		
+		bufferHitRate.get(metrics.getServerId()).add(
+				new StampedMetric<>(timestamp, metrics.getBufferHitRate()));
+		bufferAvgPinCount.get(metrics.getServerId()).add(
+				new StampedMetric<>(timestamp, metrics.getBufferAvgPinCount()));
+		pinnedBufferCount.get(metrics.getServerId()).add(
+				new StampedMetric<>(timestamp, metrics.getPinnedBufferCount()));
 		processCpuLoad.get(metrics.getServerId()).add(
 				new StampedMetric<>(timestamp, metrics.getProcessCpuLoad()));
 		systemCpuLoad.get(metrics.getServerId()).add(
@@ -82,6 +100,33 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		// debug code
 //		System.out.println(String.format("Receives a metric report from server %d with CPU load: %f",
 //				metrics.getServerId(), metrics.getSystemCpuLoad()));
+	}
+	
+	public synchronized double getBufferHitRate(int serverId) {
+		List<StampedMetric<Double>> history = bufferHitRate.get(serverId);
+		if (history.isEmpty()) {
+			return 0.0;
+		} else {
+			return history.get(history.size() - 1).metric;
+		}
+	}
+	
+	public synchronized double getBufferAvgPinCount(int serverId) {
+		List<StampedMetric<Double>> history = bufferAvgPinCount.get(serverId);
+		if (history.isEmpty()) {
+			return 0.0;
+		} else {
+			return history.get(history.size() - 1).metric;
+		}
+	}
+	
+	public synchronized int getPinnedBufferCount(int serverId) {
+		List<StampedMetric<Integer>> history = pinnedBufferCount.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric;
+		}
 	}
 	
 	public synchronized double getProcessCpuLoad(int serverId) {
