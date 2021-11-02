@@ -44,7 +44,6 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		bufferHitRate = new HashMap<Integer, List<StampedMetric<Double>>>();
 		bufferAvgPinCount = new HashMap<Integer, List<StampedMetric<Double>>>();
 		pinnedBufferCount = new HashMap<Integer, List<StampedMetric<Integer>>>();
-		
 		processCpuLoad = new HashMap<Integer, List<StampedMetric<Double>>>();
 		systemCpuLoad = new HashMap<Integer, List<StampedMetric<Double>>>();
 		systemLoadAverage = new HashMap<Integer, List<StampedMetric<Double>>>();
@@ -150,7 +149,7 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	public synchronized double getAveragedSystemCpuLoad(int serverId, long timeLength) {
 		long startTime = System.currentTimeMillis() - timeLength;
 		double sum = 0.0;
-		double count = 0.0;
+		int count = 0;
 
 		List<StampedMetric<Double>> history = systemCpuLoad.get(serverId);
 		for (int idx = history.size() - 1; idx >= 0; idx--) {
@@ -158,7 +157,16 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 			if (metric.timestamp < startTime)
 				break;
 			sum += metric.metric;
-			count += 1.0;
+			count++;
+		}
+		
+		// Special case: no data in the window
+		if (count == 0) {
+			if (history.isEmpty()) {
+				return 0.0;
+			} else {
+				return history.get(history.size() - 1).metric;
+			}
 		}
 		
 		return sum / count;
