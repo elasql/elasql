@@ -117,6 +117,9 @@ public class TGraph {
 	}
 
 	public TxNode getLastInsertedTxNode() {
+		if (txNodes.isEmpty())
+			return null;
+			
 		return txNodes.get(txNodes.size() - 1);
 	}
 

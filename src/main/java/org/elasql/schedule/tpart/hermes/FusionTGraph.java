@@ -23,28 +23,32 @@ public class FusionTGraph extends TGraph {
 	 */
 	@Override
 	public void addWriteBackEdge() {
-		// Get the overflowed keys that need to be placed back to the original locations
-		Set<PrimaryKey> overflowedKeys = fusionTable.getOverflowKeys();
-		if (overflowedKeys != null && overflowedKeys.size() > 0) {
-			
-			// Make each key that will be processed in this graph
-			// be written back to the original location by the last one using it
-			Set<PrimaryKey> noOneHandledKeys = new HashSet<PrimaryKey>();
-			for (PrimaryKey key : overflowedKeys) {
-				TxNode handler = resPos.remove(key);
-				if (handler != null) {
+		// == Handles overflowed keys ==
+		// Check if there is a transaction can handle overflowed keys
+		TxNode lastTxNode = getLastInsertedTxNode();
+		if (lastTxNode != null) {
+			// Get the overflowed keys that need to be placed back to the original locations
+			Set<PrimaryKey> overflowedKeys = fusionTable.getOverflowKeys();
+			if (overflowedKeys != null && overflowedKeys.size() > 0) {
+				
+				// Make each key that will be processed in this graph
+				// be written back to the original location by the last one using it
+				Set<PrimaryKey> noOneHandledKeys = new HashSet<PrimaryKey>();
+				for (PrimaryKey key : overflowedKeys) {
+					TxNode handler = resPos.remove(key);
+					if (handler != null) {
+						int originalLocation = parMeta.getPartition(key);
+						handler.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
+					} else
+						noOneHandledKeys.add(key);
+				}
+				
+				// For the keys that on one handles, let the last node read and write them back.
+				for (PrimaryKey key : noOneHandledKeys) {
 					int originalLocation = parMeta.getPartition(key);
-					handler.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
-				} else
-					noOneHandledKeys.add(key);
-			}
-			
-			// For the keys that on one handles, let the last node read and write them back.
-			TxNode lastNode = getLastInsertedTxNode();
-			for (PrimaryKey key : noOneHandledKeys) {
-				int originalLocation = parMeta.getPartition(key);
-				lastNode.addReadEdges(new Edge(getResourcePosition(key), key));
-				lastNode.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
+					lastTxNode.addReadEdges(new Edge(getResourcePosition(key), key));
+					lastTxNode.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
+				}
 			}
 		}
 		
