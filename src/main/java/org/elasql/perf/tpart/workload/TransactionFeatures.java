@@ -26,12 +26,18 @@ public class TransactionFeatures {
 		// (Modify this part to add/remove features)
 		// - Transaction start time (the time entering the system) 
 		featureKeys.add("Start Time");
-		// - Number of read records
+		// - Number of records
 		featureKeys.add("Number of Read Records");
-		// - Number of written records
-		featureKeys.add("Number of Write Records");
-		// - Read data distribution
+		featureKeys.add("Number of Update Records");
+		featureKeys.add("Number of Insert Records");
+		featureKeys.add("Number of Fully Replicated Records");
+		// - Data distribution
 		featureKeys.add("Read Data Distribution");
+		featureKeys.add("Update Data Distribution");
+		
+		featureKeys.add("Buffer Hit Rate");
+		featureKeys.add("Avg Pin Count");
+		featureKeys.add("Pinned Buffer Count");
 		
 		featureKeys.add("System CPU Load");
 		featureKeys.add("Process CPU Load");

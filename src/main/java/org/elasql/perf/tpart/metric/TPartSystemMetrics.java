@@ -9,6 +9,10 @@ public class TPartSystemMetrics implements MetricReport {
 	public static class Builder {
 		private int serverId;
 
+		private double bufferHitRate;
+		private double bufferAvgPinCount;
+		private int pinnedBufferCount;
+		
 		private double systemCpuLoad;
 		private double processCpuLoad;
 		private double systemLoadAverage;
@@ -17,6 +21,18 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		public Builder(int serverId) {
 			this.serverId = serverId;
+		}
+		
+		public void setBufferHitRate(double bufferHitRate) {
+			this.bufferHitRate = bufferHitRate;
+		}
+		
+		public void setBufferAvgPinCount(double avgPinCount) {
+			this.bufferAvgPinCount = avgPinCount;
+		}
+		
+		public void setPinnedBufferCount(int pinnedBufferCount) {
+			this.pinnedBufferCount = pinnedBufferCount;
 		}
 		
 		public void setSystemCpuLoad(double systemCpuLoad) {
@@ -39,6 +55,10 @@ public class TPartSystemMetrics implements MetricReport {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
 			metrics.serverId = serverId;
 			
+			metrics.bufferHitRate = bufferHitRate;
+			metrics.bufferAvgPinCount = bufferAvgPinCount;
+			metrics.pinnedBufferCount = pinnedBufferCount;
+			
 			metrics.systemCpuLoad = systemCpuLoad;
 			metrics.processCpuLoad = processCpuLoad;
 			metrics.systemLoadAverage = systemLoadAverage;
@@ -50,6 +70,10 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	private int serverId;
 
+	private double bufferHitRate;
+	private double bufferAvgPinCount;
+	private int pinnedBufferCount;
+	
 	private double systemCpuLoad;
 	private double processCpuLoad;
 	private double systemLoadAverage;
@@ -62,6 +86,18 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getServerId() {
 		return serverId;
+	}
+	
+	public double getBufferHitRate() {
+		return bufferHitRate;
+	}
+	
+	public double getBufferAvgPinCount() {
+		return bufferAvgPinCount;
+	}
+	
+	public int getPinnedBufferCount() {
+		return pinnedBufferCount;
 	}
 	
 	public double getSystemCpuLoad() {

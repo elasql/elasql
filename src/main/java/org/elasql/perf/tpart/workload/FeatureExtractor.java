@@ -53,8 +53,16 @@ public class FeatureExtractor {
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
 		builder.addFeature("Start Time", task.getArrivedTime());
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
-		builder.addFeature("Number of Write Records", task.getWriteSet().size());
-		builder.addFeature("Read Data Distribution", extractReadDistribution(task.getReadSet(), graph));
+		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
+		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
+		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
+		
+		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
+		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
+
+		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
+		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
+		builder.addFeature("Pinned Buffer Count", extractPinnedBufferCount());
 
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
@@ -69,6 +77,36 @@ public class FeatureExtractor {
 			builder.addDependency(dependentTx);
 		
 		return builder.build();
+	}
+	
+	private Double[] extractBufferHitRate() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Double[] bufferHitRates = new Double[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			bufferHitRates[serverId] = metricWarehouse.getBufferHitRate(serverId);
+		
+		return bufferHitRates;
+	}
+	
+	private Double[] extractBufferAvgPinCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Double[] bufferAvgPinCounts = new Double[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			bufferAvgPinCounts[serverId] = metricWarehouse.getBufferAvgPinCount(serverId);
+		
+		return bufferAvgPinCounts;
+	}
+	
+	private Integer[] extractPinnedBufferCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] pinnedBufferCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			pinnedBufferCounts[serverId] = metricWarehouse.getPinnedBufferCount(serverId);
+		
+		return pinnedBufferCounts;
 	}
 	
 	private Double[] extractSystemCpuLoad() {
@@ -111,16 +149,16 @@ public class FeatureExtractor {
 		return counts;
 	}
 	
-	private Integer[] extractReadDistribution(Set<PrimaryKey> readKeys, TGraph graph) {
+	private Integer[] extractRecordDistribution(Set<PrimaryKey> keys, TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
-		for (PrimaryKey readKey : readKeys) {
+		for (PrimaryKey key : keys) {
 			// Skip fully replicated records
-			if (partMgr.isFullyReplicated(readKey))
+			if (partMgr.isFullyReplicated(key))
 				continue;
 			
-			int partId = graph.getResourcePosition(readKey).getPartId();
+			int partId = graph.getResourcePosition(key).getPartId();
 			counts[partId]++;
 		}
 		
@@ -128,5 +166,18 @@ public class FeatureExtractor {
 	    Arrays.setAll(newCounts, i -> counts[i]);
 	    
 		return newCounts;
+	}
+	
+	private int extractFullyReplicatedCount(Set<PrimaryKey> keys) {
+		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+		int count = 0;
+		
+		for (PrimaryKey key : keys) {
+			// Skip fully replicated records
+			if (partMgr.isFullyReplicated(key))
+				count++;
+		}
+	    
+		return count;
 	}
 }
