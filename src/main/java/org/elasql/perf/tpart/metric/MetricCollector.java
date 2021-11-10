@@ -98,6 +98,6 @@ public class MetricCollector extends Task {
 	}
 	
 	private int getThreadActiveCount() {
-		return Elasql.txMgr().getActiveTxCount();
+		return Elasql.taskMgr().getActiveCount();
 	}
 }

@@ -100,9 +100,11 @@ public class FusionTGraph extends TGraph {
 	}
 	
 	private void setRecordCurrentLocation(PrimaryKey key, int loc) {
-		if (parMeta.getPartition(key) == loc && fusionTable.containsKey(key))
-			fusionTable.remove(key);
-		else
+		if (parMeta.getPartition(key) == loc) {
+			if (fusionTable.containsKey(key)) {
+				fusionTable.remove(key);
+			}
+		} else
 			fusionTable.setLocation(key, loc);
 	}
 }
