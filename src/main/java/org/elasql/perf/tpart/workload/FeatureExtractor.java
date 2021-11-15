@@ -6,6 +6,7 @@ import java.util.Set;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -58,6 +59,7 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
 		
 		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
+		builder.addFeature("Read Data In Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
 
 		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
@@ -160,6 +162,29 @@ public class FeatureExtractor {
 			
 			int partId = graph.getResourcePosition(key).getPartId();
 			counts[partId]++;
+		}
+		
+		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
+	    Arrays.setAll(newCounts, i -> counts[i]);
+	    
+		return newCounts;
+	}
+	
+	private Integer[] extractReadInCacheDistribution(Set<PrimaryKey> keys, TGraph graph) {
+		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		
+		switch (Elasql.SERVICE_TYPE) {
+		case HERMES:
+		case LEAP:
+		case HERMES_CONTROL:
+			FusionTGraph fusionTGraph = (FusionTGraph) graph;
+			for (PrimaryKey key : keys) {
+				int partId = fusionTGraph.getCachedLocation(key);
+				if (partId != -1)
+					counts[partId]++;
+			}
+			break;
+		default:
 		}
 		
 		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];

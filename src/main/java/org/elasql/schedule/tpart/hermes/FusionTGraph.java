@@ -99,6 +99,10 @@ public class FusionTGraph extends TGraph {
 		super.clear();
 	}
 	
+	public int getCachedLocation(PrimaryKey key) {
+		return fusionTable.getLocation(key);
+	}
+	
 	private void setRecordCurrentLocation(PrimaryKey key, int loc) {
 		if (parMeta.getPartition(key) == loc) {
 			if (fusionTable.containsKey(key)) {

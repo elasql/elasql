@@ -33,6 +33,7 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Fully Replicated Records");
 		// - Data distribution
 		featureKeys.add("Read Data Distribution");
+		featureKeys.add("Read Data In Cache Distribution");
 		featureKeys.add("Update Data Distribution");
 		
 		featureKeys.add("Buffer Hit Rate");
