@@ -61,6 +61,8 @@ public class FeatureExtractor {
 		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
 		builder.addFeature("Read Data In Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
+		
+		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
 		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
 		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
@@ -191,6 +193,18 @@ public class FeatureExtractor {
 	    Arrays.setAll(newCounts, i -> counts[i]);
 	    
 		return newCounts;
+	}
+	
+	private int getFusionTableOverflowCount(TGraph graph) {
+		switch (Elasql.SERVICE_TYPE) {
+		case HERMES:
+		case LEAP:
+		case HERMES_CONTROL:
+			FusionTGraph fusionTGraph = (FusionTGraph) graph;
+			return fusionTGraph.getFusionTableOverflowCount();
+		default:
+			return 0;
+		}
 	}
 	
 	private int extractFullyReplicatedCount(Set<PrimaryKey> keys) {

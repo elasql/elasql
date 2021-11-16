@@ -36,6 +36,9 @@ public class TransactionFeatures {
 		featureKeys.add("Read Data In Cache Distribution");
 		featureKeys.add("Update Data Distribution");
 		
+		// Fusion Table
+		featureKeys.add("Number of Overflows in Fusion Table");
+		
 		featureKeys.add("Buffer Hit Rate");
 		featureKeys.add("Avg Pin Count");
 		featureKeys.add("Pinned Buffer Count");
