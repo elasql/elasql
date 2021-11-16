@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.metric;
 
 import java.lang.management.ManagementFactory;
+import java.util.List;
 
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
@@ -13,6 +14,7 @@ import com.sun.management.OperatingSystemMXBean;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
 import oshi.hardware.HardwareAbstractionLayer;
+import oshi.hardware.HWDiskStore;
 
 /**
  * A collector that collects system and transaction metrics on each machine.
@@ -28,6 +30,10 @@ public class MetricCollector extends Task {
 	
 	private CentralProcessor cpu;
 	private long[] cpuTicks;
+	
+	private HWDiskStore hwds;
+	private long previousReadByte = 0l;
+	private long previousWriteByte = 0l;
 	
 	private OperatingSystemMXBean bean = (com.sun.management.OperatingSystemMXBean) ManagementFactory
 		.getOperatingSystemMXBean();
@@ -57,6 +63,9 @@ public class MetricCollector extends Task {
 			while (true) {
 				startTime = System.nanoTime();
 
+				// Read disk info 
+				initDiskStore();
+				
 				// Collect the metrics
 				TPartSystemMetrics metrics = collectSystemMetrics();
 				
@@ -81,6 +90,10 @@ public class MetricCollector extends Task {
 		cpuTicks = cpu.getSystemCpuLoadTicks();
 	}
 
+	private void initDiskStore() {
+		hwds = new SystemInfo().getHardware().getDiskStores().get(0);
+	}
+
 	private TPartSystemMetrics collectSystemMetrics() {
 		TPartSystemMetrics.Builder builder = new TPartSystemMetrics.Builder(Elasql.serverId());
 
@@ -94,10 +107,27 @@ public class MetricCollector extends Task {
 		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
 		builder.setThreadActiveCount(getThreadActiveCount());
 		
+		builder.setIOReadByte(getIOReadByte());
+		builder.setIOWriteByte(getIOWriteByte());
+		builder.setIOQueueLength(getIOQueuLangth());
 		return builder.build();
 	}
 	
 	private int getThreadActiveCount() {
 		return Elasql.taskMgr().getActiveCount();
+	}
+	
+	private long getIOReadByte() {
+		long readByte = hwds.getReadBytes() - previousReadByte;
+		previousReadByte = hwds.getReadBytes();
+		return readByte;
+	}
+	private long getIOWriteByte() {
+		long writeByte = hwds.getWriteBytes() - previousWriteByte;
+		previousWriteByte = hwds.getWriteBytes();
+		return writeByte;
+	}
+	private long getIOQueuLangth() {
+		return hwds.getCurrentQueueLength();
 	}
 }

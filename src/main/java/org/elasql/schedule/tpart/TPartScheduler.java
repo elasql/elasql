@@ -84,14 +84,18 @@ public class TPartScheduler extends Task implements Scheduler {
 		List<TPartStoredProcedureTask> batchedTasks = new LinkedList<TPartStoredProcedureTask>();
 		
 		Thread.currentThread().setName("T-Part Scheduler");
+		Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
 		
 		while (true) {
 			try {
 				// blocked if the queue is empty
 				StoredProcedureCall call = spcQueue.take();
+				
+//				reportQueueSize(call.getArrivedTime());
+				
 				TransactionProfiler.setProfiler(call.getProfiler());
 				TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-				
+
 				TPartStoredProcedureTask task = createStoredProcedureTask(call, profiler);
 
 				// schedules the utility procedures directly without T-Part
@@ -327,6 +331,23 @@ public class TPartScheduler extends Task implements Scheduler {
 			numOfBatches = 0;
 			totalImbalanced = 0;
 			nextReportTime = time + 3;
+		}
+	}
+	
+	
+	// Debug: show the distribution of assigned masters
+	private long lastReportTime = -1;
+	private void reportQueueSize(long currentTime) {
+		if (lastReportTime == -1) {
+			lastReportTime = currentTime;
+		} else if (currentTime - lastReportTime > 1_000_000) {
+			StringBuffer sb = new StringBuffer();
+			
+			sb.append(String.format("Time: %d seconds - %d", currentTime / 1_000_000, spcQueue.size()));
+		
+			System.out.println(sb.toString());
+				
+			lastReportTime = currentTime;
 		}
 	}
 }

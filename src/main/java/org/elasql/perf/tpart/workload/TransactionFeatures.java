@@ -33,7 +33,8 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Fully Replicated Records");
 		// - Data distribution
 		featureKeys.add("Read Data Distribution");
-		featureKeys.add("Read Data In Cache Distribution");
+		featureKeys.add("Read Data Distribution in Bytes");
+		featureKeys.add("Read Data in Cache Distribution");
 		featureKeys.add("Update Data Distribution");
 		
 		featureKeys.add("Buffer Hit Rate");
@@ -44,6 +45,10 @@ public class TransactionFeatures {
 		featureKeys.add("Process CPU Load");
 		featureKeys.add("System Load Average");
 		featureKeys.add("Thread Active Count");
+		
+		featureKeys.add("I/O Read Byte");
+		featureKeys.add("I/O Write Byte");
+		featureKeys.add("I/O Queue Length");
 		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);

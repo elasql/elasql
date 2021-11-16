@@ -19,6 +19,10 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		private int threadActiveCount;
 		
+		private long ioReadByte;
+		private long ioWriteByte;
+		private long ioQueueLength;
+		
 		public Builder(int serverId) {
 			this.serverId = serverId;
 		}
@@ -51,6 +55,18 @@ public class TPartSystemMetrics implements MetricReport {
 			this.threadActiveCount = threadActiveCount;
 		}
 		
+		public void setIOReadByte(long ioReadByte) {
+			this.ioReadByte = ioReadByte;
+		}
+		
+		public void setIOWriteByte(long ioWriteByte) {
+			this.ioWriteByte = ioWriteByte;
+		}
+		
+		public void setIOQueueLength(long ioQueueLength) {
+			this.ioQueueLength = ioQueueLength;
+		}
+		
 		public TPartSystemMetrics build() {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
 			metrics.serverId = serverId;
@@ -64,6 +80,11 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.systemLoadAverage = systemLoadAverage;
 			
 			metrics.threadActiveCount = threadActiveCount;
+			
+			metrics.ioReadByte = ioReadByte;
+			metrics.ioWriteByte = ioWriteByte;
+			metrics.ioQueueLength = ioQueueLength;
+			
 			return metrics;
 		}
 	}
@@ -79,6 +100,10 @@ public class TPartSystemMetrics implements MetricReport {
 	private double systemLoadAverage;
 	
 	private int threadActiveCount;
+	
+	private long ioReadByte;
+	private long ioWriteByte;
+	private long ioQueueLength;
 	
 	private TPartSystemMetrics() {
 		// do nothing
@@ -114,5 +139,17 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getThreadActiveCount() {
 		return threadActiveCount;
+	}
+	
+	public long getIOReadByte() {
+		return ioReadByte;
+	}
+	
+	public long getIOWriteByte() {
+		return ioWriteByte;
+	}
+	
+	public long getIOQueueLength() {
+		return ioQueueLength;
 	}
 }
