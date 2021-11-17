@@ -4,8 +4,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.elasql.sql.PrimaryKey;
-
 public class RecordSizeMaintainer {
 	
 	// Record size for each table
@@ -28,15 +26,6 @@ public class RecordSizeMaintainer {
 		
 		RECORD_SIZES = Collections.unmodifiableMap(recordSizes);
 	}
-
-//	public static void setRecordSize(PrimaryKey key, int size) {
-//		String tableName = key.getTableName();
-//		Integer tableSize = recordSizes.get(tableName);
-//		if(tableSize == null) {
-//			recordSizes.put(tableName, size);
-//		}
-//		return;
-//	}
 	
 	public static int getRecordSize(String tableName) {
 		Integer tableSize = RECORD_SIZES.get(tableName);
@@ -44,10 +33,5 @@ public class RecordSizeMaintainer {
 			throw new RuntimeException("Can't find the record size for the table."); 
 		}
 		return tableSize;
-	}
-	
-	public static void printRecordSize() {
-		System.out.println(RECORD_SIZES.size());
-		System.out.println(RECORD_SIZES);
 	}
 }

@@ -25,7 +25,6 @@ public class FeatureExtractor {
 			new TransactionDependencyAnalyzer();
 	
 	private TpartMetricWarehouse metricWarehouse;
-	private RecordSizeMaintainer recordSizes = new RecordSizeMaintainer();
 	
 	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
 		this.metricWarehouse = metricWarehouse;
@@ -60,7 +59,7 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
 		
 		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
-		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributioninByte(task.getReadSet(), graph));
+		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
 		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
 		
@@ -77,8 +76,8 @@ public class FeatureExtractor {
 		builder.addFeature("Thread Active Count", extractThreadActiveCount());
 		
 		// Features for i/o
-		builder.addFeature("I/O Read Byte", extractIOReadByte());
-		builder.addFeature("I/O Write Byte", extractIOWriteByte());
+		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
+		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
 		
 		// Get dependencies
@@ -179,7 +178,7 @@ public class FeatureExtractor {
 		return newCounts;
 	}
 	
-	private Integer[] extractReadDistributioninByte(Set<PrimaryKey> keys, TGraph graph) {
+	private Integer[] extractReadDistributionInBytes(Set<PrimaryKey> keys, TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] size = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		
@@ -192,10 +191,10 @@ public class FeatureExtractor {
 			size[partId]+= RecordSizeMaintainer.getRecordSize(key.getTableName());
 		}
 		
-		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
-	    Arrays.setAll(newCounts, i -> size[i]);
+		Integer[] newSizes = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
+	    Arrays.setAll(newSizes, i -> size[i]);
 	    
-		return newCounts;
+		return newSizes;
 	}
 	
 	private Integer[] extractReadInCacheDistribution(Set<PrimaryKey> keys, TGraph graph) {
@@ -246,22 +245,22 @@ public class FeatureExtractor {
 		return count;
 	}
 	
-	private Long[] extractIOReadByte() {
+	private Long[] extractIOReadBytes() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
 		Long[] bytes = new Long[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++) 
-			bytes[serverId] = metricWarehouse.getIOReadByte(serverId);
+			bytes[serverId] = metricWarehouse.getIOReadBytes(serverId);
 		
 		return bytes;
 	}
 	
-	private Long[] extractIOWriteByte() {
+	private Long[] extractIOWriteBytes() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
 		Long[] bytes = new Long[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++) 
-			bytes[serverId] = metricWarehouse.getIOWriteByte(serverId);
+			bytes[serverId] = metricWarehouse.getIOWriteBytes(serverId);
 		
 		return bytes;
 	}

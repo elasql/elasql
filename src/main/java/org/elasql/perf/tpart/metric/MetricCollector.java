@@ -1,7 +1,6 @@
 package org.elasql.perf.tpart.metric;
 
 import java.lang.management.ManagementFactory;
-import java.util.List;
 
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
@@ -32,8 +31,8 @@ public class MetricCollector extends Task {
 	private long[] cpuTicks;
 	
 	private HWDiskStore hwds;
-	private long previousReadByte = 0l;
-	private long previousWriteByte = 0l;
+	private long previousReadBytes = 0l;
+	private long previousWriteBytes = 0l;
 	
 	private OperatingSystemMXBean bean = (com.sun.management.OperatingSystemMXBean) ManagementFactory
 		.getOperatingSystemMXBean();
@@ -107,8 +106,8 @@ public class MetricCollector extends Task {
 		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
 		builder.setThreadActiveCount(getThreadActiveCount());
 		
-		builder.setIOReadByte(getIOReadByte());
-		builder.setIOWriteByte(getIOWriteByte());
+		builder.setIOReadBytes(getIOReadBytes());
+		builder.setIOWriteBytes(getIOWriteBytes());
 		builder.setIOQueueLength(getIOQueuLangth());
 		return builder.build();
 	}
@@ -117,15 +116,15 @@ public class MetricCollector extends Task {
 		return Elasql.taskMgr().getActiveCount();
 	}
 	
-	private long getIOReadByte() {
-		long readByte = hwds.getReadBytes() - previousReadByte;
-		previousReadByte = hwds.getReadBytes();
-		return readByte;
+	private long getIOReadBytes() {
+		long readBytes = hwds.getReadBytes() - previousReadBytes;
+		previousReadBytes = hwds.getReadBytes();
+		return readBytes;
 	}
-	private long getIOWriteByte() {
-		long writeByte = hwds.getWriteBytes() - previousWriteByte;
-		previousWriteByte = hwds.getWriteBytes();
-		return writeByte;
+	private long getIOWriteBytes() {
+		long writeBytes = hwds.getWriteBytes() - previousWriteBytes;
+		previousWriteBytes = hwds.getWriteBytes();
+		return writeBytes;
 	}
 	private long getIOQueuLangth() {
 		return hwds.getCurrentQueueLength();

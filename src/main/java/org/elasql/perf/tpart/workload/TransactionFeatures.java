@@ -49,8 +49,8 @@ public class TransactionFeatures {
 		featureKeys.add("System Load Average");
 		featureKeys.add("Thread Active Count");
 		
-		featureKeys.add("I/O Read Byte");
-		featureKeys.add("I/O Write Byte");
+		featureKeys.add("I/O Read Bytes");
+		featureKeys.add("I/O Write Bytes");
 		featureKeys.add("I/O Queue Length");
 		
 		// Convert the list to a read-only list

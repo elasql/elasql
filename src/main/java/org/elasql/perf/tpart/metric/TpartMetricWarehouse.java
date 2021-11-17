@@ -39,8 +39,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	private Map<Integer, List<StampedMetric<Integer>>> threadActiveCount;
 	
 	// I/O metrics
-	private Map<Integer, List<StampedMetric<Long>>> ioReadByte;
-	private Map<Integer, List<StampedMetric<Long>>> ioWriteByte;
+	private Map<Integer, List<StampedMetric<Long>>> ioReadBytes;
+	private Map<Integer, List<StampedMetric<Long>>> ioWriteBytes;
 	private Map<Integer, List<StampedMetric<Long>>> ioQueueLength;
 	
 	public TpartMetricWarehouse() {
@@ -53,8 +53,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		systemCpuLoad = new HashMap<Integer, List<StampedMetric<Double>>>();
 		systemLoadAverage = new HashMap<Integer, List<StampedMetric<Double>>>();
 		threadActiveCount = new HashMap<Integer, List<StampedMetric<Integer>>>();
-		ioReadByte = new HashMap<Integer, List<StampedMetric<Long>>>();
-		ioWriteByte = new HashMap<Integer, List<StampedMetric<Long>>>();
+		ioReadBytes = new HashMap<Integer, List<StampedMetric<Long>>>();
+		ioWriteBytes = new HashMap<Integer, List<StampedMetric<Long>>>();
 		ioQueueLength = new HashMap<Integer, List<StampedMetric<Long>>>();
 		
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
@@ -65,8 +65,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 			systemCpuLoad.put(nodeId, new ArrayList<StampedMetric<Double>>());
 			systemLoadAverage.put(nodeId, new ArrayList<StampedMetric<Double>>());
 			threadActiveCount.put(nodeId, new ArrayList<StampedMetric<Integer>>());
-			ioReadByte.put(nodeId, new ArrayList<StampedMetric<Long>>());
-			ioWriteByte.put(nodeId, new ArrayList<StampedMetric<Long>>());
+			ioReadBytes.put(nodeId, new ArrayList<StampedMetric<Long>>());
+			ioWriteBytes.put(nodeId, new ArrayList<StampedMetric<Long>>());
 			ioQueueLength.put(nodeId, new ArrayList<StampedMetric<Long>>());
 		}
 	}
@@ -106,10 +106,10 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 				new StampedMetric<>(timestamp, metrics.getSystemLoadAverage()));
 		threadActiveCount.get(metrics.getServerId()).add(
 				new StampedMetric<>(timestamp, metrics.getThreadActiveCount()));
-		ioReadByte.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getIOReadByte()));
-		ioWriteByte.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getIOWriteByte()));
+		ioReadBytes.get(metrics.getServerId()).add(
+				new StampedMetric<>(timestamp, metrics.getIOReadBytes()));
+		ioWriteBytes.get(metrics.getServerId()).add(
+				new StampedMetric<>(timestamp, metrics.getIOWriteBytes()));
 		ioQueueLength.get(metrics.getServerId()).add(
 				new StampedMetric<>(timestamp, metrics.getIOQueueLength()));
 		
@@ -207,8 +207,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
-	public synchronized long getIOReadByte(int serverId) {
-		List<StampedMetric<Long>> history = ioReadByte.get(serverId);
+	public synchronized long getIOReadBytes(int serverId) {
+		List<StampedMetric<Long>> history = ioReadBytes.get(serverId);
 		if (history.isEmpty()) {
 			return 0;
 		} else {
@@ -216,8 +216,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
-	public synchronized long getIOWriteByte(int serverId) {
-		List<StampedMetric<Long>> history = ioWriteByte.get(serverId);
+	public synchronized long getIOWriteBytes(int serverId) {
+		List<StampedMetric<Long>> history = ioWriteBytes.get(serverId);
 		if (history.isEmpty()) {
 			return 0;
 		} else {

@@ -15,8 +15,6 @@
  *******************************************************************************/
 package org.elasql.cache;
 
-import java.awt.datatransfer.SystemFlavorMap;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -27,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.perf.tpart.workload.RecordSizeMaintainer;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.sql.PrimaryKeyBuilder;
@@ -50,7 +47,6 @@ import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
-import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * The CURD interfaces to VanillaCore.
@@ -75,25 +71,13 @@ public class VanillaCoreCrud {
 
 		if (s.next()) {
 			rec = new CachedRecord(key);
-
 			for (String fld : tp.schema().fields())
 				rec.addFldVal(fld, s.getVal(fld));
-			
 		}
 		s.close();
 		
 		tx.endStatement();
 
-		/* For collecting record size of each table.
-		int size = 0;
-		try {
-			size = TransactionProfiler.getMessageSize(rec);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		RecordSizeMaintainer.setRecordSize(key, size);
-		*/
-		
 		return rec;
 	}
 	
@@ -204,7 +188,6 @@ public class VanillaCoreCrud {
 	}
 
 	public static boolean update(PrimaryKey key, CachedRecord rec, Transaction tx) {
-
 		boolean found = false;
 		String tblName = key.getTableName();
 		
@@ -295,7 +278,6 @@ public class VanillaCoreCrud {
 	}
 
 	public static void insert(PrimaryKey key, CachedRecord rec, Transaction tx) {
-		
 		String tblname = key.getTableName();
 		
 //		Timer.getLocalTimer().startComponentTimer("Insert to table " + tblname);
