@@ -6,6 +6,7 @@ import java.util.Set;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
@@ -58,7 +59,11 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
 		
 		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
+		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
+		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
+		
+		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
 		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
 		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
@@ -69,6 +74,11 @@ public class FeatureExtractor {
 		builder.addFeature("Process CPU Load", extractProcessCpuLoad());
 		builder.addFeature("System Load Average", extractSystemLoadAverage());
 		builder.addFeature("Thread Active Count", extractThreadActiveCount());
+		
+		// Features for i/o
+		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
+		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
+		builder.addFeature("I/O Queue Length", extractIOQueueLength());
 		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -168,6 +178,60 @@ public class FeatureExtractor {
 		return newCounts;
 	}
 	
+	private Integer[] extractReadDistributionInBytes(Set<PrimaryKey> keys, TGraph graph) {
+		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+		int[] size = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		
+		for (PrimaryKey key : keys) {
+			// Skip fully replicated records
+			if (partMgr.isFullyReplicated(key))
+				continue;
+			
+			int partId = graph.getResourcePosition(key).getPartId();
+			size[partId]+= RecordSizeMaintainer.getRecordSize(key.getTableName());
+		}
+		
+		Integer[] newSizes = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
+	    Arrays.setAll(newSizes, i -> size[i]);
+	    
+		return newSizes;
+	}
+	
+	private Integer[] extractReadInCacheDistribution(Set<PrimaryKey> keys, TGraph graph) {
+		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		
+		switch (Elasql.SERVICE_TYPE) {
+		case HERMES:
+		case LEAP:
+		case HERMES_CONTROL:
+			FusionTGraph fusionTGraph = (FusionTGraph) graph;
+			for (PrimaryKey key : keys) {
+				int partId = fusionTGraph.getCachedLocation(key);
+				if (partId != -1)
+					counts[partId]++;
+			}
+			break;
+		default:
+		}
+		
+		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
+	    Arrays.setAll(newCounts, i -> counts[i]);
+	    
+		return newCounts;
+	}
+	
+	private int getFusionTableOverflowCount(TGraph graph) {
+		switch (Elasql.SERVICE_TYPE) {
+		case HERMES:
+		case LEAP:
+		case HERMES_CONTROL:
+			FusionTGraph fusionTGraph = (FusionTGraph) graph;
+			return fusionTGraph.getFusionTableOverflowCount();
+		default:
+			return 0;
+		}
+	}
+	
 	private int extractFullyReplicatedCount(Set<PrimaryKey> keys) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int count = 0;
@@ -179,5 +243,35 @@ public class FeatureExtractor {
 		}
 	    
 		return count;
+	}
+	
+	private Long[] extractIOReadBytes() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Long[] bytes = new Long[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) 
+			bytes[serverId] = metricWarehouse.getIOReadBytes(serverId);
+		
+		return bytes;
+	}
+	
+	private Long[] extractIOWriteBytes() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Long[] bytes = new Long[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) 
+			bytes[serverId] = metricWarehouse.getIOWriteBytes(serverId);
+		
+		return bytes;
+	}
+	
+	private Long[] extractIOQueueLength() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Long[] lengths = new Long[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) 
+			lengths[serverId] = metricWarehouse.getIOQueueLength(serverId);
+		
+		return lengths;
 	}
 }

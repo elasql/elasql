@@ -13,6 +13,7 @@ import com.sun.management.OperatingSystemMXBean;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
 import oshi.hardware.HardwareAbstractionLayer;
+import oshi.hardware.HWDiskStore;
 
 /**
  * A collector that collects system and transaction metrics on each machine.
@@ -28,6 +29,10 @@ public class MetricCollector extends Task {
 	
 	private CentralProcessor cpu;
 	private long[] cpuTicks;
+	
+	private HWDiskStore hwds;
+	private long previousReadBytes = 0l;
+	private long previousWriteBytes = 0l;
 	
 	private OperatingSystemMXBean bean = (com.sun.management.OperatingSystemMXBean) ManagementFactory
 		.getOperatingSystemMXBean();
@@ -57,6 +62,9 @@ public class MetricCollector extends Task {
 			while (true) {
 				startTime = System.nanoTime();
 
+				// Read disk info 
+				initDiskStore();
+				
 				// Collect the metrics
 				TPartSystemMetrics metrics = collectSystemMetrics();
 				
@@ -81,6 +89,10 @@ public class MetricCollector extends Task {
 		cpuTicks = cpu.getSystemCpuLoadTicks();
 	}
 
+	private void initDiskStore() {
+		hwds = new SystemInfo().getHardware().getDiskStores().get(0);
+	}
+
 	private TPartSystemMetrics collectSystemMetrics() {
 		TPartSystemMetrics.Builder builder = new TPartSystemMetrics.Builder(Elasql.serverId());
 
@@ -94,10 +106,27 @@ public class MetricCollector extends Task {
 		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
 		builder.setThreadActiveCount(getThreadActiveCount());
 		
+		builder.setIOReadBytes(getIOReadBytes());
+		builder.setIOWriteBytes(getIOWriteBytes());
+		builder.setIOQueueLength(getIOQueuLangth());
 		return builder.build();
 	}
 	
 	private int getThreadActiveCount() {
 		return Elasql.taskMgr().getActiveCount();
+	}
+	
+	private long getIOReadBytes() {
+		long readBytes = hwds.getReadBytes() - previousReadBytes;
+		previousReadBytes = hwds.getReadBytes();
+		return readBytes;
+	}
+	private long getIOWriteBytes() {
+		long writeBytes = hwds.getWriteBytes() - previousWriteBytes;
+		previousWriteBytes = hwds.getWriteBytes();
+		return writeBytes;
+	}
+	private long getIOQueuLangth() {
+		return hwds.getCurrentQueueLength();
 	}
 }
