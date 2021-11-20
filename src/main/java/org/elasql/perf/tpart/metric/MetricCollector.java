@@ -1,41 +1,35 @@
 package org.elasql.perf.tpart.metric;
 
-import java.lang.management.ManagementFactory;
-
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.storage.buffer.BufferPoolMonitor;
 import org.vanilladb.core.util.TransactionProfiler;
 
-import com.sun.management.OperatingSystemMXBean;
-
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
-import oshi.hardware.HardwareAbstractionLayer;
 import oshi.hardware.HWDiskStore;
+import oshi.hardware.HardwareAbstractionLayer;
+import oshi.software.os.OSProcess;
+import oshi.software.os.OperatingSystem;
 
 /**
  * A collector that collects system and transaction metrics on each machine.
  * 
  * @author Yu-Shan Lin
  */
-@SuppressWarnings("restriction")
 public class MetricCollector extends Task {
 
 	private static final int SYSTEM_METRIC_INTERVAL = 500; // in milliseconds
 
 	private TransactionMetricRecorder metricRecorder;
 	
+	private OperatingSystem os;
 	private CentralProcessor cpu;
-	private long[] cpuTicks;
 	
 	private HWDiskStore hwds;
 	private long previousReadBytes = 0l;
 	private long previousWriteBytes = 0l;
-	
-	private OperatingSystemMXBean bean = (com.sun.management.OperatingSystemMXBean) ManagementFactory
-		.getOperatingSystemMXBean();
 
 	public MetricCollector() {
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
@@ -84,9 +78,9 @@ public class MetricCollector extends Task {
 	
 	private void setupInterfaces() {
 		SystemInfo si = new SystemInfo();
+		os = si.getOperatingSystem();
 		HardwareAbstractionLayer hal = si.getHardware();
 		cpu = hal.getProcessor();
-		cpuTicks = cpu.getSystemCpuLoadTicks();
 	}
 
 	private void initDiskStore() {
@@ -100,16 +94,25 @@ public class MetricCollector extends Task {
 		builder.setBufferAvgPinCount(BufferPoolMonitor.getAvgPinCount());
 		builder.setPinnedBufferCount(BufferPoolMonitor.getPinnedBufferCount());
 		
-		builder.setProcessCpuLoad(bean.getProcessCpuLoad());
-		builder.setSystemCpuLoad(cpu.getSystemCpuLoadBetweenTicks(cpuTicks));
-		cpuTicks = cpu.getSystemCpuLoadTicks();
-		builder.setSystemLoadAverage(bean.getSystemLoadAverage());
+		collectCpuLoad(builder);
 		builder.setThreadActiveCount(getThreadActiveCount());
 		
 		builder.setIOReadBytes(getIOReadBytes());
 		builder.setIOWriteBytes(getIOWriteBytes());
 		builder.setIOQueueLength(getIOQueuLangth());
 		return builder.build();
+	}
+	
+	private void collectCpuLoad(TPartSystemMetrics.Builder builder) {
+		// System
+		builder.setSystemCpuLoadTicks(cpu.getSystemCpuLoadTicks());
+		builder.setSystemLoadAverage(cpu.getSystemLoadAverage(1)[0]);
+		
+		// Process
+		OSProcess process = os.getProcess(os.getProcessId());
+		builder.setProcessUserTime(process.getUserTime());
+		builder.setProcessKernelTime(process.getKernelTime());
+		builder.setProcessUpTime(process.getUpTime());
 	}
 	
 	private int getThreadActiveCount() {

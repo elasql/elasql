@@ -11,63 +11,30 @@ import org.elasql.perf.MetricWarehouse;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.task.Task;
 
+import oshi.hardware.CentralProcessor.TickType;
+
 public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	
-	private static class StampedMetric<M> {
+	private static class StampedMetric {
 		long timestamp;
-		M metric;
+		TPartSystemMetrics metric;
 		
-		StampedMetric(long timestamp, M metric) {
+		StampedMetric(long timestamp, TPartSystemMetrics metric) {
 			this.timestamp = timestamp;
 			this.metric = metric;
 		}
 	}
 	
 	private BlockingQueue<TPartSystemMetrics> metricQueue;
-
-	// Buffer metrics
-	private Map<Integer, List<StampedMetric<Double>>> bufferHitRate;
-	private Map<Integer, List<StampedMetric<Double>>> bufferAvgPinCount;
-	private Map<Integer, List<StampedMetric<Integer>>> pinnedBufferCount;
 	
-	// Load metrics
-	private Map<Integer, List<StampedMetric<Double>>> systemCpuLoad;
-	private Map<Integer, List<StampedMetric<Double>>> processCpuLoad;
-	private Map<Integer, List<StampedMetric<Double>>> systemLoadAverage;
-	
-	// Thread metrics
-	private Map<Integer, List<StampedMetric<Integer>>> threadActiveCount;
-	
-	// I/O metrics
-	private Map<Integer, List<StampedMetric<Long>>> ioReadBytes;
-	private Map<Integer, List<StampedMetric<Long>>> ioWriteBytes;
-	private Map<Integer, List<StampedMetric<Long>>> ioQueueLength;
+	// Metrics
+	private Map<Integer, List<StampedMetric>> metricStore;
 	
 	public TpartMetricWarehouse() {
 		metricQueue = new LinkedBlockingQueue<TPartSystemMetrics>();
-		
-		bufferHitRate = new HashMap<Integer, List<StampedMetric<Double>>>();
-		bufferAvgPinCount = new HashMap<Integer, List<StampedMetric<Double>>>();
-		pinnedBufferCount = new HashMap<Integer, List<StampedMetric<Integer>>>();
-		processCpuLoad = new HashMap<Integer, List<StampedMetric<Double>>>();
-		systemCpuLoad = new HashMap<Integer, List<StampedMetric<Double>>>();
-		systemLoadAverage = new HashMap<Integer, List<StampedMetric<Double>>>();
-		threadActiveCount = new HashMap<Integer, List<StampedMetric<Integer>>>();
-		ioReadBytes = new HashMap<Integer, List<StampedMetric<Long>>>();
-		ioWriteBytes = new HashMap<Integer, List<StampedMetric<Long>>>();
-		ioQueueLength = new HashMap<Integer, List<StampedMetric<Long>>>();
-		
+		metricStore = new HashMap<Integer, List<StampedMetric>>();
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			bufferHitRate.put(nodeId, new ArrayList<StampedMetric<Double>>());
-			bufferAvgPinCount.put(nodeId, new ArrayList<StampedMetric<Double>>());
-			pinnedBufferCount.put(nodeId, new ArrayList<StampedMetric<Integer>>());
-			processCpuLoad.put(nodeId, new ArrayList<StampedMetric<Double>>());
-			systemCpuLoad.put(nodeId, new ArrayList<StampedMetric<Double>>());
-			systemLoadAverage.put(nodeId, new ArrayList<StampedMetric<Double>>());
-			threadActiveCount.put(nodeId, new ArrayList<StampedMetric<Integer>>());
-			ioReadBytes.put(nodeId, new ArrayList<StampedMetric<Long>>());
-			ioWriteBytes.put(nodeId, new ArrayList<StampedMetric<Long>>());
-			ioQueueLength.put(nodeId, new ArrayList<StampedMetric<Long>>());
+			metricStore.put(nodeId, new ArrayList<StampedMetric>());
 		}
 	}
 	
@@ -91,27 +58,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	
 	private synchronized void recordMetric(TPartSystemMetrics metrics) {
 		long timestamp = System.currentTimeMillis();
-		
-		bufferHitRate.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getBufferHitRate()));
-		bufferAvgPinCount.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getBufferAvgPinCount()));
-		pinnedBufferCount.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getPinnedBufferCount()));
-		processCpuLoad.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getProcessCpuLoad()));
-		systemCpuLoad.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getSystemCpuLoad()));
-		systemLoadAverage.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getSystemLoadAverage()));
-		threadActiveCount.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getThreadActiveCount()));
-		ioReadBytes.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getIOReadBytes()));
-		ioWriteBytes.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getIOWriteBytes()));
-		ioQueueLength.get(metrics.getServerId()).add(
-				new StampedMetric<>(timestamp, metrics.getIOQueueLength()));
+		metricStore.get(metrics.getServerId()).add(
+				new StampedMetric(timestamp, metrics));
 		
 		// debug code
 //		System.out.println(String.format("Receives a metric report from server %d with CPU load: %f",
@@ -119,118 +67,138 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	}
 	
 	public synchronized double getBufferHitRate(int serverId) {
-		List<StampedMetric<Double>> history = bufferHitRate.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0.0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getBufferHitRate();
 		}
 	}
 	
 	public synchronized double getBufferAvgPinCount(int serverId) {
-		List<StampedMetric<Double>> history = bufferAvgPinCount.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0.0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getBufferAvgPinCount();
 		}
 	}
 	
 	public synchronized int getPinnedBufferCount(int serverId) {
-		List<StampedMetric<Integer>> history = pinnedBufferCount.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getPinnedBufferCount();
 		}
 	}
 	
 	public synchronized double getProcessCpuLoad(int serverId) {
-		List<StampedMetric<Double>> history = processCpuLoad.get(serverId);
-		if (history.isEmpty()) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.size() < 2) {
 			return 0.0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			TPartSystemMetrics lastRec = history.get(history.size() - 1).metric;
+			TPartSystemMetrics secLastRec = history.get(history.size() - 2).metric;
+			
+			double processWorkingTime = 
+					(lastRec.getProcessUserTime() - secLastRec.getProcessUserTime() +
+					 lastRec.getProcessKernelTime() - secLastRec.getProcessKernelTime());
+			double processUpTime = (lastRec.getProcessUpTime() - 
+					secLastRec.getProcessUpTime());
+					
+			return processWorkingTime / processUpTime;
 		}
 	}
 	
 	public synchronized double getSystemCpuLoad(int serverId) {
-		List<StampedMetric<Double>> history = systemCpuLoad.get(serverId);
-		if (history.isEmpty()) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.size() < 2) {
 			return 0.0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			TPartSystemMetrics lastRec = history.get(history.size() - 1).metric;
+			TPartSystemMetrics secLastRec = history.get(history.size() - 2).metric;
+			return getCpuUsageBetween(secLastRec.getSystemCpuLoadTicks(),
+					lastRec.getSystemCpuLoadTicks());
 		}
 	}
 	
 	public synchronized double getAveragedSystemCpuLoad(int serverId, long timeLength) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		
+		if (history.size() < 2) {
+			return 0.0;
+		}
+		
+		// Get the latest CPU load ticks
+		long[] endTicks = history.get(history.size() - 1).metric.getSystemCpuLoadTicks();
+		
+		// Get the ticks at the beginning of the time window
+		long[] startTicks = endTicks;
 		long startTime = System.currentTimeMillis() - timeLength;
-		double sum = 0.0;
-		int count = 0;
-
-		List<StampedMetric<Double>> history = systemCpuLoad.get(serverId);
-		for (int idx = history.size() - 1; idx >= 0; idx--) {
-			StampedMetric<Double> metric = history.get(idx);
-			if (metric.timestamp < startTime)
+		for (int idx = history.size() - 2; idx >= 0; idx--) {
+			StampedMetric record = history.get(idx);
+			startTicks = record.metric.getSystemCpuLoadTicks();
+			if (record.timestamp < startTime)
 				break;
-			sum += metric.metric;
-			count++;
 		}
 		
-		// Special case: no data in the window
-		if (count == 0) {
-			if (history.isEmpty()) {
-				return 0.0;
-			} else {
-				return history.get(history.size() - 1).metric;
-			}
-		}
-		
-		return sum / count;
+		return getCpuUsageBetween(startTicks, endTicks);
 	}
 	
 	public synchronized double getSystemLoadAverage(int serverId) {
-		List<StampedMetric<Double>> history = systemLoadAverage.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0.0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getSystemLoadAverage();
 		}
 	}
 	
 	public synchronized int getThreadActiveCount(int serverId) {
-		List<StampedMetric<Integer>> history = threadActiveCount.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getThreadActiveCount();
 		}
 	}
 	
 	public synchronized long getIOReadBytes(int serverId) {
-		List<StampedMetric<Long>> history = ioReadBytes.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getIOReadBytes();
 		}
 	}
 	
 	public synchronized long getIOWriteBytes(int serverId) {
-		List<StampedMetric<Long>> history = ioWriteBytes.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getIOWriteBytes();
 		}
 	}
 	
 	public synchronized long getIOQueueLength(int serverId) {
-		List<StampedMetric<Long>> history = ioQueueLength.get(serverId);
+		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
 			return 0;
 		} else {
-			return history.get(history.size() - 1).metric;
+			return history.get(history.size() - 1).metric.getIOQueueLength();
 		}
+	}
+	
+	private double getCpuUsageBetween(long[] startTicks, long[] endTicks) {
+		long total = 0;
+        for (int i = 0; i < startTicks.length; i++) {
+            total += endTicks[i] - startTicks[i];
+        }
+        // CPU Usage = 1 - (idle + IOWait) / total
+        long idle = endTicks[TickType.IDLE.getIndex()] + endTicks[TickType.IOWAIT.getIndex()]
+                - startTicks[TickType.IDLE.getIndex()] - startTicks[TickType.IOWAIT.getIndex()];
+        return total > 0 && idle >= 0 ? (double) (total - idle) / total : 0d;
 	}
 }
