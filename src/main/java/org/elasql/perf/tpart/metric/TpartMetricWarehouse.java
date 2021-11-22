@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.metric;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,14 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 	
 	public void receiveMetricReport(TPartSystemMetrics metrics) {
 		metricQueue.add(metrics);
+		
+		// Debug: print some records
+//		if (metrics.getServerId() == 0) {
+//			System.out.println("System CPU Usage: " + getSystemCpuLoad(0));
+//			System.out.println("System CPU Usage (last 5 secs): " + getAveragedSystemCpuLoad(0, 5000));
+//			System.out.println("Process CPU Usage: " + getProcessCpuLoad(0));
+//			System.out.println("Load average: " + getSystemLoadAverage(0));
+//		}
 	}
 
 	@Override
@@ -116,10 +125,22 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		if (history.size() < 2) {
 			return 0.0;
 		} else {
-			TPartSystemMetrics lastRec = history.get(history.size() - 1).metric;
-			TPartSystemMetrics secLastRec = history.get(history.size() - 2).metric;
-			return getCpuUsageBetween(secLastRec.getSystemCpuLoadTicks(),
-					lastRec.getSystemCpuLoadTicks());
+			long[] endTicks = history.get(history.size() - 1)
+					.metric.getSystemCpuLoadTicks();
+			long[] startTicks = null;
+			
+			// Sampling too fast may get the same value between last
+			// two records, so we need to find the last two records
+			// with different values.
+			for (int i = 2; i <= history.size(); i++) {
+				startTicks = history.get(history.size() - i)
+						.metric.getSystemCpuLoadTicks();
+				if (!Arrays.equals(startTicks, endTicks)) {
+					break;
+				}
+			}
+			
+			return getCpuUsageBetween(startTicks, endTicks);
 		}
 	}
 	

@@ -20,7 +20,7 @@ import oshi.software.os.OperatingSystem;
  */
 public class MetricCollector extends Task {
 
-	private static final int SYSTEM_METRIC_INTERVAL = 500; // in milliseconds
+	private static final int SYSTEM_METRIC_INTERVAL = 100; // in milliseconds
 
 	private TransactionMetricRecorder metricRecorder;
 	
