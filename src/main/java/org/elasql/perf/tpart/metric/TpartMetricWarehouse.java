@@ -132,8 +132,8 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 			// Sampling too fast may get the same value between last
 			// two records, so we need to find the last two records
 			// with different values.
-			for (int i = 2; i <= history.size(); i++) {
-				startTicks = history.get(history.size() - i)
+			for (int idx = history.size() - 2; idx >= 0; idx--) {
+				startTicks = history.get(idx)
 						.metric.getSystemCpuLoadTicks();
 				if (!Arrays.equals(startTicks, endTicks)) {
 					break;
@@ -155,7 +155,7 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		long[] endTicks = history.get(history.size() - 1).metric.getSystemCpuLoadTicks();
 		
 		// Get the ticks at the beginning of the time window
-		long[] startTicks = endTicks;
+		long[] startTicks = null;
 		long startTime = System.currentTimeMillis() - timeLength;
 		for (int idx = history.size() - 2; idx >= 0; idx--) {
 			StampedMetric record = history.get(idx);
