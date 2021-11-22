@@ -8,17 +8,23 @@ public class TPartSystemMetrics implements MetricReport {
 
 	public static class Builder {
 		private int serverId;
-
+		
+		// Buffers
 		private double bufferHitRate;
 		private double bufferAvgPinCount;
 		private int pinnedBufferCount;
 		
-		private double systemCpuLoad;
-		private double processCpuLoad;
+		// CPU Usage and Load
+		private long[] systemCpuLoadTicks;
 		private double systemLoadAverage;
+		private long processUserTime;
+		private long processKernelTime;
+		private long processUpTime;
 		
+		// Threads
 		private int threadActiveCount;
 		
+		// I/O
 		private long ioReadBytes;
 		private long ioWriteBytes;
 		private long ioQueueLength;
@@ -39,16 +45,24 @@ public class TPartSystemMetrics implements MetricReport {
 			this.pinnedBufferCount = pinnedBufferCount;
 		}
 		
-		public void setSystemCpuLoad(double systemCpuLoad) {
-			this.systemCpuLoad = systemCpuLoad;
-		}
-		
-		public void setProcessCpuLoad(double processCpuLoad) {
-			this.processCpuLoad = processCpuLoad;
+		public void setSystemCpuLoadTicks(long[] systemCpuLoadTicks) {
+			this.systemCpuLoadTicks = systemCpuLoadTicks;
 		}
 		
 		public void setSystemLoadAverage(double systemLoadAverage) {
 			this.systemLoadAverage = systemLoadAverage;
+		}
+		
+		public void setProcessUserTime(long processUserTime) {
+			this.processUserTime = processUserTime;
+		}
+		
+		public void setProcessKernelTime(long processKernelTime) {
+			this.processKernelTime = processKernelTime;
+		}
+		
+		public void setProcessUpTime(long processUpTime) {
+			this.processUpTime = processUpTime;
 		}
 		
 		public void setThreadActiveCount(int threadActiveCount) {
@@ -75,9 +89,11 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.bufferAvgPinCount = bufferAvgPinCount;
 			metrics.pinnedBufferCount = pinnedBufferCount;
 			
-			metrics.systemCpuLoad = systemCpuLoad;
-			metrics.processCpuLoad = processCpuLoad;
+			metrics.systemCpuLoadTicks = systemCpuLoadTicks;
 			metrics.systemLoadAverage = systemLoadAverage;
+			metrics.processUserTime = processUserTime;
+			metrics.processKernelTime = processKernelTime;
+			metrics.processUpTime = processUpTime;
 			
 			metrics.threadActiveCount = threadActiveCount;
 			
@@ -95,9 +111,12 @@ public class TPartSystemMetrics implements MetricReport {
 	private double bufferAvgPinCount;
 	private int pinnedBufferCount;
 	
-	private double systemCpuLoad;
-	private double processCpuLoad;
+	// CPU Usage and Loading
+	private long[] systemCpuLoadTicks;
 	private double systemLoadAverage;
+	private long processUserTime;
+	private long processKernelTime;
+	private long processUpTime;
 	
 	private int threadActiveCount;
 	
@@ -125,16 +144,24 @@ public class TPartSystemMetrics implements MetricReport {
 		return pinnedBufferCount;
 	}
 	
-	public double getSystemCpuLoad() {
-		return systemCpuLoad;
-	}
-	
-	public double getProcessCpuLoad() {
-		return processCpuLoad;
+	public long[] getSystemCpuLoadTicks() {
+		return systemCpuLoadTicks;
 	}
 	
 	public double getSystemLoadAverage() {
 		return systemLoadAverage;
+	}
+	
+	public long getProcessUserTime() {
+		return processUserTime;
+	}
+	
+	public long getProcessKernelTime() {
+		return processKernelTime;
+	}
+	
+	public long getProcessUpTime() {
+		return processUpTime;
 	}
 	
 	public int getThreadActiveCount() {
