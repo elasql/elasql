@@ -19,10 +19,13 @@ public class RoutingControlActuator extends Task {
 	private static Logger logger = Logger.getLogger(RoutingControlActuator.class.getName());
 	
 	private static final long UPDATE_PERIOD;
+	private static final double INITIAL_ALPHA;
 	
 	static {
 		UPDATE_PERIOD = ElasqlProperties.getLoader().getPropertyAsLong(
 				RoutingControlActuator.class.getName() + ".UPDATE_PERIOD", 5_000);
+		INITIAL_ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
+				RoutingControlActuator.class.getName() + ".INITIAL_ALPHA", 1.0);
 	}
 	
 	// Alpha parameters control the weights of CPU cost
@@ -42,7 +45,7 @@ public class RoutingControlActuator extends Task {
 		gamma = new PidController[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			alpha[nodeId] = new PidController(1.0);
+			alpha[nodeId] = new PidController(INITIAL_ALPHA);
 			beta[nodeId] = new PidController(1.0);
 			gamma[nodeId] = new PidController(1.0);
 		}
@@ -105,8 +108,17 @@ public class RoutingControlActuator extends Task {
 	private void acquireObservations() {
 		// TODO: add disk and network I/O
 		// XXX: right observation?
-		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
-			alpha[nodeId].setObservation(metricWarehouse.getAveragedSystemCpuLoad(nodeId, UPDATE_PERIOD));
+		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+			double observation = metricWarehouse.getAveragedSystemCpuLoad(nodeId, UPDATE_PERIOD);
+			
+			// XXX: Test hardware limitation
+			if (nodeId == 0) {
+				observation *= 2;
+				observation = Math.min(observation, 1.00);
+			}
+			
+			alpha[nodeId].setObservation(observation);
+		}
 	}
 	
 	private void updateReferences() {
