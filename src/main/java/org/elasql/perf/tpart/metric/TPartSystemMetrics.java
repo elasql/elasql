@@ -14,6 +14,9 @@ public class TPartSystemMetrics implements MetricReport {
 		private double bufferAvgPinCount;
 		private int pinnedBufferCount;
 		
+		private int bufferReadWaitCount;
+		private int bufferWriteWaitCount;
+		
 		// CPU Usage and Load
 		private long[] systemCpuLoadTicks;
 		private double systemLoadAverage;
@@ -43,6 +46,14 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		public void setPinnedBufferCount(int pinnedBufferCount) {
 			this.pinnedBufferCount = pinnedBufferCount;
+		}
+		
+		public void setBufferReadWaitCount(int bufferReadWaitCount) {
+			this.bufferReadWaitCount = bufferReadWaitCount;
+		}
+		
+		public void setBufferWriteWaitCount(int bufferWriteWaitCount) {
+			this.bufferWriteWaitCount = bufferWriteWaitCount;
 		}
 		
 		public void setSystemCpuLoadTicks(long[] systemCpuLoadTicks) {
@@ -89,6 +100,9 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.bufferAvgPinCount = bufferAvgPinCount;
 			metrics.pinnedBufferCount = pinnedBufferCount;
 			
+			metrics.bufferReadWaitCount = bufferReadWaitCount;
+			metrics.bufferWriteWaitCount = bufferWriteWaitCount;
+			
 			metrics.systemCpuLoadTicks = systemCpuLoadTicks;
 			metrics.systemLoadAverage = systemLoadAverage;
 			metrics.processUserTime = processUserTime;
@@ -110,6 +124,9 @@ public class TPartSystemMetrics implements MetricReport {
 	private double bufferHitRate;
 	private double bufferAvgPinCount;
 	private int pinnedBufferCount;
+	
+	private int bufferReadWaitCount;
+	private int bufferWriteWaitCount;
 	
 	// CPU Usage and Loading
 	private long[] systemCpuLoadTicks;
@@ -142,6 +159,14 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getPinnedBufferCount() {
 		return pinnedBufferCount;
+	}
+	
+	public int getBufferReadWaitCount() {
+		return bufferReadWaitCount;
+	}
+	
+	public int getBufferWriteWaitCount() {
+		return bufferWriteWaitCount;
 	}
 	
 	public long[] getSystemCpuLoadTicks() {

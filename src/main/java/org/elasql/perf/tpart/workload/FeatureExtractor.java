@@ -68,6 +68,9 @@ public class FeatureExtractor {
 		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
 		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
 		builder.addFeature("Pinned Buffer Count", extractPinnedBufferCount());
+		
+		builder.addFeature("Buffer RL Wait Count", extractBufferReadWaitCount());
+		builder.addFeature("Buffer WL Wait Count", extractBufferWriteWaitCount());
 
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
@@ -117,6 +120,26 @@ public class FeatureExtractor {
 			pinnedBufferCounts[serverId] = metricWarehouse.getPinnedBufferCount(serverId);
 		
 		return pinnedBufferCounts;
+	}
+	
+	private Integer[] extractBufferReadWaitCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] bufferWaitCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			bufferWaitCounts[serverId] = metricWarehouse.getBufferReadWaitCount(serverId);
+		
+		return bufferWaitCounts;
+	}
+	
+	private Integer[] extractBufferWriteWaitCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] bufferWaitCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			bufferWaitCounts[serverId] = metricWarehouse.getBufferWriteWaitCount(serverId);
+		
+		return bufferWaitCounts;
 	}
 	
 	private Double[] extractSystemCpuLoad() {

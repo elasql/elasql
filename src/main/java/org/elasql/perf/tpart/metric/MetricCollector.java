@@ -94,6 +94,9 @@ public class MetricCollector extends Task {
 		builder.setBufferAvgPinCount(BufferPoolMonitor.getAvgPinCount());
 		builder.setPinnedBufferCount(BufferPoolMonitor.getPinnedBufferCount());
 		
+		builder.setBufferReadWaitCount(BufferPoolMonitor.getReadWaitCount());
+		builder.setBufferWriteWaitCount(BufferPoolMonitor.getWriteWaitCount());
+		
 		collectCpuLoad(builder);
 		builder.setThreadActiveCount(getThreadActiveCount());
 		
