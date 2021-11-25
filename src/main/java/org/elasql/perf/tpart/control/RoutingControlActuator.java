@@ -1,5 +1,6 @@
 package org.elasql.perf.tpart.control;
 
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -20,12 +21,29 @@ public class RoutingControlActuator extends Task {
 	
 	private static final long UPDATE_PERIOD;
 	private static final double INITIAL_ALPHA;
+	private static final double[] CPU_MAX_CAPACITIES;
 	
 	static {
 		UPDATE_PERIOD = ElasqlProperties.getLoader().getPropertyAsLong(
 				RoutingControlActuator.class.getName() + ".UPDATE_PERIOD", 5_000);
 		INITIAL_ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
 				RoutingControlActuator.class.getName() + ".INITIAL_ALPHA", 1.0);
+		
+		// Gather CPU MAXs
+		double[] cpuMaxCapacities = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		for (int i = 0; i < cpuMaxCapacities.length; i++)
+			cpuMaxCapacities[i] = 1.0;
+		
+		String cpuMaxStr = ElasqlProperties.getLoader().getPropertyAsString(
+				RoutingControlActuator.class.getName() + ".CPU_MAX_CAPACITIES", "");
+		if (!cpuMaxStr.isEmpty()) {
+			String[] cpuMaxValues = cpuMaxStr.split(",");
+			for (int i = 0; i < cpuMaxValues.length; i++) {
+				double value = Double.parseDouble(cpuMaxValues[i].trim());
+				cpuMaxCapacities[i] = value;
+			}
+		}
+		CPU_MAX_CAPACITIES = cpuMaxCapacities;
 	}
 	
 	// Alpha parameters control the weights of CPU cost
@@ -110,13 +128,8 @@ public class RoutingControlActuator extends Task {
 		// XXX: right observation?
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
 			double observation = metricWarehouse.getAveragedSystemCpuLoad(nodeId, UPDATE_PERIOD);
-			
-			// XXX: Test hardware limitation
-			if (nodeId == 0) {
-				observation *= 2;
-				observation = Math.min(observation, 1.00);
-			}
-			
+			observation = observation / CPU_MAX_CAPACITIES[nodeId];
+			observation = Math.min(observation, 1.0);
 			alpha[nodeId].setObservation(observation);
 		}
 	}
