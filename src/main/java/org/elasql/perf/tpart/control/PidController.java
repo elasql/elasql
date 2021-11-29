@@ -43,7 +43,7 @@ public class PidController {
 		this.reference = reference;
 	}
 	
-	public void updateControlParameters(double timeOffsetInSecs) {
+	public String updateControlParameters(double timeOffsetInSecs) {
 		double error = reference - observation;
 		
 		// Calculate PID values
@@ -58,11 +58,15 @@ public class PidController {
 		// Update the parameter
 		controlParameter = initialParameter * Math.exp(-controlSignal);
 		
-		System.out.println(String.format("[%f, %f, %f, %f, %f, %f, %f, %f]",
-				reference, observation, error, proportional, integral, derivative, controlSignal, controlParameter));
+		// For debugging
+		String updateInfo = String.format("[%f, %f, %f, %f, %f, %f, %f, %f]",
+				reference, observation, error, proportional, integral,
+				derivative, controlSignal, controlParameter);
 		
 		// Record the error
 		previousError = error;
+		
+		return updateInfo;
 	}
 	
 	public double getControlParameter() {

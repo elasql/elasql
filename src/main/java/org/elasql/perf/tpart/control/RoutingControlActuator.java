@@ -1,6 +1,5 @@
 package org.elasql.perf.tpart.control;
 
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -147,8 +146,8 @@ public class RoutingControlActuator extends Task {
 	
 	private void updateParameters(double timeOffsetInSecs) {
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			System.out.print("Alaph #" + nodeId + ": ");
-			alpha[nodeId].updateControlParameters(timeOffsetInSecs);
+			String info = alpha[nodeId].updateControlParameters(timeOffsetInSecs);
+			System.out.print("Alpha #" + nodeId + ": " + info);
 		}
 	}
 	
