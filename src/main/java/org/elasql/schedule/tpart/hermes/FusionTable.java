@@ -5,9 +5,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
+import org.elasql.util.PeriodicalJob;
+import org.vanilladb.core.sql.Constant;
 
 public class FusionTable {
 
@@ -106,6 +109,23 @@ public class FusionTable {
 //				System.out.println(sb.toString());
 //			}
 //		}).start();
+		
+		// Debug: Show the TPC-C records of partition 0 are distributed in each partition
+		new PeriodicalJob(5_000, 360_000, new Runnable() {
+			@Override
+			public void run() {
+				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+				time /= 1000;
+				
+				StringBuffer sb = new StringBuffer();
+				sb.append(String.format("Time: %d seconds - Data: ", time));
+				for (int i = 0; i < countsPerParts.length; i++)
+					sb.append(String.format("%d, ", countsPerParts[i]));
+				sb.delete(sb.length() - 2, sb.length());
+				
+				System.out.println(sb.toString());
+			}
+		}).start();
 
 		// Debug: show how many records are cached in each table
 //		new PeriodicalJob(5_000, 2400_000, new Runnable() {
@@ -163,18 +183,18 @@ public class FusionTable {
 		Integer slotId = keyToSlotIds.get(key);
 
 		if (slotId != null) {
-			countsPerParts[locations[slotId].partId]--;
+			decrementCount(key, locations[slotId].partId);
 			locations[slotId].partId = partId;
 			locations[slotId].referenced = true;
 		} else {
 			if (overflowedKeys.containsKey(key)) {
-				countsPerParts[overflowedKeys.get(key)]--;
+				decrementCount(key, overflowedKeys.get(key));
 				overflowedKeys.put(key, partId);
 			} else
 				insertNewRecord(key, partId);
 		}
-
-		countsPerParts[partId]++;
+		
+		incrementCount(key, partId);
 	}
 
 	public int getLocation(PrimaryKey key) {
@@ -212,7 +232,7 @@ public class FusionTable {
 		if (slotId != null) {
 			locations[slotId].key = null;
 			size--;
-			countsPerParts[locations[slotId].partId]--;
+			decrementCount(key, locations[slotId].partId);
 
 			// add to the free chain
 			locations[slotId].nextFreeSlotId = firstFreeSlot;
@@ -223,7 +243,7 @@ public class FusionTable {
 			Integer partId = overflowedKeys.remove(key);
 			if (partId != null) {
 				size--;
-				countsPerParts[partId]--;
+				decrementCount(key, partId);
 				return partId;
 			} else
 				return -1;
@@ -244,6 +264,55 @@ public class FusionTable {
 
 	public Set<PrimaryKey> getOverflowKeys() {
 		return new HashSet<PrimaryKey>(overflowedKeys.keySet());
+	}
+	
+	private Integer getWarehouseId(PrimaryKey key) {
+		// For other tables, partitioned by wid
+		Constant widCon;
+		switch (key.getTableName()) {
+		case "warehouse":
+			widCon = key.getVal("w_id");
+			break;
+		case "district":
+			widCon = key.getVal("d_w_id");
+			break;
+		case "stock":
+			widCon = key.getVal("s_w_id");
+			break;
+		case "customer":
+			widCon = key.getVal("c_w_id");
+			break;
+		case "history":
+			widCon = key.getVal("h_c_w_id");
+			break;
+		case "orders":
+			widCon = key.getVal("o_w_id");
+			break;
+		case "new_order":
+			widCon = key.getVal("no_w_id");
+			break;
+		case "order_line":
+			widCon = key.getVal("ol_w_id");
+			break;
+		default:
+			return null;
+		}
+		
+		return (Integer) widCon.asJavaVal();
+	}
+	
+	private boolean isPartition0Record(PrimaryKey key) {
+		return getWarehouseId(key) <= 10;
+	}
+	
+	private void incrementCount(PrimaryKey key, int partId) {
+		if (isPartition0Record(key))
+			countsPerParts[partId]++;
+	}
+	
+	private void decrementCount(PrimaryKey key, int partId) {
+		if (isPartition0Record(key))
+			countsPerParts[partId]--;
 	}
 
 	private void insertNewRecord(PrimaryKey key, int partId) {

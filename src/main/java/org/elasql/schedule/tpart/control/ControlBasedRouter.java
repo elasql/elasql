@@ -12,6 +12,7 @@ import org.elasql.perf.tpart.control.ControlParamUpdateProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class ControlBasedRouter implements BatchNodeInserter {
@@ -45,7 +46,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 			if (task.getProcedure().getClass().equals(ControlParamUpdateProcedure.class)) {
 				ControlParamUpdateProcedure procedure = 
 						(ControlParamUpdateProcedure) task.getProcedure();
-				updateParameters(procedure.getParamHelper());
+//				updateParameters(procedure.getParamHelper());
 			} else {
 				insert(graph, task);
 
@@ -98,7 +99,8 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		}
 		
 		// Debug
-		assignedCounts[bestMasterId]++;
+		if (isPartition0Tx(task))
+			assignedCounts[bestMasterId]++;
 		
 		graph.insertTxNode(task, bestMasterId);
 	}
@@ -111,6 +113,22 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		// TODO: Disk I/O Factor and Network I/O Factor
 		return e - paramAlpha[masterId] * cpuFactor;
 	}
+	
+	private boolean isPartition0Tx(TPartStoredProcedureTask task) {
+		// Find the warehouse record and check w_id
+		for (PrimaryKey key : task.getReadSet()) {
+			if (key.getTableName().equals("warehouse")) {
+				int wid = (Integer) key.getVal("w_id").asJavaVal();
+				if (wid <= 10) {
+					return true;
+				} else {
+					return false;
+				}
+			}
+		}
+		
+		throw new RuntimeException("Something wrong");
+	}
 
 	// Debug: show the distribution of assigned masters
 	private void reportRoutingDistribution(long currentTime) {
@@ -119,7 +137,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		} else if (currentTime - lastReportTime > 5_000_000) {
 			StringBuffer sb = new StringBuffer();
 			
-			sb.append(String.format("Time: %d seconds - ", currentTime / 1_000_000));
+			sb.append(String.format("Time: %d seconds - Routing: ", currentTime / 1_000_000));
 			for (int i = 0; i < assignedCounts.length; i++) {
 				sb.append(String.format("%d, ", assignedCounts[i]));
 				assignedCounts[i] = 0;
