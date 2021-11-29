@@ -46,7 +46,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 			if (task.getProcedure().getClass().equals(ControlParamUpdateProcedure.class)) {
 				ControlParamUpdateProcedure procedure = 
 						(ControlParamUpdateProcedure) task.getProcedure();
-//				updateParameters(procedure.getParamHelper());
+				updateParameters(procedure.getParamHelper());
 			} else {
 				insert(graph, task);
 
