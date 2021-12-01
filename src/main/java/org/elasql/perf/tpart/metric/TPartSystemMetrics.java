@@ -16,6 +16,7 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		private int bufferReadWaitCount;
 		private int bufferWriteWaitCount;
+		private int blockWaitCount;
 		
 		// CPU Usage and Load
 		private long[] systemCpuLoadTicks;
@@ -54,6 +55,10 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		public void setBufferWriteWaitCount(int bufferWriteWaitCount) {
 			this.bufferWriteWaitCount = bufferWriteWaitCount;
+		}
+		
+		public void setBlockWaitCount(int blockWaitCount) {
+			this.blockWaitCount = blockWaitCount;
 		}
 		
 		public void setSystemCpuLoadTicks(long[] systemCpuLoadTicks) {
@@ -102,6 +107,7 @@ public class TPartSystemMetrics implements MetricReport {
 			
 			metrics.bufferReadWaitCount = bufferReadWaitCount;
 			metrics.bufferWriteWaitCount = bufferWriteWaitCount;
+			metrics.blockWaitCount = blockWaitCount;
 			
 			metrics.systemCpuLoadTicks = systemCpuLoadTicks;
 			metrics.systemLoadAverage = systemLoadAverage;
@@ -127,6 +133,7 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	private int bufferReadWaitCount;
 	private int bufferWriteWaitCount;
+	private int blockWaitCount;
 	
 	// CPU Usage and Loading
 	private long[] systemCpuLoadTicks;
@@ -167,6 +174,10 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getBufferWriteWaitCount() {
 		return bufferWriteWaitCount;
+	}
+	
+	public int getBlockWaitCount() {
+		return blockWaitCount;
 	}
 	
 	public long[] getSystemCpuLoadTicks() {

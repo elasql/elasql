@@ -71,6 +71,7 @@ public class FeatureExtractor {
 		
 		builder.addFeature("Buffer RL Wait Count", extractBufferReadWaitCount());
 		builder.addFeature("Buffer WL Wait Count", extractBufferWriteWaitCount());
+		builder.addFeature("Block Lock Wait Count", extractBlockLockWaitCount());
 
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
@@ -140,6 +141,16 @@ public class FeatureExtractor {
 			bufferWaitCounts[serverId] = metricWarehouse.getBufferWriteWaitCount(serverId);
 		
 		return bufferWaitCounts;
+	}
+	
+	private Integer[] extractBlockLockWaitCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] blockWaitCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			blockWaitCounts[serverId] = metricWarehouse.getBlockWaitCount(serverId);
+		
+		return blockWaitCounts;
 	}
 	
 	private Double[] extractSystemCpuLoad() {
