@@ -4,6 +4,7 @@ import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.storage.buffer.BufferPoolMonitor;
+import org.vanilladb.core.storage.tx.concurrency.LockTable;
 import org.vanilladb.core.util.TransactionProfiler;
 
 import oshi.SystemInfo;
@@ -19,7 +20,6 @@ import oshi.software.os.OperatingSystem;
  * @author Yu-Shan Lin
  */
 public class MetricCollector extends Task {
-
 	private static final int SYSTEM_METRIC_INTERVAL = 100; // in milliseconds
 
 	private TransactionMetricRecorder metricRecorder;
@@ -96,6 +96,7 @@ public class MetricCollector extends Task {
 		
 		builder.setBufferReadWaitCount(BufferPoolMonitor.getReadWaitCount());
 		builder.setBufferWriteWaitCount(BufferPoolMonitor.getWriteWaitCount());
+		builder.setBlockWaitDiff(BufferPoolMonitor.getBlockWaitDiff());
 		builder.setBlockWaitCount(BufferPoolMonitor.getBlockWaitCount());
 		
 		collectCpuLoad(builder);

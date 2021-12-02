@@ -46,6 +46,7 @@ public class TransactionFeatures {
 		
 		featureKeys.add("Buffer RL Wait Count");
 		featureKeys.add("Buffer WL Wait Count");
+		featureKeys.add("Block Lock Wait Diff");
 		featureKeys.add("Block Lock Wait Count");
 		
 		featureKeys.add("System CPU Load");

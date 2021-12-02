@@ -120,6 +120,15 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
+	public synchronized int getBlockWaitDiff(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getBlockWaitDiff();
+		}
+	}
+	
 	public synchronized int getBlockWaitCount(int serverId) {
 		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {
