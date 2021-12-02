@@ -4,7 +4,6 @@ import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.storage.buffer.BufferPoolMonitor;
-import org.vanilladb.core.storage.tx.concurrency.LockTable;
 import org.vanilladb.core.util.TransactionProfiler;
 
 import oshi.SystemInfo;
