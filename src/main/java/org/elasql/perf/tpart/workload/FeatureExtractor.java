@@ -71,7 +71,7 @@ public class FeatureExtractor {
 		
 		builder.addFeature("Buffer RL Wait Count", extractBufferReadWaitCount());
 		builder.addFeature("Buffer WL Wait Count", extractBufferWriteWaitCount());
-		builder.addFeature("Block Lock Wait Diff", extractBlockLockWaitDiff());
+		builder.addFeature("Block Lock Release Count", extractBlockLockReleaseCount());
 		builder.addFeature("Block Lock Wait Count", extractBlockLockWaitCount());
 
 		// Features below are from the servers
@@ -144,12 +144,12 @@ public class FeatureExtractor {
 		return bufferWaitCounts;
 	}
 	
-	private Integer[] extractBlockLockWaitDiff() {
+	private Integer[] extractBlockLockReleaseCount() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
 		Integer[] blockWaitDiffs = new Integer[serverCount];
 		
 		for (int serverId = 0; serverId < serverCount; serverId++)	
-			blockWaitDiffs[serverId] = metricWarehouse.getBlockWaitDiff(serverId);
+			blockWaitDiffs[serverId] = metricWarehouse.getBlockReleaseCount(serverId);
 		
 		return blockWaitDiffs;
 	}

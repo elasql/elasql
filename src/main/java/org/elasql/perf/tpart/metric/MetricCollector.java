@@ -96,7 +96,7 @@ public class MetricCollector extends Task {
 		
 		builder.setBufferReadWaitCount(BufferPoolMonitor.getReadWaitCount());
 		builder.setBufferWriteWaitCount(BufferPoolMonitor.getWriteWaitCount());
-		builder.setBlockWaitDiff(BufferPoolMonitor.getBlockWaitDiff());
+		builder.setBlockReleaseCount(BufferPoolMonitor.getBlockReleaseCount());
 		builder.setBlockWaitCount(BufferPoolMonitor.getBlockWaitCount());
 		
 		collectCpuLoad(builder);

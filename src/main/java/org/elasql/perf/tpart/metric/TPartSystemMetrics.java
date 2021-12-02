@@ -16,7 +16,7 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		private int bufferReadWaitCount;
 		private int bufferWriteWaitCount;
-		private int blockWaitDiff;
+		private int blockReleaseCount;
 		private int blockWaitCount;
 		
 		// CPU Usage and Load
@@ -58,8 +58,8 @@ public class TPartSystemMetrics implements MetricReport {
 			this.bufferWriteWaitCount = bufferWriteWaitCount;
 		}
 		
-		public void setBlockWaitDiff(int blockWaitDiff) {
-			this.blockWaitDiff = blockWaitDiff;
+		public void setBlockReleaseCount(int blockReleaseCount) {
+			this.blockReleaseCount = blockReleaseCount;
 		}
 		
 		public void setBlockWaitCount(int blockWaitCount) {
@@ -112,7 +112,7 @@ public class TPartSystemMetrics implements MetricReport {
 			
 			metrics.bufferReadWaitCount = bufferReadWaitCount;
 			metrics.bufferWriteWaitCount = bufferWriteWaitCount;
-			metrics.blockWaitDiff = blockWaitDiff;
+			metrics.blockReleaseCount = blockReleaseCount;
 			metrics.blockWaitCount = blockWaitCount;
 			
 			metrics.systemCpuLoadTicks = systemCpuLoadTicks;
@@ -139,7 +139,7 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	private int bufferReadWaitCount;
 	private int bufferWriteWaitCount;
-	private int blockWaitDiff;
+	private int blockReleaseCount;
 	private int blockWaitCount;
 	
 	// CPU Usage and Loading
@@ -183,8 +183,8 @@ public class TPartSystemMetrics implements MetricReport {
 		return bufferWriteWaitCount;
 	}
 	
-	public int getBlockWaitDiff() {
-		return blockWaitDiff;
+	public int getBlockReleaseCount() {
+		return blockReleaseCount;
 	}
 	
 	public int getBlockWaitCount() {
