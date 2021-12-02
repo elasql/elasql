@@ -18,6 +18,8 @@ public class TPartSystemMetrics implements MetricReport {
 		private int bufferWriteWaitCount;
 		private int blockReleaseCount;
 		private int blockWaitCount;
+		private int fhpReleaseCount;
+		private int fhpWaitCount;
 		
 		// CPU Usage and Load
 		private long[] systemCpuLoadTicks;
@@ -64,6 +66,14 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		public void setBlockWaitCount(int blockWaitCount) {
 			this.blockWaitCount = blockWaitCount;
+		}
+		
+		public void setFhpReleaseCount(int fhpReleaseCount) {
+			this.fhpReleaseCount = fhpReleaseCount;
+		}
+		
+		public void setFhpWaitCount(int fhpWaitCount) {
+			this.fhpWaitCount = fhpWaitCount;
 		}
 		
 		public void setSystemCpuLoadTicks(long[] systemCpuLoadTicks) {
@@ -114,6 +124,8 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.bufferWriteWaitCount = bufferWriteWaitCount;
 			metrics.blockReleaseCount = blockReleaseCount;
 			metrics.blockWaitCount = blockWaitCount;
+			metrics.fhpReleaseCount = fhpReleaseCount;
+			metrics.fhpWaitCount = fhpWaitCount;
 			
 			metrics.systemCpuLoadTicks = systemCpuLoadTicks;
 			metrics.systemLoadAverage = systemLoadAverage;
@@ -141,6 +153,8 @@ public class TPartSystemMetrics implements MetricReport {
 	private int bufferWriteWaitCount;
 	private int blockReleaseCount;
 	private int blockWaitCount;
+	private int fhpReleaseCount;
+	private int fhpWaitCount;
 	
 	// CPU Usage and Loading
 	private long[] systemCpuLoadTicks;
@@ -189,6 +203,14 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getBlockWaitCount() {
 		return blockWaitCount;
+	}
+	
+	public int getFhpReleaseCount() {
+		return fhpReleaseCount;
+	}
+	
+	public int getFhpWaitCount() {
+		return fhpWaitCount;
 	}
 	
 	public long[] getSystemCpuLoadTicks() {

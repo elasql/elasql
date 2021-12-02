@@ -138,6 +138,24 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
+	public synchronized int getFhpReleaseCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getFhpReleaseCount();
+		}
+	}
+	
+	public synchronized int getFhpWaitCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getFhpWaitCount();
+		}
+	}
+	
 	public synchronized double getProcessCpuLoad(int serverId) {
 		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.size() < 2) {
