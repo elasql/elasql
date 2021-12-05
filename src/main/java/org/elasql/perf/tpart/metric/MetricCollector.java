@@ -3,6 +3,7 @@ package org.elasql.perf.tpart.metric;
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.storage.buffer.Buffer;
 import org.vanilladb.core.storage.buffer.BufferPoolMonitor;
 import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.util.TransactionProfiler;
@@ -100,6 +101,8 @@ public class MetricCollector extends Task {
 		builder.setBlockWaitCount(BufferPoolMonitor.getBlockWaitCount());
 		builder.setFhpReleaseCount(RecordFile.fhpReleaseCount());
 		builder.setFhpWaitCount(RecordFile.fhpWaitCount());
+		builder.setPageGetValReleaseCount(Buffer.getPageGetValReleaseCount());
+		builder.setPageSetValReleaseCount(Buffer.getPageSetValReleaseCount());
 		
 		collectCpuLoad(builder);
 		builder.setThreadActiveCount(getThreadActiveCount());

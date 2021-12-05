@@ -20,6 +20,8 @@ public class TPartSystemMetrics implements MetricReport {
 		private int blockWaitCount;
 		private int fhpReleaseCount;
 		private int fhpWaitCount;
+		private int pageGetValReleaseCount;
+		private int pageSetValReleaseCount;
 		
 		// CPU Usage and Load
 		private long[] systemCpuLoadTicks;
@@ -76,6 +78,14 @@ public class TPartSystemMetrics implements MetricReport {
 			this.fhpWaitCount = fhpWaitCount;
 		}
 		
+		public void setPageGetValReleaseCount(int pageGetValReleaseCount) {
+			this.pageGetValReleaseCount = pageGetValReleaseCount;
+		}
+		
+		public void setPageSetValReleaseCount(int pageSetValReleaseCount) {
+			this.pageSetValReleaseCount = pageSetValReleaseCount;
+		}
+		
 		public void setSystemCpuLoadTicks(long[] systemCpuLoadTicks) {
 			this.systemCpuLoadTicks = systemCpuLoadTicks;
 		}
@@ -126,6 +136,8 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.blockWaitCount = blockWaitCount;
 			metrics.fhpReleaseCount = fhpReleaseCount;
 			metrics.fhpWaitCount = fhpWaitCount;
+			metrics.pageGetValReleaseCount = pageGetValReleaseCount;
+			metrics.pageSetValReleaseCount = pageSetValReleaseCount;
 			
 			metrics.systemCpuLoadTicks = systemCpuLoadTicks;
 			metrics.systemLoadAverage = systemLoadAverage;
@@ -155,6 +167,8 @@ public class TPartSystemMetrics implements MetricReport {
 	private int blockWaitCount;
 	private int fhpReleaseCount;
 	private int fhpWaitCount;
+	private int pageGetValReleaseCount;
+	private int pageSetValReleaseCount;
 	
 	// CPU Usage and Loading
 	private long[] systemCpuLoadTicks;
@@ -211,6 +225,14 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getFhpWaitCount() {
 		return fhpWaitCount;
+	}
+	
+	public int getPageGetValReleaseCount() {
+		return pageGetValReleaseCount;
+	}
+	
+	public int getPageSetValReleaseCount() {
+		return pageSetValReleaseCount;
 	}
 	
 	public long[] getSystemCpuLoadTicks() {
