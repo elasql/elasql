@@ -156,6 +156,24 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
+	public synchronized int getPageGetValWaitCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getPageGetValWaitCount();
+		}
+	}
+	
+	public synchronized int getPageSetValWaitCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getPageSetValWaitCount();
+		}
+	}
+	
 	public synchronized int getPageGetValReleaseCount(int serverId) {
 		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.isEmpty()) {

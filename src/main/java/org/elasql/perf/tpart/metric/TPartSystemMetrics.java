@@ -20,6 +20,8 @@ public class TPartSystemMetrics implements MetricReport {
 		private int blockWaitCount;
 		private int fhpReleaseCount;
 		private int fhpWaitCount;
+		private int pageGetValWaitCount;
+		private int pageSetValWaitCount;
 		private int pageGetValReleaseCount;
 		private int pageSetValReleaseCount;
 		
@@ -76,6 +78,14 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		public void setFhpWaitCount(int fhpWaitCount) {
 			this.fhpWaitCount = fhpWaitCount;
+		}
+		
+		public void setPageGetValWaitCount(int pageGetValWaitCount) {
+			this.pageGetValWaitCount = pageGetValWaitCount;
+		}
+		
+		public void setPageSetValWaitCount(int pageSetValWaitCount) {
+			this.pageSetValWaitCount = pageSetValWaitCount;
 		}
 		
 		public void setPageGetValReleaseCount(int pageGetValReleaseCount) {
@@ -136,6 +146,8 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.blockWaitCount = blockWaitCount;
 			metrics.fhpReleaseCount = fhpReleaseCount;
 			metrics.fhpWaitCount = fhpWaitCount;
+			metrics.pageGetValWaitCount = pageGetValWaitCount;
+			metrics.pageSetValWaitCount = pageSetValWaitCount;
 			metrics.pageGetValReleaseCount = pageGetValReleaseCount;
 			metrics.pageSetValReleaseCount = pageSetValReleaseCount;
 			
@@ -167,6 +179,8 @@ public class TPartSystemMetrics implements MetricReport {
 	private int blockWaitCount;
 	private int fhpReleaseCount;
 	private int fhpWaitCount;
+	private int pageGetValWaitCount;
+	private int pageSetValWaitCount;
 	private int pageGetValReleaseCount;
 	private int pageSetValReleaseCount;
 	
@@ -225,6 +239,14 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public int getFhpWaitCount() {
 		return fhpWaitCount;
+	}
+	
+	public int getPageGetValWaitCount() {
+		return pageGetValWaitCount;
+	}
+	
+	public int getPageSetValWaitCount() {
+		return pageSetValWaitCount;
 	}
 	
 	public int getPageGetValReleaseCount() {

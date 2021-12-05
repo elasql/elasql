@@ -101,6 +101,8 @@ public class MetricCollector extends Task {
 		builder.setBlockWaitCount(BufferPoolMonitor.getBlockWaitCount());
 		builder.setFhpReleaseCount(RecordFile.fhpReleaseCount());
 		builder.setFhpWaitCount(RecordFile.fhpWaitCount());
+		builder.setPageGetValReleaseCount(Buffer.getPageGetValWaitCount());
+		builder.setPageSetValReleaseCount(Buffer.getPageSetValWaitCount());
 		builder.setPageGetValReleaseCount(Buffer.getPageGetValReleaseCount());
 		builder.setPageSetValReleaseCount(Buffer.getPageSetValReleaseCount());
 		
