@@ -31,4 +31,9 @@ public class ControlParamUpdateProcedure extends TPartStoredProcedure<ControlPar
 	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
 		// Do nothing
 	}
+	
+	@Override
+	public ProcedureType getProcedureType() {
+		return ProcedureType.CONTROL;
+	}
 }

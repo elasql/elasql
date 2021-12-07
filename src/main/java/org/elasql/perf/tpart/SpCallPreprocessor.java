@@ -94,7 +94,8 @@ public class SpCallPreprocessor extends Task {
 				TPartStoredProcedureTask task = createSpTask(spc);
 				
 				// Add normal SPs to the task batch
-				if (task.getProcedureType() == ProcedureType.NORMAL) {
+				if (task.getProcedureType() == ProcedureType.NORMAL ||
+						task.getProcedureType() == ProcedureType.CONTROL) {
 					// Pre-process the transaction 
 					if (TPartPerformanceManager.ENABLE_COLLECTING_DATA ||
 							performanceEstimator != null) {
@@ -139,7 +140,8 @@ public class SpCallPreprocessor extends Task {
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph);
 		
 		// Record the feature if necessary
-		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
+		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
+				task.getProcedureType() != ProcedureType.CONTROL) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
 		}
