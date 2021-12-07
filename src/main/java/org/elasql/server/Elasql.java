@@ -292,7 +292,7 @@ public class Elasql extends VanillaDb {
 			graph = new FusionTGraph(table); 
 			inserter = new ControlBasedRouter(); 
 			sinker = new FusionSinker(table); 
-			isBatching = true; 
+			isBatching = false; 
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
@@ -382,7 +382,7 @@ public class Elasql extends VanillaDb {
 			case HERMES_CONTROL:
 				graph = new FusionTGraph(new FusionTable()); 
 				inserter = new ControlBasedRouter();
-				isBatching = true;
+				isBatching = false;
 				break; 
 			default: 
 				throw new IllegalArgumentException("Not supported"); 
