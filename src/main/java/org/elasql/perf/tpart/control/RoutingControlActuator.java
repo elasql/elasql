@@ -142,12 +142,13 @@ public class RoutingControlActuator extends Task {
 		double average = sum / PartitionMetaMgr.NUM_PARTITIONS;
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
 			alpha[nodeId].setReference(average);
+//			alpha[nodeId].setReference(0.8);
 	}
 	
 	private void updateParameters(double timeOffsetInSecs) {
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
 			String info = alpha[nodeId].updateControlParameters(timeOffsetInSecs);
-			System.out.print("Alpha #" + nodeId + ": " + info);
+			System.out.println("Alpha #" + nodeId + ": " + info);
 		}
 	}
 	
