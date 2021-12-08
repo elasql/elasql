@@ -5,10 +5,28 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class ReadCountEstimator implements Estimator {
 	
-	private static double[] latency = new double[] {10, 7.423, 4.765};
+//	private static double[] latency = new double[] {10, 7.423, 4.765};
+//	private static int[] masterCpuTime = new int[] {60, 90, 120};
+//	private static int[] slaveCpuTime = new int[] {22, 52, 82};
 	
-	private static int[] masterCpuTime = new int[] {60, 90, 120};
-	private static int[] slaveCpuTime = new int[] {22, 52, 82};
+	private static final int MAX_READ = 24;
+	
+	// TPC-C
+	private static double[] latency;
+	private static int[] masterCpuTime;
+	private static int[] slaveCpuTime;
+	
+	static {
+		latency = new double[MAX_READ];
+		masterCpuTime = new int[MAX_READ];
+		slaveCpuTime = new int[MAX_READ];
+		
+		for (int i = 0; i < MAX_READ; i++) {
+			latency[MAX_READ - i - 1] = 50 + i * 5;
+			masterCpuTime[i] = 200 + i * 50;
+			slaveCpuTime[i] = 100 + i * 50;
+		}
+	}
 	
 	@Override
 	public TransactionEstimation estimate(TransactionFeatures features) {

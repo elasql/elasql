@@ -30,35 +30,71 @@ public class TPartPerformanceManager implements PerformanceManager {
 		ESTIMATOR_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger( 
 				TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
 	}
+	
+	public static TPartPerformanceManager newForSequencer(
+			TPartStoredProcedureFactory factory, 
+			BatchNodeInserter inserter, TGraph graph, boolean isBatching) {
+		// The sequencer maintains a SpCallPreprocessor and a warehouse.
+		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
+		Elasql.taskMgr().runTask(metricWarehouse);
+		
+		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(
+				factory, inserter, graph, isBatching, metricWarehouse,
+				newEstimator());
+		Elasql.taskMgr().runTask(spCallPreprocessor);
+		
+		// Hermes-Control has a control actuator
+		RoutingControlActuator actuator = null;
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
+			actuator = new RoutingControlActuator(metricWarehouse);
+			Elasql.taskMgr().runTask(actuator);
+		}
+		
+		return new TPartPerformanceManager(spCallPreprocessor,
+				metricWarehouse, actuator);
+	}
+	
+	public static TPartPerformanceManager newForDbServer() {
+		MetricCollector localMetricCollector = new MetricCollector();
+		Elasql.taskMgr().runTask(localMetricCollector);
+		
+		return new TPartPerformanceManager(localMetricCollector);
+	}
+	
+	private static Estimator newEstimator() {
+		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_CONTROL) {
+			return null;
+		}
+		
+		switch (ESTIMATOR_TYPE) {
+		case 0:
+			return new ConstantEstimator();
+		case 1:	
+			return new ReadCountEstimator();
+		default: 
+			throw new IllegalArgumentException("Not supported");
+		}
+	}
 
 	// On the sequencer
 	private SpCallPreprocessor spCallPreprocessor;
 	private TpartMetricWarehouse metricWarehouse;
+	private RoutingControlActuator actuator;
 	
 	// On each DB machine
 	private MetricCollector localMetricCollector;
 	
-	public TPartPerformanceManager(TPartStoredProcedureFactory factory, 
-			BatchNodeInserter inserter, TGraph graph,
-			boolean isBatching) {
-		if (Elasql.isStandAloneSequencer()) {
-			// The sequencer maintains a SpCallPreprocessor and a warehouse.
-			metricWarehouse = new TpartMetricWarehouse();
-			Elasql.taskMgr().runTask(metricWarehouse);
-			
-			spCallPreprocessor = new SpCallPreprocessor(factory, inserter,
-					graph, isBatching, metricWarehouse, getEstimator());
-			Elasql.taskMgr().runTask(spCallPreprocessor);
-			
-			// Hermes-Control has a control actuator
-			if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
-				Elasql.taskMgr().runTask(new RoutingControlActuator(metricWarehouse));
-			}
-		} else {
-			localMetricCollector = new MetricCollector();
-			Elasql.taskMgr().runTask(localMetricCollector);
-		}
-	} 
+	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor,
+			TpartMetricWarehouse metricWarehouse,
+			RoutingControlActuator actuator) {
+		this.spCallPreprocessor = spCallPreprocessor;
+		this.metricWarehouse = metricWarehouse;
+		this.actuator = actuator;
+	}
+	
+	private TPartPerformanceManager(MetricCollector localMetricCollector) {
+		this.localMetricCollector = localMetricCollector;
+	}
 
 	@Override
 	public void preprocessSpCall(StoredProcedureCall spc) {
@@ -84,20 +120,5 @@ public class TPartPerformanceManager implements PerformanceManager {
 	@Override
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
-	}
-	
-	private Estimator getEstimator() {
-		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_CONTROL) {
-			return null;
-		}
-		
-		switch (ESTIMATOR_TYPE) {
-		case 0:
-			return new ConstantEstimator();
-		case 1:	
-			return new ReadCountEstimator();
-		default: 
-			throw new IllegalArgumentException("Not supported");
-		}
 	}
 }

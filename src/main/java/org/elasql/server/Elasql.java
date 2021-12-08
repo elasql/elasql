@@ -269,7 +269,8 @@ public class Elasql extends VanillaDb {
 		case HERMES: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new HermesNodeInserter(); 
+			inserter = new HermesNodeInserter();
+//			inserter = new HotAvoidanceRouter();
 			sinker = new FusionSinker(table); 
 			isBatching = true; 
 			break; 
@@ -291,7 +292,7 @@ public class Elasql extends VanillaDb {
 			graph = new FusionTGraph(table); 
 			inserter = new ControlBasedRouter(); 
 			sinker = new FusionSinker(table); 
-			isBatching = true; 
+			isBatching = false; 
 			break; 
 		default: 
 			throw new IllegalArgumentException("Not supported"); 
@@ -351,45 +352,46 @@ public class Elasql extends VanillaDb {
 	}
 	
 	private static TPartPerformanceManager newTPartPerfMgr(TPartStoredProcedureFactory factory) {
-		TGraph graph; 
-		BatchNodeInserter inserter;
-		FusionTable table; 
-		boolean isBatching = true;
-		 
-		switch (SERVICE_TYPE) { 
-		case TPART: 
-			graph = new TGraph(); 
-			inserter = new CostAwareNodeInserter();
-			isBatching = true;
-			break; 
-		case HERMES: 
-			table = new FusionTable(); 
-			graph = new FusionTGraph(table); 
-			inserter = new HermesNodeInserter();
-			isBatching = true;
-			break; 
-		case G_STORE: 
-			graph = new TGraph(); 
-			inserter = new LocalFirstNodeInserter();
-			isBatching = false;
-			break; 
-		case LEAP: 
-			table = new FusionTable(); 
-			graph = new FusionTGraph(table); 
-			inserter = new LocalFirstNodeInserter();
-			isBatching = false;
-			break; 
-		case HERMES_CONTROL:
-			table = new FusionTable(); 
-			graph = new FusionTGraph(table); 
-			inserter = new ControlBasedRouter();
-			isBatching = true;
-			break; 
-		default: 
-			throw new IllegalArgumentException("Not supported"); 
-		} 
-		 
-		return new TPartPerformanceManager(factory, inserter, graph, isBatching); 
+		if (isStandAloneSequencer()) {
+			TGraph graph = null; 
+			BatchNodeInserter inserter;
+			boolean isBatching = true;
+			 
+			switch (SERVICE_TYPE) { 
+			case TPART: 
+				graph = new TGraph(); 
+				inserter = new CostAwareNodeInserter();
+				isBatching = true;
+				break; 
+			case HERMES:
+				graph = new FusionTGraph(new FusionTable()); 
+				inserter = new HermesNodeInserter();
+//				inserter = new HotAvoidanceRouter();
+				isBatching = true;
+				break; 
+			case G_STORE: 
+				graph = new TGraph(); 
+				inserter = new LocalFirstNodeInserter();
+				isBatching = false;
+				break; 
+			case LEAP: 
+				graph = new FusionTGraph(new FusionTable()); 
+				inserter = new LocalFirstNodeInserter();
+				isBatching = false;
+				break; 
+			case HERMES_CONTROL:
+				graph = new FusionTGraph(new FusionTable()); 
+				inserter = new ControlBasedRouter();
+				isBatching = false;
+				break; 
+			default: 
+				throw new IllegalArgumentException("Not supported"); 
+			} 
+			 
+			return TPartPerformanceManager.newForSequencer(factory, inserter, graph, isBatching); 
+		} else {
+			return TPartPerformanceManager.newForDbServer();
+		}
 	}
  
 	// ================ 
