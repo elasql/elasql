@@ -12,7 +12,6 @@ import org.elasql.perf.tpart.control.ControlParamUpdateProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
-import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class ControlBasedRouter implements BatchNodeInserter {
@@ -99,8 +98,8 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		}
 		
 		// Debug
-		if (isPartition0Tx(task))
-			assignedCounts[bestMasterId]++;
+//		if (isPartition0Tx(task))
+		assignedCounts[bestMasterId]++;
 		
 		graph.insertTxNode(task, bestMasterId);
 	}
@@ -114,21 +113,21 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		return e - paramAlpha[masterId] * cpuFactor;
 	}
 	
-	private boolean isPartition0Tx(TPartStoredProcedureTask task) {
-		// Find the warehouse record and check w_id
-		for (PrimaryKey key : task.getReadSet()) {
-			if (key.getTableName().equals("warehouse")) {
-				int wid = (Integer) key.getVal("w_id").asJavaVal();
-				if (wid <= 10) {
-					return true;
-				} else {
-					return false;
-				}
-			}
-		}
-		
-		throw new RuntimeException("Something wrong");
-	}
+//	private boolean isPartition0Tx(TPartStoredProcedureTask task) {
+//		// Find the warehouse record and check w_id
+//		for (PrimaryKey key : task.getReadSet()) {
+//			if (key.getTableName().equals("warehouse")) {
+//				int wid = (Integer) key.getVal("w_id").asJavaVal();
+//				if (wid <= 10) {
+//					return true;
+//				} else {
+//					return false;
+//				}
+//			}
+//		}
+//		
+//		throw new RuntimeException("Something wrong");
+//	}
 
 	// Debug: show the distribution of assigned masters
 	private void reportRoutingDistribution(long currentTime) {

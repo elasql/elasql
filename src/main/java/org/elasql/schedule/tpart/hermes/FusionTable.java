@@ -5,11 +5,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
-import org.elasql.util.PeriodicalJob;
 import org.vanilladb.core.sql.Constant;
 
 public class FusionTable {
@@ -111,21 +109,21 @@ public class FusionTable {
 //		}).start();
 		
 		// Debug: Show the TPC-C records of partition 0 are distributed in each partition
-		new PeriodicalJob(5_000, 360_000, new Runnable() {
-			@Override
-			public void run() {
-				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
-				time /= 1000;
-				
-				StringBuffer sb = new StringBuffer();
-				sb.append(String.format("Time: %d seconds - Data: ", time));
-				for (int i = 0; i < countsPerParts.length; i++)
-					sb.append(String.format("%d, ", countsPerParts[i]));
-				sb.delete(sb.length() - 2, sb.length());
-				
-				System.out.println(sb.toString());
-			}
-		}).start();
+//		new PeriodicalJob(5_000, 360_000, new Runnable() {
+//			@Override
+//			public void run() {
+//				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+//				time /= 1000;
+//				
+//				StringBuffer sb = new StringBuffer();
+//				sb.append(String.format("Time: %d seconds - Data: ", time));
+//				for (int i = 0; i < countsPerParts.length; i++)
+//					sb.append(String.format("%d, ", countsPerParts[i]));
+//				sb.delete(sb.length() - 2, sb.length());
+//				
+//				System.out.println(sb.toString());
+//			}
+//		}).start();
 
 		// Debug: show how many records are cached in each table
 //		new PeriodicalJob(5_000, 2400_000, new Runnable() {
