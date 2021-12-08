@@ -26,6 +26,9 @@ public class PidController {
 	private double previousError;
 	private double integral;
 	
+	// For debug
+	private String latestUpdateLog = "";
+	
 	public PidController(double initialParameter) {
 		this.initialParameter = initialParameter;
 		this.controlParameter = initialParameter;
@@ -43,7 +46,7 @@ public class PidController {
 		this.reference = reference;
 	}
 	
-	public String updateControlParameters(double timeOffsetInSecs) {
+	public void updateControlParameters(double timeOffsetInSecs) {
 		double error = reference - observation;
 		
 		// Calculate PID values
@@ -59,17 +62,19 @@ public class PidController {
 		controlParameter = initialParameter * Math.exp(-controlSignal);
 		
 		// For debugging
-		String updateInfo = String.format("[%f, %f, %f, %f, %f, %f, %f, %f]",
+		latestUpdateLog = String.format("[%f, %f, %f, %f, %f, %f, %f, %f]",
 				reference, observation, error, proportional, integral,
 				derivative, controlSignal, controlParameter);
 		
 		// Record the error
 		previousError = error;
-		
-		return updateInfo;
 	}
 	
 	public double getControlParameter() {
 		return controlParameter;
+	}
+	
+	public String getLatestUpdateLog() {
+		return latestUpdateLog;
 	}
 }

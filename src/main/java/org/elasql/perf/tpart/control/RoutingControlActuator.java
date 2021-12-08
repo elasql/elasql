@@ -124,7 +124,6 @@ public class RoutingControlActuator extends Task {
 	
 	private void acquireObservations() {
 		// TODO: add disk and network I/O
-		// XXX: right observation?
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
 			double observation = metricWarehouse.getAveragedSystemCpuLoad(nodeId, UPDATE_PERIOD);
 			observation = observation / CPU_MAX_CAPACITIES[nodeId];
@@ -142,13 +141,14 @@ public class RoutingControlActuator extends Task {
 		double average = sum / PartitionMetaMgr.NUM_PARTITIONS;
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
 			alpha[nodeId].setReference(average);
-//			alpha[nodeId].setReference(0.8);
 	}
 	
 	private void updateParameters(double timeOffsetInSecs) {
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			String info = alpha[nodeId].updateControlParameters(timeOffsetInSecs);
-			System.out.println("Alpha #" + nodeId + ": " + info);
+			alpha[nodeId].updateControlParameters(timeOffsetInSecs);
+			
+			// Debug
+			System.out.println("Alpha #" + nodeId + ": " + alpha[nodeId].getLatestUpdateLog());
 		}
 	}
 	
