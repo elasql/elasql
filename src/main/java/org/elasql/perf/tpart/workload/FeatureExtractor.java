@@ -92,10 +92,10 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
 		
 		// Get dependencies
-		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
-				task.getTxNum(), task.getReadSet(), task.getWriteSet());
-		for (Long dependentTx : dependentTxs)
-			builder.addDependency(dependentTx);
+//		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
+//				task.getTxNum(), task.getReadSet(), task.getWriteSet());
+//		for (Long dependentTx : dependentTxs)
+//			builder.addDependency(dependentTx);
 		
 		return builder.build();
 	}

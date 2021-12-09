@@ -181,6 +181,8 @@ public class ConservativeOrderedLockTable {
 	 */
 	void xLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
+		
+		// TODO: Can we increase the number of anchor to decrease the conflict rate.
 		Object anchor = getAnchor(obj);
 
 		synchronized (anchor) {

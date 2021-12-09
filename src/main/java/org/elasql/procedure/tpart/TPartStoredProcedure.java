@@ -213,6 +213,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 			// Read the records from the local sink
 			profiler.startComponentProfiler("OU4 - Read from Local");
+			TransactionProfiler.setStageIndicator(4);
 			for (PrimaryKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k));
 			}
@@ -285,7 +286,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 //					
 //				} else {
 					// Normal transactions
-				profiler.startComponentProfiler("OU4 - Read from Local");
+					profiler.startComponentProfiler("OU4 - Read from Local");
+					TransactionProfiler.setStageIndicator(4);
 					for (PushInfo pushInfo : entry.getValue()) {
 						
 						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
@@ -304,7 +306,9 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
+		
 		profiler.startComponentProfiler("OU7 - Write to Local");
+		TransactionProfiler.setStageIndicator(7);
 		cache.flush(plan,  cachedEntrySet);
 		profiler.stopComponentProfiler("OU7 - Write to Local");
 	}
