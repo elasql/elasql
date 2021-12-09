@@ -46,6 +46,14 @@ public class TransactionFeatures {
 		
 		featureKeys.add("Buffer RL Wait Count");
 		featureKeys.add("Buffer WL Wait Count");
+		featureKeys.add("Block Lock Release Count");
+		featureKeys.add("Block Lock Wait Count");
+		featureKeys.add("File Header Page Release Count");
+		featureKeys.add("File Header Page Wait Count");
+		featureKeys.add("Page GetVal Wait Count");
+		featureKeys.add("Page SetVal Wait Count");
+		featureKeys.add("Page GetVal Release Count");
+		featureKeys.add("Page SetVal Release Count");
 		
 		featureKeys.add("System CPU Load");
 		featureKeys.add("Process CPU Load");

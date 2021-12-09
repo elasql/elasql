@@ -31,7 +31,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		extends StoredProcedure<H> {
 	
 	public static enum ProcedureType {
-		NOP, NORMAL, UTILITY, MIGRATION
+		NOP, NORMAL, UTILITY, MIGRATION, CONTROL
 	}
 
 	// Protected resource

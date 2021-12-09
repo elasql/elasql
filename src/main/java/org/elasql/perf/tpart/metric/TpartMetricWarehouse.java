@@ -120,6 +120,78 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
+	public synchronized int getBlockReleaseCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getBlockReleaseCount();
+		}
+	}
+	
+	public synchronized int getBlockWaitCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getBlockWaitCount();
+		}
+	}
+	
+	public synchronized int getFhpReleaseCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getFhpReleaseCount();
+		}
+	}
+	
+	public synchronized int getFhpWaitCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getFhpWaitCount();
+		}
+	}
+	
+	public synchronized int getPageGetValWaitCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getPageGetValWaitCount();
+		}
+	}
+	
+	public synchronized int getPageSetValWaitCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getPageSetValWaitCount();
+		}
+	}
+	
+	public synchronized int getPageGetValReleaseCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getPageGetValReleaseCount();
+		}
+	}
+	
+	public synchronized int getPageSetValReleaseCount(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getPageSetValReleaseCount();
+		}
+	}
+	
 	public synchronized double getProcessCpuLoad(int serverId) {
 		List<StampedMetric> history = metricStore.get(serverId);
 		if (history.size() < 2) {

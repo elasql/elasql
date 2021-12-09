@@ -71,6 +71,14 @@ public class FeatureExtractor {
 		
 		builder.addFeature("Buffer RL Wait Count", extractBufferReadWaitCount());
 		builder.addFeature("Buffer WL Wait Count", extractBufferWriteWaitCount());
+		builder.addFeature("Block Lock Release Count", extractBlockLockReleaseCount());
+		builder.addFeature("Block Lock Wait Count", extractBlockLockWaitCount());
+		builder.addFeature("File Header Page Release Count", extractFhpReleaseCount());
+		builder.addFeature("File Header Page Wait Count", extractFhpWaitCount());
+		builder.addFeature("Page GetVal Wait Count", extractPageGetValWaitCount());
+		builder.addFeature("Page SetVal Wait Count", extractPageSetValWaitCount());
+		builder.addFeature("Page GetVal Release Count", extractPageGetValReleaseCount());
+		builder.addFeature("Page SetVal Release Count", extractPageSetValReleaseCount());
 
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
@@ -140,6 +148,86 @@ public class FeatureExtractor {
 			bufferWaitCounts[serverId] = metricWarehouse.getBufferWriteWaitCount(serverId);
 		
 		return bufferWaitCounts;
+	}
+	
+	private Integer[] extractBlockLockReleaseCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] blockWaitDiffs = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			blockWaitDiffs[serverId] = metricWarehouse.getBlockReleaseCount(serverId);
+		
+		return blockWaitDiffs;
+	}
+	
+	private Integer[] extractBlockLockWaitCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] blockWaitCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			blockWaitCounts[serverId] = metricWarehouse.getBlockWaitCount(serverId);
+		
+		return blockWaitCounts;
+	}
+	
+	private Integer[] extractFhpReleaseCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] fhpReleaseCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			fhpReleaseCounts[serverId] = metricWarehouse.getFhpReleaseCount(serverId);
+		
+		return fhpReleaseCounts;
+	}
+	
+	private Integer[] extractFhpWaitCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] fhpWaitCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			fhpWaitCounts[serverId] = metricWarehouse.getFhpWaitCount(serverId);
+		
+		return fhpWaitCounts;
+	}
+	
+	private Integer[] extractPageGetValWaitCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] pageGetValWaitCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			pageGetValWaitCounts[serverId] = metricWarehouse.getPageGetValWaitCount(serverId);
+		
+		return pageGetValWaitCounts;
+	}
+	
+	private Integer[] extractPageSetValWaitCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] pageSetValWaitCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			pageSetValWaitCounts[serverId] = metricWarehouse.getPageSetValWaitCount(serverId);
+		
+		return pageSetValWaitCounts;
+	}
+	
+	private Integer[] extractPageGetValReleaseCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] pageGetValReleaseCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			pageGetValReleaseCounts[serverId] = metricWarehouse.getPageGetValReleaseCount(serverId);
+		
+		return pageGetValReleaseCounts;
+	}
+	
+	private Integer[] extractPageSetValReleaseCount() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Integer[] pageSetValReleaseCounts = new Integer[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++)	
+			pageSetValReleaseCounts[serverId] = metricWarehouse.getPageSetValReleaseCount(serverId);
+		
+		return pageSetValReleaseCounts;
 	}
 	
 	private Double[] extractSystemCpuLoad() {

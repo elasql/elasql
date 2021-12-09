@@ -19,10 +19,30 @@ public class RoutingControlActuator extends Task {
 	private static Logger logger = Logger.getLogger(RoutingControlActuator.class.getName());
 	
 	private static final long UPDATE_PERIOD;
+	private static final double INITIAL_ALPHA;
+	private static final double[] CPU_MAX_CAPACITIES;
 	
 	static {
 		UPDATE_PERIOD = ElasqlProperties.getLoader().getPropertyAsLong(
 				RoutingControlActuator.class.getName() + ".UPDATE_PERIOD", 5_000);
+		INITIAL_ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
+				RoutingControlActuator.class.getName() + ".INITIAL_ALPHA", 1.0);
+		
+		// Gather CPU MAXs
+		double[] cpuMaxCapacities = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		for (int i = 0; i < cpuMaxCapacities.length; i++)
+			cpuMaxCapacities[i] = 1.0;
+		
+		String cpuMaxStr = ElasqlProperties.getLoader().getPropertyAsString(
+				RoutingControlActuator.class.getName() + ".CPU_MAX_CAPACITIES", "");
+		if (!cpuMaxStr.isEmpty()) {
+			String[] cpuMaxValues = cpuMaxStr.split(",");
+			for (int i = 0; i < cpuMaxValues.length; i++) {
+				double value = Double.parseDouble(cpuMaxValues[i].trim());
+				cpuMaxCapacities[i] = value;
+			}
+		}
+		CPU_MAX_CAPACITIES = cpuMaxCapacities;
 	}
 	
 	// Alpha parameters control the weights of CPU cost
@@ -42,7 +62,7 @@ public class RoutingControlActuator extends Task {
 		gamma = new PidController[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			alpha[nodeId] = new PidController(1.0);
+			alpha[nodeId] = new PidController(INITIAL_ALPHA);
 			beta[nodeId] = new PidController(1.0);
 			gamma[nodeId] = new PidController(1.0);
 		}
@@ -104,9 +124,12 @@ public class RoutingControlActuator extends Task {
 	
 	private void acquireObservations() {
 		// TODO: add disk and network I/O
-		// XXX: right observation?
-		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++)
-			alpha[nodeId].setObservation(metricWarehouse.getAveragedSystemCpuLoad(nodeId, UPDATE_PERIOD));
+		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+			double observation = metricWarehouse.getAveragedSystemCpuLoad(nodeId, UPDATE_PERIOD);
+			observation = observation / CPU_MAX_CAPACITIES[nodeId];
+			observation = Math.min(observation, 1.0);
+			alpha[nodeId].setObservation(observation);
+		}
 	}
 	
 	private void updateReferences() {
@@ -122,8 +145,10 @@ public class RoutingControlActuator extends Task {
 	
 	private void updateParameters(double timeOffsetInSecs) {
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			System.out.print("Alaph #" + nodeId + ": ");
 			alpha[nodeId].updateControlParameters(timeOffsetInSecs);
+			
+			// Debug
+			System.out.println("Alpha #" + nodeId + ": " + alpha[nodeId].getLatestUpdateLog());
 		}
 	}
 	
