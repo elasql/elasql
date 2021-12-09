@@ -264,53 +264,12 @@ public class FusionTable {
 		return new HashSet<PrimaryKey>(overflowedKeys.keySet());
 	}
 	
-	private Integer getWarehouseId(PrimaryKey key) {
-		// For other tables, partitioned by wid
-		Constant widCon;
-		switch (key.getTableName()) {
-		case "warehouse":
-			widCon = key.getVal("w_id");
-			break;
-		case "district":
-			widCon = key.getVal("d_w_id");
-			break;
-		case "stock":
-			widCon = key.getVal("s_w_id");
-			break;
-		case "customer":
-			widCon = key.getVal("c_w_id");
-			break;
-		case "history":
-			widCon = key.getVal("h_c_w_id");
-			break;
-		case "orders":
-			widCon = key.getVal("o_w_id");
-			break;
-		case "new_order":
-			widCon = key.getVal("no_w_id");
-			break;
-		case "order_line":
-			widCon = key.getVal("ol_w_id");
-			break;
-		default:
-			return null;
-		}
-		
-		return (Integer) widCon.asJavaVal();
-	}
-	
-	private boolean isPartition0Record(PrimaryKey key) {
-		return getWarehouseId(key) <= 10;
-	}
-	
 	private void incrementCount(PrimaryKey key, int partId) {
-		if (isPartition0Record(key))
-			countsPerParts[partId]++;
+		countsPerParts[partId]++;
 	}
 	
 	private void decrementCount(PrimaryKey key, int partId) {
-		if (isPartition0Record(key))
-			countsPerParts[partId]--;
+		countsPerParts[partId]--;
 	}
 
 	private void insertNewRecord(PrimaryKey key, int partId) {
