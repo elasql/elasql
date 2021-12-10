@@ -22,6 +22,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConservativeOrderedLockTable {
 
@@ -183,10 +184,18 @@ public class ConservativeOrderedLockTable {
 		// See the comments in sLock(..) for the explanation of the algorithm
 		
 		// TODO: Can we increase the number of anchor to decrease the conflict rate.
+		TransactionProfiler txProfiler = TransactionProfiler.getLocalProfiler();
+		int stage = TransactionProfiler.getStageIndicator();
+		
+		txProfiler.startComponentProfiler(stage + "-xLock getAnchor");
 		Object anchor = getAnchor(obj);
-
+		txProfiler.stopComponentProfiler(stage + "-xLock getAnchor");
+		txProfiler.startComponentProfiler(stage + "-xLock AnchorLock");
 		synchronized (anchor) {
+			txProfiler.stopComponentProfiler(stage + "-xLock AnchorLock");
+			txProfiler.startComponentProfiler(stage + "-xLock prepareLockers");
 			Lockers lockers = prepareLockers(obj);
+			txProfiler.stopComponentProfiler(stage + "-xLock prepareLockers");
 
 			if (hasXLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
@@ -199,6 +208,7 @@ public class ConservativeOrderedLockTable {
 				
 				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
+				txProfiler.startComponentProfiler(stage + "-xLock WaitQueue");
 				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
 				/* && !waitingTooLong(timestamp) */) {
 					
@@ -221,7 +231,7 @@ public class ConservativeOrderedLockTable {
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
-
+				txProfiler.stopComponentProfiler(stage + "-xLock WaitQueue");
 				// For debug
 //				Thread.currentThread().setName(name);
 				
