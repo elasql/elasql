@@ -150,4 +150,8 @@ public class TPartStoredProcedureTask
 	public TransactionEstimation getEstimation() {
 		return estimation;
 	}
+	
+	public long getxLockLatency() {
+		return tsp.getxLockLatency();
+	}
 }

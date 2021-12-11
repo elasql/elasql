@@ -285,4 +285,8 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		readObjs.clear();
 		writeObjs.clear();
 	}
+	
+	public long getxLockLatency() {
+		return lockTbl.getxLockWaitTime();
+	}
 }

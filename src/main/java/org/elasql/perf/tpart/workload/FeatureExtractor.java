@@ -1,6 +1,8 @@
 package org.elasql.perf.tpart.workload;
 
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
@@ -10,6 +12,9 @@ import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A processor to extract features from a transaction request. The transaction
@@ -26,8 +31,13 @@ public class FeatureExtractor {
 	
 	private TpartMetricWarehouse metricWarehouse;
 	
+	private static final int MOVING_WINDOW = 1000;
+	private Queue<Long> xLockLatencies;
+	private AtomicLong xLockLatencyCache = new AtomicLong();
+	
 	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
 		this.metricWarehouse = metricWarehouse;
+		this.xLockLatencies = new LinkedList<Long>();
 	}
 	
 	/**
@@ -90,6 +100,9 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
 		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
+		
+		// Test Features
+		builder.addFeature("xLock SMA Latency", extractxLockWaitTimeSimpleMovingAverage(task));
 		
 		// Get dependencies
 //		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -384,5 +397,27 @@ public class FeatureExtractor {
 			lengths[serverId] = metricWarehouse.getIOQueueLength(serverId);
 		
 		return lengths;
+	}
+	
+	private long extractxLockWaitTimeSimpleMovingAverage(TPartStoredProcedureTask task) {
+		long lat_come = task.getxLockLatency();
+		if(xLockLatencies.size() > MOVING_WINDOW) {
+			
+			long popped = xLockLatencies.poll();
+			long temp_sum = xLockLatencyCache.get() * (MOVING_WINDOW) - popped;
+			
+			xLockLatencies.add(lat_come);
+			temp_sum += lat_come;
+			
+			xLockLatencyCache.set(temp_sum / MOVING_WINDOW);
+			return xLockLatencyCache.get();
+		}
+		
+		long temp_sum = xLockLatencyCache.get() * xLockLatencies.size();
+		xLockLatencies.add(lat_come);
+		temp_sum += lat_come;
+		
+		xLockLatencyCache.set(temp_sum / xLockLatencies.size());
+		return xLockLatencyCache.get();
 	}
 }

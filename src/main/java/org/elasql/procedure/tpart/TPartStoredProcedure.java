@@ -159,6 +159,12 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public ProcedureType getProcedureType() {
 		return ProcedureType.NORMAL;
 	}
+	
+	public long getxLockLatency() {
+		ConservativeOrderedCcMgr ccmgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
+		return ccmgr.getxLockLatency();
+		
+	}
 
 	public Set<PrimaryKey> getReadSet() {
 		return readKeys;
