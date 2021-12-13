@@ -142,6 +142,7 @@ public class TPartScheduler extends Task implements Scheduler {
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			// Record plan gen start time, CPU start time, disk IO count
+			TransactionProfiler.setStageIndicator(1);
 			for(TPartStoredProcedureTask task : batchedTasks) 
 				task.getTxProfiler().startComponentProfiler("OU1 - Generate Plan");
 			
@@ -151,6 +152,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			for(TPartStoredProcedureTask task : batchedTasks)
 				task.getTxProfiler().stopComponentProfiler("OU1 - Generate Plan");
 			// Record thread init start time, CPU start time, disk IO count
+			TransactionProfiler.setStageIndicator(2);
 			for(TPartStoredProcedureTask task : batchedTasks)
 				task.getTxProfiler().startComponentProfiler("OU2 - Initialize Thread");
 			

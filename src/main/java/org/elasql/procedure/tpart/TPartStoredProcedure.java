@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.tpart.CachedEntryKey;
@@ -116,12 +118,14 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public SpResultSet execute() {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		try {
+			TransactionProfiler.setStageIndicator(3);
 			profiler.startComponentProfiler("OU3 - Acquire Locks");
 			getConservativeLocks();
 			profiler.stopComponentProfiler("OU3 - Acquire Locks");
 			
 			executeTransactionLogic();
 			
+			TransactionProfiler.setStageIndicator(8);
 			profiler.startComponentProfiler("OU8 - Commit");
 			tx.commit();
 			profiler.stopComponentProfiler("OU8 - Commit");
@@ -158,12 +162,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	public ProcedureType getProcedureType() {
 		return ProcedureType.NORMAL;
-	}
-	
-	public long getxLockLatency() {
-		ConservativeOrderedCcMgr ccmgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		return ccmgr.getxLockLatency();
-		
 	}
 
 	public Set<PrimaryKey> getReadSet() {
@@ -226,6 +224,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			profiler.stopComponentProfiler("OU4 - Read from Local");
 
 			// Read all needed records
+			TransactionProfiler.setStageIndicator(5);
 			profiler.startComponentProfiler("OU5M - Read from Remote");
 			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
@@ -237,6 +236,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			profiler.stopComponentProfiler("OU5M - Read from Remote");
 			
 			// Execute the SQLs defined by users
+			TransactionProfiler.setStageIndicator(6);
 			profiler.startComponentProfiler("OU6 - Execute Arithmetic Logic");
 			executeSql(readings);
 			profiler.stopComponentProfiler("OU6 - Execute Arithmetic Logic");
@@ -292,8 +292,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 //					
 //				} else {
 					// Normal transactions
-					profiler.startComponentProfiler("OU4 - Read from Local");
 					TransactionProfiler.setStageIndicator(4);
+					profiler.startComponentProfiler("OU4 - Read from Local");
 					for (PushInfo pushInfo : entry.getValue()) {
 						
 						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
@@ -312,9 +312,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
-		
-		profiler.startComponentProfiler("OU7 - Write to Local");
 		TransactionProfiler.setStageIndicator(7);
+		profiler.startComponentProfiler("OU7 - Write to Local");
 		cache.flush(plan,  cachedEntrySet);
 		profiler.stopComponentProfiler("OU7 - Write to Local");
 	}

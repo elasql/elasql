@@ -13,8 +13,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import org.elasql.storage.tx.concurrency.ConservativeOrderedLockMonitor;
 
 /**
  * A processor to extract features from a transaction request. The transaction
@@ -31,13 +30,11 @@ public class FeatureExtractor {
 	
 	private TpartMetricWarehouse metricWarehouse;
 	
-	private static final int MOVING_WINDOW = 1000;
-	private Queue<Long> xLockLatencies;
-	private AtomicLong xLockLatencyCache = new AtomicLong();
+	private ConservativeOrderedLockMonitor conservativeLockMonitor = 
+			new ConservativeOrderedLockMonitor();
 	
 	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
 		this.metricWarehouse = metricWarehouse;
-		this.xLockLatencies = new LinkedList<Long>();
 	}
 	
 	/**
@@ -102,7 +99,8 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
 		
 		// Test Features
-		builder.addFeature("xLock SMA Latency", extractxLockWaitTimeSimpleMovingAverage(task));
+		//builder.addFeature("xLock Latencies", extractxLockWaitTime(task));
+		//builder.addFeature("xLock SMA Latency", extractxLockWaitTimeSimpleMovingAverage(task));
 		
 		// Get dependencies
 //		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -400,24 +398,10 @@ public class FeatureExtractor {
 	}
 	
 	private long extractxLockWaitTimeSimpleMovingAverage(TPartStoredProcedureTask task) {
-		long lat_come = task.getxLockLatency();
-		if(xLockLatencies.size() > MOVING_WINDOW) {
-			
-			long popped = xLockLatencies.poll();
-			long temp_sum = xLockLatencyCache.get() * (MOVING_WINDOW) - popped;
-			
-			xLockLatencies.add(lat_come);
-			temp_sum += lat_come;
-			
-			xLockLatencyCache.set(temp_sum / MOVING_WINDOW);
-			return xLockLatencyCache.get();
-		}
-		
-		long temp_sum = xLockLatencyCache.get() * xLockLatencies.size();
-		xLockLatencies.add(lat_come);
-		temp_sum += lat_come;
-		
-		xLockLatencyCache.set(temp_sum / xLockLatencies.size());
-		return xLockLatencyCache.get();
+		return conservativeLockMonitor.getxLockWaitTimeSMA();
 	}
+	
+	private Long[] extractxLockWaitTime(TPartStoredProcedureTask task) {
+		return conservativeLockMonitor.getxLockWaitTime().toArray(new Long[0]);
+	}	
 }

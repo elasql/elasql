@@ -2,6 +2,7 @@ package org.elasql.procedure.tpart;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Queue;
 
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.procedure.StoredProcedureTask;
@@ -149,9 +150,5 @@ public class TPartStoredProcedureTask
 	
 	public TransactionEstimation getEstimation() {
 		return estimation;
-	}
-	
-	public long getxLockLatency() {
-		return tsp.getxLockLatency();
 	}
 }

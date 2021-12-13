@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
 import org.vanilladb.core.util.TransactionProfiler;
@@ -28,8 +27,7 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class ConservativeOrderedLockTable {
 
 	private static final int NUM_ANCHOR = 1009;
-	private static AtomicLong xLockLatency = new AtomicLong();
-	
+
 	enum LockType {
 		IS_LOCK, IX_LOCK, S_LOCK, SIX_LOCK, X_LOCK
 	}
@@ -235,7 +233,7 @@ public class ConservativeOrderedLockTable {
 					head = lockers.requestQueue.peek();
 				}
 				long waitStop = System.currentTimeMillis();
-				xLockLatency.set(waitStop - waitStart);
+				//AddxLockWaitTime(waitStart, waitStop);
 				txProfiler.stopComponentProfiler(stage + "-xLock WaitQueue");
 				// For debug
 //				Thread.currentThread().setName(name);
@@ -593,9 +591,5 @@ public class ConservativeOrderedLockTable {
 
 	private boolean isLockable(Lockers lks, long txNum) {
 		return (!xLocked(lks) || hasXLock(lks, txNum));
-	}
-	
-	public long getxLockWaitTime() {
-		return xLockLatency.get();
 	}
 }

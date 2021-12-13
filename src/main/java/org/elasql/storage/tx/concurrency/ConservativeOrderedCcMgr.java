@@ -25,6 +25,7 @@ import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
 import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	protected static ConservativeOrderedLockTable lockTbl = new ConservativeOrderedLockTable();
@@ -109,10 +110,15 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * make the thread wait until it can obtain all locks it requests.
 	 */
 	public void requestLocks() {
+		TransactionProfiler txProfiler = TransactionProfiler.getLocalProfiler();
+		int stage = TransactionProfiler.getStageIndicator();
 		bookedObjs.clear();
-		
-		for (Object obj : writeObjs)
+		for (Object obj : writeObjs) {
+			txProfiler.startComponentProfiler(stage + "-xLock requestLocks");
 			lockTbl.xLock(obj, txNum);
+			txProfiler.stopComponentProfiler(stage + "-xLock requestLocks");
+		}
+			
 		
 		for (Object obj : readObjs)
 			if (!writeObjs.contains(obj))
@@ -187,7 +193,11 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void modifyLeafBlock(BlockId blk) {
+		TransactionProfiler txProfiler = TransactionProfiler.getLocalProfiler();
+		int stage = TransactionProfiler.getStageIndicator();
+		txProfiler.startComponentProfiler(stage + "-xLock modifyLeafBlock");
 		lockTbl.xLock(blk, txNum);
+		txProfiler.stopComponentProfiler(stage + "-xLock modifyLeafBlock");
 		writtenIndexBlks.add(blk);
 	}
 
@@ -210,7 +220,11 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void crabDownDirBlockForModification(BlockId blk) {
+		TransactionProfiler txProfiler = TransactionProfiler.getLocalProfiler();
+		int stage = TransactionProfiler.getStageIndicator();
+		txProfiler.startComponentProfiler(stage + "-xLock crabDownDirBlockForModification");
 		lockTbl.xLock(blk, txNum);
+		txProfiler.stopComponentProfiler(stage + "-xLock crabDownDirBlockForModification");
 		writtenIndexBlks.add(blk);
 	}
 
@@ -284,9 +298,5 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		
 		readObjs.clear();
 		writeObjs.clear();
-	}
-	
-	public long getxLockLatency() {
-		return lockTbl.getxLockWaitTime();
 	}
 }
