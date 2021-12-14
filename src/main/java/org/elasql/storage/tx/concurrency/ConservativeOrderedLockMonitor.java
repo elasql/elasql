@@ -1,47 +1,84 @@
 package org.elasql.storage.tx.concurrency;
 
-import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConservativeOrderedLockMonitor {
 	
 	private static final int MOVING_WINDOW = 1000;
 	
 	//xLock statistics
-	private static Queue<Long> xLockLatencies;
-	private static AtomicLong xLockLatency;
+	private static Queue<Long> xLockLatencies  = new ConcurrentLinkedQueue<Long>();
+	private static AtomicLong xLockLatencySMA = new AtomicLong();
+	private static AtomicLong xLockLatencyWMA = new AtomicLong();
 	
 	public ConservativeOrderedLockMonitor() {
-		xLockLatencies = new LinkedList<Long>();
-		xLockLatency = new AtomicLong();
+		//Do nothing
 	}
 	
-	public void AddxLockWaitTime(long waitTime) {
+	public static void AddxLockWaitTime(long waitTime) {
+		if (xLockLatencies == null)
+			return;
+		
+		xLockLatencies.add(waitTime);
+
 		if(xLockLatencies.size() >= MOVING_WINDOW) {
 			long popped = xLockLatencies.poll();
-			long temp_sum = xLockLatency.get() * (MOVING_WINDOW) - popped;
 			
-			xLockLatencies.add(waitTime);
-			temp_sum += waitTime;
-			xLockLatency.set(temp_sum / MOVING_WINDOW);
+			calculateSMA(popped, waitTime);
+			//calculateWMA(waitTime);
+			
+			return;
 		}
 		
-		long temp_sum = xLockLatency.get() * xLockLatencies.size();
-		xLockLatencies.add(waitTime);
-		temp_sum += waitTime;
+		calculateSMA(0, waitTime);
+		//calculateWMA(waitTime);
 		
-		xLockLatency.set(temp_sum / xLockLatencies.size());
+		return;
 	}
 	
-	public Queue<Long> getxLockWaitTime() {
+	public static Queue<Long> getxLockWaitTime() {
 		return xLockLatencies;
 	}
 	
-	public long getxLockWaitTimeSMA() {
-		return xLockLatency.get();
+	public static long getxLockWaitTimeSMA() {
+		return xLockLatencySMA.get();
 	}
 	
+	public static long getxLockWaitTimeWMA() {
+		return xLockLatencyWMA.get();
+	}
+	
+	private static void calculateSMA(long popped, long waitTime) {
+		long temp_sum = xLockLatencySMA.get() * xLockLatencies.size() - popped;
+		temp_sum += waitTime;
+		if(xLockLatencies.size() > 0)
+			xLockLatencySMA.set(temp_sum/ xLockLatencies.size());
+		else
+			xLockLatencySMA.set(temp_sum);
+		return;
+	}
+	
+	private static void calculateWMA(long waitTime) {
+		long temp_sum = 0;
+		int weight = 1;
+		float weight_decay = 0.1f;
+		
+		if(xLockLatencies.size() > 0) {
+			for(long item : xLockLatencies) {
+				temp_sum += item * weight;
+				weight += weight_decay;
+			}
+		}
+		
+		temp_sum += waitTime * weight;
+		
+		float total_denominator = (1 + weight) * xLockLatencies.size() / 2;
+		if(total_denominator > 0)
+			xLockLatencyWMA.set((long)(temp_sum/total_denominator));
+		else
+			xLockLatencyWMA.set(temp_sum);
+		return;
+	}
 }

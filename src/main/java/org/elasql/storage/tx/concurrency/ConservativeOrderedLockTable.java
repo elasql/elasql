@@ -233,7 +233,7 @@ public class ConservativeOrderedLockTable {
 					head = lockers.requestQueue.peek();
 				}
 				long waitStop = System.currentTimeMillis();
-				//AddxLockWaitTime(waitStart, waitStop);
+				ConservativeOrderedLockMonitor.AddxLockWaitTime(waitStop - waitStart);
 				txProfiler.stopComponentProfiler(stage + "-xLock WaitQueue");
 				// For debug
 //				Thread.currentThread().setName(name);

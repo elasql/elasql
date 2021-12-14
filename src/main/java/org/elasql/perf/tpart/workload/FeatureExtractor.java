@@ -30,9 +30,6 @@ public class FeatureExtractor {
 	
 	private TpartMetricWarehouse metricWarehouse;
 	
-	private ConservativeOrderedLockMonitor conservativeLockMonitor = 
-			new ConservativeOrderedLockMonitor();
-	
 	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
 		this.metricWarehouse = metricWarehouse;
 	}
@@ -99,8 +96,8 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
 		
 		// Test Features
-		//builder.addFeature("xLock Latencies", extractxLockWaitTime(task));
-		//builder.addFeature("xLock SMA Latency", extractxLockWaitTimeSimpleMovingAverage(task));
+		builder.addFeature("xLock Latencies", extractxLockWaitTime());
+		builder.addFeature("xLock SMA Latency", extractxLockWaitTimeSimpleMovingAverage());
 		
 		// Get dependencies
 //		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -397,11 +394,11 @@ public class FeatureExtractor {
 		return lengths;
 	}
 	
-	private long extractxLockWaitTimeSimpleMovingAverage(TPartStoredProcedureTask task) {
-		return conservativeLockMonitor.getxLockWaitTimeSMA();
+	private long extractxLockWaitTimeSimpleMovingAverage() {
+		return ConservativeOrderedLockMonitor.getxLockWaitTimeSMA();
 	}
 	
-	private Long[] extractxLockWaitTime(TPartStoredProcedureTask task) {
-		return conservativeLockMonitor.getxLockWaitTime().toArray(new Long[0]);
+	private Long[] extractxLockWaitTime() {
+		return ConservativeOrderedLockMonitor.getxLockWaitTime().toArray(new Long[0]);
 	}	
 }

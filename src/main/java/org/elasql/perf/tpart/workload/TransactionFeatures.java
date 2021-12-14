@@ -65,8 +65,8 @@ public class TransactionFeatures {
 		featureKeys.add("I/O Queue Length");
 		
 		// Test Features
-		//featureKeys.add("xLock Latencies");
-		//featureKeys.add("xLock SMA Latency");
+		featureKeys.add("xLock Latencies");
+		featureKeys.add("xLock SMA Latency");
 		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
