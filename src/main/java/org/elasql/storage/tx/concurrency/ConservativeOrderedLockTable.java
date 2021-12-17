@@ -209,7 +209,7 @@ public class ConservativeOrderedLockTable {
 				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
 				txProfiler.startComponentProfiler(stage + "-xLock WaitQueue");
-				long waitStart = System.currentTimeMillis();
+				long waitStart = System.nanoTime();
 				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
 				/* && !waitingTooLong(timestamp) */) {
 					
@@ -232,7 +232,7 @@ public class ConservativeOrderedLockTable {
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
 				}
-				long waitStop = System.currentTimeMillis();
+				long waitStop = System.nanoTime();
 				ConservativeOrderedLockMonitor.AddxLockWaitTime(waitStop - waitStart);
 				txProfiler.stopComponentProfiler(stage + "-xLock WaitQueue");
 				// For debug

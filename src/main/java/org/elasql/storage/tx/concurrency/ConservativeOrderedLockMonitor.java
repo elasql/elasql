@@ -6,12 +6,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class ConservativeOrderedLockMonitor {
 	
-	private static final int MOVING_WINDOW = 1000;
+	//Window sizes go beyond this amount are pretty much meaningless.
+	//Since it will be dominated by huge peaks.
+	private static final int MOVING_WINDOW = 10;
 	
 	//xLock statistics
 	private static Queue<Long> xLockLatencies  = new ConcurrentLinkedQueue<Long>();
-	private static AtomicLong xLockLatencySMA = new AtomicLong();
-	private static AtomicLong xLockLatencyWMA = new AtomicLong();
+	private static AtomicLong xLockLatencySimpleMovingAverage = new AtomicLong();
+	private static AtomicLong xLockLatencyWeightedMovingAverage = new AtomicLong();
+	private static long xLockLatencySimpleMovingAverage_cache = 0;
 	
 	public ConservativeOrderedLockMonitor() {
 		//Do nothing
@@ -21,19 +24,20 @@ public class ConservativeOrderedLockMonitor {
 		if (xLockLatencies == null)
 			return;
 		
-		xLockLatencies.add(waitTime);
-
-		if(xLockLatencies.size() >= MOVING_WINDOW) {
-			long popped = xLockLatencies.poll();
-			
-			calculateSMA(popped, waitTime);
-			//calculateWMA(waitTime);
-			
-			return;
+		System.out.println("WaitTime: " + waitTime);
+		long popped = 0;
+		synchronized(xLockLatencies) {
+			xLockLatencies.add(waitTime);
+			if(xLockLatencies.size() >= MOVING_WINDOW) {
+				popped = xLockLatencies.poll();
+				System.out.println("popped: " + popped);
+				calculateSimpleMovingAverage(popped, waitTime);
+			}
 		}
-		
-		calculateSMA(0, waitTime);
-		//calculateWMA(waitTime);
+			
+		//calculateWeightedMovingAverage(waitTime);
+		System.out.println("xLockLatencySimpleMovingAverage: " + xLockLatencySimpleMovingAverage);
+		System.out.println("xLockLatencySimpleMovingAverage_cache: " + xLockLatencySimpleMovingAverage_cache);
 		
 		return;
 	}
@@ -43,24 +47,28 @@ public class ConservativeOrderedLockMonitor {
 	}
 	
 	public static long getxLockWaitTimeSMA() {
-		return xLockLatencySMA.get();
+		System.out.println("getxLockWaitTimeSMA reutrn: " + xLockLatencySimpleMovingAverage_cache);
+		return xLockLatencySimpleMovingAverage_cache;
 	}
 	
 	public static long getxLockWaitTimeWMA() {
-		return xLockLatencyWMA.get();
+		return xLockLatencyWeightedMovingAverage.get();
 	}
 	
-	private static void calculateSMA(long popped, long waitTime) {
-		long temp_sum = xLockLatencySMA.get() * xLockLatencies.size() - popped;
+	// TODO: Make sure synchronized
+	private static void calculateSimpleMovingAverage(long popped, long waitTime) {
+		
+		long temp_sum = xLockLatencySimpleMovingAverage.get() * xLockLatencies.size() - popped;
 		temp_sum += waitTime;
 		if(xLockLatencies.size() > 0)
-			xLockLatencySMA.set(temp_sum/ xLockLatencies.size());
+			xLockLatencySimpleMovingAverage.set(temp_sum/ xLockLatencies.size());
 		else
-			xLockLatencySMA.set(temp_sum);
+			xLockLatencySimpleMovingAverage.set(temp_sum);
+		xLockLatencySimpleMovingAverage_cache = xLockLatencySimpleMovingAverage.longValue();
 		return;
 	}
 	
-	private static void calculateWMA(long waitTime) {
+	private static void calculateWeightedMovingAverage(long waitTime) {
 		long temp_sum = 0;
 		int weight = 1;
 		float weight_decay = 0.1f;
@@ -76,9 +84,9 @@ public class ConservativeOrderedLockMonitor {
 		
 		float total_denominator = (1 + weight) * xLockLatencies.size() / 2;
 		if(total_denominator > 0)
-			xLockLatencyWMA.set((long)(temp_sum/total_denominator));
+			xLockLatencyWeightedMovingAverage.set((long)(temp_sum/total_denominator));
 		else
-			xLockLatencyWMA.set(temp_sum);
+			xLockLatencyWeightedMovingAverage.set(temp_sum);
 		return;
 	}
 }

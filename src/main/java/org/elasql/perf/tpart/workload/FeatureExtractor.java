@@ -395,6 +395,7 @@ public class FeatureExtractor {
 	}
 	
 	private long extractxLockWaitTimeSimpleMovingAverage() {
+		System.out.println("extractxLockWaitTimeSimpleMovingAverage reutrn: " + ConservativeOrderedLockMonitor.getxLockWaitTimeSMA());
 		return ConservativeOrderedLockMonitor.getxLockWaitTimeSMA();
 	}
 	
