@@ -40,6 +40,9 @@ public class TPartSystemMetrics implements MetricReport {
 		private long ioWriteBytes;
 		private long ioQueueLength;
 		
+		// Latches
+		private long xLockSimpleMovingAverage;
+		
 		public Builder(int serverId) {
 			this.serverId = serverId;
 		}
@@ -132,6 +135,10 @@ public class TPartSystemMetrics implements MetricReport {
 			this.ioQueueLength = ioQueueLength;
 		}
 		
+		public void setxLockSimpleMovingAverage(long SimpleMovingAverage) {
+			this.xLockSimpleMovingAverage = SimpleMovingAverage;
+		}
+		
 		public TPartSystemMetrics build() {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
 			metrics.serverId = serverId;
@@ -162,6 +169,8 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.ioReadBytes = ioReadBytes;
 			metrics.ioWriteBytes = ioWriteBytes;
 			metrics.ioQueueLength = ioQueueLength;
+			
+			metrics.xLockSimpleMovingAverage = xLockSimpleMovingAverage;
 			
 			return metrics;
 		}
@@ -196,6 +205,9 @@ public class TPartSystemMetrics implements MetricReport {
 	private long ioReadBytes;
 	private long ioWriteBytes;
 	private long ioQueueLength;
+	
+	// Latches
+	private long xLockSimpleMovingAverage;
 	
 	private TPartSystemMetrics() {
 		// do nothing
@@ -291,5 +303,9 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	public long getIOQueueLength() {
 		return ioQueueLength;
+	}
+	
+	public long getxLockSimpleMovingAverage() {
+		return xLockSimpleMovingAverage;
 	}
 }

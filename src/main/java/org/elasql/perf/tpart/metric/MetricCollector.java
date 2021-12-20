@@ -2,6 +2,7 @@ package org.elasql.perf.tpart.metric;
 
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
+import org.elasql.storage.tx.concurrency.ConservativeOrderedLockMonitor;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.storage.buffer.Buffer;
 import org.vanilladb.core.storage.buffer.BufferPoolMonitor;
@@ -112,6 +113,9 @@ public class MetricCollector extends Task {
 		builder.setIOReadBytes(getIOReadBytes());
 		builder.setIOWriteBytes(getIOWriteBytes());
 		builder.setIOQueueLength(getIOQueuLangth());
+		
+		collectLatch(builder);
+		
 		return builder.build();
 	}
 	
@@ -125,6 +129,11 @@ public class MetricCollector extends Task {
 		builder.setProcessUserTime(process.getUserTime());
 		builder.setProcessKernelTime(process.getKernelTime());
 		builder.setProcessUpTime(process.getUpTime());
+	}
+	
+	private void collectLatch(TPartSystemMetrics.Builder builder) {
+		// xLock
+		builder.setxLockSimpleMovingAverage(ConservativeOrderedLockMonitor.getxLockWaitTimeSMA());
 	}
 	
 	private int getThreadActiveCount() {

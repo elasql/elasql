@@ -95,8 +95,8 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
 		
-		// Test Features
-		builder.addFeature("xLock Latencies", extractxLockWaitTime());
+		// Latch Features
+		//builder.addFeature("xLock Latencies", extractxLockWaitTime());
 		builder.addFeature("xLock SMA Latency", extractxLockWaitTimeSimpleMovingAverage());
 		
 		// Get dependencies
@@ -394,12 +394,12 @@ public class FeatureExtractor {
 		return lengths;
 	}
 	
-	private long extractxLockWaitTimeSimpleMovingAverage() {
-		System.out.println("extractxLockWaitTimeSimpleMovingAverage reutrn: " + ConservativeOrderedLockMonitor.getxLockWaitTimeSMA());
-		return ConservativeOrderedLockMonitor.getxLockWaitTimeSMA();
+	private Long[] extractxLockWaitTimeSimpleMovingAverage() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		Long[] waitTimes = new Long[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) 
+			waitTimes[serverId] = metricWarehouse.getxLockSimpleMovingAverage(serverId);
+		return waitTimes;
 	}
-	
-	private Long[] extractxLockWaitTime() {
-		return ConservativeOrderedLockMonitor.getxLockWaitTime().toArray(new Long[0]);
-	}	
 }

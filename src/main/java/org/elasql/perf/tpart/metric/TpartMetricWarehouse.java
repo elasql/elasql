@@ -302,6 +302,15 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
+	public synchronized long getxLockSimpleMovingAverage(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return 0;
+		} else {
+			return history.get(history.size() - 1).metric.getxLockSimpleMovingAverage();
+		}
+	}
+	
 	private double getCpuUsageBetween(long[] startTicks, long[] endTicks) {
 		long total = 0;
         for (int i = 0; i < startTicks.length; i++) {
