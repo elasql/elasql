@@ -22,6 +22,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConservativeOrderedLockTable {
 
@@ -104,11 +105,16 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void sLock(Object obj, long txNum) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		int indicator = 3;
+		boolean is_wait_anchor = false;
+		profiler.startComponentProfilerIndic("OU3 - sLock Overhead", indicator);
 		Object anchor = getAnchor(obj);
 
+		profiler.startComponentProfilerIndic("OU3 - sAnchor Waiting", indicator);
 		synchronized (anchor) {
+			profiler.stopComponentProfilerIndic("OU3 - sAnchor Waiting", indicator);
 			Lockers lockers = prepareLockers(obj);
-
 			// check if it have already held the lock
 			if (hasSLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
@@ -116,49 +122,30 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
-				// For debug
-//				String name = Thread.currentThread().getName();
-				
-				/*
-				 * If this transaction is not the first one requesting this
-				 * object or it cannot get lock on this object, it must wait.
-				 */
 				Long head = lockers.requestQueue.peek();
 				while (!sLockable(lockers, txNum) || (head != null && head.longValue() != txNum)) {
-
-					// For debug
-//					if (lockers.xLocker != -1) {
-//						Thread.currentThread().setName(String.format(
-//								"%s waits for slock of %s from tx.%d (xlock holder)",
-//								name, obj, lockers.xLocker));
-//					} else {
-//						Thread.currentThread().setName(String.format(
-//								"%s waits for slock of %s from tx.%d (head of queue)",
-//								name, obj, head));
-//					}
-					
+					profiler.stopComponentProfilerIndic("OU3 - sLock Overhead", indicator);
+					profiler.startComponentProfilerIndic("OU3 - sLock Waiting", indicator);
 					anchor.wait();
+					profiler.stopComponentProfilerIndic("OU3 - sLock Waiting", indicator);
 
-					// Since a transaction may delete the lockers of an object
-					// after releasing them, it should call prepareLockers()
-					// here, instead of using lockers it obtains earlier.
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
+					is_wait_anchor = true;
 				}
 
-				// For debug
-//				Thread.currentThread().setName(name);
+				if(!is_wait_anchor){
+					profiler.stopComponentProfilerIndic("OU3 - sLock Overhead", indicator);
+					profiler.startComponentProfilerIndic("OU3 - sLock Waiting", indicator);
+					profiler.stopComponentProfilerIndic("OU3 - sLock Waiting", indicator);
+				}
 				
 				if (!sLockable(lockers, txNum))
 					throw new LockAbortException();
-
 				// get the s lock
 				lockers.requestQueue.poll();
 				lockers.sLockers.add(txNum);
-
 				// Wake up other waiting transactions (on this object) to let
-				// them
-				// fight for the lockers on this object.
 				anchor.notifyAll();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
@@ -181,56 +168,40 @@ public class ConservativeOrderedLockTable {
 	 */
 	void xLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		int indicator = 3;
+		boolean is_wait_anchor = false;
+		profiler.startComponentProfilerIndic("OU3 - xLock Overhead", indicator);
 		Object anchor = getAnchor(obj);
 
+		profiler.startComponentProfilerIndic("OU3 - xAnchor Waiting", indicator);
 		synchronized (anchor) {
+			profiler.stopComponentProfilerIndic("OU3 - xAnchor Waiting", indicator);
 			Lockers lockers = prepareLockers(obj);
 
 			if (hasXLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
 				return;
 			}
-
 			try {
-				// For debug
-//				String name = Thread.currentThread().getName();
-				
-				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
-				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
-				/* && !waitingTooLong(timestamp) */) {
-					
-					// For debug
-//					if (lockers.xLocker != -1) {
-//						Thread.currentThread().setName(String.format(
-//								"%s waits for xlock of %s from tx.%d (xlock holder)",
-//								name, obj, lockers.xLocker));
-//					} else if (!lockers.sLockers.isEmpty()) {
-//						Thread.currentThread().setName(String.format(
-//								"%s waits for xlock of %s from tx.%d (slock holder, %d other holders)",
-//								name, obj, lockers.sLockers.get(0), lockers.sLockers.size() - 1));
-//					} else {
-//						Thread.currentThread().setName(String.format(
-//								"%s waits for xlock of %s from tx.%d (head of queue)",
-//								name, obj, head));
-//					}
-					
+				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))) {
+					profiler.stopComponentProfilerIndic("OU3 - xLock Overhead", indicator);
+					profiler.startComponentProfilerIndic("OU3 - xLock Waiting", indicator);
 					anchor.wait();
+					profiler.stopComponentProfilerIndic("OU3 - xLock Waiting", indicator);
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
+					is_wait_anchor = true;
 				}
 
-				// For debug
-//				Thread.currentThread().setName(name);
-				
-				// if (!xLockable(lockers, txNum))
-				// throw new LockAbortException();
-				// get the x lock
+				if(!is_wait_anchor){
+					profiler.stopComponentProfilerIndic("OU3 - xLock Overhead", indicator);
+					profiler.startComponentProfilerIndic("OU3 - xLock Waiting", indicator);
+					profiler.stopComponentProfilerIndic("OU3 - xLock Waiting", indicator);
+				}
 				lockers.requestQueue.poll();
 				lockers.xLocker = txNum;
-
-				// An X lock blocks all other lockers, so it don't need to
-				// wake up anyone.
 			} catch (InterruptedException e) {
 				throw new LockAbortException("Interrupted when waitting for lock");
 			}

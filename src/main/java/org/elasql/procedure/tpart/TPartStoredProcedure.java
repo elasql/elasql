@@ -116,9 +116,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public SpResultSet execute() {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		try {
+			profiler.set_indicator(3);
 			profiler.startComponentProfiler("OU3 - Acquire Locks");
 			getConservativeLocks();
 			profiler.stopComponentProfiler("OU3 - Acquire Locks");
+			profiler.reset_indicator();
 			
 			executeTransactionLogic();
 			
