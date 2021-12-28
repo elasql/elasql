@@ -67,6 +67,8 @@ public class TransactionFeatures {
 		// Latch Features
 		//featureKeys.add("xLock Latencies");
 		featureKeys.add("xLock SMA Latency");
+		//featureKeys.add("xLock Anchor Counter");
+		//featureKeys.add("sLock Anchor Counter");
 		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);

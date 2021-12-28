@@ -98,6 +98,8 @@ public class FeatureExtractor {
 		// Latch Features
 		//builder.addFeature("xLock Latencies", extractxLockWaitTime());
 		builder.addFeature("xLock SMA Latency", extractxLockWaitTimeSimpleMovingAverage());
+		//builder.addFeature("xLock Anchor Counter", extractxLockAnchorCounter());
+		//builder.addFeature("sLock Anchor Counter", extractsLockAnchorCounter());
 		
 		// Get dependencies
 //		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
@@ -402,4 +404,17 @@ public class FeatureExtractor {
 			waitTimes[serverId] = metricWarehouse.getxLockSimpleMovingAverage(serverId);
 		return waitTimes;
 	}
+	/*
+	private int[] extractxLockAnchorCounter() {
+		int[] xLockAnchor;
+		xLockAnchor = metricWarehouse.getxLockAnchorCounter(0);
+		return xLockAnchor;
+	}
+	
+	private int[] extractsLockAnchorCounter() {
+		int[] sLockAnchor;
+		sLockAnchor = metricWarehouse.getsLockAnchorCounter(0);
+		return sLockAnchor;
+	}
+	*/
 }

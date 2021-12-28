@@ -111,8 +111,8 @@ public class MetricCollector extends Task {
 		builder.setThreadActiveCount(getThreadActiveCount());
 		
 		builder.setIOReadBytes(getIOReadBytes());
-		builder.setIOWriteBytes(getIOWriteBytes());
-		builder.setIOQueueLength(getIOQueuLangth());
+		//builder.setIOWriteBytes(getIOWriteBytes());
+		//builder.setIOQueueLength(getIOQueuLangth());
 		
 		collectLatch(builder);
 		
@@ -134,6 +134,8 @@ public class MetricCollector extends Task {
 	private void collectLatch(TPartSystemMetrics.Builder builder) {
 		// xLock
 		builder.setxLockSimpleMovingAverage(ConservativeOrderedLockMonitor.getxLockWaitTimeSMA());
+		//builder.setxLockAnchorCounter(ConservativeOrderedLockMonitor.getxLockAnchorCounter());
+		//builder.setsLockAnchorCounter(ConservativeOrderedLockMonitor.getsLockAnchorCounter());
 	}
 	
 	private int getThreadActiveCount() {

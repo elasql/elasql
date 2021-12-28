@@ -310,6 +310,25 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 			return history.get(history.size() - 1).metric.getxLockSimpleMovingAverage();
 		}
 	}
+	/*
+	public synchronized int[] getxLockAnchorCounter(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return new int[0];
+		} else {
+			return history.get(history.size() - 1).metric.getxLockAnchorCounter();
+		}
+	}
+	
+	public synchronized int[] getsLockAnchorCounter(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return new int[0];
+		} else {
+			return history.get(history.size() - 1).metric.getsLockAnchorCounter();
+		}
+	}
+	*/
 	
 	private double getCpuUsageBetween(long[] startTicks, long[] endTicks) {
 		long total = 0;

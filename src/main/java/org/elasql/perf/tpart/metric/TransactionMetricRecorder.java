@@ -11,8 +11,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.io.FileWriter;
+import java.io.IOException;
 
 import org.elasql.server.Elasql;
+import org.elasql.storage.tx.concurrency.ConservativeOrderedLockMonitor;
 import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;
 import org.vanilladb.core.server.task.Task;
@@ -305,6 +308,9 @@ public class TransactionMetricRecorder extends Task {
 			saveToNetworkinSizeCsv(header);
 			saveToNetworkoutSizeCsv(header);
 		}		
+		// Test Output
+		saveToLatchStrippingCsv(ConservativeOrderedLockMonitor.getsLockAnchorCounter(), ConservativeOrderedLockMonitor.getsLockAnchorConflictCounter(), "sLock");
+		saveToLatchStrippingCsv(ConservativeOrderedLockMonitor.getxLockAnchorCounter(), ConservativeOrderedLockMonitor.getxLockAnchorConflictCounter(), "xLock");
 	}
 	
 	private void saveToLatencyCsv(List<String> header) {
@@ -362,6 +368,36 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 	
+	private void saveToLatchStrippingCsv(int count[], int conflict[], String latch_name) {
+		String fileName = String.format("%s-%s-latch-count-server-%d", FILENAME_PREFIX, latch_name, serverId);
+		try {
+		      FileWriter writer = new FileWriter(fileName + ".csv");
+		      StringBuilder sb = new StringBuilder();
+		      
+		      sb.append("Anchor");
+		      sb.append(',');
+		      sb.append("Hash_Count");
+		      sb.append(',');
+		      sb.append("Conflict_Count");
+		      sb.append('\n');
+		      for (int i = 0; i < count.length; i++) {
+		    	  sb.append(i);
+		    	  sb.append(',');
+		    	  sb.append(count[i]);
+		    	  sb.append(',');
+		    	  sb.append(conflict[i]);
+		    	  sb.append('\n');
+		    	  writer.append(sb.toString());
+		      }
+		      
+		      writer.close();
+		      System.out.println("Successfully wrote latch to the file.");
+		} catch (IOException e) {
+		      System.out.println("An error occurred.");
+		      e.printStackTrace();
+			}
+	}
+
 	private List<String> generateHeader() {
 		List<String> header = new ArrayList<String>();
 		

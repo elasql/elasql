@@ -42,6 +42,8 @@ public class TPartSystemMetrics implements MetricReport {
 		
 		// Latches
 		private long xLockSimpleMovingAverage;
+		//private int[] xLockAnchorCounter;
+		//private int[] sLockAnchorCounter;
 		
 		public Builder(int serverId) {
 			this.serverId = serverId;
@@ -138,6 +140,15 @@ public class TPartSystemMetrics implements MetricReport {
 		public void setxLockSimpleMovingAverage(long SimpleMovingAverage) {
 			this.xLockSimpleMovingAverage = SimpleMovingAverage;
 		}
+		/*
+		public void setxLockAnchorCounter(int[] xLockAnchorCounter) {
+			this.xLockAnchorCounter = xLockAnchorCounter;
+		}
+		
+		public void setsLockAnchorCounter(int[] sLockAnchorCounter) {
+			this.sLockAnchorCounter = sLockAnchorCounter;
+		}
+		*/
 		
 		public TPartSystemMetrics build() {
 			TPartSystemMetrics metrics = new TPartSystemMetrics();
@@ -171,6 +182,8 @@ public class TPartSystemMetrics implements MetricReport {
 			metrics.ioQueueLength = ioQueueLength;
 			
 			metrics.xLockSimpleMovingAverage = xLockSimpleMovingAverage;
+			//metrics.xLockAnchorCounter = xLockAnchorCounter;
+			//metrics.sLockAnchorCounter = sLockAnchorCounter;
 			
 			return metrics;
 		}
@@ -208,6 +221,8 @@ public class TPartSystemMetrics implements MetricReport {
 	
 	// Latches
 	private long xLockSimpleMovingAverage;
+	//private int[] xLockAnchorCounter;
+	//private int[] sLockAnchorCounter;
 	
 	private TPartSystemMetrics() {
 		// do nothing
@@ -308,4 +323,14 @@ public class TPartSystemMetrics implements MetricReport {
 	public long getxLockSimpleMovingAverage() {
 		return xLockSimpleMovingAverage;
 	}
+	
+	/*
+	public int[] getxLockAnchorCounter() {
+		return xLockAnchorCounter;
+	}
+	
+	public int[] getsLockAnchorCounter() {
+		return sLockAnchorCounter;
+	}
+	*/
 }

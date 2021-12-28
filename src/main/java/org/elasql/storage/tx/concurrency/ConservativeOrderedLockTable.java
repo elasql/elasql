@@ -65,6 +65,10 @@ public class ConservativeOrderedLockTable {
 
 	// Lock-stripping
 	private final Object anchors[] = new Object[NUM_ANCHOR];
+	
+	// Hash caching
+	private static boolean first_hash[] = new boolean[NUM_ANCHOR];
+	private final int anchors_hash[] = new int[NUM_ANCHOR];
 
 	/**
 	 * Create and initialize a conservative ordered lock table.
@@ -73,6 +77,8 @@ public class ConservativeOrderedLockTable {
 		// Initialize anchors
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
+			first_hash[i] = false;
+			anchors_hash[i] = -1;
 		}
 	}
 
@@ -106,12 +112,13 @@ public class ConservativeOrderedLockTable {
 	 */
 	void sLock(Object obj, long txNum) {
 		Object anchor = getAnchor(obj);
+		LockgetAnchor(obj, "sLock");
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
 			// check if it have already held the lock
-			if (hasSLock(lockers, txNum)) {
+			if (hasSLock(lockers, txNum )) {
 				lockers.requestQueue.remove(txNum);
 				return;
 			}
@@ -190,6 +197,7 @@ public class ConservativeOrderedLockTable {
 		txProfiler.startComponentProfiler(stage + "-xLock getAnchor");
 		Object anchor = getAnchor(obj);
 		txProfiler.stopComponentProfiler(stage + "-xLock getAnchor");
+		LockgetAnchor(obj, "xLock");
 		txProfiler.startComponentProfiler(stage + "-xLock AnchorLock");
 		synchronized (anchor) {
 			txProfiler.stopComponentProfiler(stage + "-xLock AnchorLock");
@@ -430,6 +438,24 @@ public class ConservativeOrderedLockTable {
 		int code = obj.hashCode();
 		code = Math.abs(code); // avoid negative value
 		return anchors[code % anchors.length];
+	}
+	
+	// Test function
+	private void LockgetAnchor(Object obj, String lockType) {
+		int code = obj.hashCode();
+		code = Math.abs(code); // avoid negative value
+		// to tell if this is conflict or not
+		boolean conflict = false;
+		if(!first_hash[code % anchors.length]) {
+			// if this is the first time being hashed to, cache the hash value 
+			anchors_hash[code % anchors.length] = code;
+			first_hash[code % anchors.length] = true;
+		}
+		else {
+			// if not the first time, compare their hash value to determine if there is conflict or not
+			conflict = (code == anchors_hash[code % anchors.length]);
+		}
+		ConservativeOrderedLockMonitor.raiseAnchorCounter(code % anchors.length, lockType, conflict);
 	}
 
 	private Lockers prepareLockers(Object obj) {
