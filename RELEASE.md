@@ -1,5 +1,11 @@
 # Release Notes
 
+## Version 0.3.1 (2021-01-07)
+
+### Security Issue
+
+- Bump vanillacomm from 0.2.5 to 0.2.6 due to the vulnerability of log4j
+
 ## Version 0.3.0 (2021-07-22)
 
 ### System Implementations
