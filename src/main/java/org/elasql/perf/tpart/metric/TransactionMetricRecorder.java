@@ -1,7 +1,8 @@
 package org.elasql.perf.tpart.metric;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,7 @@ import org.vanilladb.core.util.TransactionProfiler;
  */
 public class TransactionMetricRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionMetricRecorder.class.getName());
-	
+
 	private static final String FILENAME_PREFIX = "transaction";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String MASTER_ID_COLUMN = "Is Master";
@@ -34,7 +35,7 @@ public class TransactionMetricRecorder extends Task {
 	private static final boolean ENABLE_CPU_TIMER = TransactionProfiler.ENABLE_CPU_TIMER;
 	private static final boolean ENABLE_DISKIO_COUNTER = TransactionProfiler.ENABLE_DISKIO_COUNTER;
 	private static final boolean ENABLE_NETWORKIO_COUNTER = TransactionProfiler.ENABLE_NETWORKIO_COUNTER;
-	
+
 	private static class TransactionMetrics {
 		long txNum;
 		boolean isMaster;
@@ -45,12 +46,12 @@ public class TransactionMetricRecorder extends Task {
 		Map<String, Long> diskioCounts;
 		Map<String, Long> networkinSizes;
 		Map<String, Long> networkoutSizes;
-		
+
 		TransactionMetrics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 			this.txNum = txNum;
 			this.isMaster = role.equals("Master");
 			this.isTxDistributed = isTxDistributed;
-			
+
 			metricNames = new ArrayList<String>();
 			latencies = new HashMap<String, Long>();
 			cpuTimes = new HashMap<String, Long>();
@@ -69,17 +70,17 @@ public class TransactionMetricRecorder extends Task {
 					networkinSizes.put(metricName, profiler.getComponentNetworkInSize(component));
 					networkoutSizes.put(metricName, profiler.getComponentNetworkOutSize(component));
 				}
-					
+
 			}
 		}
 	}
-	
+
 	private static class LongValueRow implements CsvRow, Comparable<LongValueRow> {
 		long txNum;
 		boolean isMaster;
 		boolean isTxDistributed;
 		long[] values;
-		
+
 		LongValueRow(long txNum, boolean isMaster, boolean isTxDistributed, long[] values) {
 			this.txNum = txNum;
 			this.isMaster = isMaster;
@@ -109,102 +110,208 @@ public class TransactionMetricRecorder extends Task {
 			return Long.compare(txNum, row.txNum);
 		}
 	}
-	
+
 	private AtomicBoolean isRecording = new AtomicBoolean(false);
-	private BlockingQueue<TransactionMetrics> queue
-		= new LinkedBlockingQueue<TransactionMetrics>();
-	
+	private BlockingQueue<TransactionMetrics> queue = new LinkedBlockingQueue<TransactionMetrics>();
+
 	// Header
 	private int serverId;
 	private List<Object> metricNames = new ArrayList<Object>();
 	private Map<Object, Integer> metricNameToPos = new HashMap<Object, Integer>();
-	
-	// Data
-	private List<LongValueRow> latencyRows = new ArrayList<LongValueRow>();
-	private List<LongValueRow> cpuTimeRows = new ArrayList<LongValueRow>();
-	private List<LongValueRow> diskioCountRows = new ArrayList<LongValueRow>();
-	private List<LongValueRow> networkinSizeRows = new ArrayList<LongValueRow>();
-	private List<LongValueRow> networkoutSizeRows = new ArrayList<LongValueRow>();
-	
+
 	public TransactionMetricRecorder(int serverId) {
 		this.serverId = serverId;
 	}
-	
+
 	public void startRecording() {
 		if (!isRecording.getAndSet(true)) {
 			// Note: this should be called only once
 			Elasql.taskMgr().runTask(this);
 		}
 	}
-	
+
 	public void addTransactionMetrics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 		if (!isRecording.get())
 			return;
-		
+
 		queue.add(new TransactionMetrics(txNum, role, isTxDistributed, profiler));
+	}
+
+	@SuppressWarnings("unused")
+	private class CsvSavers implements AutoCloseable {
+		private CsvSaver<LongValueRow> latencyCsvSaver;
+		private CsvSaver<LongValueRow> cpuTimeCsvSaver;
+		private CsvSaver<LongValueRow> diskioCountCsvSaver;
+		private CsvSaver<LongValueRow> networkinSizeCsvSaver;
+		private CsvSaver<LongValueRow> networkoutSizeCsvSaver;
+
+		public BufferedWriter latencyWriter;
+		public BufferedWriter cpuTimeWriter;
+		public BufferedWriter diskioCountWriter;
+		public BufferedWriter networkinSizeWriter;
+		public BufferedWriter networkoutSizeWriter;
+
+		public CsvSavers() throws IOException {
+			initLatencyCsvSaver();
+			if (ENABLE_CPU_TIMER) {
+				initCpuTimeCsvSaver();
+			}
+			if (ENABLE_DISKIO_COUNTER) {
+				initDiskioCountCsvSaver();
+			}
+			if (ENABLE_NETWORKIO_COUNTER) {
+				initNetworkinSizeCsvSaver();
+				initNetworkoutSizeCsvSaver();
+			}
+		}
+
+		private void initLatencyCsvSaver() throws IOException {
+			String fileName = String.format("%s-latency-server-%d", FILENAME_PREFIX, serverId);
+			CsvSaver<LongValueRow> latencyCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			latencyWriter = latencyCsvSaver.createOutputFile();
+		}
+
+		private void initCpuTimeCsvSaver() throws IOException {
+			String fileName = String.format("%s-cpu-time-server-%d", FILENAME_PREFIX, serverId);
+			CsvSaver<LongValueRow> cpuTimeCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			cpuTimeWriter = cpuTimeCsvSaver.createOutputFile();
+		}
+
+		private void initDiskioCountCsvSaver() throws IOException {
+			String fileName = String.format("%s-diskio-count-server-%d", FILENAME_PREFIX, serverId);
+			CsvSaver<LongValueRow> diskioCountCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			diskioCountWriter = diskioCountCsvSaver.createOutputFile();
+		}
+
+		private void initNetworkinSizeCsvSaver() throws IOException {
+			String fileName = String.format("%s-networkin-size-server-%d", FILENAME_PREFIX, serverId);
+			CsvSaver<LongValueRow> networkinSizeCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			networkinSizeWriter = networkinSizeCsvSaver.createOutputFile();
+		}
+
+		private void initNetworkoutSizeCsvSaver() throws IOException {
+			String fileName = String.format("%s-networkout-size-server-%d", FILENAME_PREFIX, serverId);
+			CsvSaver<LongValueRow> networkoutSizeCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			networkoutSizeWriter = networkoutSizeCsvSaver.createOutputFile();
+		}
+
+		@Override
+		public void close() throws Exception {
+			latencyWriter.close();
+			if (ENABLE_CPU_TIMER) {
+				cpuTimeWriter.close();
+			}
+			if (ENABLE_DISKIO_COUNTER) {
+				diskioCountWriter.close();
+			}
+			if (ENABLE_NETWORKIO_COUNTER) {
+				networkinSizeWriter.close();
+				networkoutSizeWriter.close();
+			}
+		}
+
+		public void printInfo() {
+			if (logger.isLoggable(Level.INFO)) {
+				String log = String.format("A latency log is generated at '%s'", latencyCsvSaver.fileName());
+				logger.info(log);
+				if (ENABLE_CPU_TIMER) {
+					log = String.format("A cpu time log is generated at '%s'", cpuTimeCsvSaver.fileName());
+					logger.info(log);
+				}
+				if (ENABLE_DISKIO_COUNTER) {
+					log = String.format("A disk io count log is generated at '%s'", diskioCountCsvSaver.fileName());
+					logger.info(log);
+				}
+				if (ENABLE_NETWORKIO_COUNTER) {
+					log = String.format("A network in size log is generated at '%s'", networkinSizeCsvSaver.fileName());
+					logger.info(log);
+					log = String.format("A network out size log is generated at '%s'",
+							networkoutSizeCsvSaver.fileName());
+					logger.info(log);
+				}
+			}
+		}
 	}
 
 	@Override
 	public void run() {
 		Thread.currentThread().setName("Transaction Metrics Recorder");
-		
+		int columnCount = generateHeader().size();
+
 		try {
 			// Wait for receiving the first metrics
 			TransactionMetrics metrics = queue.take();
-			
+
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Transaction metrics recorder starts recording metrics");
-			
-			// Save the metrics
-			saveMetrics(metrics);
-			
-			// Wait until no more metrics coming in the last 10 seconds
-			while ((metrics = queue.poll(TIME_TO_FLUSH, TimeUnit.SECONDS)) != null) {
-				saveMetrics(metrics);
+
+			try (CsvSavers savers = new CsvSavers()) {
+				saveHeader(savers);
+
+				// Save the first metrics
+				saveMetrics(savers, metrics, columnCount);
+
+				// Wait until no more metrics coming in the last 10 seconds
+				while ((metrics = queue.poll(TIME_TO_FLUSH, TimeUnit.SECONDS)) != null) {
+					saveMetrics(savers, metrics, columnCount);
+				}
+
+				if (logger.isLoggable(Level.INFO)) {
+					String log = String.format("No more metrics coming in last %d seconds. Start generating a report.",
+							TIME_TO_FLUSH);
+					logger.info(log);
+				}
+
+				savers.printInfo();
+
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-			
-			if (logger.isLoggable(Level.INFO)) {
-				String log = String.format("No more metrics coming in last %d seconds. Start generating a report.",
-						TIME_TO_FLUSH);
-				logger.info(log);
-			}
-			
-			// Sort by transaction ID
-			sortRows();
-			
-			// Save to CSV files
-			saveToCsv();
-			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 	}
-	
-	private void saveMetrics(TransactionMetrics metrics) {
+
+	private void saveHeader(CsvSavers savers) throws IOException {
+		// Generate the header
+		List<String> header = generateHeader();
+
+		savers.latencyCsvSaver.writeHeader(savers.latencyWriter, header);
+		if (ENABLE_CPU_TIMER) {
+			savers.cpuTimeCsvSaver.writeHeader(savers.cpuTimeWriter, header);
+		}
+		if (ENABLE_DISKIO_COUNTER) {
+			savers.diskioCountCsvSaver.writeHeader(savers.diskioCountWriter, header);
+		}
+		if (ENABLE_NETWORKIO_COUNTER) {
+			savers.networkinSizeCsvSaver.writeHeader(savers.networkinSizeWriter, header);
+			savers.networkoutSizeCsvSaver.writeHeader(savers.networkoutSizeWriter, header);
+		}
+	}
+
+	private void saveMetrics(CsvSavers savers, TransactionMetrics metrics, int columnCount) throws IOException {
 		// Update component names
 		updateMetricNames(metrics);
-		
+
 		// Split the metrics to different types of rows
 		LongValueRow latRow = convertToLatencyRow(metrics);
-		latencyRows.add(latRow);
-		
+		savers.latencyCsvSaver.writeRecord(savers.latencyWriter, latRow, columnCount);
 		if (ENABLE_CPU_TIMER) {
 			LongValueRow cpuRow = convertToCpuTimeRow(metrics);
-			cpuTimeRows.add(cpuRow);
+			savers.cpuTimeCsvSaver.writeRecord(savers.cpuTimeWriter, cpuRow, columnCount);
 		}
 		if (ENABLE_DISKIO_COUNTER) {
 			LongValueRow diskioRow = convertToDiskioCountRow(metrics);
-			diskioCountRows.add(diskioRow);
+			savers.diskioCountCsvSaver.writeRecord(savers.diskioCountWriter, diskioRow, columnCount);
 		}
 		if (ENABLE_NETWORKIO_COUNTER) {
 			LongValueRow networkinRow = convertToNetworkinSizeRow(metrics);
-			networkinSizeRows.add(networkinRow);
+			savers.networkinSizeCsvSaver.writeRecord(savers.networkinSizeWriter, networkinRow, columnCount);
 			LongValueRow networkoutRow = convertToNetworkoutSizeRow(metrics);
-			networkoutSizeRows.add(networkoutRow);
+			savers.networkoutSizeCsvSaver.writeRecord(savers.networkoutSizeWriter, networkoutRow, columnCount);
 		}
-		
 	}
-	
+
 	private void updateMetricNames(TransactionMetrics metrics) {
 		for (String metricName : metrics.metricNames) {
 			if (!metricNameToPos.containsKey(metricName)) {
@@ -213,10 +320,10 @@ public class TransactionMetricRecorder extends Task {
 			}
 		}
 	}
-	
+
 	private LongValueRow convertToLatencyRow(TransactionMetrics metrics) {
 		long[] latValues = new long[metricNames.size()];
-		
+
 		for (Object metricName : metricNames) {
 			Long latency = metrics.latencies.get(metricName);
 			if (latency != null) {
@@ -226,10 +333,10 @@ public class TransactionMetricRecorder extends Task {
 		}
 		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, latValues);
 	}
-	
+
 	private LongValueRow convertToCpuTimeRow(TransactionMetrics metrics) {
 		long[] cpuValues = new long[metricNames.size()];
-		
+
 		for (Object metricName : metricNames) {
 			Long cpuTime = metrics.cpuTimes.get(metricName);
 			if (cpuTime != null) {
@@ -239,28 +346,28 @@ public class TransactionMetricRecorder extends Task {
 		}
 		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, cpuValues);
 	}
-	
+
 	private LongValueRow convertToDiskioCountRow(TransactionMetrics metrics) {
 		long[] diskioValues = new long[metricNames.size()];
-		
+
 		for (Object metricName : metricNames) {
 			Long diskioCount = metrics.diskioCounts.get(metricName);
 			if (diskioCount != null) {
 				int pos = metricNameToPos.get(metricName);
-				diskioValues[pos] = metrics.diskioCounts.get(metricName);;
+				diskioValues[pos] = metrics.diskioCounts.get(metricName);
 			}
 		}
 		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, diskioValues);
 	}
-	
+
 	private LongValueRow convertToNetworkinSizeRow(TransactionMetrics metrics) {
 		long[] networkinValues = new long[metricNames.size()];
-		
+
 		for (Object metricName : metricNames) {
 			Long networkinSize = metrics.networkinSizes.get(metricName);
 			if (networkinSize != null) {
 				int pos = metricNameToPos.get(metricName);
-				networkinValues[pos] = metrics.networkinSizes.get(metricName);;
+				networkinValues[pos] = metrics.networkinSizes.get(metricName);
 			}
 		}
 		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, networkinValues);
@@ -268,116 +375,33 @@ public class TransactionMetricRecorder extends Task {
 
 	private LongValueRow convertToNetworkoutSizeRow(TransactionMetrics metrics) {
 		long[] networkoutValues = new long[metricNames.size()];
-		
+
 		for (Object metricName : metricNames) {
 			Long networkoutSize = metrics.networkoutSizes.get(metricName);
 			if (networkoutSize != null) {
 				int pos = metricNameToPos.get(metricName);
-				networkoutValues[pos] = metrics.networkoutSizes.get(metricName);;
+				networkoutValues[pos] = metrics.networkoutSizes.get(metricName);
 			}
 		}
 		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, networkoutValues);
 	}
-	
-	private void sortRows() {
-		Collections.sort(latencyRows);
-		if (ENABLE_CPU_TIMER)
-			Collections.sort(cpuTimeRows);
-		if (ENABLE_DISKIO_COUNTER)
-			Collections.sort(diskioCountRows);
-		if (ENABLE_NETWORKIO_COUNTER) {
-			Collections.sort(networkinSizeRows);
-			Collections.sort(networkoutSizeRows);
-		}
-	}
-	
-	private void saveToCsv() {
-		// Generate the header
-		List<String> header = generateHeader();
-		
-		// Save to different files
-		saveToLatencyCsv(header);
-		if (ENABLE_CPU_TIMER)
-			saveToCpuTimeCsv(header);
-		if (ENABLE_DISKIO_COUNTER)
-			saveToDiskioCountCsv(header);
-		if (ENABLE_NETWORKIO_COUNTER) {
-			saveToNetworkinSizeCsv(header);
-			saveToNetworkoutSizeCsv(header);
-		}		
-	}
-	
-	private void saveToLatencyCsv(List<String> header) {
-		String fileName = String.format("%s-latency-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
-		String path = csvSaver.generateOutputFile(header, latencyRows);
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A latency log is generated at '%s'", path);
-			logger.info(log);
-		}
-	}
-	
-	private void saveToCpuTimeCsv(List<String> header) {
-		String fileName = String.format("%s-cpu-time-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
-		String path = csvSaver.generateOutputFile(header, cpuTimeRows);
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A cpu time log is generated at '%s'", path);
-			logger.info(log);
-		}
-	}	
-	
-	private void saveToDiskioCountCsv(List<String> header) {
-		String fileName = String.format("%s-diskio-count-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
-		String path = csvSaver.generateOutputFile(header, diskioCountRows);
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A disk io count log is generated at '%s'", path);
-			logger.info(log);
-		}
-	}
-	
-	private void saveToNetworkinSizeCsv(List<String> header) {
-		String fileName = String.format("%s-networkin-size-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
-		String path = csvSaver.generateOutputFile(header, networkinSizeRows);
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A network in size log is generated at '%s'", path);
-			logger.info(log);
-		}
-	}
-	
-	private void saveToNetworkoutSizeCsv(List<String> header) {
-		String fileName = String.format("%s-networkout-size-server-%d", FILENAME_PREFIX, serverId);
-		CsvSaver<LongValueRow> csvSaver = new CsvSaver<LongValueRow>(fileName);
-		String path = csvSaver.generateOutputFile(header, networkoutSizeRows);
-		
-		if (logger.isLoggable(Level.INFO)) {
-			String log = String.format("A network out size log is generated at '%s'", path);
-			logger.info(log);
-		}
-	}
-	
+
 	private List<String> generateHeader() {
 		List<String> header = new ArrayList<String>();
-		
+
 		// First column: transaction ID
 		header.add(TRANSACTION_ID_COLUMN);
-		
+
 		// Second column: is master
 		header.add(MASTER_ID_COLUMN);
-		
+
 		// Third column: is tx distributed
 		header.add(DISTRIBUTED_TX_COLUMN);
-		
+
 		// After: metrics
 		for (Object metricName : metricNames)
 			header.add(metricName.toString());
-		
+
 		return header;
 	}
 }
