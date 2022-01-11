@@ -139,11 +139,11 @@ public class TransactionMetricRecorder extends Task {
 
 	@SuppressWarnings("unused")
 	private class CsvSavers implements AutoCloseable {
-		private CsvSaver<LongValueRow> latencyCsvSaver;
-		private CsvSaver<LongValueRow> cpuTimeCsvSaver;
-		private CsvSaver<LongValueRow> diskioCountCsvSaver;
-		private CsvSaver<LongValueRow> networkinSizeCsvSaver;
-		private CsvSaver<LongValueRow> networkoutSizeCsvSaver;
+		public CsvSaver<LongValueRow> latencyCsvSaver;
+		public CsvSaver<LongValueRow> cpuTimeCsvSaver;
+		public CsvSaver<LongValueRow> diskioCountCsvSaver;
+		public CsvSaver<LongValueRow> networkinSizeCsvSaver;
+		public CsvSaver<LongValueRow> networkoutSizeCsvSaver;
 
 		public BufferedWriter latencyWriter;
 		public BufferedWriter cpuTimeWriter;
@@ -167,36 +167,36 @@ public class TransactionMetricRecorder extends Task {
 
 		private void initLatencyCsvSaver() throws IOException {
 			String fileName = String.format("%s-latency-server-%d", FILENAME_PREFIX, serverId);
-			CsvSaver<LongValueRow> latencyCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			latencyCsvSaver = new CsvSaver<LongValueRow>(fileName);
 			latencyWriter = latencyCsvSaver.createOutputFile();
 		}
 
 		private void initCpuTimeCsvSaver() throws IOException {
 			String fileName = String.format("%s-cpu-time-server-%d", FILENAME_PREFIX, serverId);
-			CsvSaver<LongValueRow> cpuTimeCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			cpuTimeCsvSaver = new CsvSaver<LongValueRow>(fileName);
 			cpuTimeWriter = cpuTimeCsvSaver.createOutputFile();
 		}
 
 		private void initDiskioCountCsvSaver() throws IOException {
 			String fileName = String.format("%s-diskio-count-server-%d", FILENAME_PREFIX, serverId);
-			CsvSaver<LongValueRow> diskioCountCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			diskioCountCsvSaver = new CsvSaver<LongValueRow>(fileName);
 			diskioCountWriter = diskioCountCsvSaver.createOutputFile();
 		}
 
 		private void initNetworkinSizeCsvSaver() throws IOException {
 			String fileName = String.format("%s-networkin-size-server-%d", FILENAME_PREFIX, serverId);
-			CsvSaver<LongValueRow> networkinSizeCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			networkinSizeCsvSaver = new CsvSaver<LongValueRow>(fileName);
 			networkinSizeWriter = networkinSizeCsvSaver.createOutputFile();
 		}
 
 		private void initNetworkoutSizeCsvSaver() throws IOException {
 			String fileName = String.format("%s-networkout-size-server-%d", FILENAME_PREFIX, serverId);
-			CsvSaver<LongValueRow> networkoutSizeCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			networkoutSizeCsvSaver = new CsvSaver<LongValueRow>(fileName);
 			networkoutSizeWriter = networkoutSizeCsvSaver.createOutputFile();
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			latencyWriter.close();
 			if (ENABLE_CPU_TIMER) {
 				cpuTimeWriter.close();
@@ -245,7 +245,11 @@ public class TransactionMetricRecorder extends Task {
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Transaction metrics recorder starts recording metrics");
 
-			try (CsvSavers savers = new CsvSavers()) {
+			CsvSavers savers = null;
+
+			try {
+				savers = new CsvSavers();
+
 				saveHeader(savers);
 
 				// Save the first metrics
@@ -264,8 +268,15 @@ public class TransactionMetricRecorder extends Task {
 
 				savers.printInfo();
 
-			} catch (Exception e) {
+			} catch (IOException e) {
 				e.printStackTrace();
+			} finally {
+				try {
+					savers.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
