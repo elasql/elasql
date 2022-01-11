@@ -32,6 +32,10 @@ public class HermesNodeInserter implements BatchNodeInserter {
 	private Set<Integer> saturatedParts = new HashSet<Integer>();
 	private int overloadedThreshold;
 
+	// Debug: show the distribution of assigned masters
+	private long lastReportTime = -1;
+	private int[] assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
 		// Step 0: Reset statistics
@@ -63,6 +67,11 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			if (increaseTolerence > 100)
 				throw new RuntimeException("Something wrong");
 		}
+
+		// Debug: show the distribution of assigned masters
+		for (TxNode node : graph.getTxNodes())
+			assignedCounts[node.getPartId()]++;
+		reportRoutingDistribution(tasks.get(0).getArrivedTime());
 		
 //		System.out.println(String.format("Final loads: %s", Arrays.toString(loadPerPart)));
 	}
@@ -81,7 +90,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			
 			// Count the number of remote edge
 			int remoteEdgeCount = countRemoteReadEdge(graph, task, partId);
-			
+
 			// Find the node in which the tx has fewest remote edges.
 			if (remoteEdgeCount < minRemoteEdgeCount) {
 				minRemoteEdgeCount = remoteEdgeCount;
@@ -226,5 +235,25 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		// Note: We do not consider write back edges because Hermes will make it local
 		
 		return count;
+	}
+
+	// Debug: show the distribution of assigned masters
+	private void reportRoutingDistribution(long currentTime) {
+		if (lastReportTime == -1) {
+			lastReportTime = currentTime;
+		} else if (currentTime - lastReportTime > 5_000_000) {
+			StringBuffer sb = new StringBuffer();
+			
+			sb.append(String.format("Time: %d seconds - ", currentTime / 1_000_000));
+			for (int i = 0; i < assignedCounts.length; i++) {
+				sb.append(String.format("%d, ", assignedCounts[i]));
+				assignedCounts[i] = 0;
+			}
+			sb.delete(sb.length() - 2, sb.length());
+			
+			System.out.println(sb.toString());
+			
+			lastReportTime = currentTime;
+		}
 	}
 }

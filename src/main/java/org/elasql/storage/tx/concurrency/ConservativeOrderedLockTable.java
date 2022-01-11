@@ -22,11 +22,12 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConservativeOrderedLockTable {
 
 	private static final int NUM_ANCHOR = 1009;
-	
+
 	enum LockType {
 		IS_LOCK, IX_LOCK, S_LOCK, SIX_LOCK, X_LOCK
 	}
@@ -64,6 +65,10 @@ public class ConservativeOrderedLockTable {
 
 	// Lock-stripping
 	private final Object anchors[] = new Object[NUM_ANCHOR];
+	
+	// Hash caching
+	private static boolean first_hash[] = new boolean[NUM_ANCHOR];
+	private final int anchors_hash[] = new int[NUM_ANCHOR];
 
 	/**
 	 * Create and initialize a conservative ordered lock table.
@@ -72,6 +77,8 @@ public class ConservativeOrderedLockTable {
 		// Initialize anchors
 		for (int i = 0; i < anchors.length; ++i) {
 			anchors[i] = new Object();
+			first_hash[i] = false;
+			anchors_hash[i] = -1;
 		}
 	}
 
@@ -105,12 +112,13 @@ public class ConservativeOrderedLockTable {
 	 */
 	void sLock(Object obj, long txNum) {
 		Object anchor = getAnchor(obj);
+		LockgetAnchor(obj, "sLock");
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
 			// check if it have already held the lock
-			if (hasSLock(lockers, txNum)) {
+			if (hasSLock(lockers, txNum )) {
 				lockers.requestQueue.remove(txNum);
 				return;
 			}
@@ -181,10 +189,21 @@ public class ConservativeOrderedLockTable {
 	 */
 	void xLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
+		
+		// TODO: Can we increase the number of anchor to decrease the conflict rate.
+		TransactionProfiler txProfiler = TransactionProfiler.getLocalProfiler();
+		int stage = TransactionProfiler.getStageIndicator();
+		
+		txProfiler.startComponentProfiler(stage + "-xLock getAnchor");
 		Object anchor = getAnchor(obj);
-
+		txProfiler.stopComponentProfiler(stage + "-xLock getAnchor");
+		LockgetAnchor(obj, "xLock");
+		txProfiler.startComponentProfiler(stage + "-xLock AnchorLock");
 		synchronized (anchor) {
+			txProfiler.stopComponentProfiler(stage + "-xLock AnchorLock");
+			txProfiler.startComponentProfiler(stage + "-xLock prepareLockers");
 			Lockers lockers = prepareLockers(obj);
+			txProfiler.stopComponentProfiler(stage + "-xLock prepareLockers");
 
 			if (hasXLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
@@ -197,6 +216,8 @@ public class ConservativeOrderedLockTable {
 				
 				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
+				txProfiler.startComponentProfiler(stage + "-xLock WaitQueue");
+				long waitStart = System.nanoTime();
 				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
 				/* && !waitingTooLong(timestamp) */) {
 					
@@ -218,8 +239,11 @@ public class ConservativeOrderedLockTable {
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
+					ConservativeOrderedLockMonitor.addHotLatchHistory(lockers.requestQueue.size(), new LinkedList<Long>(lockers.requestQueue));
 				}
-
+				long waitStop = System.nanoTime();
+				ConservativeOrderedLockMonitor.AddxLockWaitTime(waitStop - waitStart);
+				txProfiler.stopComponentProfiler(stage + "-xLock WaitQueue");
 				// For debug
 //				Thread.currentThread().setName(name);
 				
@@ -415,6 +439,33 @@ public class ConservativeOrderedLockTable {
 		int code = obj.hashCode();
 		code = Math.abs(code); // avoid negative value
 		return anchors[code % anchors.length];
+	}
+	
+	// Test function
+	private void LockgetAnchor(Object obj, String lockType) {
+		int code = obj.hashCode();
+		code = Math.abs(code); // avoid negative value
+		// to tell if this is conflict or not
+		boolean conflict = false;
+		if(!first_hash[code % anchors.length]) {
+			// if this is the first time being hashed to, cache the hash value 
+			anchors_hash[code % anchors.length] = code;
+			first_hash[code % anchors.length] = true;
+		}
+		else {
+			// if not the first time, compare their hash value to determine if there is conflict or not
+			conflict = (code == anchors_hash[code % anchors.length]);
+		}
+		if(code % anchors.length == 820) {
+			// System.out.println("The hot obj is: " + obj.toString());
+		}
+		if(ConservativeOrderedLockMonitor.getsLockAnchorCounter()[code % anchors.length] > 100000) {
+			// System.out.println("The hot sLock obj is: " + obj.toString() + " with module" + code % anchors.length + "type = " + obj.getClass().getName());
+		}
+		if(ConservativeOrderedLockMonitor.getxLockAnchorCounter()[code % anchors.length] > 100000) {
+			// System.out.println("The hot xLock obj is: " + obj.toString() + " with module" + code % anchors.length + "type = " + obj.getClass().getName());
+		}
+		ConservativeOrderedLockMonitor.raiseAnchorCounter(code % anchors.length, lockType, conflict);
 	}
 
 	private Lockers prepareLockers(Object obj) {

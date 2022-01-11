@@ -1,15 +1,17 @@
 package org.elasql.procedure.tpart;
 
+import java.util.HashSet;
 import java.util.Set;
+import java.util.Queue;
 
+import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.util.Timer;
-import org.vanilladb.core.util.TimerStatistics;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
@@ -22,13 +24,23 @@ public class TPartStoredProcedureTask
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
+	
+	// Timestamps
+	// The time that the stored procedure call arrives the system
+	private long arrivedTime;
+	private TransactionEstimation estimation;
+	private TransactionProfiler profiler;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, TPartStoredProcedure<?> sp) {
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
+			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
+		this.arrivedTime = arrivedTime;
+		this.profiler = profiler;
 		this.tsp = sp;
+		this.estimation = estimation;
 	}
 
 	@Override
@@ -36,16 +48,20 @@ public class TPartStoredProcedureTask
 		SpResultSet rs = null;
 		
 		Thread.currentThread().setName("Tx." + txNum);
-//		Timer timer = Timer.getLocalTimer();
-//		timer.reset();
-//		timer.startExecution();
+		
+		// Initialize a thread-local profiler which is from scheduler
+		TransactionProfiler.setProfiler(profiler);
+		TransactionProfiler profiler =  TransactionProfiler.getLocalProfiler();
 
-//		try {
-			rs = tsp.execute();
-//		} finally {
-//			timer.stopExecution();
-//		}
+		// OU2
+		profiler.stopComponentProfiler("OU2 - Initialize Thread");
+		
+		// Transaction Execution
+		rs = tsp.execute();
 
+		// Stop the profiler for the whole execution
+		profiler.stopExecution();
+		
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
@@ -60,18 +76,38 @@ public class TPartStoredProcedureTask
 			// For Debugging
 //			timer.addToGlobalStatistics();
 		}
+		
+		// Record the profiler result
+		String role = tsp.isMaster()? "Master" : "Slave";
+		
+		Elasql.performanceMgr().addTransactionMetics(txNum, role, tsp.isTxDistributed(), profiler);
 	}
 
 	public long getTxNum() {
 		return txNum;
 	}
+	
+	public long getArrivedTime() {
+		return arrivedTime;
+	}
 
 	public Set<PrimaryKey> getReadSet() {
 		return tsp.getReadSet();
 	}
-
+	
 	public Set<PrimaryKey> getWriteSet() {
-		return tsp.getWriteSet();
+		Set<PrimaryKey> writeSet = new HashSet<PrimaryKey>();
+		writeSet.addAll(tsp.getUpdateSet());
+		writeSet.addAll(tsp.getInsertSet());
+		return writeSet;
+	}
+	
+	public Set<PrimaryKey> getUpdateSet() {
+		return tsp.getUpdateSet();
+	}
+	
+	public Set<PrimaryKey> getInsertSet() {
+		return tsp.getInsertSet();
 	}
 
 	public double getWeight() {
@@ -94,6 +130,10 @@ public class TPartStoredProcedureTask
 		return tsp;
 	}
 
+	public TransactionProfiler getTxProfiler() {
+		return profiler;
+	}
+	
 	public ProcedureType getProcedureType() {
 		if (tsp == null)
 			return ProcedureType.NOP;
@@ -102,5 +142,13 @@ public class TPartStoredProcedureTask
 
 	public boolean isReadOnly() {
 		return tsp.isReadOnly();
+	}
+	
+	public void setEstimation(TransactionEstimation estimation) {
+		this.estimation = estimation;
+	}
+	
+	public TransactionEstimation getEstimation() {
+		return estimation;
 	}
 }

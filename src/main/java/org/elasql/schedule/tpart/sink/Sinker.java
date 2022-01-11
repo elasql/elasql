@@ -18,7 +18,7 @@ public class Sinker {
 	protected PartitionMetaMgr parMeta;
 	protected int myId = Elasql.serverId();
 	protected static int sinkProcessId = 0;
-
+	
 	public Sinker() {
 		parMeta = Elasql.partitionMetaMgr();
 	}
@@ -70,6 +70,9 @@ public class Sinker {
 				node.getTask().decideExceutionPlan(plan);
 				localTasks.add(node.getTask());
 			}
+			
+			// Check if it is a distributed transaction
+			checkIfIsDistributed(plan, node);
 		}
 		
 		return localTasks;
@@ -79,7 +82,7 @@ public class Sinker {
 		for (Edge e : node.getReadEdges()) {
 			long srcTxn = e.getTarget().getTxNum();
 			boolean isLocalResource = (e.getTarget().getPartId() == myId);
-			
+
 			if (plan.isHereMaster()) {
 				plan.addReadingInfo(e.getResourceKey(), srcTxn);
 				
@@ -126,6 +129,24 @@ public class Sinker {
 			} else if (plan.isHereMaster()) { // XXX: Untested
 				// push the write-back data to the remote node
 				plan.addPushingInfo(k, dataWriteBackPos, TPartCacheMgr.toSinkId(dataWriteBackPos));
+			}
+		}
+	}
+	
+	private void checkIfIsDistributed(SunkPlan plan, TxNode node) {
+		// Check read edges
+		for (Edge e : node.getReadEdges()) {
+			if (e.getTarget().getPartId() != node.getPartId()) {
+				plan.setDistributed(true);
+				return;
+			}
+		}
+		
+		// Check write back edges
+		for (Edge e : node.getWriteBackEdges()) {
+			if (e.getTarget().getPartId() != node.getPartId()) {
+				plan.setDistributed(true);
+				return;
 			}
 		}
 	}

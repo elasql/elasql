@@ -23,28 +23,32 @@ public class FusionTGraph extends TGraph {
 	 */
 	@Override
 	public void addWriteBackEdge() {
-		// Get the overflowed keys that need to be placed back to the original locations
-		Set<PrimaryKey> overflowedKeys = fusionTable.getOverflowKeys();
-		if (overflowedKeys != null && overflowedKeys.size() > 0) {
-			
-			// Make each key that will be processed in this graph
-			// be written back to the original location by the last one using it
-			Set<PrimaryKey> noOneHandledKeys = new HashSet<PrimaryKey>();
-			for (PrimaryKey key : overflowedKeys) {
-				TxNode handler = resPos.remove(key);
-				if (handler != null) {
+		// == Handles overflowed keys ==
+		// Check if there is a transaction can handle overflowed keys
+		TxNode lastTxNode = getLastInsertedTxNode();
+		if (lastTxNode != null) {
+			// Get the overflowed keys that need to be placed back to the original locations
+			Set<PrimaryKey> overflowedKeys = fusionTable.getOverflowKeys();
+			if (overflowedKeys != null && overflowedKeys.size() > 0) {
+				
+				// Make each key that will be processed in this graph
+				// be written back to the original location by the last one using it
+				Set<PrimaryKey> noOneHandledKeys = new HashSet<PrimaryKey>();
+				for (PrimaryKey key : overflowedKeys) {
+					TxNode handler = resPos.remove(key);
+					if (handler != null) {
+						int originalLocation = parMeta.getPartition(key);
+						handler.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
+					} else
+						noOneHandledKeys.add(key);
+				}
+				
+				// For the keys that on one handles, let the last node read and write them back.
+				for (PrimaryKey key : noOneHandledKeys) {
 					int originalLocation = parMeta.getPartition(key);
-					handler.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
-				} else
-					noOneHandledKeys.add(key);
-			}
-			
-			// For the keys that on one handles, let the last node read and write them back.
-			TxNode lastNode = getLastInsertedTxNode();
-			for (PrimaryKey key : noOneHandledKeys) {
-				int originalLocation = parMeta.getPartition(key);
-				lastNode.addReadEdges(new Edge(getResourcePosition(key), key));
-				lastNode.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
+					lastTxNode.addReadEdges(new Edge(getResourcePosition(key), key));
+					lastTxNode.addWriteBackEdges(new Edge(sinkNodes[originalLocation], key));
+				}
 			}
 		}
 		
@@ -80,5 +84,35 @@ public class FusionTGraph extends TGraph {
 			return sinkNodes[location];
 		
 		return sinkNodes[parMeta.getPartition(res)];
+	}
+
+	@Override
+	public void clear() {
+		for (TxNode node : getTxNodes()) {
+			for (Edge e : node.getWriteBackEdges()) {
+				PrimaryKey key = e.getResourceKey();
+				int writeBackPos = e.getTarget().getPartId();
+				setRecordCurrentLocation(key, writeBackPos);
+			}
+		}
+		
+		super.clear();
+	}
+	
+	public int getCachedLocation(PrimaryKey key) {
+		return fusionTable.getLocation(key);
+	}
+	
+	public int getFusionTableOverflowCount() {
+		return fusionTable.getOverflowKeys().size();
+	}
+	
+	private void setRecordCurrentLocation(PrimaryKey key, int loc) {
+		if (parMeta.getPartition(key) == loc) {
+			if (fusionTable.containsKey(key)) {
+				fusionTable.remove(key);
+			}
+		} else
+			fusionTable.setLocation(key, loc);
 	}
 }

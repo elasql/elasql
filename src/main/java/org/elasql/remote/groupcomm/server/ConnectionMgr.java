@@ -15,6 +15,7 @@
  ******************************************************************************/
 package org.elasql.remote.groupcomm.server;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.logging.Logger;
 
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
+import org.elasql.perf.MetricReport;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.Tuple;
@@ -35,6 +37,7 @@ import org.vanilladb.comm.server.VanillaCommServer;
 import org.vanilladb.comm.server.VanillaCommServerListener;
 import org.vanilladb.comm.view.ProcessType;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConnectionMgr implements VanillaCommServerListener {
 	private static Logger logger = Logger.getLogger(ConnectionMgr.class.getName());
@@ -42,17 +45,26 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public static final int SEQUENCER_ID = VanillaCommServer.getServerCount() - 1;
 
 	private VanillaCommServer commServer;
-	private boolean sequencerMode;
+	private boolean isSequencer;
 	private BlockingQueue<List<Serializable>> tomSendQueue = new LinkedBlockingQueue<List<Serializable>>();
 	private boolean areAllServersReady = false;
+	
+	private long firstSpcArrivedTime = -1;
+
+	// See Note #1 in onReceiveP2pMessage
+	private long nextTransactionId = 1;
+	private List<Serializable> tomRequest = new ArrayList<Serializable>();
 
 	public ConnectionMgr(int id) {
-		sequencerMode = Elasql.serverId() == SEQUENCER_ID;
+		isSequencer = Elasql.serverId() == SEQUENCER_ID;
 		commServer = new VanillaCommServer(id, this);
+	}
+	
+	public void start() {
 		new Thread(null, commServer, "VanillaComm-Server").start();
 
 		// Only the sequencer needs to wait for all servers ready
-		if (sequencerMode) {
+		if (isSequencer) {
 			waitForServersReady();
 			createTomSender();
 		}
@@ -64,11 +76,25 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
-		commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
+		// In order to ensure that all the transaction numbers are dispatched
+		// from the sequencer, all stored procedure calls must be sent to the sequencer
+		// for further processing.
+		StoredProcedureCall spc = new StoredProcedureCall(-1, -1, pid, pars);
+		if (isSequencer) {
+			onReceiveP2pMessage(ProcessType.SERVER, Elasql.serverId(), spc);
+		} else {
+			commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, spc);
+		}
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
+		// For controller
+		TransactionProfiler.getLocalProfiler().incrementNetworkOutSize(reading);
 		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
+	}
+	
+	public void sendMetricReport(MetricReport report) {
+		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, report);
 	}
 
 	@Override
@@ -86,45 +112,125 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	@Override
 	public void onReceiveP2pMessage(ProcessType senderType, int senderId, Serializable message) {
-		if (senderType == ProcessType.CLIENT) {
-			// Normally, the client will only sends its request to the sequencer.
-			// However, any other server can also send a total order request.
-			// So, we do not need to check if this machine is the sequencer.
-			
-			// Transfer the given batch to a list of messages
-			StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
-			List<Serializable> tomRequest = new ArrayList<Serializable>(spcs.length);
-			for (StoredProcedureCall spc : spcs)
-				tomRequest.add(spc);
-			try {
-				tomSendQueue.put(tomRequest);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		} else if (message.getClass().equals(TupleSet.class)) {
-			TupleSet ts = (TupleSet) message;
-			
-			if (ts.sinkId() == MigrationSystemController.MSG_RANGE_FINISH) {
-				Elasql.migraSysControl().onReceiveMigrationRangeFinishMsg(
-						(MigrationRangeFinishMessage) ts.getMetadata());
-				return;
-			}
-			
-			for (Tuple t : ts.getTupleSet())
-				Elasql.remoteRecReceiver().cacheRemoteRecord(t);
-		} else
-			throw new IllegalArgumentException();
+		if (isSequencer) {
+			if (message.getClass().equals(StoredProcedureCall[].class)) {
+				StoredProcedureCall[] spcs = (StoredProcedureCall[]) message;
+				for (StoredProcedureCall spc : spcs) {
+					onReceivedSpCall(spc);
+				}
+				flushTotalOrderMsgs();
+			} else if (message.getClass().equals(StoredProcedureCall.class)) {
+				StoredProcedureCall spc = (StoredProcedureCall) message;
+				onReceivedSpCall(spc);
+				flushTotalOrderMsgs();
+			} else if (message instanceof MetricReport) {
+				MetricReport report = (MetricReport) message;
+				Elasql.performanceMgr().receiveMetricReport(report);
+			} else
+				throw new IllegalArgumentException("the sequencer doesn't know how to handle "
+						+ message);
+		} else {
+			if (message.getClass().equals(TupleSet.class)) {
+				TupleSet ts = (TupleSet) message;
+				
+				if (ts.sinkId() == MigrationSystemController.MSG_RANGE_FINISH) {
+					Elasql.migraSysControl().onReceiveMigrationRangeFinishMsg(
+							(MigrationRangeFinishMessage) ts.getMetadata());
+					return;
+				}
+				
+				for (Tuple t : ts.getTupleSet())
+					Elasql.remoteRecReceiver().cacheRemoteRecord(t);
+			} else
+				throw new IllegalArgumentException("server #" + Elasql.serverId() + 
+						" doesn't know how to handle " + message);
+		}
+	}
+	
+	public void sendTotalOrderRequest(List<Serializable> requests) {
+		// Send a total order request
+		try {
+			tomSendQueue.put(requests);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	@Override
 	public void onReceiveTotalOrderMessage(long serialNumber, Serializable message) {
+		StoredProcedureCall spc = (StoredProcedureCall) message;
+		
+		profileBroadcast(spc, message);
+		
+		// See Note #1 in onReceivedSpCall
+//		spc.setTxNum(serialNumber);
+		
 		// The sequencer running with Calvin must receive stored procedure call for planning migrations
-		if (sequencerMode && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
+		if (isSequencer && Elasql.SERVICE_TYPE != ServiceType.CALVIN)
 			return;
 		
-		StoredProcedureCall spc = (StoredProcedureCall) message;
-		spc.setTxNum(serialNumber);
+		// Pass to the scheduler
 		Elasql.scheduler().schedule(spc);
+	}
+	
+	public boolean areAllServersReady() {
+		return areAllServersReady;
+	}
+	
+	private void onReceivedSpCall(StoredProcedureCall spc) {
+		// Record when the first spc arrives
+		if (firstSpcArrivedTime == -1)
+			firstSpcArrivedTime = System.nanoTime();
+		
+		// Set arrived time
+		long arrivedTime = (System.nanoTime() - firstSpcArrivedTime) / 1000;
+		spc.stampArrivedTime(arrivedTime);
+		spc.stampOu0StartTime(System.nanoTime());
+		
+		// Set transaction number
+		// Note #1: the transaction number originally should be dispatched
+		// through Zab. However, in order to estimate the latency and 
+		// the cost of each transaction. We make the sequencer decide
+		// the transaction number before the total ordering, so that
+		// we can estimate the cost before sending the requests to DB
+		// servers.
+		// This method works because there is only one leader in Zab,
+		// and the leader won't change in the experiment.
+		spc.setTxNum(nextTransactionId);
+		nextTransactionId++;
+
+		// Processes the transaction request
+		// and append some metadata if necessary
+		if (Elasql.performanceMgr() != null)
+			Elasql.performanceMgr().preprocessSpCall(spc);
+		else
+			// Add to the total order request queue
+			tomRequest.add(spc);
+	}
+	
+	private void flushTotalOrderMsgs() {
+		if (!tomRequest.isEmpty()) {
+			sendTotalOrderRequest(tomRequest);
+			tomRequest = new ArrayList<Serializable>();
+		}	
+	}
+	
+	private void profileBroadcast(StoredProcedureCall spc, Serializable message) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.reset();
+		profiler.startExecution();
+		
+		long broadcastTime = (spc.getOu0StopTime() - spc.getOu0StartTime()) / 1000;
+		int networkSize = 0;
+		try {
+			networkSize = TransactionProfiler.getMessageSize(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, networkSize, 0, 0);
+		profiler.startComponentProfiler("OU0 - ROUTE");
+		
+		spc.setProfiler(TransactionProfiler.takeOut());
 	}
 	
 	private void createTomSender() {
@@ -134,6 +240,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				while (true) {
 					try {
 						List<Serializable> messages = tomSendQueue.take();
+						for (int i = messages.size() - 1; i >= 0; i--) {
+							StoredProcedureCall spc = (StoredProcedureCall) messages.get(i);
+							spc.stampOu0StopTime(System.nanoTime());
+						}
 						commServer.sendTotalOrderMessages(messages);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
@@ -141,7 +251,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				}
 
 			}
-		}).start();;
+		}).start();
 	}
 	
 	private void waitForServersReady() {

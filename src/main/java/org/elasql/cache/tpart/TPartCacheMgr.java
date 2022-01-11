@@ -15,6 +15,7 @@ import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartCacheMgr implements RemoteRecordReceiver {
 	private static Logger logger = Logger.getLogger(TPartCacheMgr.class.getName());
@@ -33,7 +34,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 //	private static LocalStorageCcMgr localCcMgr = new LocalStorageCcMgr();
 //	private static LocalStorageLockTable lockTable = new LocalStorageLockTable();
 
-	private Map<CachedEntryKey, CachedRecord> exchange;
+	private Map<CachedEntryKey, EnhancedCachedRecord> exchange;
 	
 	private Map<PrimaryKey, CachedRecord> recordCache;
 
@@ -45,7 +46,7 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 		}
 		
 		recordCache = new ConcurrentHashMap<PrimaryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
-		exchange = new ConcurrentHashMap<CachedEntryKey, CachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
+		exchange = new ConcurrentHashMap<CachedEntryKey, EnhancedCachedRecord>(FusionTable.EXPECTED_MAX_SIZE + 1000);
 		
 //		new PeriodicalJob(5000, 600000, new Runnable() {
 //			@Override
@@ -89,11 +90,18 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 					while (!exchange.containsKey(k)) {
 						prepareAnchor(k).wait();
 					}
-
+					
+					EnhancedCachedRecord r = exchange.remove(k);
+					CachedRecord rec = r.getCachedRecord();
+					
+					// For controller
+					if (r.isRemote())
+						TransactionProfiler.getLocalProfiler().incrementNetworkInSize(rec);
+					
 					// Debug: Tracing the waiting key
 //					Thread.currentThread().setName("Tx." + dest);
 					
-					return exchange.remove(k);
+					return rec;
 				} catch (InterruptedException e) {
 					throw new RuntimeException();
 				}
@@ -109,8 +117,10 @@ public class TPartCacheMgr implements RemoteRecordReceiver {
 					"The record for %s is null (from Tx.%d to Tx.%d)", key, src, dest));
 		
 		CachedEntryKey k = new CachedEntryKey(key, src, dest);
+		EnhancedCachedRecord r = new EnhancedCachedRecord(rec, isRemote);
+		
 		synchronized (prepareAnchor(k)) {
-			exchange.put(k, rec);
+			exchange.put(k, r);
 			prepareAnchor(k).notifyAll();
 		}
 	}

@@ -68,8 +68,6 @@ public class FusionSinker extends Sinker {
 						// TODO: Think if we need a "write back deletion"
 //										cm.registerSinkWriteback(k, txNum);
 					}
-					
-					setRecordCurrentLocation(k, dataWriteBackPos);
 				}
 				
 				// == Hermes specific code ==
@@ -118,12 +116,5 @@ public class FusionSinker extends Sinker {
 //		}
 		
 		return parMeta.getPartition(key);
-	}
-	
-	private void setRecordCurrentLocation(PrimaryKey key, int loc) {
-		if (parMeta.getPartition(key) == loc && fusionTable.containsKey(key))
-			fusionTable.remove(key);
-		else
-			fusionTable.setLocation(key, loc);
 	}
 }

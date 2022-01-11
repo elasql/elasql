@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.tpart.CachedEntryKey;
@@ -25,6 +27,7 @@ import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		extends StoredProcedure<H> {
@@ -41,7 +44,9 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	// Private resource
 	private Set<PrimaryKey> readKeys = new HashSet<PrimaryKey>();
-	private Set<PrimaryKey> writeKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> updateKeys = new HashSet<PrimaryKey>();
+	private Set<PrimaryKey> insertKeys = new HashSet<PrimaryKey>();
+	
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
@@ -102,6 +107,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		ccMgr.bookWriteKeys(plan.getCacheDeletions());
 	}
 
+
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 		
@@ -110,19 +116,27 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 	@Override
 	public SpResultSet execute() {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		try {
-//			Timer.getLocalTimer().startComponentTimer("Get locks");
+			TransactionProfiler.setStageIndicator(3);
+			profiler.startComponentProfiler("OU3 - Acquire Locks");
 			getConservativeLocks();
-//			Timer.getLocalTimer().stopComponentTimer("Get locks");
+			profiler.stopComponentProfiler("OU3 - Acquire Locks");
 			
 			executeTransactionLogic();
 			
+			TransactionProfiler.setStageIndicator(8);
+			profiler.startComponentProfiler("OU8 - Commit");
 			tx.commit();
+			profiler.stopComponentProfiler("OU8 - Commit");
+			
 			isCommitted = true;
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("Tx." + txNum + "'s plan: " + plan);
+			profiler.startComponentProfiler("Tx rollback");
 			tx.rollback();
+			profiler.stopComponentProfiler("Tx rollback");
 		}
 		return new SpResultSet(
 			isCommitted,
@@ -141,6 +155,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public boolean isMaster() {
 		return plan.isHereMaster();
 	}
+	
+	public boolean isTxDistributed() {
+		return plan.isTxDistributed();
+	}
 
 	public ProcedureType getProcedureType() {
 		return ProcedureType.NORMAL;
@@ -149,9 +167,13 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public Set<PrimaryKey> getReadSet() {
 		return readKeys;
 	}
-
-	public Set<PrimaryKey> getWriteSet() {
-		return writeKeys;
+	
+	public Set<PrimaryKey> getUpdateSet() {
+		return updateKeys;
+	}
+	
+	public Set<PrimaryKey> getInsertSet() {
+		return insertKeys;
 	}
 	
 	public boolean isReadOnly() {
@@ -170,12 +192,12 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		readKeys.add(readKey);
 	}
 
-	protected void addWriteKey(PrimaryKey writeKey) {
-		writeKeys.add(writeKey);
+	protected void addUpdateKey(PrimaryKey writeKey) {
+		updateKeys.add(writeKey);
 	}
 
 	protected void addInsertKey(PrimaryKey insertKey) {
-		writeKeys.add(insertKey);
+		insertKeys.add(insertKey);
 	}
 
 	protected void update(PrimaryKey key, CachedRecord rec) {
@@ -186,25 +208,24 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		cache.insert(key, fldVals);
 	}
 
-	protected void delete(PrimaryKey key) {
-		cache.delete(key);
-	}
-
 	private void executeTransactionLogic() {
 		int sinkId = plan.sinkProcessId();
-//		Timer timer = Timer.getLocalTimer();
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 
 		if (plan.isHereMaster()) {
 			Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
+
 			// Read the records from the local sink
-//			timer.startComponentTimer("Read from sink");
+			profiler.startComponentProfiler("OU4 - Read from Local");
+			TransactionProfiler.setStageIndicator(4);
 			for (PrimaryKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k));
 			}
-//			timer.stopComponentTimer("Read from sink");
+			profiler.stopComponentProfiler("OU4 - Read from Local");
 
 			// Read all needed records
-//			timer.startComponentTimer("Read from cache");
+			TransactionProfiler.setStageIndicator(5);
+			profiler.startComponentProfiler("OU5M - Read from Remote");
 			for (PrimaryKey k : plan.getReadSet()) {
 				if (!readings.containsKey(k)) {
 					long srcTxNum = plan.getReadSrcTxNum(k);
@@ -212,15 +233,16 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
 				}
 			}
-//			timer.stopComponentTimer("Read from cache");
+			profiler.stopComponentProfiler("OU5M - Read from Remote");
 			
 			// Execute the SQLs defined by users
-//			timer.startComponentTimer("Execute SQL");
+			TransactionProfiler.setStageIndicator(6);
+			profiler.startComponentProfiler("OU6 - Execute Arithmetic Logic");
 			executeSql(readings);
-//			timer.stopComponentTimer("Execute SQL");
+			profiler.stopComponentProfiler("OU6 - Execute Arithmetic Logic");
 
 			// Push the data to where they need at
-//			timer.startComponentTimer("Push");
+			profiler.startComponentProfiler("NonOU - Push to Remote");
 			Map<Integer, Set<PushInfo>> pi = plan.getPushingInfo();
 			if (pi != null) {
 				// read from local storage and send to remote site
@@ -239,7 +261,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
 				}
 			}
-//			timer.stopComponentTimer("Push");
+			profiler.stopComponentProfiler("NonOU - Push to Remote");
 		} else if (plan.hasSinkPush()) {
 			long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
 			
@@ -270,7 +292,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 //					
 //				} else {
 					// Normal transactions
-//					timer.startComponentTimer("Read from sink");
+					TransactionProfiler.setStageIndicator(4);
+					profiler.startComponentProfiler("OU4 - Read from Local");
 					for (PushInfo pushInfo : entry.getValue()) {
 						
 						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
@@ -278,17 +301,20 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 						rec.setSrcTxNum(sinkTxnNum);
 						rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
 					}
-//					timer.stopComponentTimer("Read from sink");
+					profiler.stopComponentProfiler("OU4 - Read from Local");
 //				}
 
-//				timer.startComponentTimer("Push");
+				profiler.startComponentProfiler("OU5S - Push to Remote");
 				Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
-//				timer.stopComponentTimer("Push");
+				profiler.stopComponentProfiler("OU5S - Push to Remote");
 			}
 		}
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
+		TransactionProfiler.setStageIndicator(7);
+		profiler.startComponentProfiler("OU7 - Write to Local");
 		cache.flush(plan,  cachedEntrySet);
+		profiler.stopComponentProfiler("OU7 - Write to Local");
 	}
 }

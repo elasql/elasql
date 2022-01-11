@@ -1,6 +1,6 @@
 package org.elasql.schedule.tpart;
 
-import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -10,6 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -26,11 +27,12 @@ import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartScheduler extends Task implements Scheduler {
 	private static Logger logger = Logger.getLogger(TPartScheduler.class.getName());
 
-	private static final int SCHEDULE_BATCH_SIZE;
+	public static final int SCHEDULE_BATCH_SIZE;
 
 	private TPartStoredProcedureFactory factory;
 	
@@ -77,15 +79,20 @@ public class TPartScheduler extends Task implements Scheduler {
 			e.printStackTrace();
 		}
 	}
-
+	
 	public void run() {
 		List<TPartStoredProcedureTask> batchedTasks = new LinkedList<TPartStoredProcedureTask>();
+		
+		Thread.currentThread().setName("T-Part Scheduler");
 		
 		while (true) {
 			try {
 				// blocked if the queue is empty
 				StoredProcedureCall call = spcQueue.take();
-				TPartStoredProcedureTask task = createStoredProcedureTask(call);
+				TransactionProfiler.setProfiler(call.getProfiler());
+				TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+				
+				TPartStoredProcedureTask task = createStoredProcedureTask(call, profiler);
 
 				// schedules the utility procedures directly without T-Part
 				// module
@@ -105,6 +112,8 @@ public class TPartScheduler extends Task implements Scheduler {
 					batchedTasks.add(task);
 				}
 				
+				profiler.stopComponentProfiler("OU0 - ROUTE");
+				
 				// sink current t-graph if # pending tx exceeds threshold
 				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
 						|| !batchingEnabled) {
@@ -112,7 +121,7 @@ public class TPartScheduler extends Task implements Scheduler {
 					batchedTasks.clear();
 				}
 
-			} catch (InterruptedException ex) {
+			} catch (InterruptedException | IOException ex) {
 				if (logger.isLoggable(Level.SEVERE))
 					logger.severe("fail to dequeue task");
 			}
@@ -121,8 +130,8 @@ public class TPartScheduler extends Task implements Scheduler {
 	
 	private void processBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
-		inserter.insertBatch(graph, batchedTasks);
-		
+		inserter.insertBatch(graph, batchedTasks);	
+
 		// Debug
 //		printGraphStatistics();
 //		System.out.println(graph);
@@ -132,7 +141,21 @@ public class TPartScheduler extends Task implements Scheduler {
 		
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
+			// Record plan gen start time, CPU start time, disk IO count
+			TransactionProfiler.setStageIndicator(1);
+			for(TPartStoredProcedureTask task : batchedTasks) 
+				task.getTxProfiler().startComponentProfiler("OU1 - Generate Plan");
+			
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
+
+			// Record plan gen stop time, CPU stop time, disk IO count
+			for(TPartStoredProcedureTask task : batchedTasks)
+				task.getTxProfiler().stopComponentProfiler("OU1 - Generate Plan");
+			// Record thread init start time, CPU start time, disk IO count
+			TransactionProfiler.setStageIndicator(2);
+			for(TPartStoredProcedureTask task : batchedTasks)
+				task.getTxProfiler().startComponentProfiler("OU2 - Initialize Thread");
+			
 			dispatchToTaskMgr(plansTter);
 		}
 	}
@@ -148,17 +171,29 @@ public class TPartScheduler extends Task implements Scheduler {
 //		dispatchToTaskMgr(plansTter);
 //	}
 
-	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call) {
+	private TPartStoredProcedureTask createStoredProcedureTask(StoredProcedureCall call, TransactionProfiler profiler)
+			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
-			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), null);
+			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
+					call.getTxNum(), call.getArrivedTime(), profiler, null, null);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
 
 			if (!sp.isReadOnly())
 				DdRecoveryMgr.logRequest(call);
+			
+			// Take out the transaction estimation
+			TransactionEstimation estimation = null;
+			if (call.getMetadata() != null) {
+				if (call.getMetadata().getClass().equals(byte[].class)) {
+					byte[] data = (byte[]) call.getMetadata();
+					estimation = TransactionEstimation.fromBytes(data);
+				}
+			}
 
-			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(), call.getTxNum(), sp);
+			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
+					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation);
 		}
 	}
 

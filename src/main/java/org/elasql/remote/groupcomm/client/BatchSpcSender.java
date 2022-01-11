@@ -29,15 +29,15 @@ import org.elasql.util.ElasqlProperties;
 import org.vanilladb.comm.client.VanillaCommClient;
 import org.vanilladb.comm.view.ProcessType;
 
-class BatchSpcSender implements Runnable {
+public class BatchSpcSender implements Runnable {
 	private static Logger logger = Logger.getLogger(BatchSpcSender.class.getName());
 
-	private final static int COMM_BATCH_SIZE;
+	public final static int COMM_BATCH_SIZE;
 	private final static long MAX_WAITING_TIME; // in ms
 
 	static {
 		COMM_BATCH_SIZE = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".BATCH_SIZE", 1);
+				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".COMM_BATCH_SIZE", 1);
 		MAX_WAITING_TIME = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".MAX_WAITING_TIME", 1000);
 	}
