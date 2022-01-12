@@ -116,6 +116,7 @@ public class TransactionMetricRecorder extends Task {
 
 	// Header
 	private int serverId;
+	private int columnCount;
 	private List<Object> metricNames = new ArrayList<Object>();
 	private Map<Object, Integer> metricNameToPos = new HashMap<Object, Integer>();
 
@@ -236,8 +237,6 @@ public class TransactionMetricRecorder extends Task {
 	@Override
 	public void run() {
 		Thread.currentThread().setName("Transaction Metrics Recorder");
-		int columnCount = generateHeader().size();
-
 		try {
 			// Wait for receiving the first metrics
 			TransactionMetrics metrics = queue.take();
@@ -246,14 +245,14 @@ public class TransactionMetricRecorder extends Task {
 				logger.info("Transaction metrics recorder starts recording metrics");
 
 			try (CsvSavers savers = new CsvSavers()) {
-				saveHeader(savers);
+				saveHeader(savers, metrics);
 
 				// Save the first metrics
-				saveMetrics(savers, metrics, columnCount);
+				saveMetrics(savers, metrics);
 
 				// Wait until no more metrics coming in the last 10 seconds
 				while ((metrics = queue.poll(TIME_TO_FLUSH, TimeUnit.SECONDS)) != null) {
-					saveMetrics(savers, metrics, columnCount);
+					saveMetrics(savers, metrics);
 				}
 
 				if (logger.isLoggable(Level.INFO)) {
@@ -272,9 +271,9 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 
-	private void saveHeader(CsvSavers savers) throws IOException {
+	private void saveHeader(CsvSavers savers, TransactionMetrics metrics) throws IOException {
 		// Generate the header
-		List<String> header = generateHeader();
+		List<String> header = generateHeader(metrics);
 
 		savers.latencyCsvSaver.writeHeader(savers.latencyWriter, header);
 		if (ENABLE_CPU_TIMER) {
@@ -289,10 +288,7 @@ public class TransactionMetricRecorder extends Task {
 		}
 	}
 
-	private void saveMetrics(CsvSavers savers, TransactionMetrics metrics, int columnCount) throws IOException {
-		// Update component names
-		updateMetricNames(metrics);
-
+	private void saveMetrics(CsvSavers savers, TransactionMetrics metrics) throws IOException {
 		// Split the metrics to different types of rows
 		LongValueRow latRow = convertToLatencyRow(metrics);
 		savers.latencyCsvSaver.writeRecord(savers.latencyWriter, latRow, columnCount);
@@ -309,15 +305,6 @@ public class TransactionMetricRecorder extends Task {
 			savers.networkinSizeCsvSaver.writeRecord(savers.networkinSizeWriter, networkinRow, columnCount);
 			LongValueRow networkoutRow = convertToNetworkoutSizeRow(metrics);
 			savers.networkoutSizeCsvSaver.writeRecord(savers.networkoutSizeWriter, networkoutRow, columnCount);
-		}
-	}
-
-	private void updateMetricNames(TransactionMetrics metrics) {
-		for (String metricName : metrics.metricNames) {
-			if (!metricNameToPos.containsKey(metricName)) {
-				metricNames.add(metricName);
-				metricNameToPos.put(metricName, metricNames.size() - 1);
-			}
 		}
 	}
 
@@ -386,7 +373,10 @@ public class TransactionMetricRecorder extends Task {
 		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, networkoutValues);
 	}
 
-	private List<String> generateHeader() {
+	private List<String> generateHeader(TransactionMetrics metrics) {
+		// Update component names
+		updateMetricNames(metrics);
+
 		List<String> header = new ArrayList<String>();
 
 		// First column: transaction ID
@@ -402,6 +392,17 @@ public class TransactionMetricRecorder extends Task {
 		for (Object metricName : metricNames)
 			header.add(metricName.toString());
 
+		columnCount = header.size();
+
 		return header;
+	}
+
+	private void updateMetricNames(TransactionMetrics metrics) {
+		for (String metricName : metrics.metricNames) {
+			if (!metricNameToPos.containsKey(metricName)) {
+				metricNames.add(metricName);
+				metricNameToPos.put(metricName, metricNames.size() - 1);
+			}
+		}
 	}
 }
