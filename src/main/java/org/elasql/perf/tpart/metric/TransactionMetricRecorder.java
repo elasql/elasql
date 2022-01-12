@@ -245,11 +245,7 @@ public class TransactionMetricRecorder extends Task {
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Transaction metrics recorder starts recording metrics");
 
-			CsvSavers savers = null;
-
-			try {
-				savers = new CsvSavers();
-
+			try (CsvSavers savers = new CsvSavers()) {
 				saveHeader(savers);
 
 				// Save the first metrics
@@ -270,13 +266,6 @@ public class TransactionMetricRecorder extends Task {
 
 			} catch (IOException e) {
 				e.printStackTrace();
-			} finally {
-				try {
-					savers.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
