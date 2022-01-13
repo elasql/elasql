@@ -68,6 +68,10 @@
 			<name>Yu-Xuan Lin</name>
 			<email>yxlin@datalab.cs.nthu.edu.tw</email>
 		</developer>
+		<developer>
+			<name>Wilbert Harriman</name>
+			<email>wilbert@datalab.cs.nthu.edu.tw</email>
+		</developer>
 	</developers>
 
 	<scm>
