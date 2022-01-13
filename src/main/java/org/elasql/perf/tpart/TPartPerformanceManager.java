@@ -1,5 +1,7 @@
 package org.elasql.perf.tpart;
 
+import java.util.Map;
+
 import org.elasql.perf.MetricReport;
 import org.elasql.perf.MetricWarehouse;
 import org.elasql.perf.PerformanceManager;
@@ -10,6 +12,7 @@ import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.perf.tpart.metric.latch.LatchFeatureCollector;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
@@ -17,6 +20,8 @@ import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.util.TransactionProfiler;
+import org.vanilladb.core.latch.feature.ILatchFeatureCollector;
+import org.vanilladb.core.server.VanillaDb;
 
 public class TPartPerformanceManager implements PerformanceManager {
 	
@@ -29,6 +34,13 @@ public class TPartPerformanceManager implements PerformanceManager {
 						+ ".ENABLE_COLLECTING_DATA", false);
 		ESTIMATOR_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger( 
 				TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
+	}
+	
+	public static Map<String, ILatchFeatureCollector> initLatchFeatureCollector() throws Exception {
+		if (VanillaDb.isInited()) {
+			throw new Exception("This code should be placed before VanillaDB.init()");
+		}
+		return LatchFeatureCollector.registerCollectors();
 	}
 	
 	public static TPartPerformanceManager newForSequencer(

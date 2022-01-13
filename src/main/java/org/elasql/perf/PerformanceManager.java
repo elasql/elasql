@@ -1,6 +1,9 @@
 package org.elasql.perf;
 
+import java.util.Map;
+
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.vanilladb.core.latch.feature.ILatchFeatureCollector;
 import org.vanilladb.core.util.TransactionProfiler;
 
 /**

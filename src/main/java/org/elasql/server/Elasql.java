@@ -167,10 +167,19 @@ public class Elasql extends VanillaDb {
 			if (migraComsFactory != null) 
 				migraSysControl = migraComsFactory.newSystemController(); 
 			return; 
-		} 
+		}
+		
+		// LatchFeatureCollector is a specialized object to collect features in vanillaDB
+		// Passing this object into VanillaDb.init() is a kind of dependency injection.
+		try {
+			// initialize core modules 
+			VanillaDb.init(dirName, TPartPerformanceManager.initLatchFeatureCollector()); 
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
  
-		// initialize core modules 
-		VanillaDb.init(dirName); 
+		
  
 		// initialize DD modules 
 		initConnectionMgr(myNodeId);
