@@ -11,7 +11,7 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 /**
  * An object to store the features for a transaction request.
  * 
- * @author Yu-Xuan Lin, Yu-Shan Lin
+ * @author Yu-Xuan Lin, Yu-Shan Lin, Ping-Yu Wang
  */
 public class TransactionFeatures {
 	
