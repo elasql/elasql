@@ -22,7 +22,7 @@ import org.vanilladb.core.util.TransactionProfiler;
 /**
  * A recorder to record the transaction metrics to CSV files.
  * 
- * @author Yu-Shan Lin
+ * @author Yu-Shan Lin, Yu-Xuan Lin, Ping-Yu Wang
  */
 public class TransactionMetricRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionMetricRecorder.class.getName());
@@ -245,8 +245,6 @@ public class TransactionMetricRecorder extends Task {
 				logger.info("Transaction metrics recorder starts recording metrics");
 
 			try (CsvSavers savers = new CsvSavers()) {
-				saveHeader(savers, metrics);
-
 				// Save the first metrics
 				saveMetrics(savers, metrics);
 
@@ -289,6 +287,11 @@ public class TransactionMetricRecorder extends Task {
 	}
 
 	private void saveMetrics(CsvSavers savers, TransactionMetrics metrics) throws IOException {
+		
+		if (updateMetricNames(metrics)) {
+			saveHeader(savers, metrics);
+		}
+		
 		// Split the metrics to different types of rows
 		LongValueRow latRow = convertToLatencyRow(metrics);
 		savers.latencyCsvSaver.writeRecord(savers.latencyWriter, latRow, columnCount);
@@ -306,6 +309,18 @@ public class TransactionMetricRecorder extends Task {
 			LongValueRow networkoutRow = convertToNetworkoutSizeRow(metrics);
 			savers.networkoutSizeCsvSaver.writeRecord(savers.networkoutSizeWriter, networkoutRow, columnCount);
 		}
+	}
+	
+	private boolean updateMetricNames(TransactionMetrics metrics) {
+		boolean headerChanged = false;
+		for (String metricName : metrics.metricNames) {
+			if (!metricNameToPos.containsKey(metricName)) {
+				headerChanged = true;
+				metricNames.add(metricName);
+				metricNameToPos.put(metricName, metricNames.size() - 1);
+			}
+		}
+		return headerChanged;
 	}
 
 	private LongValueRow convertToLatencyRow(TransactionMetrics metrics) {
@@ -374,8 +389,6 @@ public class TransactionMetricRecorder extends Task {
 	}
 
 	private List<String> generateHeader(TransactionMetrics metrics) {
-		// Update component names
-		updateMetricNames(metrics);
 
 		List<String> header = new ArrayList<String>();
 
@@ -395,14 +408,5 @@ public class TransactionMetricRecorder extends Task {
 		columnCount = header.size();
 
 		return header;
-	}
-
-	private void updateMetricNames(TransactionMetrics metrics) {
-		for (String metricName : metrics.metricNames) {
-			if (!metricNameToPos.containsKey(metricName)) {
-				metricNames.add(metricName);
-				metricNameToPos.put(metricName, metricNames.size() - 1);
-			}
-		}
 	}
 }

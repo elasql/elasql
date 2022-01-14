@@ -22,7 +22,7 @@ import org.vanilladb.core.server.task.Task;
 /**
  * A recorder to save TransactionFeatures objects to a CSV file.
  * 
- * @author Yu-Xuan Lin, Yu-Shan Lin
+ * @author Yu-Xuan Lin, Yu-Shan Lin, Ping-Yu Wang
  */
 public class TransactionFeaturesRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionFeaturesRecorder.class.getName());
