@@ -5,6 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +20,6 @@ import org.vanilladb.core.server.task.Task;
 
 public class LatchFeatureCollector extends Task implements ILatchFeatureCollector {
 	private static final int FLUSH_TIMEOUT = 10;
-	private static final int BUFFER_SIZE = 4096;
 	private static Logger logger = Logger.getLogger(LatchFeatureCollector.class.getName());
 	private static Map<String, ILatchFeatureCollector> collectorMap;
 	
@@ -67,7 +67,7 @@ public class LatchFeatureCollector extends Task implements ILatchFeatureCollecto
 				logger.info("Latch feature collector starts to collect data");
 			}
 
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName), BUFFER_SIZE)) {
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
 				writer.append(LatchFeature.toHeader() + "\n");
 				writer.append(latchFeature.toRow() + "\n");
 
