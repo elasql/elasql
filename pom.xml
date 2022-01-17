@@ -60,6 +60,10 @@
 			<name>Tz-Yu Lin</name>
 			<email>tylin@netdb.cs.nthu.edu.tw</email>
 		</developer>
+		<developer>
+			<name>Wei-Yu Lin</name>
+			<email>wylin@datalab.cs.nthu.edu.tw</email>
+		</developer>
 	</developers>
 
 	<scm>
