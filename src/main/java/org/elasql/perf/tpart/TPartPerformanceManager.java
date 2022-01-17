@@ -19,9 +19,9 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
-import org.vanilladb.core.util.TransactionProfiler;
 import org.vanilladb.core.latch.feature.ILatchFeatureCollector;
 import org.vanilladb.core.server.VanillaDb;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartPerformanceManager implements PerformanceManager {
 	

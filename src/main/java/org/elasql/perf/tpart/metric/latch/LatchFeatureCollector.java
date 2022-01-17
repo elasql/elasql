@@ -5,7 +5,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -22,17 +21,15 @@ public class LatchFeatureCollector extends Task implements ILatchFeatureCollecto
 	private static final int FLUSH_TIMEOUT = 10;
 	private static Logger logger = Logger.getLogger(LatchFeatureCollector.class.getName());
 	private static Map<String, ILatchFeatureCollector> collectorMap;
-	
+
 	public static Map<String, ILatchFeatureCollector> registerCollectors() {
 		collectorMap = new HashMap<String, ILatchFeatureCollector>();
-		
+
 		// register collector here
 		// NOTICE: These keys should match with the keys in vanillaDB
-		collectorMap.put(
-			LatchMgr.getCollectorKey("BufferPoolMgr", "block"),
-			new LatchFeatureCollector("bufferPoolMgr-block.csv")
-		);
-		
+		collectorMap.put(LatchMgr.getCollectorKey("BufferPoolMgr", "block"),
+				new LatchFeatureCollector("bufferPoolMgr-block.csv"));
+
 		return collectorMap;
 	}
 

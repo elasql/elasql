@@ -173,7 +173,7 @@ public class Elasql extends VanillaDb {
 		// Passing this object into VanillaDb.init() is a kind of dependency injection.
 		try {
 			// initialize core modules 
-			VanillaDb.init(dirName, TPartPerformanceManager.initLatchFeatureCollector()); 
+			VanillaDb.init(dirName); 
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
