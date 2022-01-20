@@ -111,7 +111,7 @@ public class ConservativeOrderedLockTable {
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
-			// check if it have already held the lock
+			// check if it has already held the lock
 			if (hasSLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
 				return;
@@ -169,6 +169,15 @@ public class ConservativeOrderedLockTable {
 		}
 	}
 
+	/**
+	 * Grants an slock on index item
+	 * 
+	 * @param obj
+	 *            an object to be locked
+	 * @param txNum
+	 *            a transaction number
+	 * 
+	 */
 	void sLockIndex(Object obj, long txNum) {
 		Object anchor = getIndexAnchor(obj);
 
@@ -280,6 +289,15 @@ public class ConservativeOrderedLockTable {
 		}
 	}
 
+	/**
+	 * Grants an xlock on index item
+	 * 
+	 * @param obj
+	 *            an object to be locked
+	 * @param txNum
+	 *            a transaction number
+	 * 
+	 */
 	void xLockIndex(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getIndexAnchor(obj);
@@ -440,7 +458,19 @@ public class ConservativeOrderedLockTable {
 		}
 	}
 
-	void releaseLock(Object obj, long txNum, LockType lockType, Object anchor){
+	/**
+	 * Release the lock
+	 * 
+	 * @param obj
+	 *            an object to be locked
+	 * @param txNum
+	 *            a transaction number
+	 * @param lockType
+	 *            the lock type(slock or xlock) that the transaction holds
+	 * @param anchor
+	 *            The strip lock anchor of the corresponding object
+	 */
+	void getLockersAndReleaseLock(Object obj, long txNum, LockType lockType, Object anchor){
 		synchronized (anchor) {
 			Lockers lks = lockerMap.get(obj);
 			
@@ -475,12 +505,22 @@ public class ConservativeOrderedLockTable {
 	 */
 	void release(Object obj, long txNum, LockType lockType) {
 		Object anchor = getAnchor(obj);
-		releaseLock(obj, txNum, lockType, anchor);
+		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
 	}
 
+	/**
+	 * Releases the holding index lock.
+	 * 
+	 * @param obj
+	 *            a locked object
+	 * @param txNum
+	 *            a transaction number
+	 * @param lockType
+	 *            the type of lock
+	 */
 	void releaseIndex(Object obj, long txNum, LockType lockType) {
 		Object anchor = getIndexAnchor(obj);
-		releaseLock(obj, txNum, lockType, anchor);
+		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
 	}
 
 	/**
@@ -496,6 +536,13 @@ public class ConservativeOrderedLockTable {
 		return anchors[code % anchors.length];
 	}
 
+	/**
+	 * Gets the anchor for the specified index object.
+	 * 
+	 * @param obj
+	 *            the target object
+	 * @return the anchor for index obj
+	 */
 	private Object getIndexAnchor(Object obj) {
 		int code = obj.hashCode();
 		code = Math.abs(code); // avoid negative value
