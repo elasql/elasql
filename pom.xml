@@ -71,15 +71,15 @@
 		<developer>
 			<name>Chao-Wei Lin</name>
 			<email>cwlin@datalab.cs.nthu.edu.tw</email>
-    </developer>
+		</developer>
 		<developer>
 			<name>Wilbert Harriman</name>
 			<email>wilbert@datalab.cs.nthu.edu.tw</email>
 		</developer>
-    <developer>
+    	<developer>
 			<name>Wei-Yu Lin</name>
 			<email>wylin@datalab.cs.nthu.edu.tw</email>
-    </developer>
+    	</developer>
 	</developers>
 
 	<scm>
