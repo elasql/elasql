@@ -508,6 +508,7 @@ public class ConservativeOrderedLockTable {
 	private Object hashAndGetLatch(Object[] latches, Object obj) {
 		int code = obj.hashCode();
 		code = Math.abs(code); // avoid negative value
+		code = code % latches.length;
 		return latches[code];
 	}
 
