@@ -21,10 +21,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.vanilladb.core.server.VanillaDb;
-import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
-import org.vanilladb.core.util.StripedLatchObserver;
 
 public class ConservativeOrderedLockTable {
 
@@ -61,23 +58,17 @@ public class ConservativeOrderedLockTable {
 	private Map<Object, Lockers> lockerMap = new ConcurrentHashMap<Object, Lockers>();
 
 	// Lock-stripping
-	private final Object anchors[] = new Object[NUM_ANCHOR];
-
-	// For observing
-	private StripedLatchObserver<BlockId> observer;
+	private final Object recordLatches[] = new Object[NUM_ANCHOR];
+	private final Object indexLatches[] = new Object[NUM_ANCHOR];
 
 	/**
 	 * Create and initialize a conservative ordered lock table.
 	 */
 	public ConservativeOrderedLockTable() {
 		// Initialize anchors
-		for (int i = 0; i < anchors.length; ++i) {
-			anchors[i] = new Object();
-		}
-
-		if (StripedLatchObserver.ENABLE_OBSERVE_STRIPED_LOCK) {
-			observer = new StripedLatchObserver<BlockId>("conservative-anchor-observation.csv");
-			VanillaDb.taskMgr().runTask(observer);
+		for (int i = 0; i < NUM_ANCHOR; ++i) {
+			recordLatches[i] = new Object();
+			indexLatches[i] = new Object();
 		}
 	}
 
@@ -89,7 +80,7 @@ public class ConservativeOrderedLockTable {
 	 * @param txNum the transaction that requests the lock
 	 */
 	void requestLock(Object obj, long txNum) {
-		synchronized (getAnchor(obj)) {
+		synchronized (getRecordLatch(obj)) {
 			Lockers lockers = prepareLockers(obj);
 			lockers.requestQueue.add(txNum);
 		}
@@ -106,12 +97,12 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void sLock(Object obj, long txNum) {
-		Object anchor = getAnchor(obj);
+		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
-			// check if it have already held the lock
+			// check if it has already held the lock
 			if (hasSLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
 				return;
@@ -170,6 +161,54 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
+	 * Grants an slock on index item
+	 * 
+	 * @param obj   an object to be locked
+	 * @param txNum a transaction number
+	 * 
+	 */
+	void sLockIndex(Object obj, long txNum) {
+		Object anchor = getIndexLatch(obj);
+
+		synchronized (anchor) {
+			Lockers lockers = prepareLockers(obj);
+
+			// check if it have already held the lock
+			if (hasSLock(lockers, txNum)) {
+				return;
+			}
+
+			try {
+				/*
+				 * If this transaction is not the first one requesting this object or it cannot
+				 * get lock on this object, it must wait.
+				 */
+				while (!sLockable(lockers, txNum)) {
+					anchor.wait();
+
+					// Since a transaction may delete the lockers of an object
+					// after releasing them, it should call prepareLockers()
+					// here, instead of using lockers it obtains earlier.
+					lockers = prepareLockers(obj);
+				}
+				if (!sLockable(lockers, txNum))
+					throw new LockAbortException();
+
+				// get the s lock
+				lockers.sLockers.add(txNum);
+
+				// Wake up other waiting transactions (on this object) to let
+				// them
+				// fight for the lockers on this object.
+				anchor.notifyAll();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				throw new LockAbortException("Interrupted when waitting for lock");
+			}
+		}
+	}
+
+	/**
 	 * Grants an xlock on the specified item. If any conflict lock exists when the
 	 * method is called, then the calling thread will be placed on a wait list until
 	 * the lock is released. If the thread remains on the wait list for a certain
@@ -181,7 +220,7 @@ public class ConservativeOrderedLockTable {
 	 */
 	void xLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
-		Object anchor = getAnchor(obj);
+		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
@@ -238,6 +277,40 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
+	 * Grants an xlock on index item
+	 * 
+	 * @param obj   an object to be locked
+	 * @param txNum a transaction number
+	 * 
+	 */
+	void xLockIndex(Object obj, long txNum) {
+		// See the comments in sLock(..) for the explanation of the algorithm
+		Object anchor = getIndexLatch(obj);
+
+		synchronized (anchor) {
+			Lockers lockers = prepareLockers(obj);
+
+			if (hasXLock(lockers, txNum)) {
+				return;
+			}
+
+			try {
+				while (!xLockable(lockers, txNum)) {
+					anchor.wait();
+					lockers = prepareLockers(obj);
+				}
+				// get the x lock
+				lockers.xLocker = txNum;
+
+				// An X lock blocks all other lockers, so it don't need to
+				// wake up anyone.
+			} catch (InterruptedException e) {
+				throw new LockAbortException("Interrupted when waitting for lock");
+			}
+		}
+	}
+
+	/**
 	 * Grants an sixlock on the specified item. If any conflict lock exists when the
 	 * method is called, then the calling thread will be placed on a wait list until
 	 * the lock is released. If the thread remains on the wait list for a certain
@@ -249,7 +322,7 @@ public class ConservativeOrderedLockTable {
 	 */
 	void sixLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
-		Object anchor = getAnchor(obj);
+		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
@@ -289,7 +362,7 @@ public class ConservativeOrderedLockTable {
 	 */
 	void isLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
-		Object anchor = getAnchor(obj);
+		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
@@ -329,7 +402,7 @@ public class ConservativeOrderedLockTable {
 	 */
 	void ixLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
-		Object anchor = getAnchor(obj);
+		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
@@ -359,16 +432,14 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
-	 * Releases the specified type of lock on an item holding by a transaction. If a
-	 * lock is the last lock on that block, then the waiting transactions are
-	 * notified.
+	 * Release the lock
 	 * 
-	 * @param obj      a locked object
+	 * @param obj      an object to be locked
 	 * @param txNum    a transaction number
-	 * @param lockType the type of lock
+	 * @param lockType the lock type(slock or xlock) that the transaction holds
+	 * @param anchor   The strip lock anchor of the corresponding object
 	 */
-	void release(Object obj, long txNum, LockType lockType) {
-		Object anchor = getAnchor(obj);
+	void getLockersAndReleaseLock(Object obj, long txNum, LockType lockType, Object anchor) {
 		synchronized (anchor) {
 			Lockers lks = lockerMap.get(obj);
 
@@ -389,22 +460,55 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
+	 * Releases the specified type of lock on an item holding by a transaction. If a
+	 * lock is the last lock on that block, then the waiting transactions are
+	 * notified.
+	 * 
+	 * @param obj      a locked object
+	 * @param txNum    a transaction number
+	 * @param lockType the type of lock
+	 */
+	void release(Object obj, long txNum, LockType lockType) {
+		Object anchor = getRecordLatch(obj);
+		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
+	}
+
+	/**
+	 * Releases the holding index lock.
+	 * 
+	 * @param obj      a locked object
+	 * @param txNum    a transaction number
+	 * @param lockType the type of lock
+	 */
+	void releaseIndex(Object obj, long txNum, LockType lockType) {
+		Object anchor = getIndexLatch(obj);
+		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
+	}
+
+	/**
 	 * Gets the anchor for the specified object.
 	 * 
 	 * @param obj the target object
 	 * @return the anchor for obj
 	 */
-	private Object getAnchor(Object obj) {
+	private Object getRecordLatch(Object obj) {
+		return hashAndGetLatch(recordLatches, obj);
+	}
+
+	/**
+	 * Gets the anchor for the specified index object.
+	 * 
+	 * @param obj the target object
+	 * @return the anchor for index obj
+	 */
+	private Object getIndexLatch(Object obj) {
+		return hashAndGetLatch(indexLatches, obj);
+	}
+
+	private Object hashAndGetLatch(Object[] latches, Object obj) {
 		int code = obj.hashCode();
 		code = Math.abs(code); // avoid negative value
-		code = code % anchors.length;
-		Object anchor = anchors[code];
-
-		if (StripedLatchObserver.ENABLE_OBSERVE_STRIPED_LOCK && obj instanceof BlockId) {
-			observer.increment(code, (BlockId) obj, 0);
-		}
-
-		return anchor;
+		return latches[code];
 	}
 
 	private Lockers prepareLockers(Object obj) {
