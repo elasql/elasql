@@ -91,6 +91,11 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
 		
+		// Features for latches
+		// Due to the complexity of getting individual latch features,
+		// we just pass a huge string that consists of key latch features
+		builder.addFeature("Latch Features", extractLatchFeatures());
+		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
 				task.getTxNum(), task.getReadSet(), task.getWriteSet());
@@ -382,6 +387,16 @@ public class FeatureExtractor {
 		
 		for (int serverId = 0; serverId < serverCount; serverId++) 
 			lengths[serverId] = metricWarehouse.getIOQueueLength(serverId);
+		
+		return lengths;
+	}
+	
+	private String[] extractLatchFeatures() {
+		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
+		String[] lengths = new String[serverCount];
+		
+		for (int serverId = 0; serverId < serverCount; serverId++) 
+			lengths[serverId] = metricWarehouse.getLatchFeatures(serverId);
 		
 		return lengths;
 	}

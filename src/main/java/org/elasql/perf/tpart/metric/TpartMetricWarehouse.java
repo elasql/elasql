@@ -302,6 +302,15 @@ public class TpartMetricWarehouse extends Task implements MetricWarehouse {
 		}
 	}
 	
+	public synchronized String getLatchFeatures(int serverId) {
+		List<StampedMetric> history = metricStore.get(serverId);
+		if (history.isEmpty()) {
+			return null;
+		} else {
+			return history.get(history.size() - 1).metric.getLatchFeatures();
+		}
+	}
+	
 	private double getCpuUsageBetween(long[] startTicks, long[] endTicks) {
 		long total = 0;
         for (int i = 0; i < startTicks.length; i++) {
