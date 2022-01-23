@@ -167,9 +167,8 @@ public class Elasql extends VanillaDb {
 			if (migraComsFactory != null) 
 				migraSysControl = migraComsFactory.newSystemController(); 
 			return; 
-		} 
- 
-		// initialize core modules 
+		}
+		
 		VanillaDb.init(dirName); 
  
 		// initialize DD modules 
