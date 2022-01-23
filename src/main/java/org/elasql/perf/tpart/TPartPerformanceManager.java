@@ -1,7 +1,5 @@
 package org.elasql.perf.tpart;
 
-import java.util.Map;
-
 import org.elasql.perf.MetricReport;
 import org.elasql.perf.MetricWarehouse;
 import org.elasql.perf.PerformanceManager;
@@ -12,78 +10,64 @@ import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
-import org.elasql.perf.tpart.metric.latch.LatchFeatureCollector;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
-import org.vanilladb.core.latch.feature.ILatchFeatureCollector;
-import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartPerformanceManager implements PerformanceManager {
-	
+
 	public static final boolean ENABLE_COLLECTING_DATA;
 	public static final int ESTIMATOR_TYPE;
 
 	static {
 		ENABLE_COLLECTING_DATA = ElasqlProperties.getLoader()
-				.getPropertyAsBoolean(TPartPerformanceManager.class.getName()
-						+ ".ENABLE_COLLECTING_DATA", false);
-		ESTIMATOR_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger( 
-				TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
+				.getPropertyAsBoolean(TPartPerformanceManager.class.getName() + ".ENABLE_COLLECTING_DATA", false);
+		ESTIMATOR_TYPE = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
 	}
-	
-	public static Map<String, ILatchFeatureCollector> initLatchFeatureCollector() throws Exception {
-		if (VanillaDb.isInited()) {
-			throw new Exception("This code should be placed before VanillaDB.init()");
-		}
-		return LatchFeatureCollector.registerCollectors();
-	}
-	
-	public static TPartPerformanceManager newForSequencer(
-			TPartStoredProcedureFactory factory, 
+
+	public static TPartPerformanceManager newForSequencer(TPartStoredProcedureFactory factory,
 			BatchNodeInserter inserter, TGraph graph, boolean isBatching) {
 		// The sequencer maintains a SpCallPreprocessor and a warehouse.
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
-		
-		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(
-				factory, inserter, graph, isBatching, metricWarehouse,
-				newEstimator());
+
+		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
+				metricWarehouse, newEstimator());
 		Elasql.taskMgr().runTask(spCallPreprocessor);
-		
+
 		// Hermes-Control has a control actuator
 		RoutingControlActuator actuator = null;
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
 			actuator = new RoutingControlActuator(metricWarehouse);
 			Elasql.taskMgr().runTask(actuator);
 		}
-		
-		return new TPartPerformanceManager(spCallPreprocessor,
-				metricWarehouse, actuator);
+
+		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, actuator);
 	}
-	
+
 	public static TPartPerformanceManager newForDbServer() {
 		MetricCollector localMetricCollector = new MetricCollector();
 		Elasql.taskMgr().runTask(localMetricCollector);
-		
+
 		return new TPartPerformanceManager(localMetricCollector);
 	}
-	
+
 	private static Estimator newEstimator() {
 		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_CONTROL) {
 			return null;
 		}
-		
+
 		switch (ESTIMATOR_TYPE) {
 		case 0:
 			return new ConstantEstimator();
-		case 1:	
+		case 1:
 			return new ReadCountEstimator();
-		default: 
+		default:
 			throw new IllegalArgumentException("Not supported");
 		}
 	}
@@ -92,18 +76,17 @@ public class TPartPerformanceManager implements PerformanceManager {
 	private SpCallPreprocessor spCallPreprocessor;
 	private TpartMetricWarehouse metricWarehouse;
 	private RoutingControlActuator actuator;
-	
+
 	// On each DB machine
 	private MetricCollector localMetricCollector;
-	
-	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor,
-			TpartMetricWarehouse metricWarehouse,
+
+	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse,
 			RoutingControlActuator actuator) {
 		this.spCallPreprocessor = spCallPreprocessor;
 		this.metricWarehouse = metricWarehouse;
 		this.actuator = actuator;
 	}
-	
+
 	private TPartPerformanceManager(MetricCollector localMetricCollector) {
 		this.localMetricCollector = localMetricCollector;
 	}
@@ -128,7 +111,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	public void receiveMetricReport(MetricReport report) {
 		metricWarehouse.receiveMetricReport((TPartSystemMetrics) report);
 	}
-	
+
 	@Override
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
