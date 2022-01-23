@@ -169,17 +169,7 @@ public class Elasql extends VanillaDb {
 			return; 
 		}
 		
-		// LatchFeatureCollector is a specialized object to collect features in vanillaDB
-		// Passing this object into VanillaDb.init() is a kind of dependency injection.
-		try {
-			// initialize core modules 
-			VanillaDb.init(dirName); 
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
- 
-		
+		VanillaDb.init(dirName); 
  
 		// initialize DD modules 
 		initConnectionMgr(myNodeId);
