@@ -59,7 +59,7 @@ public class ConservativeOrderedLockTable {
 
 	// Lock-stripping
 	private final Object recordLatches[] = new Object[NUM_ANCHOR];
-	private final Object indexLatches[] = new Object[NUM_ANCHOR];
+	private final Object blockLatches[] = new Object[NUM_ANCHOR];
 
 	/**
 	 * Create and initialize a conservative ordered lock table.
@@ -68,7 +68,7 @@ public class ConservativeOrderedLockTable {
 		// Initialize anchors
 		for (int i = 0; i < NUM_ANCHOR; ++i) {
 			recordLatches[i] = new Object();
-			indexLatches[i] = new Object();
+			blockLatches[i] = new Object();
 		}
 	}
 
@@ -87,7 +87,7 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
-	 * Grants an slock on the specified item. If any conflict lock exists when the
+	 * Grants an slock on the specified item excluding blocks. If any conflict lock exists when the
 	 * method is called, then the calling thread will be placed on a wait list until
 	 * the lock is released. If the thread remains on the wait list for a certain
 	 * amount of time, then an exception is thrown.
@@ -161,14 +161,14 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
-	 * Grants an slock on index item
+	 * Grants an slock on block item
 	 * 
 	 * @param obj   an object to be locked
 	 * @param txNum a transaction number
 	 * 
 	 */
-	void sLockIndex(Object obj, long txNum) {
-		Object anchor = getIndexLatch(obj);
+	void sLockForBlock(Object obj, long txNum) {
+		Object anchor = getBlockLatch(obj);
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
@@ -209,7 +209,7 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
-	 * Grants an xlock on the specified item. If any conflict lock exists when the
+	 * Grants an xlock on the specified item excluding blocks. If any conflict lock exists when the
 	 * method is called, then the calling thread will be placed on a wait list until
 	 * the lock is released. If the thread remains on the wait list for a certain
 	 * amount of time, then an exception is thrown.
@@ -277,15 +277,15 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
-	 * Grants an xlock on index item
+	 * Grants an xlock on block item
 	 * 
 	 * @param obj   an object to be locked
 	 * @param txNum a transaction number
 	 * 
 	 */
-	void xLockIndex(Object obj, long txNum) {
+	void xLockForBlock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
-		Object anchor = getIndexLatch(obj);
+		Object anchor = getBlockLatch(obj);
 
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
@@ -480,8 +480,8 @@ public class ConservativeOrderedLockTable {
 	 * @param txNum    a transaction number
 	 * @param lockType the type of lock
 	 */
-	void releaseIndex(Object obj, long txNum, LockType lockType) {
-		Object anchor = getIndexLatch(obj);
+	void releaseForBlock(Object obj, long txNum, LockType lockType) {
+		Object anchor = getBlockLatch(obj);
 		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
 	}
 
@@ -501,8 +501,8 @@ public class ConservativeOrderedLockTable {
 	 * @param obj the target object
 	 * @return the anchor for index obj
 	 */
-	private Object getIndexLatch(Object obj) {
-		return hashAndGetLatch(indexLatches, obj);
+	private Object getBlockLatch(Object obj) {
+		return hashAndGetLatch(blockLatches, obj);
 	}
 
 	private Object hashAndGetLatch(Object[] latches, Object obj) {
