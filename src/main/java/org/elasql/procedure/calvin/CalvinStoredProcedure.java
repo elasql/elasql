@@ -223,6 +223,20 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 	public boolean isReadOnly() {
 		return execPlan.isReadOnly();
 	}
+	
+	int clientId, connectionId;
+	public void setClientInfo(int clientId, int connectionId) {
+		this.clientId = clientId;
+		this.connectionId = connectionId;
+	}
+	
+	public int getClientId() {
+		return clientId;
+	}
+	
+	public int getConnectionId() {
+		return connectionId;
+	}
 
 	@Override
 	protected void executeSql() {

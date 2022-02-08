@@ -64,7 +64,16 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
-		commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
+		if (pars.length == 4) {
+			int clientId = (int) pars[0];
+			int connectionId = (int) pars[1];
+			long txNum = (long) pars[2];
+			Object[] param = (Object[]) pars[3];
+			commServer.sendTotalOrderMessage(new StoredProcedureCall(clientId, connectionId, pid, txNum, param));
+		}
+		else {
+			commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
+		}
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
@@ -123,7 +132,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			return;
 		
 		StoredProcedureCall spc = (StoredProcedureCall) message;
-		spc.setTxNum(serialNumber);
+		if (spc.getTxNum() == -1)
+			spc.setTxNum(serialNumber);
 		Elasql.scheduler().schedule(spc);
 	}
 	
