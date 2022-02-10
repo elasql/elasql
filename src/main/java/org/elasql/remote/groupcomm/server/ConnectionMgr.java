@@ -64,16 +64,11 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
-		if (pars.length == 4) {
-			int clientId = (int) pars[0];
-			int connectionId = (int) pars[1];
-			long txNum = (long) pars[2];
-			Object[] param = (Object[]) pars[3];
-			commServer.sendTotalOrderMessage(new StoredProcedureCall(clientId, connectionId, pid, txNum, param));
-		}
-		else {
-			commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
-		}
+		commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
+	}
+	
+	public void sendStoredProcedureCall(boolean fromAppiaThread, int clientId, int connectionId, int pid, long txNum, Object[] pars) {
+		commServer.sendTotalOrderMessage(new StoredProcedureCall(clientId, connectionId, pid, txNum, pars));
 	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
