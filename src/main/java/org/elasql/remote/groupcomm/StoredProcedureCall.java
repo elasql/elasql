@@ -55,6 +55,14 @@ public class StoredProcedureCall implements Serializable {
 		this.pid = pid;
 		this.objs = objs;
 	}
+	
+	public StoredProcedureCall(int clientId, int connId, int pid, long txNum , Object... objs) {
+		this.clientId = clientId;
+		this.connectionId = connId;
+		this.pid = pid;
+		this.txNum = txNum;
+		this.objs = objs;
+	}
 
 	public Object[] getPars() {
 		return objs;

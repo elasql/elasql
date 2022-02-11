@@ -75,6 +75,8 @@ public class CalvinScheduler extends Task implements Scheduler {
 				CalvinStoredProcedure<?> sp = factory.getStoredProcedure(
 						call.getPid(), call.getTxNum());
 				
+				sp.setClientInfo(call.getClientId(), call.getConnectionId());
+				
 //				timer.startComponentTimer(sp.getClass().getSimpleName() + " prepare");
 				sp.prepare(call.getPars());
 //				timer.stopComponentTimer(sp.getClass().getSimpleName() + " prepare");

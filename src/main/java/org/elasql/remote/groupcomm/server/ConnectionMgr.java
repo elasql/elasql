@@ -66,6 +66,10 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
 		commServer.sendTotalOrderMessage(new StoredProcedureCall(-1, -1, pid, pars));
 	}
+	
+	public void sendStoredProcedureCall(boolean fromAppiaThread, int clientId, int connectionId, int pid, long txNum, Object[] pars) {
+		commServer.sendTotalOrderMessage(new StoredProcedureCall(clientId, connectionId, pid, txNum, pars));
+	}
 
 	public void pushTupleSet(int nodeId, TupleSet reading) {
 		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
@@ -123,7 +127,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			return;
 		
 		StoredProcedureCall spc = (StoredProcedureCall) message;
-		spc.setTxNum(serialNumber);
+		if (spc.getTxNum() == -1)
+			spc.setTxNum(serialNumber);
 		Elasql.scheduler().schedule(spc);
 	}
 	
