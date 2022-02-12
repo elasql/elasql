@@ -37,7 +37,7 @@ class BatchSpcSender implements Runnable {
 
 	static {
 		COMM_BATCH_SIZE = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".BATCH_SIZE", 1);
+				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".COMM_BATCH_SIZE", 1);
 		MAX_WAITING_TIME = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(BatchSpcSender.class.getName() + ".MAX_WAITING_TIME", 1000);
 	}
