@@ -64,6 +64,10 @@ public class TransactionFeatures {
 		featureKeys.add("I/O Write Bytes");
 		featureKeys.add("I/O Queue Length");
 		
+		featureKeys.add("Read PrimaryKey");
+		featureKeys.add("Write PrimaryKey");
+		featureKeys.add("Insert PrimaryKey");
+		
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
 	}
