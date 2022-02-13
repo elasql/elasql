@@ -55,13 +55,13 @@ public class TransactionFeaturesRecorder extends Task {
 				Object val = values[index - 1];
 				if (val.getClass().isArray())
 					if (val instanceof Double[]) {
-						int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
-						String[] StringVals = new String[serverCount];
+						int valLength = ((Double []) val).length;
+						String[] stringVals = new String[valLength];
 						
-						for (int serverId = 0; serverId < serverCount; serverId++)	
-							StringVals[serverId] = formatter.format(((Double[]) val)[serverId]);
+						for (int i = 0; i < valLength; i++) 
+							stringVals[i] = formatter.format(((Double []) val)[i]);
 						
-						return quoteString(Arrays.toString(StringVals));
+						return quoteString(Arrays.toString(stringVals));
 					}
 					else {
 						return quoteString(Arrays.toString((Object[]) val));
