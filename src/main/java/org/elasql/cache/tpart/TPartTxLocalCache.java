@@ -11,6 +11,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartTxLocalCache {
 
@@ -103,6 +104,10 @@ public class TPartTxLocalCache {
 		
 		// Pass to the transactions
 //		timer.startComponentTimer("Pass to next Tx");
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		
+//		profiler.startComponentProfiler("OU7 - Flush - Pass To The Next Tx");
+		// mean latency at TPCC Hermes: 0.6us
 		for (Map.Entry<PrimaryKey, CachedRecord> entry : recordCache.entrySet()) {
 			Long[] dests = plan.getLocalPassingTarget(entry.getKey());
 			if (dests != null) {
@@ -115,6 +120,7 @@ public class TPartTxLocalCache {
 				}
 			}
 		}
+//		profiler.stopComponentProfiler("OU7 - Flush - Pass To The Next Tx");
 //		timer.stopComponentTimer("Pass to next Tx");
 
 //		timer.startComponentTimer("Writeback");
@@ -122,14 +128,25 @@ public class TPartTxLocalCache {
 		for (PrimaryKey key : plan.getLocalWriteBackInfo()) {
 
 			CachedRecord rec = null;
-			if (plan.isHereMaster()) 
+			if (plan.isHereMaster()) {
+				// mean latency at TPCC Hermes: 1.07us
+//				profiler.startComponentProfiler("OU7 - Flush - Get Record");
 				rec = recordCache.get(key);
-			else
+//				profiler.stopComponentProfiler("OU7 - Flush - Get Record");
+			}
+			else {
+				// mean latency at TPCC Hermes: 1433us
+				profiler.startComponentProfiler("OU7 - Flush - Take From Tx");
 				rec = cacheMgr.takeFromTx(key, txNum, localStorageId);
+				profiler.stopComponentProfiler("OU7 - Flush - Take From Tx");
+			}
 			
 			// For migration
 			if (plan.getStorageInsertions().contains(key)) {
+				// hermes ignores this branch
+//				profiler.startComponentProfiler("OU7 - Flush - Insert To Local Storage");
 				cacheMgr.insertToLocalStorage(key, rec, tx);
+//				profiler.stopComponentProfiler("OU7 - Flush - Insert To Local Storage");
 				continue;
 			}
 
@@ -137,10 +154,18 @@ public class TPartTxLocalCache {
 			// it might be pushed from the same transaction on the other
 			// machine.
 			// Migrated data need to insert
-			if (plan.getCacheInsertions().contains(key))
+			if (plan.getCacheInsertions().contains(key)) {
+				// mean latency at TPCC Hermes: 0.04us
+//				profiler.startComponentProfiler("OU7 - Flush - Insert To Cache");
 				cacheMgr.insertToCache(key, rec, txNum);
-			else
+//				profiler.stopComponentProfiler("OU7 - Flush - Insert To Cache");
+			}
+			else {
+				// mean latency at TPCC Hermes: 915us
+				profiler.startComponentProfiler("OU7 - Flush - Write Back");
 				cacheMgr.writeBack(key, rec, tx);
+				profiler.stopComponentProfiler("OU7 - Flush - Write Back");
+			}
 		}
 //		timer.stopComponentTimer("Writeback");
 		

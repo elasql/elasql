@@ -256,6 +256,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		writtenIndexBlks.clear();
 	}
 
+	@Override
 	public void lockRecordFileHeader(BlockId blk) {
 		lockTbl.xLockIndex(blk, txNum);
 	}

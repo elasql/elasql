@@ -47,6 +47,7 @@ import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * The CURD interfaces to VanillaCore.
@@ -188,6 +189,8 @@ public class VanillaCoreCrud {
 	}
 
 	public static boolean update(PrimaryKey key, CachedRecord rec, Transaction tx) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.startComponentProfilerAtGivenStage("OU7 - Core Update", 7);
 		boolean found = false;
 		String tblName = key.getTableName();
 		
@@ -273,11 +276,13 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
-		
+		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Update", 7);
 		return found;
 	}
 
 	public static void insert(PrimaryKey key, CachedRecord rec, Transaction tx) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.startComponentProfilerAtGivenStage("OU7 - Core Insert", 7);
 		String tblname = key.getTableName();
 		
 //		Timer.getLocalTimer().startComponentTimer("Insert to table " + tblname);
@@ -310,6 +315,7 @@ public class VanillaCoreCrud {
 		
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
+		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Insert", 7);
 	}
 
 	public static void delete(PrimaryKey key, Transaction tx) {

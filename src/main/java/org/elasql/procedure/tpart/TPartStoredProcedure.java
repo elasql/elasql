@@ -116,9 +116,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public SpResultSet execute() {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		try {
+			profiler.setStageIndicator(3);
 			profiler.startComponentProfiler("OU3 - Acquire Locks");
 			getConservativeLocks();
 			profiler.stopComponentProfiler("OU3 - Acquire Locks");
+			profiler.resetStageIndicator();
 			
 			executeTransactionLogic();
 			
@@ -304,8 +306,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
+		profiler.setStageIndicator(7);
 		profiler.startComponentProfiler("OU7 - Write to Local");
 		cache.flush(plan,  cachedEntrySet);
 		profiler.stopComponentProfiler("OU7 - Write to Local");
+		profiler.resetStageIndicator();
 	}
 }

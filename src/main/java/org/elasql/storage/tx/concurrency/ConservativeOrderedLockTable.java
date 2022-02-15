@@ -21,7 +21,11 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.vanilladb.core.server.VanillaDb;
+import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
+import org.vanilladb.core.util.StripedLatchObserver;
+import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConservativeOrderedLockTable {
 
@@ -61,6 +65,9 @@ public class ConservativeOrderedLockTable {
 	private final Object recordLatches[] = new Object[NUM_ANCHOR];
 	private final Object indexLatches[] = new Object[NUM_ANCHOR];
 
+	// For observing
+	private StripedLatchObserver<BlockId> observer;
+	
 	/**
 	 * Create and initialize a conservative ordered lock table.
 	 */
@@ -69,6 +76,11 @@ public class ConservativeOrderedLockTable {
 		for (int i = 0; i < NUM_ANCHOR; ++i) {
 			recordLatches[i] = new Object();
 			indexLatches[i] = new Object();
+		}
+		
+		if (StripedLatchObserver.ENABLE_OBSERVE_STRIPED_LOCK) {
+			observer = new StripedLatchObserver<BlockId>("conservative-blocklock-observation.csv");
+			VanillaDb.taskMgr().runTask(observer);
 		}
 	}
 
@@ -170,11 +182,15 @@ public class ConservativeOrderedLockTable {
 	void sLockIndex(Object obj, long txNum) {
 		Object anchor = getIndexLatch(obj);
 
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.startComponentProfilerAtGivenStage("OU7 - sLockIndex", 7);
+		
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
 			// check if it have already held the lock
 			if (hasSLock(lockers, txNum)) {
+				profiler.stopComponentProfilerAtGivenStage("OU7 - sLockIndex", 7);
 				return;
 			}
 
@@ -201,6 +217,7 @@ public class ConservativeOrderedLockTable {
 				// them
 				// fight for the lockers on this object.
 				anchor.notifyAll();
+				profiler.stopComponentProfilerAtGivenStage("OU7 - sLockIndex", 7);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				throw new LockAbortException("Interrupted when waitting for lock");
@@ -219,6 +236,8 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void xLock(Object obj, long txNum) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getRecordLatch(obj);
 
@@ -236,8 +255,12 @@ public class ConservativeOrderedLockTable {
 
 				// long timestamp = System.currentTimeMillis();
 				Long head = lockers.requestQueue.peek();
-				while ((!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))
-				/* && !waitingTooLong(timestamp) */) {
+				while (true)
+				/* && !waitingTooLong(timestamp) */ {
+					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
+					if (!(!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))) {
+						break;
+					}
 
 					// For debug
 //					if (lockers.xLocker != -1) {
@@ -257,6 +280,7 @@ public class ConservativeOrderedLockTable {
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
+					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
 				}
 
 				// For debug
@@ -286,8 +310,16 @@ public class ConservativeOrderedLockTable {
 	void xLockIndex(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getIndexLatch(obj);
-
+		
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.startComponentProfilerAtGivenStage("OU7 - xLockIndex - syncrhonized(anchor)", 7);
+//		long start = System.nanoTime();
 		synchronized (anchor) {
+			profiler.startComponentProfilerAtGivenStage("OU7 - xLockIndex - syncrhonized(anchor)", 7);
+//			long duration = System.nanoTime() - start;
+//			if (duration > 1000_000) {
+//				System.out.print("syncrhonized(anchor) > 1ms, " + (BlockId) obj);
+//			}
 			Lockers lockers = prepareLockers(obj);
 
 			if (hasXLock(lockers, txNum)) {
@@ -295,13 +327,26 @@ public class ConservativeOrderedLockTable {
 			}
 
 			try {
+//				start = System.nanoTime();
+				profiler.startComponentProfilerAtGivenStage("OU7 - xLockIndex - while (!xLockable())", 7);
+//				int wakeUpCount = 0;
+//				long start = System.nanoTime();
 				while (!xLockable(lockers, txNum)) {
 					anchor.wait();
+//					wakeUpCount += 1;
 					lockers = prepareLockers(obj);
 				}
+//				if (obj instanceof BlockId && ((BlockId) obj).toString().contains("file order_line.tbl, block 0")) {
+//					System.out.println("wakeUpCount: " + wakeUpCount + ", waitingTime: " + (System.nanoTime() - start));
+//				}
+				profiler.stopComponentProfilerAtGivenStage("OU7 - xLockIndex - while (!xLockable())", 7);
+//				duration = System.nanoTime() - start;
+//				if (duration > 1000_000) {
+//					System.out.print("anchor.wait() > 1ms, " + (BlockId) obj);
+//				}
 				// get the x lock
 				lockers.xLocker = txNum;
-
+				
 				// An X lock blocks all other lockers, so it don't need to
 				// wake up anyone.
 			} catch (InterruptedException e) {
@@ -509,6 +554,14 @@ public class ConservativeOrderedLockTable {
 		int code = obj.hashCode();
 		code = Math.abs(code); // avoid negative value
 		code = code % latches.length;
+		
+		// analyze blocks
+		if (StripedLatchObserver.ENABLE_OBSERVE_STRIPED_LOCK) {
+			if (obj instanceof BlockId) {
+				observer.increment(code, (BlockId) obj, 0);
+			}
+		}
+		
 		return latches[code];
 	}
 
