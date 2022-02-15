@@ -114,7 +114,7 @@ public class MetricCollector extends Task {
 		builder.setIOWriteBytes(getIOWriteBytes());
 		builder.setIOQueueLength(getIOQueuLangth());
 
-		builder.setLatchFeatures(LatchMgr.getKeyLatchFeatures());
+//		builder.setLatchFeatures(LatchMgr.getKeyLatchFeatures());
 
 		return builder.build();
 	}

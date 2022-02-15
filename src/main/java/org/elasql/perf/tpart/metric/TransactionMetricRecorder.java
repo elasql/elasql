@@ -42,6 +42,7 @@ public class TransactionMetricRecorder extends Task {
 		boolean isTxDistributed;
 		List<String> metricNames;
 		Map<String, Long> latencies;
+		Map<String, Integer> invocations;
 		Map<String, Long> cpuTimes;
 		Map<String, Long> diskioCounts;
 		Map<String, Long> networkinSizes;
@@ -54,6 +55,7 @@ public class TransactionMetricRecorder extends Task {
 
 			metricNames = new ArrayList<String>();
 			latencies = new HashMap<String, Long>();
+			invocations = new HashMap<String, Integer>();
 			cpuTimes = new HashMap<String, Long>();
 			diskioCounts = new HashMap<String, Long>();
 			networkinSizes = new HashMap<String, Long>();
@@ -62,6 +64,7 @@ public class TransactionMetricRecorder extends Task {
 				String metricName = component.toString();
 				metricNames.add(metricName);
 				latencies.put(metricName, profiler.getComponentTime(component));
+				invocations.put(metricName, profiler.getComponentCount(component));
 				if (ENABLE_CPU_TIMER)
 					cpuTimes.put(metricName, profiler.getComponentCpuTime(component));
 				if (ENABLE_DISKIO_COUNTER)
@@ -141,12 +144,14 @@ public class TransactionMetricRecorder extends Task {
 	@SuppressWarnings("unused")
 	private class CsvSavers implements AutoCloseable {
 		public CsvSaver<LongValueRow> latencyCsvSaver;
+		public CsvSaver<LongValueRow> invocationCsvSaver;
 		public CsvSaver<LongValueRow> cpuTimeCsvSaver;
 		public CsvSaver<LongValueRow> diskioCountCsvSaver;
 		public CsvSaver<LongValueRow> networkinSizeCsvSaver;
 		public CsvSaver<LongValueRow> networkoutSizeCsvSaver;
 
 		public BufferedWriter latencyWriter;
+		public BufferedWriter invocationWriter;
 		public BufferedWriter cpuTimeWriter;
 		public BufferedWriter diskioCountWriter;
 		public BufferedWriter networkinSizeWriter;
@@ -154,6 +159,7 @@ public class TransactionMetricRecorder extends Task {
 
 		public CsvSavers() throws IOException {
 			initLatencyCsvSaver();
+			initInvocationCsvSaver();
 			if (ENABLE_CPU_TIMER) {
 				initCpuTimeCsvSaver();
 			}
@@ -170,6 +176,12 @@ public class TransactionMetricRecorder extends Task {
 			String fileName = String.format("%s-latency-server-%d", FILENAME_PREFIX, serverId);
 			latencyCsvSaver = new CsvSaver<LongValueRow>(fileName);
 			latencyWriter = latencyCsvSaver.createOutputFile();
+		}
+		
+		private void initInvocationCsvSaver() throws IOException {
+			String fileName = String.format("%s-invocation-server-%d", FILENAME_PREFIX, serverId);
+			invocationCsvSaver = new CsvSaver<LongValueRow>(fileName);
+			invocationWriter = invocationCsvSaver.createOutputFile();
 		}
 
 		private void initCpuTimeCsvSaver() throws IOException {
@@ -274,6 +286,7 @@ public class TransactionMetricRecorder extends Task {
 		List<String> header = generateHeader(metrics);
 
 		savers.latencyCsvSaver.writeHeader(savers.latencyWriter, header);
+		savers.invocationCsvSaver.writeHeader(savers.invocationWriter, header);
 		if (ENABLE_CPU_TIMER) {
 			savers.cpuTimeCsvSaver.writeHeader(savers.cpuTimeWriter, header);
 		}
@@ -287,7 +300,6 @@ public class TransactionMetricRecorder extends Task {
 	}
 
 	private void saveMetrics(CsvSavers savers, TransactionMetrics metrics) throws IOException {
-		
 		if (updateMetricNames(metrics)) {
 			saveHeader(savers, metrics);
 		}
@@ -295,6 +307,9 @@ public class TransactionMetricRecorder extends Task {
 		// Split the metrics to different types of rows
 		LongValueRow latRow = convertToLatencyRow(metrics);
 		savers.latencyCsvSaver.writeRecord(savers.latencyWriter, latRow, columnCount);
+		
+		LongValueRow invRow = convertToInvocationRow(metrics);
+		savers.invocationCsvSaver.writeRecord(savers.invocationWriter, invRow, columnCount);
 		if (ENABLE_CPU_TIMER) {
 			LongValueRow cpuRow = convertToCpuTimeRow(metrics);
 			savers.cpuTimeCsvSaver.writeRecord(savers.cpuTimeWriter, cpuRow, columnCount);
@@ -331,6 +346,19 @@ public class TransactionMetricRecorder extends Task {
 			if (latency != null) {
 				int pos = metricNameToPos.get(metricName);
 				latValues[pos] = latency;
+			}
+		}
+		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, latValues);
+	}
+	
+	private LongValueRow convertToInvocationRow(TransactionMetrics metrics) {
+		long[] latValues = new long[metricNames.size()];
+		
+		for (Object metricName : metricNames) {
+			Integer invocation = metrics.invocations.get(metricName);
+			if (invocation != null) {
+				int pos = metricNameToPos.get(metricName);
+				latValues[pos] = invocation;
 			}
 		}
 		return new LongValueRow(metrics.txNum, metrics.isMaster, metrics.isTxDistributed, latValues);

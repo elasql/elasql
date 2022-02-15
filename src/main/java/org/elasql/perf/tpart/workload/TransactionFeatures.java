@@ -64,7 +64,7 @@ public class TransactionFeatures {
 		featureKeys.add("I/O Write Bytes");
 		featureKeys.add("I/O Queue Length");
 
-		featureKeys.add("Latch Features");
+//		featureKeys.add("Latch Features");
 
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
