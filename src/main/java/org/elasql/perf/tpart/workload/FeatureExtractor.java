@@ -100,6 +100,12 @@ public class FeatureExtractor {
 //		// we just pass a huge string that consists of key latch features
 //		builder.addFeature("Latch Features", extractLatchFeatures());
 		
+		// 2022/2/15 this features make the output file size extremely large.
+		// Features for latches
+		// Due to the complexity of getting individual latch features,
+		// we just pass a huge string that consists of key latch features
+		// builder.addFeature("Latch Features", extractLatchFeatures());
+		
 		// Get dependencies
 		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
 				task.getTxNum(), task.getReadSet(), task.getWriteSet());

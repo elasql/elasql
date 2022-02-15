@@ -70,6 +70,8 @@ public class TransactionFeatures {
 //
 //		featureKeys.add("Latch Features");
 
+//		featureKeys.add("Latch Features");
+
 		// Convert the list to a read-only list
 		FEATURE_KEYS = Collections.unmodifiableList(featureKeys);
 	}
