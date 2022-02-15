@@ -1,5 +1,17 @@
 # Release Notes
 
+## Version 0.3.2 (2022-02-15)
+
+### Bug Fixes
+
+- Remove unused property. ([#57])
+
+[#57]: https://github.com/elasql/elasql/pull/57
+
+### Dependencies
+
+- Update VanillaCore to 0.6.0
+
 ## Version 0.3.1 (2021-01-07)
 
 ### Security Issue
@@ -15,9 +27,9 @@
 - Add G-Store implementation
 - Add LEAP implementation
 
-### Refractor
+### Refactor
 
-- Perform a full-scale and system-wise refractor
+- Perform a full-scale and system-wise refactor
 
 ### Dependencies
 
@@ -27,12 +39,12 @@
 
 ## Version 0.2.1 (2018-08-21)
 
-Update the dependencies.
+- Update the dependencies.
 
 ## Version 0.2.0 (2017-05-03)
 
-Add T-Part implementation.
+- Add T-Part implementation.
 
 ## Version 0.1.0 (2016-06-18)
 
-Finish the basic architecture and Calvin implementation.
+- Finish the basic architecture and Calvin implementation.
