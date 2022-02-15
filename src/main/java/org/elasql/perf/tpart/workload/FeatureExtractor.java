@@ -399,32 +399,4 @@ public class FeatureExtractor {
 
 		return lengths;
 	}
-
-	private Integer[] extractPrimaryKeyFeature(Set<PrimaryKey> keys, TGraph graph) {
-		// total m machines, n tables and r regions,
-		// thus, feature size would be m * n * r
-		
-		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
-		
-		int machineCount = PartitionMetaMgr.NUM_PARTITIONS;
-		int tableCount = 9; // tpcc
-
-		Integer[] primaryKeyFeature = new Integer[machineCount * tableCount];
-		for (int i=0; i<primaryKeyFeature.length; i++) {
-			primaryKeyFeature[i] = 0;
-		}
-
-		for (PrimaryKey key : keys) {
-			// Skip fully replicated records
-			if (partMgr.isFullyReplicated(key))
-				continue;
-			int partId = graph.getResourcePosition(key).getPartId();
-			int tableId = tableIndexMap.get(key.getTableName());
-			int tmp = partId * tableCount + tableId;
-			
-			primaryKeyFeature[tmp]++;
-		}
-		return primaryKeyFeature;
-		
-	}
 }

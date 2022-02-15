@@ -2,6 +2,7 @@ package org.elasql.perf.tpart.metric;
 
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.server.Elasql;
+import org.vanilladb.core.latch.LatchMgr;
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.storage.buffer.Buffer;
 import org.vanilladb.core.storage.buffer.BufferPoolMonitor;
@@ -24,10 +25,10 @@ public class MetricCollector extends Task {
 	private static final int SYSTEM_METRIC_INTERVAL = 100; // in milliseconds
 
 	private TransactionMetricRecorder metricRecorder;
-	
+
 	private OperatingSystem os;
 	private CentralProcessor cpu;
-	
+
 	private HWDiskStore hwds;
 	private long previousReadBytes = 0l;
 	private long previousWriteBytes = 0l;
@@ -42,7 +43,7 @@ public class MetricCollector extends Task {
 	public void addTransactionMetrics(long txNum, String role, boolean isTxDistributed, TransactionProfiler profiler) {
 		if (!TPartPerformanceManager.ENABLE_COLLECTING_DATA)
 			throw new IllegalStateException("cannot collect transaction metrics since ENABLE_COLLECTING_DATA = false");
-	
+
 		metricRecorder.addTransactionMetrics(txNum, role, isTxDistributed, profiler);
 	}
 
@@ -50,19 +51,19 @@ public class MetricCollector extends Task {
 	public void run() {
 		Thread.currentThread().setName("metric-collector");
 		long startTime;
-		
+
 		setupInterfaces();
 
 		try {
 			while (true) {
 				startTime = System.nanoTime();
 
-				// Read disk info 
+				// Read disk info
 				initDiskStore();
-				
+
 				// Collect the metrics
 				TPartSystemMetrics metrics = collectSystemMetrics();
-				
+
 				// Send to the sequencer
 				if (Elasql.connectionMgr() != null)
 					Elasql.connectionMgr().sendMetricReport(metrics);
@@ -76,7 +77,7 @@ public class MetricCollector extends Task {
 			e.printStackTrace();
 		}
 	}
-	
+
 	private void setupInterfaces() {
 		SystemInfo si = new SystemInfo();
 		os = si.getOperatingSystem();
@@ -94,7 +95,7 @@ public class MetricCollector extends Task {
 		builder.setBufferHitRate(BufferPoolMonitor.getHitRate());
 		builder.setBufferAvgPinCount(BufferPoolMonitor.getAvgPinCount());
 		builder.setPinnedBufferCount(BufferPoolMonitor.getPinnedBufferCount());
-		
+
 		builder.setBufferReadWaitCount(BufferPoolMonitor.getReadWaitCount());
 		builder.setBufferWriteWaitCount(BufferPoolMonitor.getWriteWaitCount());
 		builder.setBlockReleaseCount(BufferPoolMonitor.getBlockReleaseCount());
@@ -105,42 +106,47 @@ public class MetricCollector extends Task {
 		builder.setPageSetValReleaseCount(Buffer.getPageSetValWaitCount());
 		builder.setPageGetValReleaseCount(Buffer.getPageGetValReleaseCount());
 		builder.setPageSetValReleaseCount(Buffer.getPageSetValReleaseCount());
-		
+
 		collectCpuLoad(builder);
 		builder.setThreadActiveCount(getThreadActiveCount());
-		
+
 		builder.setIOReadBytes(getIOReadBytes());
 		builder.setIOWriteBytes(getIOWriteBytes());
 		builder.setIOQueueLength(getIOQueuLangth());
+
+		builder.setLatchFeatures(LatchMgr.getKeyLatchFeatures());
+
 		return builder.build();
 	}
-	
+
 	private void collectCpuLoad(TPartSystemMetrics.Builder builder) {
 		// System
 		builder.setSystemCpuLoadTicks(cpu.getSystemCpuLoadTicks());
 		builder.setSystemLoadAverage(cpu.getSystemLoadAverage(1)[0]);
-		
+
 		// Process
 		OSProcess process = os.getProcess(os.getProcessId());
 		builder.setProcessUserTime(process.getUserTime());
 		builder.setProcessKernelTime(process.getKernelTime());
 		builder.setProcessUpTime(process.getUpTime());
 	}
-	
+
 	private int getThreadActiveCount() {
 		return Elasql.taskMgr().getActiveCount();
 	}
-	
+
 	private long getIOReadBytes() {
 		long readBytes = hwds.getReadBytes() - previousReadBytes;
 		previousReadBytes = hwds.getReadBytes();
 		return readBytes;
 	}
+
 	private long getIOWriteBytes() {
 		long writeBytes = hwds.getWriteBytes() - previousWriteBytes;
 		previousWriteBytes = hwds.getWriteBytes();
 		return writeBytes;
 	}
+
 	private long getIOQueuLangth() {
 		return hwds.getCurrentQueueLength();
 	}

@@ -187,7 +187,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void modifyLeafBlock(BlockId blk) {
-		lockTbl.xLock(blk, txNum);
+		lockTbl.xLockForBlock(blk, txNum);
 		writtenIndexBlks.add(blk);
 	}
 
@@ -198,7 +198,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void readLeafBlock(BlockId blk) {
-		lockTbl.sLock(blk, txNum);
+		lockTbl.sLockForBlock(blk, txNum);
 		readIndexBlks.add(blk);
 	}
 
@@ -210,7 +210,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void crabDownDirBlockForModification(BlockId blk) {
-		lockTbl.xLock(blk, txNum);
+		lockTbl.xLockForBlock(blk, txNum);
 		writtenIndexBlks.add(blk);
 	}
 
@@ -221,7 +221,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void crabDownDirBlockForRead(BlockId blk) {
-		lockTbl.sLock(blk, txNum);
+		lockTbl.sLockForBlock(blk, txNum);
 		readIndexBlks.add(blk);
 	}
 
@@ -232,7 +232,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void crabBackDirBlockForModification(BlockId blk) {
-		lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
+		lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
 		writtenIndexBlks.remove(blk);
 	}
 
@@ -243,25 +243,25 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 *            the block id
 	 */
 	public void crabBackDirBlockForRead(BlockId blk) {
-		lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
+		lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
 		readIndexBlks.remove(blk);
 	}
 
 	public void releaseIndexLocks() {
 		for (BlockId blk : readIndexBlks)
-			lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
+			lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
 		for (BlockId blk : writtenIndexBlks)
-			lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
+			lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
 		readIndexBlks.clear();
 		writtenIndexBlks.clear();
 	}
 
 	public void lockRecordFileHeader(BlockId blk) {
-		lockTbl.xLock(blk, txNum);
+		lockTbl.xLockForBlock(blk, txNum);
 	}
 
 	public void releaseRecordFileHeader(BlockId blk) {
-		lockTbl.release(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
+		lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
 	}
 
 	@Override
