@@ -280,7 +280,7 @@ public class ConservativeOrderedLockTable {
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
-					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
+					profiler.stopComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
 				}
 
 				// For debug
@@ -308,6 +308,7 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void xLockForBlock(Object obj, long txNum) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getBlockLatch(obj);
 
