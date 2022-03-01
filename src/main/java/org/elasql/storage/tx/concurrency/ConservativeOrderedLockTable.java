@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.storage.file.BlockId;
@@ -60,10 +63,16 @@ public class ConservativeOrderedLockTable {
 	}
 
 	private Map<Object, Lockers> lockerMap = new ConcurrentHashMap<Object, Lockers>();
+	
+//	private class ConditionLatch {
+//		final Lock lock = new ReentrantLock();
+//		final Condition notLockable = lock.newCondition();
+//	}
 
 	// Lock-stripping
 	private final Object recordLatches[] = new Object[NUM_ANCHOR];
 	private final Object blockLatches[] = new Object[NUM_ANCHOR];
+	private final ReentrantLock fhpLatches[] = new ReentrantLock[NUM_ANCHOR];
 
 	// For observing
 	private StripedLatchObserver<BlockId> observer;
@@ -76,6 +85,7 @@ public class ConservativeOrderedLockTable {
 		for (int i = 0; i < NUM_ANCHOR; ++i) {
 			recordLatches[i] = new Object();
 			blockLatches[i] = new Object();
+			fhpLatches[i] = new ReentrantLock();
 		}
 		
 		if (StripedLatchObserver.ENABLE_OBSERVE_STRIPED_LOCK) {
@@ -312,23 +322,24 @@ public class ConservativeOrderedLockTable {
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getBlockLatch(obj);
 
+		profiler.startComponentProfilerAtGivenStage("OU7 - xLockForBlock - syncrhonized(anchor)", 7);
 		synchronized (anchor) {
-			profiler.startComponentProfilerAtGivenStage("OU7 - xLockIndex - syncrhonized(anchor)", 7);
+			profiler.stopComponentProfilerAtGivenStage("OU7 - xLockForBlock - syncrhonized(anchor)", 7);
 //			long duration = System.nanoTime() - start;
 //			if (duration > 1000_000) {
 //				System.out.print("syncrhonized(anchor) > 1ms, " + (BlockId) obj);
 //			}
 			Lockers lockers = prepareLockers(obj);
-
+			
 			if (hasXLock(lockers, txNum)) {
 				return;
 			}
 
 			try {
-//				start = System.nanoTime();
-				profiler.startComponentProfilerAtGivenStage("OU7 - xLockIndex - while (!xLockable())", 7);
-//				int wakeUpCount = 0;
 //				long start = System.nanoTime();
+				profiler.startComponentProfilerAtGivenStage("OU7 - xLockForBlock - while (!xLockable())", 7);
+//				int wakeUpCount = 0;
+				
 				while (!xLockable(lockers, txNum)) {
 					anchor.wait();
 //					wakeUpCount += 1;
@@ -337,10 +348,10 @@ public class ConservativeOrderedLockTable {
 //				if (obj instanceof BlockId && ((BlockId) obj).toString().contains("file order_line.tbl, block 0")) {
 //					System.out.println("wakeUpCount: " + wakeUpCount + ", waitingTime: " + (System.nanoTime() - start));
 //				}
-				profiler.stopComponentProfilerAtGivenStage("OU7 - xLockIndex - while (!xLockable())", 7);
-//				duration = System.nanoTime() - start;
-//				if (duration > 1000_000) {
-//					System.out.print("anchor.wait() > 1ms, " + (BlockId) obj);
+				profiler.stopComponentProfilerAtGivenStage("OU7 - xLockForBlock - while (!xLockable())", 7);
+//				long duration = System.nanoTime() - start;
+//				if (duration > 5000_000) {
+//					System.out.print("anchor.wait() > 5ms, " + (BlockId) obj);
 //				}
 				// get the x lock
 				lockers.xLocker = txNum;
@@ -475,6 +486,32 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
+	 * Releases the specified type of lock on an item holding by a transaction. If a
+	 * lock is the last lock on that block, then the waiting transactions are
+	 * notified.
+	 * 
+	 * @param obj      a locked object
+	 * @param txNum    a transaction number
+	 * @param lockType the type of lock
+	 */
+	void release(Object obj, long txNum, LockType lockType) {
+		Object anchor = getRecordLatch(obj);
+		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
+	}
+
+	/**
+	 * Releases the holding index lock.
+	 * 
+	 * @param obj      a locked object
+	 * @param txNum    a transaction number
+	 * @param lockType the type of lock
+	 */
+	void releaseForBlock(Object obj, long txNum, LockType lockType) {
+		Object anchor = getBlockLatch(obj);
+		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
+	}
+	
+	/**
 	 * Release the lock
 	 * 
 	 * @param obj      an object to be locked
@@ -503,32 +540,6 @@ public class ConservativeOrderedLockTable {
 	}
 
 	/**
-	 * Releases the specified type of lock on an item holding by a transaction. If a
-	 * lock is the last lock on that block, then the waiting transactions are
-	 * notified.
-	 * 
-	 * @param obj      a locked object
-	 * @param txNum    a transaction number
-	 * @param lockType the type of lock
-	 */
-	void release(Object obj, long txNum, LockType lockType) {
-		Object anchor = getRecordLatch(obj);
-		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
-	}
-
-	/**
-	 * Releases the holding index lock.
-	 * 
-	 * @param obj      a locked object
-	 * @param txNum    a transaction number
-	 * @param lockType the type of lock
-	 */
-	void releaseForBlock(Object obj, long txNum, LockType lockType) {
-		Object anchor = getBlockLatch(obj);
-		getLockersAndReleaseLock(obj, txNum, lockType, anchor);
-	}
-
-	/**
 	 * Gets the anchor for the specified object.
 	 * 
 	 * @param obj the target object
@@ -546,6 +557,10 @@ public class ConservativeOrderedLockTable {
 	 */
 	private Object getBlockLatch(Object obj) {
 		return hashAndGetLatch(blockLatches, obj);
+	}
+	
+	public ReentrantLock getFhpLatch(Object obj) {
+		return (ReentrantLock) hashAndGetLatch(fhpLatches, obj);
 	}
 
 	private Object hashAndGetLatch(Object[] latches, Object obj) {

@@ -289,6 +289,7 @@ public class VanillaCoreCrud {
 		
 		Plan p = new TablePlan(tblname, tx);
 
+		profiler.startComponentProfilerAtGivenStage("OU7 - Core Insert - Record", 7);
 		// Insert the record into the record file
 		UpdateScan s = (UpdateScan) p.open();
 		s.insert();
@@ -296,6 +297,7 @@ public class VanillaCoreCrud {
 			s.setVal(fldName, rec.getVal(fldName));
 		RecordId rid = s.getRecordId();
 		s.close();
+		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Insert - Record", 7);
 		
 		// Insert the record to all corresponding indexes
 		Set<IndexInfo> indexes = new HashSet<IndexInfo>();
@@ -304,11 +306,13 @@ public class VanillaCoreCrud {
 			indexes.addAll(iis);
 		}
 		
+		profiler.startComponentProfilerAtGivenStage("OU7 - Core Insert - Index", 7);
 		for (IndexInfo ii : indexes) {
 			Index idx = ii.open(tx);
 			idx.insert(new SearchKey(ii.fieldNames(), rec.toFldValMap()), rid, true);
 			idx.close();
 		}
+		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Insert - Index", 7);
 		
 		tx.endStatement();
 //		Timer.getLocalTimer().stopComponentTimer("Insert to table " + tblname);
