@@ -55,41 +55,29 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class VanillaCoreCrud {
 
 	public static CachedRecord read(PrimaryKey key, Transaction tx) {
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-		
 		String tblName = key.getTableName();
 		TablePlan tp = new TablePlan(tblName, tx);
 		Plan selectPlan = null;
 		
 		// Create a IndexSelectPlan if there is matching index in the predicate
-		profiler.startComponentProfilerAtGivenStage("OU4 - selectByBestMatchedIndex", 4);
 		selectPlan = selectByBestMatchedIndex(tblName, tp, key, tx);
-		profiler.stopComponentProfilerAtGivenStage("OU4 - selectByBestMatchedIndex", 4);
 		
-		profiler.startComponentProfilerAtGivenStage("OU4 - new SelectPlan", 4);
 		if (selectPlan == null)
 			selectPlan = new SelectPlan(tp, key.toPredicate());
 		else
 			selectPlan = new SelectPlan(selectPlan, key.toPredicate());
-		profiler.stopComponentProfilerAtGivenStage("OU4 - new SelectPlan", 4);
 		
-		profiler.startComponentProfilerAtGivenStage("OU4 - open SelectPlan", 4);
 		SelectScan s = (SelectScan) selectPlan.open();
-		profiler.stopComponentProfilerAtGivenStage("OU4 - open SelectPlan", 4);
 		
-		profiler.startComponentProfilerAtGivenStage("OU4 - SelectPlan.BeforeFirst", 4);
 		s.beforeFirst();
-		profiler.stopComponentProfilerAtGivenStage("OU4 - SelectPlan.BeforeFirst", 4);
 		
 		CachedRecord rec = null;
 
 		if (s.next()) {
 			rec = new CachedRecord(key);
-			profiler.startComponentProfilerAtGivenStage("OU4 - getVal", 4);
 			for (String fld : tp.schema().fields()) {
 				rec.addFldVal(fld, s.getVal(fld));
 			}
-			profiler.stopComponentProfilerAtGivenStage("OU4 - getVal", 4);
 		}
 		s.close();
 		
@@ -205,8 +193,6 @@ public class VanillaCoreCrud {
 	}
 
 	public static boolean update(PrimaryKey key, CachedRecord rec, Transaction tx) {
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-		profiler.startComponentProfilerAtGivenStage("OU7 - Core Update", 7);
 		boolean found = false;
 		String tblName = key.getTableName();
 		
@@ -292,20 +278,16 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
-		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Update", 7);
 		return found;
 	}
 
 	public static void insert(PrimaryKey key, CachedRecord rec, Transaction tx) {
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-		profiler.startComponentProfilerAtGivenStage("OU7 - Core Insert", 7);
 		String tblname = key.getTableName();
 		
 //		Timer.getLocalTimer().startComponentTimer("Insert to table " + tblname);
 		
 		Plan p = new TablePlan(tblname, tx);
 
-		profiler.startComponentProfilerAtGivenStage("OU7 - Core Insert - Record", 7);
 		// Insert the record into the record file
 		UpdateScan s = (UpdateScan) p.open();
 		s.insert();
@@ -313,7 +295,6 @@ public class VanillaCoreCrud {
 			s.setVal(fldName, rec.getVal(fldName));
 		RecordId rid = s.getRecordId();
 		s.close();
-		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Insert - Record", 7);
 		
 		// Insert the record to all corresponding indexes
 		Set<IndexInfo> indexes = new HashSet<IndexInfo>();
@@ -322,20 +303,17 @@ public class VanillaCoreCrud {
 			indexes.addAll(iis);
 		}
 		
-		profiler.startComponentProfilerAtGivenStage("OU7 - Core Insert - Index", 7);
 		for (IndexInfo ii : indexes) {
 			Index idx = ii.open(tx);
 			idx.insert(new SearchKey(ii.fieldNames(), rec.toFldValMap()), rid, true);
 			idx.close();
 		}
-		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Insert - Index", 7);
 		
 		tx.endStatement();
 //		Timer.getLocalTimer().stopComponentTimer("Insert to table " + tblname);
 		
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, 1);
-		profiler.stopComponentProfilerAtGivenStage("OU7 - Core Insert", 7);
 	}
 
 	public static void delete(PrimaryKey key, Transaction tx) {
