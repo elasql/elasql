@@ -214,11 +214,13 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
 
 			// Read the records from the local sink
+			profiler.setStageIndicator(4);
 			profiler.startComponentProfiler("OU4 - Read from Local");
 			for (PrimaryKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k));
 			}
 			profiler.stopComponentProfiler("OU4 - Read from Local");
+			profiler.resetStageIndicator();
 
 			// Read all needed records
 			profiler.startComponentProfiler("OU5M - Read from Remote");

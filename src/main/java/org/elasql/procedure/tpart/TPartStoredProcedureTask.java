@@ -47,11 +47,12 @@ public class TPartStoredProcedureTask
 		SpResultSet rs = null;
 		
 		Thread.currentThread().setName("Tx." + txNum);
-		
+//		Long start = System.nanoTime();
 		// Initialize a thread-local profiler which is from scheduler
 		TransactionProfiler.setProfiler(profiler);
 		TransactionProfiler profiler =  TransactionProfiler.getLocalProfiler();
 
+//		System.out.println("init profiler: " + (System.nanoTime() - start)/1000);
 		// OU2
 		profiler.stopComponentProfiler("OU2 - Initialize Thread");
 		

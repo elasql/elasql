@@ -55,25 +55,41 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class VanillaCoreCrud {
 
 	public static CachedRecord read(PrimaryKey key, Transaction tx) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		
 		String tblName = key.getTableName();
 		TablePlan tp = new TablePlan(tblName, tx);
 		Plan selectPlan = null;
 		
 		// Create a IndexSelectPlan if there is matching index in the predicate
+		profiler.startComponentProfilerAtGivenStage("OU4 - selectByBestMatchedIndex", 4);
 		selectPlan = selectByBestMatchedIndex(tblName, tp, key, tx);
+		profiler.stopComponentProfilerAtGivenStage("OU4 - selectByBestMatchedIndex", 4);
+		
+		profiler.startComponentProfilerAtGivenStage("OU4 - new SelectPlan", 4);
 		if (selectPlan == null)
 			selectPlan = new SelectPlan(tp, key.toPredicate());
 		else
 			selectPlan = new SelectPlan(selectPlan, key.toPredicate());
+		profiler.stopComponentProfilerAtGivenStage("OU4 - new SelectPlan", 4);
 		
+		profiler.startComponentProfilerAtGivenStage("OU4 - open SelectPlan", 4);
 		SelectScan s = (SelectScan) selectPlan.open();
+		profiler.stopComponentProfilerAtGivenStage("OU4 - open SelectPlan", 4);
+		
+		profiler.startComponentProfilerAtGivenStage("OU4 - SelectPlan.BeforeFirst", 4);
 		s.beforeFirst();
+		profiler.stopComponentProfilerAtGivenStage("OU4 - SelectPlan.BeforeFirst", 4);
+		
 		CachedRecord rec = null;
 
 		if (s.next()) {
 			rec = new CachedRecord(key);
-			for (String fld : tp.schema().fields())
+			profiler.startComponentProfilerAtGivenStage("OU4 - getVal", 4);
+			for (String fld : tp.schema().fields()) {
 				rec.addFldVal(fld, s.getVal(fld));
+			}
+			profiler.stopComponentProfilerAtGivenStage("OU4 - getVal", 4);
 		}
 		s.close();
 		

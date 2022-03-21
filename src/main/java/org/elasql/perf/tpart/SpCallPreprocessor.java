@@ -2,6 +2,7 @@ package org.elasql.perf.tpart;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -23,6 +24,8 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
+import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.task.Task;
 
 /**
@@ -41,6 +44,7 @@ public class SpCallPreprocessor extends Task {
 	private TGraph graph;
 	private boolean isBatching;
 	private Estimator performanceEstimator;
+	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>(); 
 	
 	// For collecting features
 	private TransactionFeaturesRecorder featureRecorder;
@@ -137,7 +141,10 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph);
+		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead);
+		
+		// records must be read from disk if they are never read.
+		bookKeepKeys(task);
 		
 		// Record the feature if necessary
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
@@ -165,5 +172,11 @@ public class SpCallPreprocessor extends Task {
 		
 		// Clean up the tx nodes
 		graph.clear();
+	}
+	
+	private void bookKeepKeys(TPartStoredProcedureTask task) {
+		for (PrimaryKey key : task.getReadSet()) {
+			keyHasBeenRead.add(key);
+		}
 	}
 }

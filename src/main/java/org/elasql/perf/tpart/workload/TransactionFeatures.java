@@ -39,6 +39,7 @@ public class TransactionFeatures {
 		featureKeys.add("Read Data Distribution");
 //		featureKeys.add("Read Data Distribution in Bytes");
 		featureKeys.add("Read Data in Cache Distribution");
+		featureKeys.add("Read Data with IO Distribution");
 		featureKeys.add("Update Data Distribution");
 //
 //		// Fusion Table
@@ -52,8 +53,8 @@ public class TransactionFeatures {
 //		featureKeys.add("Buffer WL Wait Count");
 //		featureKeys.add("Block Lock Release Count");
 //		featureKeys.add("Block Lock Wait Count");
-		featureKeys.add("File Header Page Release Count");
-		featureKeys.add("File Header Page Wait Count");
+//		featureKeys.add("File Header Page Release Count");
+//		featureKeys.add("File Header Page Wait Count");
 //		featureKeys.add("Page GetVal Wait Count");
 //		featureKeys.add("Page SetVal Wait Count");
 //		featureKeys.add("Page GetVal Release Count");
