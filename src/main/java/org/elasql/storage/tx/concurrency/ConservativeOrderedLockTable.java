@@ -191,16 +191,12 @@ public class ConservativeOrderedLockTable {
 	 */
 	void sLockForBlock(Object obj, long txNum) {
 		Object anchor = getBlockLatch(obj);
-
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-		profiler.startComponentProfilerAtGivenStage("OU7 - sLockIndex", 7);
 		
 		synchronized (anchor) {
 			Lockers lockers = prepareLockers(obj);
 
 			// check if it have already held the lock
 			if (hasSLock(lockers, txNum)) {
-				profiler.stopComponentProfilerAtGivenStage("OU7 - sLockIndex", 7);
 				return;
 			}
 
@@ -227,7 +223,6 @@ public class ConservativeOrderedLockTable {
 				// them
 				// fight for the lockers on this object.
 				anchor.notifyAll();
-				profiler.stopComponentProfilerAtGivenStage("OU7 - sLockIndex", 7);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				throw new LockAbortException("Interrupted when waitting for lock");

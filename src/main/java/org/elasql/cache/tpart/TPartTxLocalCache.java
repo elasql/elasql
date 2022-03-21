@@ -162,9 +162,9 @@ public class TPartTxLocalCache {
 			}
 			else {
 				// mean latency at TPCC Hermes: 915us
-				profiler.startComponentProfiler("OU7 - Flush - Write Back");
+//				profiler.startComponentProfiler("OU7 - Flush - Write Back");
 				cacheMgr.writeBack(key, rec, tx);
-				profiler.stopComponentProfiler("OU7 - Flush - Write Back");
+//				profiler.stopComponentProfiler("OU7 - Flush - Write Back");
 			}
 		}
 //		timer.stopComponentTimer("Writeback");
