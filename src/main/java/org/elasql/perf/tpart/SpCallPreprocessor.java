@@ -2,9 +2,12 @@ package org.elasql.perf.tpart;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
@@ -25,7 +28,7 @@ import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.util.PeriodicalJob;
 import org.vanilladb.core.server.task.Task;
 
 /**
@@ -37,6 +40,8 @@ public class SpCallPreprocessor extends Task {
 	
 	private BlockingQueue<StoredProcedureCall> spcQueue;
 	private FeatureExtractor featureExtractor;
+	private Set<Long> activeTransactions = 
+			Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
 
 	// Components to simulate the scheduler
 	private TPartStoredProcedureFactory factory;
@@ -71,11 +76,26 @@ public class SpCallPreprocessor extends Task {
 			dependencyRecorder = new TransactionDependencyRecorder();
 			dependencyRecorder.startRecording();
 		}
+		
+		// Debug: shows the active transaction list
+		new PeriodicalJob(10_000, 250_000, new Runnable() {
+			@Override
+			public void run() {
+				long time = System.currentTimeMillis() - Elasql.START_TIME_MS;
+				time /= 1000;
+				System.out.println(String.format("Time: %d seconds, active transaction count: %d",
+						time, activeTransactions.size()));
+			}
+		}).start();
 	}
 	
 	public void preprocessSpCall(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall())
 			spcQueue.add(spc);
+	}
+	
+	public void onTransactionCommit(long txNum) {
+		activeTransactions.remove(txNum);
 	}
 
 	@Override
@@ -90,7 +110,10 @@ public class SpCallPreprocessor extends Task {
 			try {
 				// Take a SP call
 				StoredProcedureCall spc = spcQueue.take();
-
+				
+				// Add to the active transaction set
+				activeTransactions.add(spc.getTxNum());
+				
 				// Add to the sending list
 				sendingList.add(spc);
 				

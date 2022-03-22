@@ -63,6 +63,9 @@ public class TPartStoredProcedureTask
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+			
+			// Notify the sequencer that this transaction commits
+			Elasql.connectionMgr().sendCommitNotification(txNum);
 
 			// TODO: Uncomment this when the migration module is migrated
 //			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
