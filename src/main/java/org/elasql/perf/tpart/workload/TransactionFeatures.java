@@ -26,43 +26,50 @@ public class TransactionFeatures {
 		// (Modify this part to add/remove features)
 		// - Transaction start time (the time entering the system)
 		featureKeys.add("Start Time");
+		
+		// - Transaction Type Related
+		featureKeys.add("Tx Type");
+		
 		// - Number of records
-		featureKeys.add("Number of Read Records");
-		featureKeys.add("Number of Update Records");
+//		featureKeys.add("Number of Read Records");
+//		featureKeys.add("Number of Update Records");
 		featureKeys.add("Number of Insert Records");
-		featureKeys.add("Number of Fully Replicated Records");
-		// - Data distribution
+//		featureKeys.add("Number of Fully Replicated Records");
+//		// - Data distribution
 		featureKeys.add("Read Data Distribution");
-		featureKeys.add("Read Data Distribution in Bytes");
+//		featureKeys.add("Read Data Distribution in Bytes");
 		featureKeys.add("Read Data in Cache Distribution");
+		featureKeys.add("Read Data with IO Distribution");
 		featureKeys.add("Update Data Distribution");
-
-		// Fusion Table
+//
+//		// Fusion Table
 		featureKeys.add("Number of Overflows in Fusion Table");
 
-		featureKeys.add("Buffer Hit Rate");
-		featureKeys.add("Avg Pin Count");
-		featureKeys.add("Pinned Buffer Count");
-
-		featureKeys.add("Buffer RL Wait Count");
-		featureKeys.add("Buffer WL Wait Count");
-		featureKeys.add("Block Lock Release Count");
-		featureKeys.add("Block Lock Wait Count");
-		featureKeys.add("File Header Page Release Count");
-		featureKeys.add("File Header Page Wait Count");
-		featureKeys.add("Page GetVal Wait Count");
-		featureKeys.add("Page SetVal Wait Count");
-		featureKeys.add("Page GetVal Release Count");
-		featureKeys.add("Page SetVal Release Count");
-
+//		featureKeys.add("Buffer Hit Rate");
+//		featureKeys.add("Avg Pin Count");
+//		featureKeys.add("Pinned Buffer Count");
+//
+//		featureKeys.add("Buffer RL Wait Count");
+//		featureKeys.add("Buffer WL Wait Count");
+//		featureKeys.add("Block Lock Release Count");
+//		featureKeys.add("Block Lock Wait Count");
+//		featureKeys.add("File Header Page Release Count");
+//		featureKeys.add("File Header Page Wait Count");
+//		featureKeys.add("Page GetVal Wait Count");
+//		featureKeys.add("Page SetVal Wait Count");
+//		featureKeys.add("Page GetVal Release Count");
+//		featureKeys.add("Page SetVal Release Count");
+//
 		featureKeys.add("System CPU Load");
 		featureKeys.add("Process CPU Load");
 		featureKeys.add("System Load Average");
 		featureKeys.add("Thread Active Count");
-
+//
 		featureKeys.add("I/O Read Bytes");
 		featureKeys.add("I/O Write Bytes");
 		featureKeys.add("I/O Queue Length");
+//
+//		featureKeys.add("Latch Features");
 
 //		featureKeys.add("Latch Features");
 

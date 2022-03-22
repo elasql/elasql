@@ -47,6 +47,7 @@ import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * The CURD interfaces to VanillaCore.
@@ -60,19 +61,23 @@ public class VanillaCoreCrud {
 		
 		// Create a IndexSelectPlan if there is matching index in the predicate
 		selectPlan = selectByBestMatchedIndex(tblName, tp, key, tx);
+		
 		if (selectPlan == null)
 			selectPlan = new SelectPlan(tp, key.toPredicate());
 		else
 			selectPlan = new SelectPlan(selectPlan, key.toPredicate());
 		
 		SelectScan s = (SelectScan) selectPlan.open();
+		
 		s.beforeFirst();
+		
 		CachedRecord rec = null;
 
 		if (s.next()) {
 			rec = new CachedRecord(key);
-			for (String fld : tp.schema().fields())
+			for (String fld : tp.schema().fields()) {
 				rec.addFldVal(fld, s.getVal(fld));
+			}
 		}
 		s.close();
 		
@@ -273,7 +278,6 @@ public class VanillaCoreCrud {
 
 		// XXX: Do we need this ?
 		// VanillaDdDb.statMgr().countRecordUpdates(tblname, count);
-		
 		return found;
 	}
 

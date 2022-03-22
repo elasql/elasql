@@ -18,6 +18,7 @@ package org.elasql.storage.tx.concurrency;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedLockTable.LockType;
@@ -256,8 +257,20 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		writtenIndexBlks.clear();
 	}
 
+	@Override
 	public void lockRecordFileHeader(BlockId blk) {
 		lockTbl.xLockForBlock(blk, txNum);
+	}
+	
+	/**
+	 * Optimization on 2022/2/22
+	 * There are two attempts to a critical section if we use lockRecordFileHeader() to lock a record file header,
+	 * and use releaseRecordFileHeader to release a record file header.
+	 * An optimization here is to make locking a file header a single critical section.
+	 */
+	@Override
+	public ReentrantLock getLockForFileHeader(BlockId blk) {
+		return lockTbl.getFhpLatch(blk);
 	}
 
 	public void releaseRecordFileHeader(BlockId blk) {

@@ -116,9 +116,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public SpResultSet execute() {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		try {
+			profiler.setStageIndicator(3);
 			profiler.startComponentProfiler("OU3 - Acquire Locks");
 			getConservativeLocks();
 			profiler.stopComponentProfiler("OU3 - Acquire Locks");
+			profiler.resetStageIndicator();
 			
 			executeTransactionLogic();
 			
@@ -212,11 +214,13 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
 
 			// Read the records from the local sink
+			profiler.setStageIndicator(4);
 			profiler.startComponentProfiler("OU4 - Read from Local");
 			for (PrimaryKey k : plan.getSinkReadingInfo()) {
 				readings.put(k, cache.readFromSink(k));
 			}
 			profiler.stopComponentProfiler("OU4 - Read from Local");
+			profiler.resetStageIndicator();
 
 			// Read all needed records
 			profiler.startComponentProfiler("OU5M - Read from Remote");
@@ -304,8 +308,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// Flush the cached data
 		// including the writes to the next transaction and local write backs
+		profiler.setStageIndicator(7);
 		profiler.startComponentProfiler("OU7 - Write to Local");
 		cache.flush(plan,  cachedEntrySet);
 		profiler.stopComponentProfiler("OU7 - Write to Local");
+		profiler.resetStageIndicator();
 	}
 }

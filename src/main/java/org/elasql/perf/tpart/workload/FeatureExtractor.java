@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.workload;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
@@ -15,7 +16,7 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
  * A processor to extract features from a transaction request. The transaction
  * must be given in the total order. 
  * 
- * @author Yu-Shan Lin, Yu-Xuan Lin
+ * @author Yu-Shan Lin, Yu-Xuan Lin, Pin-Yu Wang
  */
 public class FeatureExtractor {
 	
@@ -40,7 +41,7 @@ public class FeatureExtractor {
 	 * @param graph the latest T-graph
 	 * @return the features of the stored procedure for cost estimation
 	 */
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph) {
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph, HashSet<PrimaryKey> keyHasBeenRead) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
@@ -53,33 +54,38 @@ public class FeatureExtractor {
 		
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
 		builder.addFeature("Start Time", task.getArrivedTime());
-		builder.addFeature("Number of Read Records", task.getReadSet().size());
-		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
+		
+		// Get features (tx type related)
+		builder.addFeature("Tx Type", task.getWeight());
+		
+//		builder.addFeature("Number of Read Records", task.getReadSet().size());
+//		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
 		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
-		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
-		
+//		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
+//		
 		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
-		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
+//		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
 		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
+		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
 		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
-		
+//		
 		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
-		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
-		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
-		builder.addFeature("Pinned Buffer Count", extractPinnedBufferCount());
-		
-		builder.addFeature("Buffer RL Wait Count", extractBufferReadWaitCount());
-		builder.addFeature("Buffer WL Wait Count", extractBufferWriteWaitCount());
-		builder.addFeature("Block Lock Release Count", extractBlockLockReleaseCount());
-		builder.addFeature("Block Lock Wait Count", extractBlockLockWaitCount());
-		builder.addFeature("File Header Page Release Count", extractFhpReleaseCount());
-		builder.addFeature("File Header Page Wait Count", extractFhpWaitCount());
-		builder.addFeature("Page GetVal Wait Count", extractPageGetValWaitCount());
-		builder.addFeature("Page SetVal Wait Count", extractPageSetValWaitCount());
-		builder.addFeature("Page GetVal Release Count", extractPageGetValReleaseCount());
-		builder.addFeature("Page SetVal Release Count", extractPageSetValReleaseCount());
-
+//		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
+//		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
+//		builder.addFeature("Pinned Buffer Count", extractPinnedBufferCount());
+//		
+//		builder.addFeature("Buffer RL Wait Count", extractBufferReadWaitCount());
+//		builder.addFeature("Buffer WL Wait Count", extractBufferWriteWaitCount());
+//		builder.addFeature("Block Lock Release Count", extractBlockLockReleaseCount());
+//		builder.addFeature("Block Lock Wait Count", extractBlockLockWaitCount());
+//		builder.addFeature("File Header Page Release Count", extractFhpReleaseCount());
+//		builder.addFeature("File Header Page Wait Count", extractFhpWaitCount());
+//		builder.addFeature("Page GetVal Wait Count", extractPageGetValWaitCount());
+//		builder.addFeature("Page SetVal Wait Count", extractPageSetValWaitCount());
+//		builder.addFeature("Page GetVal Release Count", extractPageGetValReleaseCount());
+//		builder.addFeature("Page SetVal Release Count", extractPageSetValReleaseCount());
+//
 		// Features below are from the servers
 		builder.addFeature("System CPU Load", extractSystemCpuLoad());
 		builder.addFeature("Process CPU Load", extractProcessCpuLoad());
@@ -90,6 +96,11 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
 		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
+//		
+//		// Features for latches
+//		// Due to the complexity of getting individual latch features,
+//		// we just pass a huge string that consists of key latch features
+//		builder.addFeature("Latch Features", extractLatchFeatures());
 		
 		// 2022/2/15 this features make the output file size extremely large.
 		// Features for latches
@@ -335,6 +346,25 @@ public class FeatureExtractor {
 	    Arrays.setAll(newCounts, i -> counts[i]);
 	    
 		return newCounts;
+	}
+	
+	private int extractReadDataWithIO(Set<PrimaryKey> keys, HashSet<PrimaryKey> keyHasBeenRead) {
+		int counts = 0;
+		
+		switch (Elasql.SERVICE_TYPE) {
+		case HERMES:
+		case LEAP:
+		case HERMES_CONTROL:
+			for (PrimaryKey key : keys) {
+				if (!keyHasBeenRead.contains(key) ) {
+					counts += 1;
+				}
+			}
+			break;
+		default:
+		}
+	    
+		return counts;
 	}
 	
 	private int getFusionTableOverflowCount(TGraph graph) {
