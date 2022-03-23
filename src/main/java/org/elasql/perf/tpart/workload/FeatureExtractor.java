@@ -25,6 +25,9 @@ public class FeatureExtractor {
 	private TransactionDependencyAnalyzer dependencyAnalyzer =
 			new TransactionDependencyAnalyzer();
 	
+	private DependencyTreeAnalyzer treeAnalyzer =
+			new DependencyTreeAnalyzer();
+	
 	private TpartMetricWarehouse metricWarehouse;
 	
 	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
@@ -114,7 +117,15 @@ public class FeatureExtractor {
 		for (Long dependentTx : dependentTxs)
 			builder.addDependency(dependentTx);
 		
+		// Generate tree features
+		treeAnalyzer.addTransaction(task.getTxNum(), dependentTxs);
+		treeAnalyzer.addDependencyTreeFeatures(task.getTxNum(), builder);
+		
 		return builder.build();
+	}
+	
+	public void onTransactionCommit(long txNum) {
+		treeAnalyzer.onTransactionCommit(txNum);
 	}
 	
 	private Double[] extractBufferHitRate() {
