@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.perf.tpart.workload.time.TimeRelatedFeatureMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
@@ -26,9 +27,11 @@ public class FeatureExtractor {
 			new TransactionDependencyAnalyzer();
 	
 	private TpartMetricWarehouse metricWarehouse;
+	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
 	
-	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
+	public FeatureExtractor(TpartMetricWarehouse metricWarehouse, TimeRelatedFeatureMgr timeRelatedFeatureMgr) {
 		this.metricWarehouse = metricWarehouse;
+		this.timeRelatedFeatureMgr = timeRelatedFeatureMgr;
 	}
 	
 	/**
@@ -48,6 +51,9 @@ public class FeatureExtractor {
 					"Transaction requests are not passed to FeatureExtractor "
 					+ "in the total order: %d, last processed tx: %d",
 					task.getTxNum(), lastProcessedTxNum));
+		
+		// Preprocess time related features
+		timeRelatedFeatureMgr.calculate(task.getArrivedTime());
 		
 		// Extract the features
 		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
@@ -96,7 +102,23 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
 		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
-//		
+		
+		// Time-related features
+		builder.addFeature("Number of Read Record in Last 100 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(100));
+		builder.addFeature("Number of Read Record Excluding Cache in Last 100 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(100));
+		builder.addFeature("Number of Update Record in Last 100 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(100));
+		builder.addFeature("Number of Insert Record in Last 100 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(100));
+		
+		builder.addFeature("Number of Read Record in Last 500 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(500));
+		builder.addFeature("Number of Read Record Excluding Cache in Last 500 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(500));
+		builder.addFeature("Number of Update Record in Last 500 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(500));
+		builder.addFeature("Number of Insert Record in Last 500 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(500));
+		
+		builder.addFeature("Number of Read Record in Last 1000 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(1000));
+		builder.addFeature("Number of Read Record Excluding Cache in Last 1000 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(1000));
+		builder.addFeature("Number of Update Record in Last 1000 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(1000));
+		builder.addFeature("Number of Insert Record in Last 1000 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(1000));
+		
 //		// Features for latches
 //		// Due to the complexity of getting individual latch features,
 //		// we just pass a huge string that consists of key latch features
