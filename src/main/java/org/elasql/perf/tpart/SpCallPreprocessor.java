@@ -14,6 +14,7 @@ import org.elasql.perf.tpart.workload.FeatureExtractor;
 import org.elasql.perf.tpart.workload.TransactionDependencyRecorder;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.perf.tpart.workload.TransactionFeaturesRecorder;
+import org.elasql.perf.tpart.workload.time.TimeRelatedFeatureMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -49,6 +50,7 @@ public class SpCallPreprocessor extends Task {
 	// For collecting features
 	private TransactionFeaturesRecorder featureRecorder;
 	private TransactionDependencyRecorder dependencyRecorder;
+	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
 	
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
@@ -63,8 +65,9 @@ public class SpCallPreprocessor extends Task {
 		this.performanceEstimator = performanceEstimator;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
+		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
 		// For collecting features
-		featureExtractor = new FeatureExtractor(metricWarehouse);
+		featureExtractor = new FeatureExtractor(metricWarehouse, timeRelatedFeatureMgr);
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder = new TransactionFeaturesRecorder();
 			featureRecorder.startRecording();
@@ -166,6 +169,8 @@ public class SpCallPreprocessor extends Task {
 	private void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
+		
+		timeRelatedFeatureMgr.pushInfo(graph);
 		
 		// add write back edges
 		graph.addWriteBackEdge();
