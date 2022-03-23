@@ -30,6 +30,11 @@ public class TransactionFeatures {
 		// - Transaction Type Related
 		featureKeys.add("Tx Type");
 		
+		// Transaction Dependency
+		featureKeys.add("Dependency - Max Depth");
+		featureKeys.add("Dependency - First Layer Tx Count");
+		featureKeys.add("Dependency - Total Tx Count");
+		
 		// - Number of records
 //		featureKeys.add("Number of Read Records");
 //		featureKeys.add("Number of Update Records");

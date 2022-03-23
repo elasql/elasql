@@ -26,7 +26,6 @@ import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.task.Task;
 
 /**
@@ -80,6 +79,10 @@ public class SpCallPreprocessor extends Task {
 		if (!spc.isNoOpStoredProcCall())
 			spcQueue.add(spc);
 	}
+	
+	public void onTransactionCommit(long txNum) {
+		featureExtractor.onTransactionCommit(txNum);
+	}
 
 	@Override
 	public void run() {
@@ -93,7 +96,7 @@ public class SpCallPreprocessor extends Task {
 			try {
 				// Take a SP call
 				StoredProcedureCall spc = spcQueue.take();
-
+				
 				// Add to the sending list
 				sendingList.add(spc);
 				

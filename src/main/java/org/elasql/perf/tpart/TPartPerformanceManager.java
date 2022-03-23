@@ -116,4 +116,9 @@ public class TPartPerformanceManager implements PerformanceManager {
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
 	}
+	
+	@Override
+	public void onTransactionCommit(long txNum) {
+		spCallPreprocessor.onTransactionCommit(txNum);
+	}
 }
