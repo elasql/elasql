@@ -50,6 +50,9 @@ public class SpCallPreprocessor extends Task {
 	// XXX: Quick test
 	private Estimator testEstimator = new PythonSubProcessEstimator();
 	
+	// XXX: Cache last tx's routing destination
+	private int lastTxRoutingDest = -1;
+	
 	// For collecting features
 	private TransactionFeaturesRecorder featureRecorder;
 	private TransactionDependencyRecorder dependencyRecorder;
@@ -152,7 +155,7 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead);
+		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 		
 		// XXX: Quick test
 		TransactionEstimation est = testEstimator.estimate(features);
@@ -183,7 +186,7 @@ public class SpCallPreprocessor extends Task {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
 		
-		timeRelatedFeatureMgr.pushInfo(graph);
+		lastTxRoutingDest = timeRelatedFeatureMgr.pushInfo(graph);
 		
 		// add write back edges
 		graph.addWriteBackEdge();

@@ -24,12 +24,13 @@ public class TimeRelatedFeatureMgr {
 		}
 	}
 
-	public void pushInfo(TGraph graph) {
+	public int pushInfo(TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
-
+		int destPart = -1;
+		
 		for (TxNode txNode : graph.getTxNodes()) {
 			TPartStoredProcedureTask task = txNode.getTask();
-			int destPart = txNode.getPartId();
+			destPart = txNode.getPartId();
 
 			TimeRelatedInfo[] timeRelatedInfos = new TimeRelatedInfo[SERVER_NUM];
 			for (int s = 0; s < SERVER_NUM; s++) {
@@ -72,6 +73,8 @@ public class TimeRelatedFeatureMgr {
 				}
 			}
 		}
+		
+		return destPart;
 	}
 
 	public void onTxCommit(int serverId) {

@@ -104,11 +104,13 @@ public class TransactionFeatures {
 	// - checks the correctness before building an object
 	public static class Builder {
 		private long txNum;
+		private int lastTxRoutingDest;
 		private Map<String, Object> features;
 		private List<Long> dependentTxns;
 
-		public Builder(long txNum) {
+		public Builder(long txNum, int lastTxRoutingDest) {
 			this.txNum = txNum;
+			this.lastTxRoutingDest = lastTxRoutingDest;
 			this.features = new HashMap<String, Object>();
 			this.dependentTxns = new ArrayList<Long>();
 		}
@@ -136,19 +138,21 @@ public class TransactionFeatures {
 			// Sort the dependencies
 			Collections.sort(dependentTxns);
 
-			return new TransactionFeatures(txNum, features, dependentTxns);
+			return new TransactionFeatures(txNum, features, dependentTxns, lastTxRoutingDest);
 		}
 	}
 
 	private long txNum;
+	private int lastTxRoutingDest;
 	private Map<String, Object> features;
 	// Transaction dependencies are handled separately
 	private List<Long> dependentTxns;
 
 	// Builder Pattern: set the constructor to private to avoid creating an object
 	// from outside
-	private TransactionFeatures(long txNum, Map<String, Object> features, List<Long> dependentTxns) {
+	private TransactionFeatures(long txNum, Map<String, Object> features, List<Long> dependentTxns, int lastTxRoutingDest) {
 		this.txNum = txNum;
+		this.lastTxRoutingDest = lastTxRoutingDest;
 		this.features = features;
 		this.dependentTxns = dependentTxns;
 	}
@@ -179,6 +183,10 @@ public class TransactionFeatures {
 		
 		// Transaction Dependencies
 		sb.append(dependentTxns);
+		sb.append(',');
+		
+		// Last tx's routing destination
+		sb.append(lastTxRoutingDest);
 		sb.append(',');
 		
 		// Non-array features

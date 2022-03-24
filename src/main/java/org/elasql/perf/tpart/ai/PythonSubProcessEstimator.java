@@ -14,16 +14,16 @@ import org.elasql.storage.metadata.PartitionMetaMgr;
 public class PythonSubProcessEstimator implements Estimator {
 	
 	// XXX: for quick testing
-	private static final String PYTHON_RUNTIME = "";
-	private static final String SCRIPT_PATH = "";
+	private static final String PYTHON_RUNTIME = "python";
+	private static final String SCRIPT_PATH = "~/cost-estimator/serve.py";
 	
 	private static double[] parseDoubleArray(String arrayStr) {
-		arrayStr = arrayStr.strip();
+		arrayStr = arrayStr.trim();
 		arrayStr = arrayStr.substring(1, arrayStr.length() - 1);
 		String[] numStrs = arrayStr.split(",");
 		double[] nums = new double[numStrs.length];
 		for (int i = 0; i < numStrs.length; i++) {
-			nums[i] = Double.parseDouble(numStrs[i].strip());
+			nums[i] = Double.parseDouble(numStrs[i].trim());
 		}
 		return nums;
 	}

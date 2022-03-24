@@ -47,7 +47,8 @@ public class FeatureExtractor {
 	 * @param graph the latest T-graph
 	 * @return the features of the stored procedure for cost estimation
 	 */
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph, HashSet<PrimaryKey> keyHasBeenRead) {
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph,
+			HashSet<PrimaryKey> keyHasBeenRead, int lastTxRoutingDest) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
@@ -59,7 +60,7 @@ public class FeatureExtractor {
 		timeRelatedFeatureMgr.calculate(task.getArrivedTime());
 		
 		// Extract the features
-		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
+		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum(), lastTxRoutingDest);
 		
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
 		builder.addFeature("Start Time", task.getArrivedTime());
