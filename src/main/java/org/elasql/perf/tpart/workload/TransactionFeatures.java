@@ -1,12 +1,11 @@
 package org.elasql.perf.tpart.workload;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.elasql.storage.metadata.PartitionMetaMgr;
 
 /**
  * An object to store the features for a transaction request.
@@ -17,7 +16,6 @@ public class TransactionFeatures {
 
 	// Defines a read-only list for feature keys
 	public static final List<String> FEATURE_KEYS;
-	public static final int SERVER_COUNT = PartitionMetaMgr.NUM_PARTITIONS;
 
 	static {
 		List<String> featureKeys = new ArrayList<String>();
@@ -166,5 +164,44 @@ public class TransactionFeatures {
 	public List<Long> getDependencies() {
 		// Use 'unmodifiableList' to avoid the list is modified outside
 		return Collections.unmodifiableList(dependentTxns);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		
+		// The starting character
+		sb.append('[');
+		
+		// Transaction ID
+		sb.append(txNum);
+		sb.append(',');
+		
+		// Transaction Dependencies
+		sb.append(dependentTxns);
+		sb.append(',');
+		
+		// Non-array features
+		for (String key : FEATURE_KEYS) {
+			Object val = features.get(key);
+			if (!val.getClass().isArray()) {
+				sb.append(val);
+				sb.append(',');
+			}
+		}
+		
+		// Array features
+		for (String key : FEATURE_KEYS) {
+			Object val = features.get(key);
+			if (val.getClass().isArray()) {
+				sb.append(Arrays.toString((Object[]) val));
+				sb.append(',');
+			}
+		}
+		
+		// The ending character
+		sb.setCharAt(sb.length() - 1, ']');
+		
+		return sb.toString();
 	}
 }

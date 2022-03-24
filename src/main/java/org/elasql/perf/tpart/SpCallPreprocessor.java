@@ -8,6 +8,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
+import org.elasql.perf.tpart.ai.PythonSubProcessEstimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
@@ -44,7 +45,10 @@ public class SpCallPreprocessor extends Task {
 	private TGraph graph;
 	private boolean isBatching;
 	private Estimator performanceEstimator;
-	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>(); 
+	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
+	
+	// XXX: Quick test
+	private Estimator testEstimator = new PythonSubProcessEstimator();
 	
 	// For collecting features
 	private TransactionFeaturesRecorder featureRecorder;
@@ -149,6 +153,11 @@ public class SpCallPreprocessor extends Task {
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead);
+		
+		// XXX: Quick test
+		TransactionEstimation est = testEstimator.estimate(features);
+		System.out.println(String.format("Tx.%d's latencies: %s",
+				features.getTxNum(), est));
 		
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
