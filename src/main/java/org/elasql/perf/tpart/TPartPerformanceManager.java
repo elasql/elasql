@@ -118,7 +118,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 	
 	@Override
-	public void onTransactionCommit(long txNum) {
-		spCallPreprocessor.onTransactionCommit(txNum);
+	public void onTransactionCommit(long txNum, int masterId) {
+		spCallPreprocessor.onTransactionCommit(txNum, masterId);
 	}
 }

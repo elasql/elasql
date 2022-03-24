@@ -78,7 +78,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	
 	public void sendCommitNotification(long txNum) {
 		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, 
-				new CommitNotification(txNum));
+				new CommitNotification(txNum, Elasql.serverId()));
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
@@ -131,7 +131,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				flushTotalOrderMsgs();
 			} else if (message.getClass().equals(CommitNotification.class)) {
 				CommitNotification cn = (CommitNotification) message;
-				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum());
+				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum(), cn.getMasterId());
 			} else if (message instanceof MetricReport) {
 				MetricReport report = (MetricReport) message;
 				Elasql.performanceMgr().receiveMetricReport(report);

@@ -111,16 +111,19 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Read Record Excluding Cache in Last 100 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(100));
 		builder.addFeature("Number of Update Record in Last 100 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(100));
 		builder.addFeature("Number of Insert Record in Last 100 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(100));
+		builder.addFeature("Number of Commit Tx in Last 100 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(100));
 		
 		builder.addFeature("Number of Read Record in Last 500 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(500));
 		builder.addFeature("Number of Read Record Excluding Cache in Last 500 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(500));
 		builder.addFeature("Number of Update Record in Last 500 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(500));
 		builder.addFeature("Number of Insert Record in Last 500 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(500));
+		builder.addFeature("Number of Commit Tx in Last 500 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(500));
 		
 		builder.addFeature("Number of Read Record in Last 1000 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(1000));
 		builder.addFeature("Number of Read Record Excluding Cache in Last 1000 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(1000));
 		builder.addFeature("Number of Update Record in Last 1000 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(1000));
 		builder.addFeature("Number of Insert Record in Last 1000 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(1000));
+		builder.addFeature("Number of Commit Tx in Last 1000 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(1000));
 		
 //		// Features for latches
 //		// Due to the complexity of getting individual latch features,
