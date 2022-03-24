@@ -48,7 +48,7 @@ public class SpCallPreprocessor extends Task {
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
 	
 	// XXX: Quick test
-	private Estimator testEstimator = new PythonSubProcessEstimator();
+//	private Estimator testEstimator = new PythonSubProcessEstimator();
 	
 	// XXX: Cache last tx's routing destination
 	private int lastTxRoutingDest = -1;
@@ -158,9 +158,9 @@ public class SpCallPreprocessor extends Task {
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 		
 		// XXX: Quick test
-		TransactionEstimation est = testEstimator.estimate(features);
-		System.out.println(String.format("Tx.%d's latencies: %s",
-				features.getTxNum(), est));
+//		TransactionEstimation est = testEstimator.estimate(features);
+//		System.out.println(String.format("Tx.%d's latencies: %s",
+//				features.getTxNum(), est));
 		
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
