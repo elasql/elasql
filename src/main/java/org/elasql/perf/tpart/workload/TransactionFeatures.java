@@ -78,16 +78,19 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Read Record Excluding Cache in Last 100 us");
 		featureKeys.add("Number of Update Record in Last 100 us");
 		featureKeys.add("Number of Insert Record in Last 100 us");
+		featureKeys.add("Number of Commit Tx in Last 100 us");
 		
 		featureKeys.add("Number of Read Record in Last 500 us");
 		featureKeys.add("Number of Read Record Excluding Cache in Last 500 us");
 		featureKeys.add("Number of Update Record in Last 500 us");
 		featureKeys.add("Number of Insert Record in Last 500 us");
+		featureKeys.add("Number of Commit Tx in Last 500 us");
 		
 		featureKeys.add("Number of Read Record in Last 1000 us");
 		featureKeys.add("Number of Read Record Excluding Cache in Last 1000 us");
 		featureKeys.add("Number of Update Record in Last 1000 us");
 		featureKeys.add("Number of Insert Record in Last 1000 us");
+		featureKeys.add("Number of Commit Tx in Last 1000 us");
 //
 //		featureKeys.add("Latch Features");
 

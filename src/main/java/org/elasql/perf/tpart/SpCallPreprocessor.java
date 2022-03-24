@@ -64,8 +64,8 @@ public class SpCallPreprocessor extends Task {
 		this.performanceEstimator = performanceEstimator;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
-		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
 		// For collecting features
+		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
 		featureExtractor = new FeatureExtractor(metricWarehouse, timeRelatedFeatureMgr);
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder = new TransactionFeaturesRecorder();
@@ -80,8 +80,9 @@ public class SpCallPreprocessor extends Task {
 			spcQueue.add(spc);
 	}
 	
-	public void onTransactionCommit(long txNum) {
+	public void onTransactionCommit(long txNum, int masterId) {
 		featureExtractor.onTransactionCommit(txNum);
+		timeRelatedFeatureMgr.onTxCommit(masterId);
 	}
 
 	@Override
