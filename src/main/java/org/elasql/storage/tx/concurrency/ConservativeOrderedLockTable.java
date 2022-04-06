@@ -122,6 +122,7 @@ public class ConservativeOrderedLockTable {
 		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
+			TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 			Lockers lockers = prepareLockers(obj);
 
 			// check if it has already held the lock
@@ -152,6 +153,7 @@ public class ConservativeOrderedLockTable {
 //								name, obj, head));
 //					}
 
+					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
 					anchor.wait();
 
 					// Since a transaction may delete the lockers of an object
@@ -159,6 +161,7 @@ public class ConservativeOrderedLockTable {
 					// here, instead of using lockers it obtains earlier.
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
+					profiler.stopComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
 				}
 
 				// For debug
@@ -262,7 +265,6 @@ public class ConservativeOrderedLockTable {
 				Long head = lockers.requestQueue.peek();
 				while (true)
 				/* && !waitingTooLong(timestamp) */ {
-					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
 					if (!(!xLockable(lockers, txNum) || (head != null && head.longValue() != txNum))) {
 						break;
 					}
@@ -282,6 +284,7 @@ public class ConservativeOrderedLockTable {
 //								name, obj, head));
 //					}
 
+					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
