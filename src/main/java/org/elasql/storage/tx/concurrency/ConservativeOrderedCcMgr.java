@@ -112,12 +112,19 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	public void requestLocks() {
 		bookedObjs.clear();
 		
-		for (Object obj : writeObjs)
-			lockTbl.xLock(obj, txNum);
+		int i = 0;
+		for (Object obj : writeObjs) {
+			lockTbl.xLock(obj, txNum, i);
+			i++;
+		}
 		
-		for (Object obj : readObjs)
-			if (!writeObjs.contains(obj))
-				lockTbl.sLock(obj, txNum);
+		i = 0;
+		for (Object obj : readObjs) {
+			if (!writeObjs.contains(obj)) {
+				lockTbl.sLock(obj, txNum, i);
+				i++;
+			}
+		}
 	}
 	
 	@Override

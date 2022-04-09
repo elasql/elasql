@@ -118,16 +118,19 @@ public class ConservativeOrderedLockTable {
 	 * @param txNum a transaction number
 	 * 
 	 */
-	void sLock(Object obj, long txNum) {
+	void sLock(Object obj, long txNum, int series) {
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.startComponentProfilerAtGivenStage("OU3 - SLock", 3);
+		
 		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
-			TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 			Lockers lockers = prepareLockers(obj);
 
 			// check if it has already held the lock
 			if (hasSLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
+				profiler.stopComponentProfilerAtGivenStage("OU3 - SLock", 3);
 				return;
 			}
 
@@ -153,7 +156,7 @@ public class ConservativeOrderedLockTable {
 //								name, obj, head));
 //					}
 
-					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
+					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in SLock " + series, 3);
 					anchor.wait();
 
 					// Since a transaction may delete the lockers of an object
@@ -161,7 +164,7 @@ public class ConservativeOrderedLockTable {
 					// here, instead of using lockers it obtains earlier.
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
-					profiler.stopComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
+					profiler.stopComponentProfilerAtGivenStage("OU3 - Wait in SLock " + series, 3);
 				}
 
 				// For debug
@@ -183,6 +186,7 @@ public class ConservativeOrderedLockTable {
 				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
+		profiler.stopComponentProfilerAtGivenStage("OU3 - SLock", 3);
 	}
 
 	/**
@@ -243,8 +247,10 @@ public class ConservativeOrderedLockTable {
 	 * @param txNum a transaction number
 	 * 
 	 */
-	void xLock(Object obj, long txNum) {
+	void xLock(Object obj, long txNum, int series) {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		
+		profiler.startComponentProfilerAtGivenStage("OU3 - XLock", 3);
 		
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getRecordLatch(obj);
@@ -254,6 +260,7 @@ public class ConservativeOrderedLockTable {
 
 			if (hasXLock(lockers, txNum)) {
 				lockers.requestQueue.remove(txNum);
+				profiler.stopComponentProfilerAtGivenStage("OU3 - XLock", 3);
 				return;
 			}
 
@@ -284,11 +291,11 @@ public class ConservativeOrderedLockTable {
 //								name, obj, head));
 //					}
 
-					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
+					profiler.startComponentProfilerAtGivenStage("OU3 - Wait in XLock " + series, 3);
 					anchor.wait();
 					lockers = prepareLockers(obj);
 					head = lockers.requestQueue.peek();
-					profiler.stopComponentProfilerAtGivenStage("OU3 - Wait in Queue", 3);
+					profiler.stopComponentProfilerAtGivenStage("OU3 - Wait in XLock " + series, 3);
 				}
 
 				// For debug
@@ -306,6 +313,7 @@ public class ConservativeOrderedLockTable {
 				throw new LockAbortException("Interrupted when waitting for lock");
 			}
 		}
+		profiler.stopComponentProfilerAtGivenStage("OU3 - XLock", 3);
 	}
 
 	/**
