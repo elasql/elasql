@@ -44,11 +44,9 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		writeObjs = new HashSet<Object>();
 	}
 	
-	public void bookReadKey(PrimaryKey key) {
+	public void bookReadKey(PrimaryKey key, FifoLockMap fifoLockMap) {
 		if (key != null) {
-			// The key needs to be booked only once. 
-			if (!bookedObjs.contains(key))
-				lockTbl.requestLock(key, txNum);
+			bookKeyIfAbsent(key, fifoLockMap);
 			
 			bookedObjs.add(key);
 			readObjs.add(key);
@@ -61,12 +59,10 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * @param keys
 	 *            the objects which the transaction intends to read
 	 */
-	public void bookReadKeys(Collection<PrimaryKey> keys) {
+	public void bookReadKeys(Collection<PrimaryKey> keys, FifoLockMap fifoLockMap) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
-				// The key needs to be booked only once. 
-				if (!bookedObjs.contains(key))
-					lockTbl.requestLock(key, txNum);
+				bookKeyIfAbsent(key, fifoLockMap);
 			}
 			
 			bookedObjs.addAll(keys);
@@ -74,11 +70,9 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		}
 	}
 	
-	public void bookWriteKey(PrimaryKey key) {
+	public void bookWriteKey(PrimaryKey key, FifoLockMap fifoLockMap) {
 		if (key != null) {
-			// The key needs to be booked only once. 
-			if (!bookedObjs.contains(key))
-				lockTbl.requestLock(key, txNum);
+			bookKeyIfAbsent(key, fifoLockMap);
 			
 			bookedObjs.add(key);
 			writeObjs.add(key);
@@ -91,16 +85,22 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * @param keys
 	 *             the objects which the transaction intends to write
 	 */
-	public void bookWriteKeys(Collection<PrimaryKey> keys) {
+	public void bookWriteKeys(Collection<PrimaryKey> keys, FifoLockMap fifoLockMap) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
-				// The key needs to be booked only once. 
-				if (!bookedObjs.contains(key))
-					lockTbl.requestLock(key, txNum);
+				bookKeyIfAbsent(key, fifoLockMap);
 			}
 			
 			bookedObjs.addAll(keys);
 			writeObjs.addAll(keys);
+		}
+	}
+	
+	private void bookKeyIfAbsent(PrimaryKey key, FifoLockMap fifoLockMap) {
+		// The key needs to be booked only once. 
+		if (!bookedObjs.contains(key)) {
+			lockTbl.requestLock(key, txNum);
+			fifoLockMap.registerLock(key);
 		}
 	}
 	

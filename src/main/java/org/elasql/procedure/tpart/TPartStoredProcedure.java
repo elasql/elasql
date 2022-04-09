@@ -19,6 +19,7 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
+import org.elasql.storage.tx.concurrency.FifoLockMap;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
@@ -44,6 +45,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private Set<PrimaryKey> readKeys = new HashSet<PrimaryKey>();
 	private Set<PrimaryKey> updateKeys = new HashSet<PrimaryKey>();
 	private Set<PrimaryKey> insertKeys = new HashSet<PrimaryKey>();
+	private FifoLockMap fifoLockMap = new FifoLockMap();
 	
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
@@ -97,12 +99,14 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public void bookConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 		
-		ccMgr.bookReadKeys(plan.getSinkReadingInfo());
-		for (Set<PushInfo> infos : plan.getSinkPushingInfo().values())
-			for (PushInfo info : infos)
-				ccMgr.bookReadKey(info.getRecord());
-		ccMgr.bookWriteKeys(plan.getLocalWriteBackInfo());
-		ccMgr.bookWriteKeys(plan.getCacheDeletions());
+		ccMgr.bookReadKeys(plan.getSinkReadingInfo(), fifoLockMap);
+		for (Set<PushInfo> infos : plan.getSinkPushingInfo().values()) {
+			for (PushInfo info : infos) {
+				ccMgr.bookReadKey(info.getRecord(), fifoLockMap);
+			}
+		}
+		ccMgr.bookWriteKeys(plan.getLocalWriteBackInfo(), fifoLockMap);
+		ccMgr.bookWriteKeys(plan.getCacheDeletions(), fifoLockMap);
 	}
 
 
