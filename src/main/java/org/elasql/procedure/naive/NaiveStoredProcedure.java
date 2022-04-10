@@ -25,6 +25,7 @@ import org.elasql.cache.naive.NaiveCacheMgr;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
+import org.elasql.storage.tx.concurrency.KeyToFifoLockMap;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
@@ -43,6 +44,7 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	// Record keys
 	private List<PrimaryKey> readKeys = new ArrayList<PrimaryKey>();
 	private List<PrimaryKey> writeKeys = new ArrayList<PrimaryKey>();
+	private KeyToFifoLockMap keyToFifoLockMap = new KeyToFifoLockMap();
 	private boolean isCommitted = false; 
 	
 	private NaiveCacheMgr cacheMgr = (NaiveCacheMgr) Elasql.remoteRecReceiver();
@@ -96,8 +98,8 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	public void requestConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx
 				.concurrencyMgr();
-		ccMgr.bookReadKeys(readKeys);
-		ccMgr.bookWriteKeys(writeKeys);
+		ccMgr.bookReadKeys(readKeys, keyToFifoLockMap);
+		ccMgr.bookWriteKeys(writeKeys, keyToFifoLockMap);
 	}
 
 	@Override

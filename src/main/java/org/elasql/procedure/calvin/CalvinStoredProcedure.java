@@ -35,6 +35,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
+import org.elasql.storage.tx.concurrency.KeyToFifoLockMap;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
@@ -53,6 +54,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	private ExecutionPlan execPlan;
 	private Transaction tx;
+	private KeyToFifoLockMap keyToFifoLockMap = new KeyToFifoLockMap();
 	private boolean isCommitted = false;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
@@ -153,12 +155,12 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	public void bookConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		ccMgr.bookReadKeys(execPlan.getLocalReadKeys());
-		ccMgr.bookReadKeys(execPlan.getLocalReadsForMigration());
-		ccMgr.bookWriteKeys(execPlan.getLocalUpdateKeys());
-		ccMgr.bookWriteKeys(execPlan.getLocalInsertKeys());
-		ccMgr.bookWriteKeys(execPlan.getLocalDeleteKeys());
-		ccMgr.bookWriteKeys(execPlan.getIncomingMigratingKeys());
+		ccMgr.bookReadKeys(execPlan.getLocalReadKeys(), keyToFifoLockMap);
+		ccMgr.bookReadKeys(execPlan.getLocalReadsForMigration(), keyToFifoLockMap);
+		ccMgr.bookWriteKeys(execPlan.getLocalUpdateKeys(), keyToFifoLockMap);
+		ccMgr.bookWriteKeys(execPlan.getLocalInsertKeys(), keyToFifoLockMap);
+		ccMgr.bookWriteKeys(execPlan.getLocalDeleteKeys(), keyToFifoLockMap);
+		ccMgr.bookWriteKeys(execPlan.getIncomingMigratingKeys(), keyToFifoLockMap);
 	}
 
 	private void getConservativeLocks() {

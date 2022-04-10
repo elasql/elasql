@@ -20,8 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.vanilladb.core.server.VanillaDb;
@@ -30,7 +28,7 @@ import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
 import org.vanilladb.core.util.StripedLatchObserver;
 import org.vanilladb.core.util.TransactionProfiler;
 
-public class ConservativeOrderedLockTable {
+public class RandomizedLockTable {
 
 	private static final int NUM_ANCHOR = 1009;
 
@@ -80,7 +78,7 @@ public class ConservativeOrderedLockTable {
 	/**
 	 * Create and initialize a conservative ordered lock table.
 	 */
-	public ConservativeOrderedLockTable() {
+	public RandomizedLockTable() {
 		// Initialize anchors
 		for (int i = 0; i < NUM_ANCHOR; ++i) {
 			recordLatches[i] = new Object();
