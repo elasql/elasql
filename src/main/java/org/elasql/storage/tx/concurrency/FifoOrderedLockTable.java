@@ -13,41 +13,49 @@ public class FifoOrderedLockTable {
 	private ConcurrentHashMap<Object, FifoLockers> lockerMap = new ConcurrentHashMap<Object, FifoLockers>();
 
 	/**
-	 * RequestLock will add the given fifoLock into the requestQueue of the given primaryKey. 
-	 * Object is type of PrimaryKey under the hood.
+	 * RequestLock will add the given fifoLock into the requestQueue of the given
+	 * primaryKey. Object is type of PrimaryKey under the hood.
+	 * 
 	 * @param obj
 	 * @param fifoLock
 	 */
 	void requestLock(Object obj, FifoLock fifoLock) {
-		/*
-		 * PutIfAbsent is an atomic operation. There will be no race condition on
-		 * getting and setting FifoLockers.
-		 */
-		FifoLockers lks = lockerMap.putIfAbsent(obj, new FifoLockers());
+		// prevent executing "new FifoLockers()" frequently, 
+		if (!lockerMap.contains(obj)) {
+			/*
+			 * putIfAbsent is an atomic operation. It's OK to let two threads put a new
+			 * FifoLockers into lockerMap because the second thread's fifoLockers will be
+			 * ignored. After that, the two threads will get the exactly same FifoLockers
+			 * from the map again.
+			 */
+			lockerMap.putIfAbsent(obj, new FifoLockers());
+		}
+
+		FifoLockers lks = lockerMap.get(obj);
 		lks.addToRequestQueue(fifoLock);
 	}
 
-	void sLock(Object obj, long txNum) {
+	void sLock(Object obj, FifoLock fifoLock) {
 		FifoLockers lks = lockerMap.get(obj);
-		
-		lks.waitOrPossessSLock(txNum);
+
+		lks.waitOrPossessSLock(obj, fifoLock);
 	}
-	
-	void xLock(Object obj, long txNum) {
+
+	void xLock(Object obj, FifoLock fifoLock) {
 		FifoLockers lks = lockerMap.get(obj);
-		
-		lks.waitOrPossessXLock(txNum);
+
+		lks.waitOrPossessXLock(obj, fifoLock);
 	}
-	
+
 	void releaseSLock(Object obj, long txNum) {
 		FifoLockers lks = lockerMap.get(obj);
-		
+
 		lks.releaseSLock(txNum);
 	}
-	
+
 	void releaseXLock(Object obj, long txNum) {
 		FifoLockers lks = lockerMap.get(obj);
-		
+
 		lks.releaseXLock(txNum);
 	}
 }

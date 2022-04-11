@@ -26,10 +26,13 @@ public class KeyToFifoLockMap {
 	 * PrimaryKey.
 	 */
 	public FifoLock registerKey(PrimaryKey key, long txNum) {
-		return map.putIfAbsent(key, new FifoLock(txNum));
+		if (!map.containsKey(key)) {
+			map.put(key, new FifoLock(txNum));
+		}
+		return map.get(key);
 	}
-	
-	public FifoLock lookForFifoLock(PrimaryKey key) {
+
+	public FifoLock lookForFifoLock(Object key) {
 		return map.get(key);
 	}
 }

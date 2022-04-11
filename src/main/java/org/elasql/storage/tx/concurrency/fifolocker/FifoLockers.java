@@ -23,6 +23,10 @@ public class FifoLockers {
 	private boolean xLocked() {
 		return xLocker.get() != -1;
 	}
+	
+	private boolean hasSLock(long txNum) {
+		return sLockers.contains(txNum);
+	}
 
 	private boolean hasXLock(long txNum) {
 		return xLocker.get() == txNum;
@@ -33,36 +37,31 @@ public class FifoLockers {
 	}
 
 	private boolean sLockable(long txNum) {
-		return (!xLocked() || hasXLock(txNum));
+		return (!sLocked() || hasSLock(txNum));
 	}
 
 	private boolean xLockable(long txNum) {
-		return (!sLocked() || isTheOnlySLocker(txNum)) && (!xLocked() || hasXLock(txNum));
+		return (!xLocked() || isTheOnlySLocker(txNum)) && (!xLocked() || hasXLock(txNum));
 	}
 
 	public void addToRequestQueue(FifoLock fifoLock) {
 		requestQueue.add(fifoLock);
 	}
 
-	public void waitOrPossessSLock(long txNum) {
+	public void waitOrPossessSLock(Object obj, FifoLock myFifoLock) {
+		long myTxNum = myFifoLock.getTxNum();
 		while (true) {
-			FifoLock fifoLock = requestQueue.peek();
+			FifoLock headFifoLock = requestQueue.peek();
 
-			if (!sLockable(txNum) || !fifoLock.isMyFifoLock(txNum)) {
-				synchronized (fifoLock) {
-					try {
-						fifoLock.wait();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
+			if (!sLockable(myTxNum) || !headFifoLock.isMyFifoLock(myTxNum)) {
+				myFifoLock.waitOnLock(obj);
 			} else {
 				break;
 			}
 		}
 
-		sLockers.add(txNum);
-		
+		sLockers.add(myTxNum);
+
 		/*
 		 * requestQueue.poll() should be put at the end of this function to make this
 		 * function logically atomic.
@@ -70,24 +69,19 @@ public class FifoLockers {
 		requestQueue.poll();
 	}
 
-	public void waitOrPossessXLock(long txNum) {
+	public void waitOrPossessXLock(Object obj, FifoLock myFifoLock) {
+		long myTxNum = myFifoLock.getTxNum();
 		while (true) {
-			FifoLock fifoLock = requestQueue.peek();
+			FifoLock headFifoLock = requestQueue.peek();
 
-			if (!xLockable(txNum) || !fifoLock.isMyFifoLock(txNum)) {
-				synchronized (fifoLock) {
-					try {
-						fifoLock.wait();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
+			if (!xLockable(myTxNum ) || !headFifoLock.isMyFifoLock(myTxNum)) {
+				myFifoLock.waitOnLock(obj);
 			} else {
 				break;
 			}
 		}
 
-		xLocker.set(txNum);
+		xLocker.set(myTxNum);
 
 		/*
 		 * requestQueue.poll() should be put at the end of this function to make this
@@ -95,12 +89,12 @@ public class FifoLockers {
 		 */
 		requestQueue.poll();
 	}
-	
+
 	public void releaseSLock(long txNum) {
 		sLockers.remove(txNum);
 		notifyFirst();
 	}
-	
+
 	public void releaseXLock(long txNum) {
 		xLocker.set(-1);
 		notifyFirst();
@@ -113,8 +107,8 @@ public class FifoLockers {
 			return;
 		}
 
-		synchronized (fifoLock) {
-			fifoLock.notify();
-		}
+		// XXX: is is possible that notify will fail?
+		// how about notify in a while loop
+		fifoLock.notifyLock();
 	}
 }

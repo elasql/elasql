@@ -30,8 +30,8 @@ import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	protected static RandomizedLockTable randomizedLockTbl = new RandomizedLockTable();
 	protected static FifoOrderedLockTable fifoLockTbl = new FifoOrderedLockTable();
-	
-	// For normal operations - using conservative locking 
+
+	// For normal operations - using conservative locking
 	private Set<Object> bookedObjs, readObjs, writeObjs;
 
 	// For Indexes - using crabbing locking
@@ -44,11 +44,11 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		readObjs = new HashSet<Object>();
 		writeObjs = new HashSet<Object>();
 	}
-	
+
 	public void bookReadKey(PrimaryKey key, KeyToFifoLockMap keyToFifoLockMap) {
 		if (key != null) {
 			bookKeyIfAbsent(key, keyToFifoLockMap);
-			
+
 			bookedObjs.add(key);
 			readObjs.add(key);
 		}
@@ -57,76 +57,79 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Book the read lock of the specified objects.
 	 * 
-	 * @param keys
-	 *            the objects which the transaction intends to read
+	 * @param keys the objects which the transaction intends to read
 	 */
 	public void bookReadKeys(Collection<PrimaryKey> keys, KeyToFifoLockMap keyToFifoLockMap) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
 				bookKeyIfAbsent(key, keyToFifoLockMap);
 			}
-			
+
 			bookedObjs.addAll(keys);
 			readObjs.addAll(keys);
 		}
 	}
-	
+
 	public void bookWriteKey(PrimaryKey key, KeyToFifoLockMap keyToFifoLockMap) {
 		if (key != null) {
 			bookKeyIfAbsent(key, keyToFifoLockMap);
-			
+
 			bookedObjs.add(key);
 			writeObjs.add(key);
 		}
 	}
-	
+
 	/**
 	 * Book the write lock of the specified object.
 	 * 
-	 * @param keys
-	 *             the objects which the transaction intends to write
+	 * @param keys the objects which the transaction intends to write
 	 */
 	public void bookWriteKeys(Collection<PrimaryKey> keys, KeyToFifoLockMap keyToFifoLockMap) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
 				bookKeyIfAbsent(key, keyToFifoLockMap);
 			}
-			
+
 			bookedObjs.addAll(keys);
 			writeObjs.addAll(keys);
 		}
 	}
-	
+
 	private void bookKeyIfAbsent(PrimaryKey key, KeyToFifoLockMap keyToFifoLockMap) {
-		// The key needs to be booked only once. 
+		// The key needs to be booked only once.
 		if (!bookedObjs.contains(key)) {
 			FifoLock fifoLock = keyToFifoLockMap.registerKey(key, txNum);
 			fifoLockTbl.requestLock(key, fifoLock);
 		}
 	}
-	
+
 	/**
-	 * Request (get the locks immediately) the locks which the transaction
-	 * has booked. If the locks can not be obtained in the time, it will
-	 * make the thread wait until it can obtain all locks it requests.
+	 * Request (get the locks immediately) the locks which the transaction has
+	 * booked. If the locks can not be obtained in the time, it will make the thread
+	 * wait until it can obtain all locks it requests.
 	 */
-	public void requestLocks() {
+	public void requestLocks(KeyToFifoLockMap keyToFifoLockMap) {
 		bookedObjs.clear();
-		
-		for (Object obj : writeObjs)
-			fifoLockTbl.xLock(obj, txNum);
-		
-		for (Object obj : readObjs)
-			if (!writeObjs.contains(obj))
-				fifoLockTbl.sLock(obj, txNum);
+
+		for (Object obj : writeObjs) {
+			FifoLock fifoLock = keyToFifoLockMap.lookForFifoLock(obj);
+			fifoLockTbl.xLock(obj, fifoLock);
+		}
+
+		for (Object obj : readObjs) {
+			if (!writeObjs.contains(obj)) {
+				FifoLock fifoLock = keyToFifoLockMap.lookForFifoLock(obj);
+				fifoLockTbl.sLock(obj, fifoLock);
+			}
+		}
 	}
-	
+
 	@Override
 	public void onTxCommit(Transaction tx) {
 		releaseIndexLocks();
 		releaseLocks();
 	}
-	
+
 	@Override
 	public void onTxRollback(Transaction tx) {
 		releaseIndexLocks();
@@ -185,8 +188,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Sets lock on the leaf block for update.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void modifyLeafBlock(BlockId blk) {
 		randomizedLockTbl.xLockForBlock(blk, txNum);
@@ -196,8 +198,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Sets lock on the leaf block for read.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void readLeafBlock(BlockId blk) {
 		randomizedLockTbl.sLockForBlock(blk, txNum);
@@ -208,8 +209,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * Sets exclusive lock on the directory block when crabbing down for
 	 * modification.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabDownDirBlockForModification(BlockId blk) {
 		randomizedLockTbl.xLockForBlock(blk, txNum);
@@ -219,8 +219,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Sets shared lock on the directory block when crabbing down for read.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabDownDirBlockForRead(BlockId blk) {
 		randomizedLockTbl.sLockForBlock(blk, txNum);
@@ -230,8 +229,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Releases exclusive locks on the directory block for crabbing back.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabBackDirBlockForModification(BlockId blk) {
 		randomizedLockTbl.releaseForBlock(blk, txNum, RandomizedLockTable.LockType.X_LOCK);
@@ -241,8 +239,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Releases shared locks on the directory block for crabbing back.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabBackDirBlockForRead(BlockId blk) {
 		randomizedLockTbl.releaseForBlock(blk, txNum, RandomizedLockTable.LockType.S_LOCK);
@@ -262,12 +259,12 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	public void lockRecordFileHeader(BlockId blk) {
 		randomizedLockTbl.xLockForBlock(blk, txNum);
 	}
-	
+
 	/**
-	 * Optimization on 2022/2/22
-	 * There are two attempts to a critical section if we use lockRecordFileHeader() to lock a record file header,
-	 * and use releaseRecordFileHeader to release a record file header.
-	 * An optimization here is to make locking a file header a single critical section.
+	 * Optimization on 2022/2/22 There are two attempts to a critical section if we
+	 * use lockRecordFileHeader() to lock a record file header, and use
+	 * releaseRecordFileHeader to release a record file header. An optimization here
+	 * is to make locking a file header a single critical section.
 	 */
 	@Override
 	public ReentrantLock getLockForFileHeader(BlockId blk) {
@@ -287,15 +284,15 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	public void readRecord(RecordId recId) {
 		// do nothing
 	}
-	
+
 	private void releaseLocks() {
 		for (Object obj : writeObjs)
 			fifoLockTbl.releaseXLock(obj, txNum);
-		
+
 		for (Object obj : readObjs)
 			if (!writeObjs.contains(obj))
 				fifoLockTbl.releaseSLock(obj, txNum);
-		
+
 		readObjs.clear();
 		writeObjs.clear();
 	}

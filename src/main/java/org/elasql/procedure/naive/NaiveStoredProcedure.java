@@ -171,6 +171,6 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx
 				.concurrencyMgr();
-		ccMgr.requestLocks();
+		ccMgr.requestLocks(keyToFifoLockMap);
 	}
 }
