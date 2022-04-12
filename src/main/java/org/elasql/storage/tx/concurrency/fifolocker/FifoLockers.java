@@ -104,14 +104,17 @@ public class FifoLockers {
 //				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is sLockable");
 				break;
 			} else {
-				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on sLock " + myFifoLock.getKey());
-				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT sLockable. The head is tx " + headFifoLock.getTxNum() + ". The xlocker is " + xLocker.get());
+//				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on sLock " + myFifoLock.getKey());
+//				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT sLockable. The head is tx " + headFifoLock.getTxNum() + ". The sLocker is empty?" + sLockers.isEmpty() + ". The xlocker is " + xLocker.get());
+				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
+					headFifoLock.notifyLock();
+				}
 				myFifoLock.waitOnLock();
-				notifyFirst();
+//				notifyFirst();
 			}
 		}
 
-		Thread.currentThread().setName("" + myTxNum);
+//		Thread.currentThread().setName("" + myTxNum);
 		sLockers.add(myTxNum);
 
 		/*
@@ -153,15 +156,19 @@ public class FifoLockers {
 //				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is xLockable");
 				break;
 			} else {
-				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on xLock " + myFifoLock.getKey());
-				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT xLockable. The head is tx " + headFifoLock.getTxNum() + ". The xlocker is " + xLocker.get());
+//				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on xLock " + myFifoLock.getKey());
+//				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT xLockable. The head is tx " + headFifoLock.getTxNum() + ". The sLocker is empty?" + sLockers.isEmpty() + ". The xlocker is " + xLocker.get());
+				
+				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
+					headFifoLock.notifyLock();
+				}
 				
 				myFifoLock.waitOnLock();
-				notifyFirst();
+//				
 			}
 		}
 
-		Thread.currentThread().setName("" + myTxNum);
+//		Thread.currentThread().setName("" + myTxNum);
 		xLocker.set(myTxNum);
 
 		/*

@@ -44,9 +44,9 @@ public class FifoLock {
 
 		synchronized (this) {
 			try {
-				isWaiting.set(true);
+//				isWaiting.set(true);
 				this.wait();
-				isWaiting.set(false);
+//				isWaiting.set(false);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

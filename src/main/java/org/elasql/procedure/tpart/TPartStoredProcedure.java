@@ -93,7 +93,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		// register locks
 		bookConservativeLocks();
 		
-		System.out.println(Thread.currentThread().getName() + " is booking the keys for tx " + txNum);
+//		System.out.println(Thread.currentThread().getName() + " is booking the keys for tx " + txNum);
 	}
 
 	public void bookConservativeLocks() {
