@@ -52,54 +52,18 @@ public class FifoLockers {
 	public void waitOrPossessSLock(FifoLock myFifoLock) {
 		long myTxNum = myFifoLock.getTxNum();
 		while (true) {
-			FifoLock headFifoLock = requestQueue.peek();
-			
-//			if (headFifoLock.getKey().hashCode() != myFifoLock.getKey().hashCode()) {
-//				throw new RuntimeException("sLock: key's hashcode is not equal" + " left: " + headFifoLock.getKey() + " right: " + myFifoLock.getKey());
-//			}
-//			
-//			if ((headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() != myFifoLock.getTxNum()))
-//					|| (!headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() == myFifoLock.getTxNum()))) {
-//				throw new RuntimeException("sLock Comparison fails among threads");
-//			}
-
-			
-			if (sLockable(myTxNum) && headFifoLock.isMyFifoLock(myFifoLock)) {
-//				if (headFifoLock.getTxNum() != myTxNum) {
-//					throw new RuntimeException("what the fuck sLock");
-//				}
-//				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is sLockable");
-				break;
-			} else {
-//				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on sLock " + myFifoLock.getKey());
-//				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT sLockable. The head is tx " + headFifoLock.getTxNum() + ". The sLocker is empty?" + sLockers.isEmpty() + ". The xlocker is " + xLocker.get());
-//				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
-//					headFifoLock.notifyLock();
-//				}
-				myFifoLock.waitOnLock();
-//				notifyFirst();
-			}
+			synchronized(myFifoLock) {
+				FifoLock headFifoLock = requestQueue.peek();
+				if (headFifoLock.isMyFifoLock(myFifoLock) && sLockable(myTxNum)) {
+					sLockers.add(myTxNum);
+					requestQueue.poll();
+					notifyNextSLockCandidate();
+					myFifoLock.resetLockable();
+					break;
+				}
+				myFifoLock.waitOnSLock();
+			}			
 		}
-
-//		Thread.currentThread().setName("" + myTxNum);
-		sLockers.add(myTxNum);
-
-		/*
-		 * requestQueue.poll() should be put after sLockers.add and should be put before
-		 * notifyFirst.
-		 */
-		requestQueue.poll();
-		
-		if (requestQueue.peek() == myFifoLock) {
-			throw new RuntimeException("sLock poll fails");
-		}
-
-		/*
-		 * Transactions that get the sLock MUST notify the next transaction in the
-		 * queue. The next transaction shouldn't be blocked because sLock is shared
-		 * unless xLock is involved.
-		 */
-		notifyFirst();
 	}
 
 	public void waitOrPossessXLock(FifoLock myFifoLock) {
@@ -135,72 +99,64 @@ public class FifoLockers {
 		 */
 		long myTxNum = myFifoLock.getTxNum();
 		while (true) {
-			FifoLock headFifoLock = requestQueue.peek();
-			
-//			if (headFifoLock.getKey().hashCode() != myFifoLock.getKey().hashCode()) {
-//				throw new RuntimeException("xLock: key's hashcode is not equal" + " left: " + headFifoLock.getKey() + " right: " + myFifoLock.getKey());
-//			}
-//			
-//			if ((headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() != myFifoLock.getTxNum()))
-//					|| (!headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() == myFifoLock.getTxNum()))) {
-//				throw new RuntimeException("xLock Comparison fails among threads");
-//			}
-
-			if (xLockable(myTxNum) && headFifoLock.isMyFifoLock(myFifoLock)) {
-//				if (headFifoLock.getTxNum() != myTxNum) {
-//					throw new RuntimeException("what the fuck xLock");
-//				}
-//				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is xLockable");
-				break;
-			} else {
-//				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on xLock " + myFifoLock.getKey());
-//				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT xLockable. The head is tx " + headFifoLock.getTxNum() + ". The sLocker is empty?" + sLockers.isEmpty() + ". The xlocker is " + xLocker.get());
-				
-//				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
-//					headFifoLock.notifyLock();
-//				}
-				
-				myFifoLock.waitOnLock();
-//				
-			}
-		}
-
-//		Thread.currentThread().setName("" + myTxNum);
-		xLocker.set(myTxNum);
-
-		/*
-		 * requestQueue.poll() should be put at the end of this function to make this
-		 * function logically atomic.
-		 */
-		requestQueue.poll();
-		
-		if (requestQueue.peek() == myFifoLock) {
-			throw new RuntimeException("xLock poll fails");
+			synchronized(myFifoLock) {
+				FifoLock headFifoLock = requestQueue.peek();
+				if (headFifoLock.isMyFifoLock(myFifoLock) && xLockable(myTxNum)) {
+					xLocker.set(myTxNum);
+					requestQueue.poll();
+					myFifoLock.resetLockable();
+					break;
+				}
+				myFifoLock.waitOnXLock();
+			}	
+//			myFifoLock.waitOnXLock();	
 		}
 	}
 
 	public void releaseSLock(long txNum) {
-		sLockers.remove(txNum);
-		notifyFirst();
-	}
-
-	public void releaseXLock(long txNum) {
-		if (txNum != xLocker.get() ) {
-			throw new RuntimeException("A transaction releases a lock that doesn't belong to itself");
-		}
-		xLocker.set(-1);
-		notifyFirst();
-	}
-
-	private void notifyFirst() {
-		FifoLock fifoLock = requestQueue.peek();
-
-		if (fifoLock == null) {
+		FifoLock nextFifoLock = requestQueue.peek();
+		if (nextFifoLock == null) {
 			return;
 		}
+		
+		synchronized(nextFifoLock) {
+			sLockers.remove(txNum);
+			
+			if (sLockable(txNum)) {
+				nextFifoLock.setSLockable();
+			}
+			
+			if (xLockable(txNum)) {
+				nextFifoLock.setXLockable();
+			}
+			
+			nextFifoLock.notifyLock();
+		}
+	}
 
-		// XXX: is is possible that notify will fail?
-		// how about notify in a while loop
-		fifoLock.notifyLock();
+	public void releaseXLock() {
+		FifoLock nextFifoLock = requestQueue.peek();
+		if (nextFifoLock == null) {
+			return;
+		}
+		
+		synchronized(nextFifoLock) {
+			xLocker.set(-1);
+			nextFifoLock.setSLockable();
+			nextFifoLock.setXLockable();
+			nextFifoLock.notifyLock();
+		}
+	}
+	
+	public void notifyNextSLockCandidate() {
+		FifoLock nextFifoLock = requestQueue.peek();
+		if (nextFifoLock == null) {
+			return;
+		}
+		
+		synchronized(nextFifoLock) {
+			nextFifoLock.setSLockable();
+			nextFifoLock.notifyLock();
+		}
 	}
 }

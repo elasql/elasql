@@ -1,7 +1,6 @@
 package org.elasql.storage.tx.concurrency.fifolocker;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.elasql.sql.PrimaryKey;
 
@@ -15,8 +14,8 @@ import org.elasql.sql.PrimaryKey;
 public class FifoLock {
 	private final PrimaryKey key;
 	private final long txNum;
-	private AtomicReference<String> originalThreadName = new AtomicReference<String>();
-	private AtomicBoolean hasBeenNotified = new AtomicBoolean(false);
+	private AtomicBoolean sLockable = new AtomicBoolean(false);
+	private AtomicBoolean xLockable = new AtomicBoolean(false);
 
 	public FifoLock(PrimaryKey key, long txNum) {
 		this.key = key;
@@ -31,46 +30,55 @@ public class FifoLock {
 		return key;
 	}
 
+	public void setSLockable() {
+		sLockable.set(true);
+	}
+
+	public void setXLockable() {
+		xLockable.set(true);
+	}
+	
+	public boolean getSLockable() {
+		return sLockable.get();
+	}
+	
+	public boolean getXLockable() {
+		return xLockable.get();
+	}
+	
+	public void resetLockable() {
+		sLockable.set(false);
+		xLockable.set(false);
+	}
+
 	public boolean isMyFifoLock(FifoLock fifoLock) {
 		return this == fifoLock;
 	}
 
-	public void waitOnLock() {
-		
-//		originalThreadName.set(Thread.currentThread().getName());
-//		Thread.currentThread().setName(Thread.currentThread().getName() + " wait on " + key);
-//		
-//		System.out.println(originalThreadName + " waits on " + key);
-
-		synchronized (this) {
-			/*
-			 * Don't wait if another thread has notified me
-			 */
-			if (hasBeenNotified.get()) {
-				hasBeenNotified.set(false);
-				return;
-			}
-			
-			try {
-//				isWaiting.set(true);
-				this.wait();
-				hasBeenNotified.set(false);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+	public void waitOnSLock() {
+		if (sLockable.get()) {
+			return;
 		}
-//		
-//		Thread.currentThread().setName(originalThreadName.get());
-//		System.out.println(originalThreadName + " wakes on " + key);
+		try {
+			this.wait();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void waitOnXLock() {
+		if (xLockable.get() ) {
+			return;
+		}
+		
+		try {
+			this.wait();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void notifyLock() {
-//		if (!hasWaitedOnce.get()) {
-//			throw new RuntimeException("Notifying a lock that is never wait can't be happening");
-//		}
-		synchronized (this) {
-			hasBeenNotified.set(true);
-			this.notify();
-		}
+		this.notify();
 	}
 }

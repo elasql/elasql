@@ -56,6 +56,6 @@ public class FifoOrderedLockTable {
 	void releaseXLock(Object obj, long txNum) {
 		FifoLockers lks = lockerMap.get(obj);
 
-		lks.releaseXLock(txNum);
+		lks.releaseXLock();
 	}
 }
