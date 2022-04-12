@@ -98,8 +98,8 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	public void requestConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx
 				.concurrencyMgr();
-		ccMgr.bookReadKeys(readKeys, keyToFifoLockMap);
-		ccMgr.bookWriteKeys(writeKeys, keyToFifoLockMap);
+		ccMgr.bookReadKeys(readKeys);
+		ccMgr.bookWriteKeys(writeKeys);
 	}
 
 	@Override
@@ -171,6 +171,6 @@ public abstract class NaiveStoredProcedure<H extends StoredProcedureParamHelper>
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx
 				.concurrencyMgr();
-		ccMgr.requestLocks(keyToFifoLockMap);
+		ccMgr.requestLocks();
 	}
 }

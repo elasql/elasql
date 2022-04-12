@@ -26,9 +26,17 @@ public class KeyToFifoLockMap {
 	 * PrimaryKey.
 	 */
 	public FifoLock registerKey(PrimaryKey key, long txNum) {
-		if (!map.containsKey(key)) {
-			map.put(key, new FifoLock(txNum));
-		}
+//		if (!map.containsKey(key)) {
+//			map.put(key, new FifoLock(key, txNum));
+//		} else {
+//			// XXX: Registering a key twice will make system stall due to the new
+//			// locking implementation.
+//			throw new RuntimeException("Registering a key twice is not allowed");
+//		}
+		
+		FifoLock fifoLock = new FifoLock(key, txNum);
+		map.put(key, fifoLock);
+		
 		return map.get(key);
 	}
 

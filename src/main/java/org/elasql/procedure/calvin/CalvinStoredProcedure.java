@@ -155,17 +155,17 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	public void bookConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		ccMgr.bookReadKeys(execPlan.getLocalReadKeys(), keyToFifoLockMap);
-		ccMgr.bookReadKeys(execPlan.getLocalReadsForMigration(), keyToFifoLockMap);
-		ccMgr.bookWriteKeys(execPlan.getLocalUpdateKeys(), keyToFifoLockMap);
-		ccMgr.bookWriteKeys(execPlan.getLocalInsertKeys(), keyToFifoLockMap);
-		ccMgr.bookWriteKeys(execPlan.getLocalDeleteKeys(), keyToFifoLockMap);
-		ccMgr.bookWriteKeys(execPlan.getIncomingMigratingKeys(), keyToFifoLockMap);
+		ccMgr.bookReadKeys(execPlan.getLocalReadKeys());
+		ccMgr.bookReadKeys(execPlan.getLocalReadsForMigration());
+		ccMgr.bookWriteKeys(execPlan.getLocalUpdateKeys());
+		ccMgr.bookWriteKeys(execPlan.getLocalInsertKeys());
+		ccMgr.bookWriteKeys(execPlan.getLocalDeleteKeys());
+		ccMgr.bookWriteKeys(execPlan.getIncomingMigratingKeys());
 	}
 
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
-		ccMgr.requestLocks(keyToFifoLockMap);
+		ccMgr.requestLocks();
 	}
 
 	@Override

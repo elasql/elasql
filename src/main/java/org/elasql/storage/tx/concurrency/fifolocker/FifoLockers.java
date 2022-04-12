@@ -1,7 +1,6 @@
 package org.elasql.storage.tx.concurrency.fifolocker;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -12,18 +11,19 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  */
 public class FifoLockers {
-	private ConcurrentLinkedQueue<FifoLock> requestQueue = new ConcurrentLinkedQueue<FifoLock>();
+	private ConcurrentLinkedDeque<FifoLock> requestQueue = new ConcurrentLinkedDeque<FifoLock>();
 	private ConcurrentLinkedDeque<Long> sLockers = new ConcurrentLinkedDeque<Long>();
 	private AtomicLong xLocker = new AtomicLong(-1);
 
 	private boolean sLocked() {
-		return sLockers.size() > 0;
+		// avoid using sLockers.size() due to the cost of traversing the queue
+		return !sLockers.isEmpty();
 	}
 
 	private boolean xLocked() {
 		return xLocker.get() != -1;
 	}
-	
+
 	private boolean hasSLock(long txNum) {
 		return sLockers.contains(txNum);
 	}
@@ -37,50 +37,131 @@ public class FifoLockers {
 	}
 
 	private boolean sLockable(long txNum) {
-		return (!sLocked() || hasSLock(txNum));
+		return (!xLocked() || hasXLock(txNum));
 	}
 
 	private boolean xLockable(long txNum) {
-		return (!xLocked() || isTheOnlySLocker(txNum)) && (!xLocked() || hasXLock(txNum));
+		return (!sLocked() || isTheOnlySLocker(txNum)) && (!xLocked() || hasXLock(txNum));
 	}
 
 	public void addToRequestQueue(FifoLock fifoLock) {
 		requestQueue.add(fifoLock);
+//		System.out.println("head is " + requestQueue.peek().getTxNum() + " tail is " + requestQueue.peekLast().getTxNum());
 	}
 
-	public void waitOrPossessSLock(Object obj, FifoLock myFifoLock) {
+	public void waitOrPossessSLock(FifoLock myFifoLock) {
 		long myTxNum = myFifoLock.getTxNum();
 		while (true) {
 			FifoLock headFifoLock = requestQueue.peek();
+			
+			if (headFifoLock.getKey().hashCode() != myFifoLock.getKey().hashCode()) {
+				throw new RuntimeException("sLock: key's hashcode is not equal" + " left: " + headFifoLock.getKey() + " right: " + myFifoLock.getKey());
+			}
+			
+			if ((headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() != myFifoLock.getTxNum()))
+					|| (!headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() == myFifoLock.getTxNum()))) {
+				throw new RuntimeException("sLock Comparison fails among threads");
+			}
 
-			if (!sLockable(myTxNum) || !headFifoLock.isMyFifoLock(myTxNum)) {
-				myFifoLock.waitOnLock(obj);
-			} else {
+			/*-
+			 * WARNING: Please be aware that the order of the following code should not be changed. 
+			 *  
+			 * The following code has two guardian logic to prevent multiple access of a xLock
+			 * 
+			 * Let's explain more:
+			 * Assume Thread A and Thread B come concurrently,
+			 * and Thread A acquires xLock while Thread B acquires sLock.
+			 * 
+			 * =========================================================
+			 * 			Thread A peaks the request queue (see A's proxy object)
+			 * 			Thread B peaks the request queue (see A's proxy object)
+			 * 							|
+			 * 							v
+			 * 			Thread A finds xLockable
+			 * 			Thread A finds the head of the request queue is itself
+			 * 							|
+			 * 							v
+			 * 			Thread B finds the record sLockable (The first guardian code has failed)
+			 * 							|
+			 * 							v
+			 * 			Thread A updates the xLocker
+			 * 			Thread A remove the head of the request queue
+			 * 							|
+			 * 							v
+			 * 			Thread B finds the head is itself (The second guardian has failed as well)
+			 * 							|
+			 * 							v
+			 * 			Thread B accidentally get the sLock of the record.
+			 * 			(Boom! This contradicts the conservative locking protocol)
+			 * 
+			 * =========================================================
+			 * 
+			 */
+			if (sLockable(myTxNum) && headFifoLock.isMyFifoLock(myFifoLock)) {
+				if (headFifoLock.getTxNum() != myTxNum) {
+					throw new RuntimeException("what the fuck sLock");
+				}
+//				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is sLockable");
 				break;
+			} else {
+				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on sLock " + myFifoLock.getKey());
+				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT sLockable. The head is tx " + headFifoLock.getTxNum() + ". The xlocker is " + xLocker.get());
+				myFifoLock.waitOnLock();
+				notifyFirst();
 			}
 		}
 
+		Thread.currentThread().setName("" + myTxNum);
 		sLockers.add(myTxNum);
 
 		/*
-		 * requestQueue.poll() should be put at the end of this function to make this
-		 * function logically atomic.
+		 * requestQueue.poll() should be put after sLockers.add and should be put before
+		 * notifyFirst.
 		 */
 		requestQueue.poll();
+		
+		if (requestQueue.peek() == myFifoLock) {
+			throw new RuntimeException("sLock poll fails");
+		}
+
+		/*
+		 * Transactions that get the sLock MUST notify the next transaction in the
+		 * queue. The next transaction shouldn't be blocked because sLock is shared
+		 * unless xLock is involved.
+		 */
+		notifyFirst();
 	}
 
-	public void waitOrPossessXLock(Object obj, FifoLock myFifoLock) {
+	public void waitOrPossessXLock(FifoLock myFifoLock) {
 		long myTxNum = myFifoLock.getTxNum();
 		while (true) {
 			FifoLock headFifoLock = requestQueue.peek();
+			
+			if (headFifoLock.getKey().hashCode() != myFifoLock.getKey().hashCode()) {
+				throw new RuntimeException("xLock: key's hashcode is not equal" + " left: " + headFifoLock.getKey() + " right: " + myFifoLock.getKey());
+			}
+			
+			if ((headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() != myFifoLock.getTxNum()))
+					|| (!headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() == myFifoLock.getTxNum()))) {
+				throw new RuntimeException("xLock Comparison fails among threads");
+			}
 
-			if (!xLockable(myTxNum ) || !headFifoLock.isMyFifoLock(myTxNum)) {
-				myFifoLock.waitOnLock(obj);
-			} else {
+			if (xLockable(myTxNum) && headFifoLock.isMyFifoLock(myFifoLock)) {
+				if (headFifoLock.getTxNum() != myTxNum) {
+					throw new RuntimeException("what the fuck xLock");
+				}
+//				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is xLockable");
 				break;
+			} else {
+				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on xLock " + myFifoLock.getKey());
+				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT xLockable. The head is tx " + headFifoLock.getTxNum() + ". The xlocker is " + xLocker.get());
+				
+				myFifoLock.waitOnLock();
+				notifyFirst();
 			}
 		}
 
+		Thread.currentThread().setName("" + myTxNum);
 		xLocker.set(myTxNum);
 
 		/*
@@ -88,6 +169,10 @@ public class FifoLockers {
 		 * function logically atomic.
 		 */
 		requestQueue.poll();
+		
+		if (requestQueue.peek() == myFifoLock) {
+			throw new RuntimeException("xLock poll fails");
+		}
 	}
 
 	public void releaseSLock(long txNum) {
@@ -96,6 +181,9 @@ public class FifoLockers {
 	}
 
 	public void releaseXLock(long txNum) {
+		if (txNum != xLocker.get() ) {
+			throw new RuntimeException("A transaction releases a lock that doesn't belong to itself");
+		}
 		xLocker.set(-1);
 		notifyFirst();
 	}

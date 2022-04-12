@@ -44,7 +44,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private Set<PrimaryKey> readKeys = new HashSet<PrimaryKey>();
 	private Set<PrimaryKey> updateKeys = new HashSet<PrimaryKey>();
 	private Set<PrimaryKey> insertKeys = new HashSet<PrimaryKey>();
-	private KeyToFifoLockMap keyToFifoLockMap = new KeyToFifoLockMap();
 
 	private SunkPlan plan;
 	private TPartTxLocalCache cache;
@@ -93,25 +92,27 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 		// register locks
 		bookConservativeLocks();
+		
+		System.out.println(Thread.currentThread().getName() + " is booking the keys for tx " + txNum);
 	}
 
 	public void bookConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 
-		ccMgr.bookReadKeys(plan.getSinkReadingInfo(), keyToFifoLockMap);
+		ccMgr.bookReadKeys(plan.getSinkReadingInfo());
 		for (Set<PushInfo> infos : plan.getSinkPushingInfo().values()) {
 			for (PushInfo info : infos) {
-				ccMgr.bookReadKey(info.getRecord(), keyToFifoLockMap);
+				ccMgr.bookReadKey(info.getRecord());
 			}
 		}
-		ccMgr.bookWriteKeys(plan.getLocalWriteBackInfo(), keyToFifoLockMap);
-		ccMgr.bookWriteKeys(plan.getCacheDeletions(), keyToFifoLockMap);
+		ccMgr.bookWriteKeys(plan.getLocalWriteBackInfo());
+		ccMgr.bookWriteKeys(plan.getCacheDeletions());
 	}
 
 	private void getConservativeLocks() {
 		ConservativeOrderedCcMgr ccMgr = (ConservativeOrderedCcMgr) tx.concurrencyMgr();
 
-		ccMgr.requestLocks(keyToFifoLockMap);
+		ccMgr.requestLocks();
 	}
 
 	@Override
@@ -128,6 +129,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 			profiler.startComponentProfiler("OU8 - Commit");
 			tx.commit();
+//			System.out.println("tx " + txNum + " commits");
 			profiler.stopComponentProfiler("OU8 - Commit");
 
 			isCommitted = true;

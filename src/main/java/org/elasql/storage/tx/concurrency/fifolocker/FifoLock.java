@@ -1,5 +1,8 @@
 package org.elasql.storage.tx.concurrency.fifolocker;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.elasql.sql.PrimaryKey;
 
 /**
@@ -10,10 +13,13 @@ import org.elasql.sql.PrimaryKey;
  *
  */
 public class FifoLock {
-	private long txNum;
-	private String originalThreadName;
+	private final PrimaryKey key;
+	private final long txNum;
+	private AtomicReference<String> originalThreadName = new AtomicReference<String>();
+	private AtomicBoolean isWaiting = new AtomicBoolean(false);
 
-	public FifoLock(long txNum) {
+	public FifoLock(PrimaryKey key, long txNum) {
+		this.key = key;
 		this.txNum = txNum;
 	}
 
@@ -21,26 +27,41 @@ public class FifoLock {
 		return txNum;
 	}
 
-	public boolean isMyFifoLock(long txNum) {
-		return this.txNum == txNum;
+	public PrimaryKey getKey() {
+		return key;
 	}
 
-	public void waitOnLock(Object obj) {
+	public boolean isMyFifoLock(FifoLock fifoLock) {
+		return this == fifoLock;
+	}
+
+	public void waitOnLock() {
+		
+//		originalThreadName.set(Thread.currentThread().getName());
+//		Thread.currentThread().setName(Thread.currentThread().getName() + " wait on " + key);
+//		
+//		System.out.println(originalThreadName + " waits on " + key);
+
 		synchronized (this) {
 			try {
-				originalThreadName = Thread.currentThread().getName();
-				Thread.currentThread().setName(originalThreadName + " wait on " + (PrimaryKey)obj);
+				isWaiting.set(true);
 				this.wait();
-				Thread.currentThread().setName(originalThreadName);
+				isWaiting.set(false);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
+//		
+//		Thread.currentThread().setName(originalThreadName.get());
+//		System.out.println(originalThreadName + " wakes on " + key);
 	}
 
 	public void notifyLock() {
+//		if (!hasWaitedOnce.get()) {
+//			throw new RuntimeException("Notifying a lock that is never wait can't be happening");
+//		}
 		synchronized (this) {
-			this.notify();
+			this.notifyAll();
 		}
 	}
 }

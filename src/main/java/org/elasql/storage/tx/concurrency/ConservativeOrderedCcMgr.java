@@ -33,7 +33,8 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 
 	// For normal operations - using conservative locking
 	private Set<Object> bookedObjs, readObjs, writeObjs;
-
+	private KeyToFifoLockMap keyToFifoLockMap = new KeyToFifoLockMap();
+	
 	// For Indexes - using crabbing locking
 	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
 	private Set<BlockId> writtenIndexBlks = new HashSet<BlockId>();
@@ -45,9 +46,9 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		writeObjs = new HashSet<Object>();
 	}
 
-	public void bookReadKey(PrimaryKey key, KeyToFifoLockMap keyToFifoLockMap) {
+	public void bookReadKey(PrimaryKey key) {
 		if (key != null) {
-			bookKeyIfAbsent(key, keyToFifoLockMap);
+			bookKeyIfAbsent(key);
 
 			bookedObjs.add(key);
 			readObjs.add(key);
@@ -59,20 +60,24 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * 
 	 * @param keys the objects which the transaction intends to read
 	 */
-	public void bookReadKeys(Collection<PrimaryKey> keys, KeyToFifoLockMap keyToFifoLockMap) {
+	public void bookReadKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
-				bookKeyIfAbsent(key, keyToFifoLockMap);
+				bookKeyIfAbsent(key);
+				
+				// XXX: test
+				bookedObjs.add(key);
+				readObjs.add(key);
 			}
 
-			bookedObjs.addAll(keys);
-			readObjs.addAll(keys);
+//			bookedObjs.addAll(keys);
+//			readObjs.addAll(keys);
 		}
 	}
 
-	public void bookWriteKey(PrimaryKey key, KeyToFifoLockMap keyToFifoLockMap) {
+	public void bookWriteKey(PrimaryKey key) {
 		if (key != null) {
-			bookKeyIfAbsent(key, keyToFifoLockMap);
+			bookKeyIfAbsent(key);
 
 			bookedObjs.add(key);
 			writeObjs.add(key);
@@ -84,22 +89,28 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * 
 	 * @param keys the objects which the transaction intends to write
 	 */
-	public void bookWriteKeys(Collection<PrimaryKey> keys, KeyToFifoLockMap keyToFifoLockMap) {
+	public void bookWriteKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
-				bookKeyIfAbsent(key, keyToFifoLockMap);
+				bookKeyIfAbsent(key);
+				
+				// XXX: test
+				bookedObjs.add(key);
+				writeObjs.add(key);
 			}
 
-			bookedObjs.addAll(keys);
-			writeObjs.addAll(keys);
+//			bookedObjs.addAll(keys);
+//			writeObjs.addAll(keys);
 		}
 	}
 
-	private void bookKeyIfAbsent(PrimaryKey key, KeyToFifoLockMap keyToFifoLockMap) {
+	private void bookKeyIfAbsent(PrimaryKey key) {
 		// The key needs to be booked only once.
 		if (!bookedObjs.contains(key)) {
 			FifoLock fifoLock = keyToFifoLockMap.registerKey(key, txNum);
 			fifoLockTbl.requestLock(key, fifoLock);
+		} else {
+//			throw new RuntimeException("Double book a key");
 		}
 	}
 
@@ -108,18 +119,32 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * booked. If the locks can not be obtained in the time, it will make the thread
 	 * wait until it can obtain all locks it requests.
 	 */
-	public void requestLocks(KeyToFifoLockMap keyToFifoLockMap) {
+	public void requestLocks() {
 		bookedObjs.clear();
+		
+		HashSet<Object> hasLockedSet = new HashSet<Object>();
 
 		for (Object obj : writeObjs) {
+			if (hasLockedSet.contains(obj)) {
+				throw new RuntimeException("An key is tried to be locked twice");
+			}
+			
 			FifoLock fifoLock = keyToFifoLockMap.lookForFifoLock(obj);
 			fifoLockTbl.xLock(obj, fifoLock);
+			
+			hasLockedSet.add(obj);
 		}
 
 		for (Object obj : readObjs) {
 			if (!writeObjs.contains(obj)) {
+				if (hasLockedSet.contains(obj)) {
+					throw new RuntimeException("An key is tried to be locked twice");
+				}
+				
 				FifoLock fifoLock = keyToFifoLockMap.lookForFifoLock(obj);
 				fifoLockTbl.sLock(obj, fifoLock);
+				
+				hasLockedSet.add(obj);
 			}
 		}
 	}
