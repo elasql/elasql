@@ -16,7 +16,7 @@ public class FifoLock {
 	private final PrimaryKey key;
 	private final long txNum;
 	private AtomicReference<String> originalThreadName = new AtomicReference<String>();
-	private AtomicBoolean isWaiting = new AtomicBoolean(false);
+	private AtomicBoolean hasBeenNotified = new AtomicBoolean(false);
 
 	public FifoLock(PrimaryKey key, long txNum) {
 		this.key = key;
@@ -43,10 +43,18 @@ public class FifoLock {
 //		System.out.println(originalThreadName + " waits on " + key);
 
 		synchronized (this) {
+			/*
+			 * Don't wait if another thread has notified me
+			 */
+			if (hasBeenNotified.get()) {
+				hasBeenNotified.set(false);
+				return;
+			}
+			
 			try {
 //				isWaiting.set(true);
 				this.wait();
-//				isWaiting.set(false);
+				hasBeenNotified.set(false);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -61,7 +69,8 @@ public class FifoLock {
 //			throw new RuntimeException("Notifying a lock that is never wait can't be happening");
 //		}
 		synchronized (this) {
-			this.notifyAll();
+			hasBeenNotified.set(true);
+			this.notify();
 		}
 	}
 }
