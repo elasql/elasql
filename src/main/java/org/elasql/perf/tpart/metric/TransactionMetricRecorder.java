@@ -22,7 +22,7 @@ import org.vanilladb.core.util.TransactionProfiler;
 /**
  * A recorder to record the transaction metrics to CSV files.
  * 
- * @author Yu-Shan Lin, Yu-Xuan Lin, Ping-Yu Wang
+ * @author Yu-Shan Lin, Yu-Xuan Lin, Pin-Yu Wang
  */
 public class TransactionMetricRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionMetricRecorder.class.getName());
@@ -31,7 +31,7 @@ public class TransactionMetricRecorder extends Task {
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String MASTER_ID_COLUMN = "Is Master";
 	private static final String DISTRIBUTED_TX_COLUMN = "Is Distributed";
-	private static final long TIME_TO_FLUSH = 10; // in seconds
+	private static final long TIME_TO_FLUSH = 30; // in seconds
 	private static final boolean ENABLE_CPU_TIMER = TransactionProfiler.ENABLE_CPU_TIMER;
 	private static final boolean ENABLE_DISKIO_COUNTER = TransactionProfiler.ENABLE_DISKIO_COUNTER;
 	private static final boolean ENABLE_NETWORKIO_COUNTER = TransactionProfiler.ENABLE_NETWORKIO_COUNTER;

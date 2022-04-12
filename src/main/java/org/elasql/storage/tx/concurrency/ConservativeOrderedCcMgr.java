@@ -311,13 +311,20 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	}
 
 	private void releaseLocks() {
-		for (Object obj : writeObjs)
-			fifoLockTbl.releaseXLock(obj, txNum);
+		for (Object obj : writeObjs) {
+			// XXX: To remove
+			FifoLock fifoLock = keyToFifoLockMap.lookForFifoLock(obj);
+			fifoLockTbl.releaseXLock(obj, txNum, fifoLock);
+		}
 
-		for (Object obj : readObjs)
-			if (!writeObjs.contains(obj))
-				fifoLockTbl.releaseSLock(obj, txNum);
-
+		for (Object obj : readObjs) {
+			if (!writeObjs.contains(obj)) {
+				// XXX: To remove
+				FifoLock fifoLock = keyToFifoLockMap.lookForFifoLock(obj);
+				fifoLockTbl.releaseSLock(obj, txNum, fifoLock);
+			}
+			
+		}
 		readObjs.clear();
 		writeObjs.clear();
 	}

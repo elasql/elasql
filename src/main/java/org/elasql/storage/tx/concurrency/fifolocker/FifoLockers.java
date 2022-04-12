@@ -49,21 +49,39 @@ public class FifoLockers {
 //		System.out.println("head is " + requestQueue.peek().getTxNum() + " tail is " + requestQueue.peekLast().getTxNum());
 	}
 
-	public void waitOrPossessSLock(FifoLock myFifoLock) {
-		long myTxNum = myFifoLock.getTxNum();
+	private void waitIfHeadIsNotMe(FifoLock myFifoLock) {
 		while (true) {
-			synchronized(myFifoLock) {
+			synchronized (myFifoLock) {
 				FifoLock headFifoLock = requestQueue.peek();
-				if (headFifoLock.isMyFifoLock(myFifoLock) && sLockable(myTxNum)) {
-					sLockers.add(myTxNum);
-					requestQueue.poll();
-					notifyNextSLockCandidate();
-					myFifoLock.resetLockable();
+
+				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
+					myFifoLock.waitOnLock();
+				} else {
 					break;
 				}
-				myFifoLock.waitOnSLock();
-			}			
+			}
 		}
+	}
+
+	public void waitOrPossessSLock(FifoLock myFifoLock) {
+		waitIfHeadIsNotMe(myFifoLock);
+
+		long myTxNum = myFifoLock.getTxNum();
+		synchronized (myFifoLock) {
+			while (true) {
+				if (!sLockable(myTxNum)) {
+					Thread.currentThread().setName(Thread.currentThread().getName() + " waits on sLock " + myFifoLock.getKey());
+					myFifoLock.waitOnLock();
+				} else {
+					sLockers.add(myTxNum);
+					Thread.currentThread().setName(Thread.currentThread().getName() + " gets sLock " + myFifoLock.getKey());
+					break;
+				}
+			}
+		}
+
+		requestQueue.poll();
+		notifyNext();
 	}
 
 	public void waitOrPossessXLock(FifoLock myFifoLock) {
@@ -97,65 +115,78 @@ public class FifoLockers {
 		 * =========================================================
 		 * 
 		 */
+		waitIfHeadIsNotMe(myFifoLock);
+
 		long myTxNum = myFifoLock.getTxNum();
-		while (true) {
-			synchronized(myFifoLock) {
-				FifoLock headFifoLock = requestQueue.peek();
-				if (headFifoLock.isMyFifoLock(myFifoLock) && xLockable(myTxNum)) {
+		synchronized (myFifoLock) {
+			while (true) {
+				if (!xLockable(myTxNum)) {
+					Thread.currentThread().setName(Thread.currentThread().getName() + " waits on xLock " + myFifoLock.getKey());
+					myFifoLock.waitOnLock();
+				} else {
 					xLocker.set(myTxNum);
-					requestQueue.poll();
-					myFifoLock.resetLockable();
+					Thread.currentThread().setName(Thread.currentThread().getName() + " gets xLock " + myFifoLock.getKey());
 					break;
 				}
-				myFifoLock.waitOnXLock();
-			}	
-//			myFifoLock.waitOnXLock();	
+			}
 		}
+
+		requestQueue.poll();
 	}
 
-	public void releaseSLock(long txNum) {
+	public void releaseSLock(long txNum, FifoLock myFifoLock) {
+		Thread.currentThread().setName(Thread.currentThread().getName() + " releases sLock " + myFifoLock.getKey());
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
-			return;
-		}
-		
-		synchronized(nextFifoLock) {
 			sLockers.remove(txNum);
-			
-			if (sLockable(txNum)) {
-				nextFifoLock.setSLockable();
+			/*
+			 * Check again because there is a chance that a transaction is added after the previous peek.
+			 */
+			nextFifoLock = requestQueue.peek();
+			if (nextFifoLock == null) {
+				return;
 			}
-			
-			if (xLockable(txNum)) {
-				nextFifoLock.setXLockable();
-			}
-			
+		}
+
+		synchronized (nextFifoLock) {
+			sLockers.remove(txNum);
 			nextFifoLock.notifyLock();
 		}
 	}
 
-	public void releaseXLock() {
+	public void releaseXLock(FifoLock myFifoLock) {
+		Thread.currentThread().setName(Thread.currentThread().getName() + " releases xLock " + myFifoLock.getKey());
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
-			return;
+			resetLockers();
+			
+			/*
+			 * Check again because there is a chance that a transaction is added after the previous peek.
+			 */
+			nextFifoLock = requestQueue.peek();
+			if (nextFifoLock == null) {
+				return;
+			}
 		}
-		
-		synchronized(nextFifoLock) {
-			xLocker.set(-1);
-			nextFifoLock.setSLockable();
-			nextFifoLock.setXLockable();
+
+		synchronized (nextFifoLock) {
+			resetLockers();
 			nextFifoLock.notifyLock();
 		}
 	}
 	
-	public void notifyNextSLockCandidate() {
+	private void resetLockers() {
+		xLocker.set(-1);
+		sLockers.clear();
+	}
+
+	private void notifyNext() {
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
 			return;
 		}
-		
-		synchronized(nextFifoLock) {
-			nextFifoLock.setSLockable();
+
+		synchronized (nextFifoLock) {
 			nextFifoLock.notifyLock();
 		}
 	}

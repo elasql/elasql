@@ -47,15 +47,15 @@ public class FifoOrderedLockTable {
 		lks.waitOrPossessXLock(fifoLock);
 	}
 
-	void releaseSLock(Object obj, long txNum) {
+	void releaseSLock(Object obj, long txNum, FifoLock fifoLock) {
 		FifoLockers lks = lockerMap.get(obj);
 
-		lks.releaseSLock(txNum);
+		lks.releaseSLock(txNum, fifoLock);
 	}
 
-	void releaseXLock(Object obj, long txNum) {
+	void releaseXLock(Object obj, long txNum, FifoLock fifoLock) {
 		FifoLockers lks = lockerMap.get(obj);
 
-		lks.releaseXLock();
+		lks.releaseXLock(fifoLock);
 	}
 }
