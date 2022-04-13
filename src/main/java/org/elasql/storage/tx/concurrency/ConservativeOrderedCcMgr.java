@@ -51,7 +51,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		if (key != null) {
 			bookKeyIfAbsent(key);
 
-			bookedObjs.add(key);
 			readObjs.add(key);
 		}
 	}
@@ -66,7 +65,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 			for (PrimaryKey key : keys) {
 				bookKeyIfAbsent(key);
 
-				bookedObjs.add(key);
 				readObjs.add(key);
 			}
 		}
@@ -76,7 +74,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		if (key != null) {
 			bookKeyIfAbsent(key);
 
-			bookedObjs.add(key);
 			writeObjs.add(key);
 		}
 	}
@@ -91,7 +88,6 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 			for (PrimaryKey key : keys) {
 				bookKeyIfAbsent(key);
 
-				bookedObjs.add(key);
 				writeObjs.add(key);
 			}
 		}
@@ -101,6 +97,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		// The key needs to be booked only once.
 		if (!bookedObjs.contains(key)) {
 			fifoLockTbl.requestLock(key, myFifoLock);
+			bookedObjs.add(key);
 		}
 	}
 
