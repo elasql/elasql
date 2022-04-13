@@ -22,7 +22,7 @@ import org.vanilladb.core.util.TransactionProfiler;
 /**
  * A recorder to record the transaction metrics to CSV files.
  * 
- * @author Yu-Shan Lin, Yu-Xuan Lin, Ping-Yu Wang
+ * @author Yu-Shan Lin, Yu-Xuan Lin, Pin-Yu Wang
  */
 public class TransactionMetricRecorder extends Task {
 	private static Logger logger = Logger.getLogger(TransactionMetricRecorder.class.getName());

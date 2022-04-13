@@ -1,8 +1,5 @@
 package org.elasql.storage.tx.concurrency.fifolocker;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.elasql.sql.PrimaryKey;
 
 /**
@@ -13,64 +10,39 @@ import org.elasql.sql.PrimaryKey;
  *
  */
 public class FifoLock {
-	private final PrimaryKey key;
+//	private final PrimaryKey key;
 	private final long txNum;
-	private AtomicReference<String> originalThreadName = new AtomicReference<String>();
-	private AtomicBoolean hasBeenNotified = new AtomicBoolean(false);
-
-	public FifoLock(PrimaryKey key, long txNum) {
-		this.key = key;
+//
+//	public FifoLock(PrimaryKey key, long txNum) {
+//		this.key = key;
+//		this.txNum = txNum;
+//	}
+	
+	public FifoLock(long txNum) {
 		this.txNum = txNum;
 	}
 
 	public long getTxNum() {
 		return txNum;
 	}
-
-	public PrimaryKey getKey() {
-		return key;
-	}
+//
+//	public PrimaryKey getKey() {
+//		return key;
+//	}
 
 	public boolean isMyFifoLock(FifoLock fifoLock) {
 		return this == fifoLock;
 	}
 
 	public void waitOnLock() {
-		
-//		originalThreadName.set(Thread.currentThread().getName());
-//		Thread.currentThread().setName(Thread.currentThread().getName() + " wait on " + key);
-//		
-//		System.out.println(originalThreadName + " waits on " + key);
-
-		synchronized (this) {
-			/*
-			 * Don't wait if another thread has notified me
-			 */
-			if (hasBeenNotified.get()) {
-				hasBeenNotified.set(false);
-				return;
-			}
-			
-			try {
-//				isWaiting.set(true);
-				this.wait();
-				hasBeenNotified.set(false);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+		try {
+			this.wait();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
-//		
-//		Thread.currentThread().setName(originalThreadName.get());
-//		System.out.println(originalThreadName + " wakes on " + key);
 	}
 
 	public void notifyLock() {
-//		if (!hasWaitedOnce.get()) {
-//			throw new RuntimeException("Notifying a lock that is never wait can't be happening");
-//		}
-		synchronized (this) {
-			hasBeenNotified.set(true);
-			this.notify();
-		}
+		this.notify();
 	}
 }

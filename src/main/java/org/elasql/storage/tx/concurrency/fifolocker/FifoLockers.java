@@ -3,6 +3,8 @@ package org.elasql.storage.tx.concurrency.fifolocker;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.elasql.sql.PrimaryKey;
+
 /**
  * FifoLockers is used to keep which transaction possesses right to access a
  * record, and to keep those transactions which are waiting for the record.
@@ -14,6 +16,11 @@ public class FifoLockers {
 	private ConcurrentLinkedDeque<FifoLock> requestQueue = new ConcurrentLinkedDeque<FifoLock>();
 	private ConcurrentLinkedDeque<Long> sLockers = new ConcurrentLinkedDeque<Long>();
 	private AtomicLong xLocker = new AtomicLong(-1);
+	private PrimaryKey key;
+
+	public FifoLockers(PrimaryKey key) {
+		this.key = key;
+	}
 
 	private boolean sLocked() {
 		// avoid using sLockers.size() due to the cost of traversing the queue
@@ -49,57 +56,37 @@ public class FifoLockers {
 //		System.out.println("head is " + requestQueue.peek().getTxNum() + " tail is " + requestQueue.peekLast().getTxNum());
 	}
 
-	public void waitOrPossessSLock(FifoLock myFifoLock) {
-		long myTxNum = myFifoLock.getTxNum();
+	private void waitIfHeadIsNotMe(FifoLock myFifoLock) {
 		while (true) {
-			FifoLock headFifoLock = requestQueue.peek();
-			
-//			if (headFifoLock.getKey().hashCode() != myFifoLock.getKey().hashCode()) {
-//				throw new RuntimeException("sLock: key's hashcode is not equal" + " left: " + headFifoLock.getKey() + " right: " + myFifoLock.getKey());
-//			}
-//			
-//			if ((headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() != myFifoLock.getTxNum()))
-//					|| (!headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() == myFifoLock.getTxNum()))) {
-//				throw new RuntimeException("sLock Comparison fails among threads");
-//			}
+			synchronized (myFifoLock) {
+				FifoLock headFifoLock = requestQueue.peek();
 
-			
-			if (sLockable(myTxNum) && headFifoLock.isMyFifoLock(myFifoLock)) {
-//				if (headFifoLock.getTxNum() != myTxNum) {
-//					throw new RuntimeException("what the fuck sLock");
-//				}
-//				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is sLockable");
-				break;
-			} else {
-//				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on sLock " + myFifoLock.getKey());
-//				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT sLockable. The head is tx " + headFifoLock.getTxNum() + ". The sLocker is empty?" + sLockers.isEmpty() + ". The xlocker is " + xLocker.get());
-//				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
-//					headFifoLock.notifyLock();
-//				}
-				myFifoLock.waitOnLock();
-//				notifyFirst();
+				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
+					myFifoLock.waitOnLock();
+				} else {
+					break;
+				}
+			}
+		}
+	}
+
+	public void waitOrPossessSLock(FifoLock myFifoLock) {
+		waitIfHeadIsNotMe(myFifoLock);
+
+		long myTxNum = myFifoLock.getTxNum();
+		synchronized (myFifoLock) {
+			while (true) {
+				if (!sLockable(myTxNum)) {
+					myFifoLock.waitOnLock();
+				} else {
+					sLockers.add(myTxNum);
+					break;
+				}
 			}
 		}
 
-//		Thread.currentThread().setName("" + myTxNum);
-		sLockers.add(myTxNum);
-
-		/*
-		 * requestQueue.poll() should be put after sLockers.add and should be put before
-		 * notifyFirst.
-		 */
 		requestQueue.poll();
-		
-		if (requestQueue.peek() == myFifoLock) {
-			throw new RuntimeException("sLock poll fails");
-		}
-
-		/*
-		 * Transactions that get the sLock MUST notify the next transaction in the
-		 * queue. The next transaction shouldn't be blocked because sLock is shared
-		 * unless xLock is involved.
-		 */
-		notifyFirst();
+		notifyNext();
 	}
 
 	public void waitOrPossessXLock(FifoLock myFifoLock) {
@@ -107,10 +94,10 @@ public class FifoLockers {
 		 * The following example shows that a thread might not be notified.
 		 * 
 		 * Assume Thread A and Thread B come concurrently,
-		 * and both of them want to acquires xLock.
+		 * and both of them want to acquire xLock.
 		 * 
 		 * =========================================================
-		 * 			Thread A peaks the request queue (see A's proxy object)
+		 * 			Thread A peeks the request queue (see A's proxy object)
 		 * 			Thread A finds xLockable
 		 * 			Thread A finds the head of the request queue is itself
 		 * 			Thread A updates the xLocker
@@ -129,78 +116,87 @@ public class FifoLockers {
 		 * 							|
 		 * 							|
 		 * 							v
-		 * 			Thread B wait on the record
+		 * 			Thread B waits on the record
 		 * =========================================================
 		 * 
 		 */
-		long myTxNum = myFifoLock.getTxNum();
-		while (true) {
-			FifoLock headFifoLock = requestQueue.peek();
-			
-//			if (headFifoLock.getKey().hashCode() != myFifoLock.getKey().hashCode()) {
-//				throw new RuntimeException("xLock: key's hashcode is not equal" + " left: " + headFifoLock.getKey() + " right: " + myFifoLock.getKey());
-//			}
-//			
-//			if ((headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() != myFifoLock.getTxNum()))
-//					|| (!headFifoLock.isMyFifoLock(myFifoLock) && (headFifoLock.getTxNum() == myFifoLock.getTxNum()))) {
-//				throw new RuntimeException("xLock Comparison fails among threads");
-//			}
+		waitIfHeadIsNotMe(myFifoLock);
 
-			if (xLockable(myTxNum) && headFifoLock.isMyFifoLock(myFifoLock)) {
-//				if (headFifoLock.getTxNum() != myTxNum) {
-//					throw new RuntimeException("what the fuck xLock");
-//				}
-//				System.out.println(headFifoLock.getTxNum() + " " + headFifoLock.getKey() + " is xLockable");
-				break;
-			} else {
-//				Thread.currentThread().setName(Thread.currentThread().getName() + " wait on xLock " + myFifoLock.getKey());
-//				System.out.println(myFifoLock.getTxNum() + " " + myFifoLock.getKey() + " is NOT xLockable. The head is tx " + headFifoLock.getTxNum() + ". The sLocker is empty?" + sLockers.isEmpty() + ". The xlocker is " + xLocker.get());
-				
-//				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
-//					headFifoLock.notifyLock();
-//				}
-				
-				myFifoLock.waitOnLock();
-//				
+		long myTxNum = myFifoLock.getTxNum();
+		synchronized (myFifoLock) {
+			while (true) {
+				if (!xLockable(myTxNum)) {
+					myFifoLock.waitOnLock();
+				} else {
+					xLocker.set(myTxNum);
+					break;
+				}
 			}
 		}
 
-//		Thread.currentThread().setName("" + myTxNum);
-		xLocker.set(myTxNum);
-
-		/*
-		 * requestQueue.poll() should be put at the end of this function to make this
-		 * function logically atomic.
-		 */
 		requestQueue.poll();
+	}
+
+	public void releaseSLock(FifoLock myFifoLock) {
+		long myTxNum = myFifoLock.getTxNum();
 		
-		if (requestQueue.peek() == myFifoLock) {
-			throw new RuntimeException("xLock poll fails");
-		}
-	}
-
-	public void releaseSLock(long txNum) {
-		sLockers.remove(txNum);
-		notifyFirst();
-	}
-
-	public void releaseXLock(long txNum) {
-		if (txNum != xLocker.get() ) {
-			throw new RuntimeException("A transaction releases a lock that doesn't belong to itself");
-		}
-		xLocker.set(-1);
-		notifyFirst();
-	}
-
-	private void notifyFirst() {
-		FifoLock fifoLock = requestQueue.peek();
-
-		if (fifoLock == null) {
+		FifoLock nextFifoLock = requestQueue.peek();
+		if (nextFifoLock == null) {
+			sLockers.remove(myTxNum);
+			/*
+			 * Check again because there might be a transaction added after the
+			 * previous peek.
+			 */
+			nextFifoLock = requestQueue.peek();
+			if (nextFifoLock != null) {
+				synchronized (nextFifoLock) {
+					nextFifoLock.notifyLock();
+				}
+			}
 			return;
 		}
 
-		// XXX: is is possible that notify will fail?
-		// how about notify in a while loop
-		fifoLock.notifyLock();
+		synchronized (nextFifoLock) {
+			sLockers.remove(myTxNum);
+			nextFifoLock.notifyLock();
+		}
+	}
+
+	public void releaseXLock(FifoLock myFifoLock) {
+		long myTxNum = myFifoLock.getTxNum();
+		
+		FifoLock nextFifoLock = requestQueue.peek();
+		if (nextFifoLock == null) {
+			xLocker.set(-1);
+
+			/*
+			 * Check again because there might be a transaction added after the
+			 * previous peek.
+			 */
+			nextFifoLock = requestQueue.peek();
+			if (nextFifoLock == null) {
+				return;
+			} else {
+				synchronized (nextFifoLock) {
+					nextFifoLock.notifyLock();
+				}
+			}
+		}
+
+		synchronized (nextFifoLock) {
+			xLocker.set(-1);
+			nextFifoLock.notifyLock();
+		}
+	}
+
+	private void notifyNext() {
+		FifoLock nextFifoLock = requestQueue.peek();
+		if (nextFifoLock == null) {
+			return;
+		}
+
+		synchronized (nextFifoLock) {
+			nextFifoLock.notifyLock();
+		}
 	}
 }
