@@ -311,13 +311,10 @@ public class RandomizedLockTable {
 	 * 
 	 */
 	void xLockForBlock(Object obj, long txNum) {
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getBlockLatch(obj);
 
-		profiler.startComponentProfilerAtGivenStage("OU7 - xLockForBlock - syncrhonized(anchor)", 7);
 		synchronized (anchor) {
-			profiler.stopComponentProfilerAtGivenStage("OU7 - xLockForBlock - syncrhonized(anchor)", 7);
 //			long duration = System.nanoTime() - start;
 //			if (duration > 1000_000) {
 //				System.out.print("syncrhonized(anchor) > 1ms, " + (BlockId) obj);
@@ -330,7 +327,6 @@ public class RandomizedLockTable {
 
 			try {
 //				long start = System.nanoTime();
-				profiler.startComponentProfilerAtGivenStage("OU7 - xLockForBlock - while (!xLockable())", 7);
 //				int wakeUpCount = 0;
 				
 				while (!xLockable(lockers, txNum)) {
@@ -341,7 +337,6 @@ public class RandomizedLockTable {
 //				if (obj instanceof BlockId && ((BlockId) obj).toString().contains("file order_line.tbl, block 0")) {
 //					System.out.println("wakeUpCount: " + wakeUpCount + ", waitingTime: " + (System.nanoTime() - start));
 //				}
-				profiler.stopComponentProfilerAtGivenStage("OU7 - xLockForBlock - while (!xLockable())", 7);
 //				long duration = System.nanoTime() - start;
 //				if (duration > 5000_000) {
 //					System.out.print("anchor.wait() > 5ms, " + (BlockId) obj);
