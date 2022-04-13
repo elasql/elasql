@@ -10,21 +10,25 @@ import org.elasql.sql.PrimaryKey;
  *
  */
 public class FifoLock {
-	private final PrimaryKey key;
+//	private final PrimaryKey key;
 	private final long txNum;
-
-	public FifoLock(PrimaryKey key, long txNum) {
-		this.key = key;
+//
+//	public FifoLock(PrimaryKey key, long txNum) {
+//		this.key = key;
+//		this.txNum = txNum;
+//	}
+	
+	public FifoLock(long txNum) {
 		this.txNum = txNum;
 	}
 
 	public long getTxNum() {
 		return txNum;
 	}
-
-	public PrimaryKey getKey() {
-		return key;
-	}
+//
+//	public PrimaryKey getKey() {
+//		return key;
+//	}
 
 	public boolean isMyFifoLock(FifoLock fifoLock) {
 		return this == fifoLock;

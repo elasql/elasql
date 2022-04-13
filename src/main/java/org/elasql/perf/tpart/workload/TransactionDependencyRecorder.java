@@ -25,7 +25,7 @@ public class TransactionDependencyRecorder extends Task {
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 	private static final String DEPENDENCY_COLUMN = "Dependent Transaction IDs";
 
-	private static final long TIME_TO_FLUSH = 30; // in seconds
+	private static final long TIME_TO_FLUSH = 10; // in seconds
 
 	private static class DependencyRow implements Comparable<DependencyRow> {
 		Long txNum;

@@ -3,6 +3,8 @@ package org.elasql.storage.tx.concurrency.fifolocker;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.elasql.sql.PrimaryKey;
+
 /**
  * FifoLockers is used to keep which transaction possesses right to access a
  * record, and to keep those transactions which are waiting for the record.
@@ -14,6 +16,11 @@ public class FifoLockers {
 	private ConcurrentLinkedDeque<FifoLock> requestQueue = new ConcurrentLinkedDeque<FifoLock>();
 	private ConcurrentLinkedDeque<Long> sLockers = new ConcurrentLinkedDeque<Long>();
 	private AtomicLong xLocker = new AtomicLong(-1);
+	private PrimaryKey key;
+
+	public FifoLockers(PrimaryKey key) {
+		this.key = key;
+	}
 
 	private boolean sLocked() {
 		// avoid using sLockers.size() due to the cost of traversing the queue
@@ -70,11 +77,9 @@ public class FifoLockers {
 		synchronized (myFifoLock) {
 			while (true) {
 				if (!sLockable(myTxNum)) {
-					Thread.currentThread().setName(Thread.currentThread().getName() + " waits on sLock " + myFifoLock.getKey());
 					myFifoLock.waitOnLock();
 				} else {
 					sLockers.add(myTxNum);
-					Thread.currentThread().setName(Thread.currentThread().getName() + " gets sLock " + myFifoLock.getKey());
 					break;
 				}
 			}
@@ -89,10 +94,10 @@ public class FifoLockers {
 		 * The following example shows that a thread might not be notified.
 		 * 
 		 * Assume Thread A and Thread B come concurrently,
-		 * and both of them want to acquires xLock.
+		 * and both of them want to acquire xLock.
 		 * 
 		 * =========================================================
-		 * 			Thread A peaks the request queue (see A's proxy object)
+		 * 			Thread A peeks the request queue (see A's proxy object)
 		 * 			Thread A finds xLockable
 		 * 			Thread A finds the head of the request queue is itself
 		 * 			Thread A updates the xLocker
@@ -111,7 +116,7 @@ public class FifoLockers {
 		 * 							|
 		 * 							|
 		 * 							v
-		 * 			Thread B wait on the record
+		 * 			Thread B waits on the record
 		 * =========================================================
 		 * 
 		 */
@@ -121,11 +126,9 @@ public class FifoLockers {
 		synchronized (myFifoLock) {
 			while (true) {
 				if (!xLockable(myTxNum)) {
-					Thread.currentThread().setName(Thread.currentThread().getName() + " waits on xLock " + myFifoLock.getKey());
 					myFifoLock.waitOnLock();
 				} else {
 					xLocker.set(myTxNum);
-					Thread.currentThread().setName(Thread.currentThread().getName() + " gets xLock " + myFifoLock.getKey());
 					break;
 				}
 			}
@@ -134,50 +137,56 @@ public class FifoLockers {
 		requestQueue.poll();
 	}
 
-	public void releaseSLock(long txNum, FifoLock myFifoLock) {
-		Thread.currentThread().setName(Thread.currentThread().getName() + " releases sLock " + myFifoLock.getKey());
+	public void releaseSLock(FifoLock myFifoLock) {
+		long myTxNum = myFifoLock.getTxNum();
+		
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
-			sLockers.remove(txNum);
+			sLockers.remove(myTxNum);
 			/*
-			 * Check again because there is a chance that a transaction is added after the previous peek.
+			 * Check again because there might be a transaction added after the
+			 * previous peek.
 			 */
 			nextFifoLock = requestQueue.peek();
-			if (nextFifoLock == null) {
-				return;
+			if (nextFifoLock != null) {
+				synchronized (nextFifoLock) {
+					nextFifoLock.notifyLock();
+				}
 			}
+			return;
 		}
 
 		synchronized (nextFifoLock) {
-			sLockers.remove(txNum);
+			sLockers.remove(myTxNum);
 			nextFifoLock.notifyLock();
 		}
 	}
 
 	public void releaseXLock(FifoLock myFifoLock) {
-		Thread.currentThread().setName(Thread.currentThread().getName() + " releases xLock " + myFifoLock.getKey());
+		long myTxNum = myFifoLock.getTxNum();
+		
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
-			resetLockers();
-			
+			xLocker.set(-1);
+
 			/*
-			 * Check again because there is a chance that a transaction is added after the previous peek.
+			 * Check again because there might be a transaction added after the
+			 * previous peek.
 			 */
 			nextFifoLock = requestQueue.peek();
 			if (nextFifoLock == null) {
 				return;
+			} else {
+				synchronized (nextFifoLock) {
+					nextFifoLock.notifyLock();
+				}
 			}
 		}
 
 		synchronized (nextFifoLock) {
-			resetLockers();
+			xLocker.set(-1);
 			nextFifoLock.notifyLock();
 		}
-	}
-	
-	private void resetLockers() {
-		xLocker.set(-1);
-		sLockers.clear();
 	}
 
 	private void notifyNext() {

@@ -19,7 +19,6 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
-import org.elasql.storage.tx.concurrency.KeyToFifoLockMap;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
@@ -129,7 +128,6 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 
 			profiler.startComponentProfiler("OU8 - Commit");
 			tx.commit();
-//			System.out.println("tx " + txNum + " commits");
 			profiler.stopComponentProfiler("OU8 - Commit");
 
 			isCommitted = true;

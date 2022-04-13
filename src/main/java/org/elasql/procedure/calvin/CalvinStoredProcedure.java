@@ -35,7 +35,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
-import org.elasql.storage.tx.concurrency.KeyToFifoLockMap;
+import org.elasql.storage.tx.concurrency.fifolocker.FifoLock;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 import org.vanilladb.core.sql.Constant;
@@ -54,7 +54,7 @@ public abstract class CalvinStoredProcedure<H extends StoredProcedureParamHelper
 
 	private ExecutionPlan execPlan;
 	private Transaction tx;
-	private KeyToFifoLockMap keyToFifoLockMap = new KeyToFifoLockMap();
+	private FifoLock myFifoLock = new FifoLock(txNum);
 	private boolean isCommitted = false;
 
 	public CalvinStoredProcedure(long txNum, H paramHelper) {
