@@ -21,17 +21,18 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.tx.concurrency.ConservativeOrderedLockTable.LockType;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
 import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
 
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
-	protected static ConservativeOrderedLockTable lockTbl = new ConservativeOrderedLockTable();
-	
-	// For normal operations - using conservative locking 
+	protected static RandomizedLockTable randomizedLockTbl = new RandomizedLockTable();
+	protected static FifoOrderedLockTable fifoLockTbl = new FifoOrderedLockTable();
+
+	// For normal operations - using conservative locking
 	private Set<Object> bookedObjs, readObjs, writeObjs;
+	private FifoLock myFifoLock = new FifoLock(txNum);
 
 	// For Indexes - using crabbing locking
 	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
@@ -43,14 +44,11 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		readObjs = new HashSet<Object>();
 		writeObjs = new HashSet<Object>();
 	}
-	
+
 	public void bookReadKey(PrimaryKey key) {
 		if (key != null) {
-			// The key needs to be booked only once. 
-			if (!bookedObjs.contains(key))
-				lockTbl.requestLock(key, txNum);
-			
-			bookedObjs.add(key);
+			bookKeyIfAbsent(key);
+
 			readObjs.add(key);
 		}
 	}
@@ -58,74 +56,90 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Book the read lock of the specified objects.
 	 * 
-	 * @param keys
-	 *            the objects which the transaction intends to read
+	 * @param keys the objects which the transaction intends to read
 	 */
 	public void bookReadKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
-				// The key needs to be booked only once. 
-				if (!bookedObjs.contains(key))
-					lockTbl.requestLock(key, txNum);
+				bookKeyIfAbsent(key);
+
+				readObjs.add(key);
 			}
-			
-			bookedObjs.addAll(keys);
-			readObjs.addAll(keys);
 		}
 	}
-	
+
 	public void bookWriteKey(PrimaryKey key) {
 		if (key != null) {
-			// The key needs to be booked only once. 
-			if (!bookedObjs.contains(key))
-				lockTbl.requestLock(key, txNum);
-			
-			bookedObjs.add(key);
+			bookKeyIfAbsent(key);
+
 			writeObjs.add(key);
 		}
 	}
-	
+
 	/**
 	 * Book the write lock of the specified object.
 	 * 
-	 * @param keys
-	 *             the objects which the transaction intends to write
+	 * @param keys the objects which the transaction intends to write
 	 */
 	public void bookWriteKeys(Collection<PrimaryKey> keys) {
 		if (keys != null) {
 			for (PrimaryKey key : keys) {
-				// The key needs to be booked only once. 
-				if (!bookedObjs.contains(key))
-					lockTbl.requestLock(key, txNum);
+				bookKeyIfAbsent(key);
+
+				writeObjs.add(key);
 			}
-			
-			bookedObjs.addAll(keys);
-			writeObjs.addAll(keys);
 		}
 	}
-	
+
+	private void bookKeyIfAbsent(PrimaryKey key) {
+		// The key needs to be booked only once.
+		if (!bookedObjs.contains(key)) {
+			fifoLockTbl.requestLock(key, myFifoLock);
+			bookedObjs.add(key);
+		}
+	}
+
 	/**
-	 * Request (get the locks immediately) the locks which the transaction
-	 * has booked. If the locks can not be obtained in the time, it will
-	 * make the thread wait until it can obtain all locks it requests.
+	 * Request (get the locks immediately) the locks which the transaction has
+	 * booked. If the locks can not be obtained in the time, it will make the thread
+	 * wait until it can obtain all locks it requests.
 	 */
 	public void requestLocks() {
 		bookedObjs.clear();
-		
-		for (Object obj : writeObjs)
-			lockTbl.xLock(obj, txNum);
-		
-		for (Object obj : readObjs)
-			if (!writeObjs.contains(obj))
-				lockTbl.sLock(obj, txNum);
+
+		HashSet<Object> hasLockedSet = new HashSet<Object>();
+
+		for (Object obj : writeObjs) {
+			// XXX: Debugging code
+//			if (hasLockedSet.contains(obj)) {
+//				throw new RuntimeException("An key is tried to be locked twice");
+//			}
+
+			fifoLockTbl.xLock(obj, myFifoLock);
+
+			hasLockedSet.add(obj);
+		}
+
+		for (Object obj : readObjs) {
+			if (!writeObjs.contains(obj)) {
+				// XXX: Debugging code
+//				if (hasLockedSet.contains(obj)) {
+//					throw new RuntimeException("An key is tried to be locked twice");
+//				}
+
+				fifoLockTbl.sLock(obj, myFifoLock);
+
+				hasLockedSet.add(obj);
+			}
+		}
 	}
-	
+
 	@Override
 	public void onTxCommit(Transaction tx) {
 		releaseIndexLocks();
 		releaseLocks();
 	}
-	
+
 	@Override
 	public void onTxRollback(Transaction tx) {
 		releaseIndexLocks();
@@ -184,22 +198,20 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	/**
 	 * Sets lock on the leaf block for update.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void modifyLeafBlock(BlockId blk) {
-		lockTbl.xLockForBlock(blk, txNum);
+		randomizedLockTbl.xLockForBlock(blk, txNum);
 		writtenIndexBlks.add(blk);
 	}
 
 	/**
 	 * Sets lock on the leaf block for read.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void readLeafBlock(BlockId blk) {
-		lockTbl.sLockForBlock(blk, txNum);
+		randomizedLockTbl.sLockForBlock(blk, txNum);
 		readIndexBlks.add(blk);
 	}
 
@@ -207,74 +219,70 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * Sets exclusive lock on the directory block when crabbing down for
 	 * modification.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabDownDirBlockForModification(BlockId blk) {
-		lockTbl.xLockForBlock(blk, txNum);
+		randomizedLockTbl.xLockForBlock(blk, txNum);
 		writtenIndexBlks.add(blk);
 	}
 
 	/**
 	 * Sets shared lock on the directory block when crabbing down for read.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabDownDirBlockForRead(BlockId blk) {
-		lockTbl.sLockForBlock(blk, txNum);
+		randomizedLockTbl.sLockForBlock(blk, txNum);
 		readIndexBlks.add(blk);
 	}
 
 	/**
 	 * Releases exclusive locks on the directory block for crabbing back.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabBackDirBlockForModification(BlockId blk) {
-		lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
+		randomizedLockTbl.releaseForBlock(blk, txNum, RandomizedLockTable.LockType.X_LOCK);
 		writtenIndexBlks.remove(blk);
 	}
 
 	/**
 	 * Releases shared locks on the directory block for crabbing back.
 	 * 
-	 * @param blk
-	 *            the block id
+	 * @param blk the block id
 	 */
 	public void crabBackDirBlockForRead(BlockId blk) {
-		lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
+		randomizedLockTbl.releaseForBlock(blk, txNum, RandomizedLockTable.LockType.S_LOCK);
 		readIndexBlks.remove(blk);
 	}
 
 	public void releaseIndexLocks() {
 		for (BlockId blk : readIndexBlks)
-			lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.S_LOCK);
+			randomizedLockTbl.releaseForBlock(blk, txNum, RandomizedLockTable.LockType.S_LOCK);
 		for (BlockId blk : writtenIndexBlks)
-			lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
+			randomizedLockTbl.releaseForBlock(blk, txNum, RandomizedLockTable.LockType.X_LOCK);
 		readIndexBlks.clear();
 		writtenIndexBlks.clear();
 	}
 
 	@Override
 	public void lockRecordFileHeader(BlockId blk) {
-		lockTbl.xLockForBlock(blk, txNum);
+		randomizedLockTbl.xLockForBlock(blk, txNum);
 	}
-	
+
 	/**
-	 * Optimization on 2022/2/22
-	 * There are two attempts to a critical section if we use lockRecordFileHeader() to lock a record file header,
-	 * and use releaseRecordFileHeader to release a record file header.
-	 * An optimization here is to make locking a file header a single critical section.
+	 * Optimization on 2022/2/22 There are two attempts to a critical section if we
+	 * use lockRecordFileHeader() to lock a record file header, and use
+	 * releaseRecordFileHeader to release a record file header. An optimization here
+	 * is to make locking a file header a single critical section.
 	 */
 	@Override
 	public ReentrantLock getLockForFileHeader(BlockId blk) {
-		return lockTbl.getFhpLatch(blk);
+		return randomizedLockTbl.getFhpLatch(blk);
 	}
 
 	public void releaseRecordFileHeader(BlockId blk) {
-		lockTbl.releaseForBlock(blk, txNum, ConservativeOrderedLockTable.LockType.X_LOCK);
+		randomizedLockTbl.releaseForBlock(blk, txNum, RandomizedLockTable.LockType.X_LOCK);
 	}
 
 	@Override
@@ -286,15 +294,18 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	public void readRecord(RecordId recId) {
 		// do nothing
 	}
-	
+
 	private void releaseLocks() {
-		for (Object obj : writeObjs)
-			lockTbl.release(obj, txNum, LockType.X_LOCK);
-		
-		for (Object obj : readObjs)
-			if (!writeObjs.contains(obj))
-				lockTbl.release(obj, txNum, LockType.S_LOCK);
-		
+		for (Object obj : writeObjs) {
+			fifoLockTbl.releaseXLock(obj, myFifoLock);
+		}
+
+		for (Object obj : readObjs) {
+			if (!writeObjs.contains(obj)) {
+				fifoLockTbl.releaseSLock(obj, myFifoLock);
+			}
+
+		}
 		readObjs.clear();
 		writeObjs.clear();
 	}

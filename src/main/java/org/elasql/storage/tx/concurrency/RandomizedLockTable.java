@@ -20,8 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.vanilladb.core.server.VanillaDb;
@@ -30,7 +28,7 @@ import org.vanilladb.core.storage.tx.concurrency.LockAbortException;
 import org.vanilladb.core.util.StripedLatchObserver;
 import org.vanilladb.core.util.TransactionProfiler;
 
-public class ConservativeOrderedLockTable {
+public class RandomizedLockTable {
 
 	private static final int NUM_ANCHOR = 1009;
 
@@ -80,7 +78,7 @@ public class ConservativeOrderedLockTable {
 	/**
 	 * Create and initialize a conservative ordered lock table.
 	 */
-	public ConservativeOrderedLockTable() {
+	public RandomizedLockTable() {
 		// Initialize anchors
 		for (int i = 0; i < NUM_ANCHOR; ++i) {
 			recordLatches[i] = new Object();
@@ -313,13 +311,10 @@ public class ConservativeOrderedLockTable {
 	 * 
 	 */
 	void xLockForBlock(Object obj, long txNum) {
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getBlockLatch(obj);
 
-		profiler.startComponentProfilerAtGivenStage("OU7 - xLockForBlock - syncrhonized(anchor)", 7);
 		synchronized (anchor) {
-			profiler.stopComponentProfilerAtGivenStage("OU7 - xLockForBlock - syncrhonized(anchor)", 7);
 //			long duration = System.nanoTime() - start;
 //			if (duration > 1000_000) {
 //				System.out.print("syncrhonized(anchor) > 1ms, " + (BlockId) obj);
@@ -332,7 +327,6 @@ public class ConservativeOrderedLockTable {
 
 			try {
 //				long start = System.nanoTime();
-				profiler.startComponentProfilerAtGivenStage("OU7 - xLockForBlock - while (!xLockable())", 7);
 //				int wakeUpCount = 0;
 				
 				while (!xLockable(lockers, txNum)) {
@@ -343,7 +337,6 @@ public class ConservativeOrderedLockTable {
 //				if (obj instanceof BlockId && ((BlockId) obj).toString().contains("file order_line.tbl, block 0")) {
 //					System.out.println("wakeUpCount: " + wakeUpCount + ", waitingTime: " + (System.nanoTime() - start));
 //				}
-				profiler.stopComponentProfilerAtGivenStage("OU7 - xLockForBlock - while (!xLockable())", 7);
 //				long duration = System.nanoTime() - start;
 //				if (duration > 5000_000) {
 //					System.out.print("anchor.wait() > 5ms, " + (BlockId) obj);
