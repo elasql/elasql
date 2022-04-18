@@ -1,26 +1,19 @@
-package org.elasql.storage.tx.concurrency.fifolocker;
+package org.elasql.storage.tx.concurrency;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.elasql.sql.PrimaryKey;
 
 /**
  * FifoLockers is used to keep which transaction possesses right to access a
  * record, and to keep those transactions which are waiting for the record.
  * 
- * @author Pin-Yu Wang
+ * @author Pin-Yu Wang, Yu-Shan Lin
  *
  */
 public class FifoLockers {
 	private ConcurrentLinkedDeque<FifoLock> requestQueue = new ConcurrentLinkedDeque<FifoLock>();
 	private ConcurrentLinkedDeque<Long> sLockers = new ConcurrentLinkedDeque<Long>();
 	private AtomicLong xLocker = new AtomicLong(-1);
-	private PrimaryKey key;
-
-	public FifoLockers(PrimaryKey key) {
-		this.key = key;
-	}
 
 	private boolean sLocked() {
 		// avoid using sLockers.size() due to the cost of traversing the queue
@@ -29,10 +22,6 @@ public class FifoLockers {
 
 	private boolean xLocked() {
 		return xLocker.get() != -1;
-	}
-
-	private boolean hasSLock(long txNum) {
-		return sLockers.contains(txNum);
 	}
 
 	private boolean hasXLock(long txNum) {
@@ -51,7 +40,7 @@ public class FifoLockers {
 		return (!sLocked() || isTheOnlySLocker(txNum)) && (!xLocked() || hasXLock(txNum));
 	}
 
-	public void addToRequestQueue(FifoLock fifoLock) {
+	void addToRequestQueue(FifoLock fifoLock) {
 		requestQueue.add(fifoLock);
 //		System.out.println("head is " + requestQueue.peek().getTxNum() + " tail is " + requestQueue.peekLast().getTxNum());
 	}
@@ -70,7 +59,7 @@ public class FifoLockers {
 		}
 	}
 
-	public void waitOrPossessSLock(FifoLock myFifoLock) {
+	void waitOrPossessSLock(FifoLock myFifoLock) {
 		waitIfHeadIsNotMe(myFifoLock);
 
 		long myTxNum = myFifoLock.getTxNum();
@@ -89,7 +78,7 @@ public class FifoLockers {
 		notifyNext();
 	}
 
-	public void waitOrPossessXLock(FifoLock myFifoLock) {
+	void waitOrPossessXLock(FifoLock myFifoLock) {
 		/*-
 		 * The following example shows that a thread might not be notified.
 		 * 
@@ -137,7 +126,7 @@ public class FifoLockers {
 		requestQueue.poll();
 	}
 
-	public void releaseSLock(FifoLock myFifoLock) {
+	void releaseSLock(FifoLock myFifoLock) {
 		long myTxNum = myFifoLock.getTxNum();
 		
 		FifoLock nextFifoLock = requestQueue.peek();
@@ -162,9 +151,7 @@ public class FifoLockers {
 		}
 	}
 
-	public void releaseXLock(FifoLock myFifoLock) {
-		long myTxNum = myFifoLock.getTxNum();
-		
+	void releaseXLock(FifoLock myFifoLock) {
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
 			xLocker.set(-1);
