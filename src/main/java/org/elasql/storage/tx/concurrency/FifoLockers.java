@@ -45,7 +45,7 @@ public class FifoLockers {
 //		System.out.println("head is " + requestQueue.peek().getTxNum() + " tail is " + requestQueue.peekLast().getTxNum());
 	}
 
-	private void waitIfHeadIsNotMe(FifoLock myFifoLock) {
+	private void waitIfHeadIsNotSelf(FifoLock myFifoLock) {
 		while (true) {
 			synchronized (myFifoLock) {
 				FifoLock headFifoLock = requestQueue.peek();
@@ -60,7 +60,7 @@ public class FifoLockers {
 	}
 
 	void waitOrPossessSLock(FifoLock myFifoLock) {
-		waitIfHeadIsNotMe(myFifoLock);
+		waitIfHeadIsNotSelf(myFifoLock);
 
 		long myTxNum = myFifoLock.getTxNum();
 		synchronized (myFifoLock) {
@@ -109,7 +109,7 @@ public class FifoLockers {
 		 * =========================================================
 		 * 
 		 */
-		waitIfHeadIsNotMe(myFifoLock);
+		waitIfHeadIsNotSelf(myFifoLock);
 
 		long myTxNum = myFifoLock.getTxNum();
 		synchronized (myFifoLock) {
