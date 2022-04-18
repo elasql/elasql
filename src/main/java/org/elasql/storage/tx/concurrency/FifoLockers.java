@@ -46,6 +46,8 @@ public class FifoLockers {
 	}
 
 	private void waitIfHeadIsNotMe(FifoLock myFifoLock) {
+		long startTime = System.nanoTime();
+		
 		while (true) {
 			synchronized (myFifoLock) {
 				FifoLock headFifoLock = requestQueue.peek();
@@ -55,13 +57,18 @@ public class FifoLockers {
 				} else {
 					break;
 				}
+				
+				if (System.nanoTime() - startTime > 1_000_000_000L ) {
+					throw new RuntimeException("A tx waited to be at the head of the request queue for at least 1s");
+				}
 			}
 		}
 	}
 
 	void waitOrPossessSLock(FifoLock myFifoLock) {
 		waitIfHeadIsNotMe(myFifoLock);
-
+		
+		long startTime = System.nanoTime();
 		long myTxNum = myFifoLock.getTxNum();
 		synchronized (myFifoLock) {
 			while (true) {
@@ -70,6 +77,10 @@ public class FifoLockers {
 				} else {
 					sLockers.add(myTxNum);
 					break;
+				}
+				
+				if (System.nanoTime() - startTime > 1_000_000_000L ) {
+					throw new RuntimeException("A tx waited for sLock for at least 1s");
 				}
 			}
 		}
@@ -111,6 +122,7 @@ public class FifoLockers {
 		 */
 		waitIfHeadIsNotMe(myFifoLock);
 
+		long startTime = System.nanoTime();
 		long myTxNum = myFifoLock.getTxNum();
 		synchronized (myFifoLock) {
 			while (true) {
@@ -119,6 +131,10 @@ public class FifoLockers {
 				} else {
 					xLocker.set(myTxNum);
 					break;
+				}
+				
+				if (System.nanoTime() - startTime > 1_000_000_000L ) {
+					throw new RuntimeException("A tx waited for xLock for at least 1s");
 				}
 			}
 		}
