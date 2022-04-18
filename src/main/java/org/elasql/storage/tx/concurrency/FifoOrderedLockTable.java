@@ -3,8 +3,6 @@ package org.elasql.storage.tx.concurrency;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.tx.concurrency.fifolocker.FifoLock;
-import org.elasql.storage.tx.concurrency.fifolocker.FifoLockers;
 
 /**
  * FifoOrderedLockTable is actually a ConservativeOrderedLockTable. However, in
@@ -39,7 +37,7 @@ public class FifoOrderedLockTable {
 			 * be ignored. After that, the two threads will get the exactly same FifoLockers
 			 * from the map again.
 			 */
-			lockerMap.putIfAbsent(obj, new FifoLockers((PrimaryKey) obj));
+			lockerMap.putIfAbsent(obj, new FifoLockers());
 		}
 
 		FifoLockers lks = lockerMap.get(obj);

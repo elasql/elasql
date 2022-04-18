@@ -21,12 +21,10 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.tx.concurrency.fifolocker.FifoLock;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
 import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
-import org.vanilladb.core.util.TransactionProfiler;
 
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	protected static RandomizedLockTable randomizedLockTbl = new RandomizedLockTable();
@@ -112,11 +110,11 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		HashSet<Object> hasLockedSet = new HashSet<Object>();
 
 		for (Object obj : writeObjs) {
-			if (hasLockedSet.contains(obj)) {
-				throw new RuntimeException("An key is tried to be locked twice");
-			}
+			// XXX: Debugging code
+//			if (hasLockedSet.contains(obj)) {
+//				throw new RuntimeException("An key is tried to be locked twice");
+//			}
 
-//			FifoLock fifoLock = keyToFifoLockMap.lookForFifoLock(obj);
 			fifoLockTbl.xLock(obj, myFifoLock);
 
 			hasLockedSet.add(obj);
@@ -124,9 +122,10 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 
 		for (Object obj : readObjs) {
 			if (!writeObjs.contains(obj)) {
-				if (hasLockedSet.contains(obj)) {
-					throw new RuntimeException("An key is tried to be locked twice");
-				}
+				// XXX: Debugging code
+//				if (hasLockedSet.contains(obj)) {
+//					throw new RuntimeException("An key is tried to be locked twice");
+//				}
 
 				fifoLockTbl.sLock(obj, myFifoLock);
 
