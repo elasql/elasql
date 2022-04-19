@@ -58,8 +58,8 @@ public class FifoLockers {
 					break;
 				}
 				
-				if (System.nanoTime() - startTime > 1_000_000_000L ) {
-					throw new RuntimeException("A tx waited to be at the head of the request queue for at least 1s");
+				if (System.nanoTime() - startTime > 60_000_000_000L ) {
+					throw new RuntimeException("A tx waited to be at the head of the request queue for at least 60s");
 				}
 			}
 		}
@@ -79,8 +79,8 @@ public class FifoLockers {
 					break;
 				}
 				
-				if (System.nanoTime() - startTime > 1_000_000_000L ) {
-					throw new RuntimeException("A tx waited for sLock for at least 1s");
+				if (System.nanoTime() - startTime > 60_000_000_000L ) {
+					throw new RuntimeException("A tx waited for sLock for at least 60s");
 				}
 			}
 		}
@@ -133,8 +133,8 @@ public class FifoLockers {
 					break;
 				}
 				
-				if (System.nanoTime() - startTime > 1_000_000_000L ) {
-					throw new RuntimeException("A tx waited for xLock for at least 1s");
+				if (System.nanoTime() - startTime > 60_000_000_000L ) {
+					throw new RuntimeException("A tx waited for xLock for at least 60s");
 				}
 			}
 		}
