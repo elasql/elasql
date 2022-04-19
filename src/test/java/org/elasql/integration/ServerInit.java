@@ -113,22 +113,22 @@ public class ServerInit {
 		Planner planner = VanillaDb.newPlanner();
 
 		// Create a table
-		planner.executeUpdate("CREATE TABLE elasql_test (id INT, value INT, overload INT)", tx);
+		planner.executeUpdate("CREATE TABLE elasql_test_add (id INT, value INT, overflow INT)", tx);
 
 		// Create an index
-		planner.executeUpdate("CREATE INDEX id_idx ON elasql_test (id) USING BTREE", tx);
+		planner.executeUpdate("CREATE INDEX id_idx ON elasql_test_add (id) USING BTREE", tx);
 
 		// Insert a few records
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (0, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (1, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (2, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (3, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (4, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (5, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (6, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (7, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (8, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overload) VALUES (9, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (0, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (1, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (2, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (3, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (4, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (5, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (6, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (7, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (8, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (9, 0, 0)", tx);
 
 		tx.commit();
 

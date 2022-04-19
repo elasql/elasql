@@ -5,33 +5,71 @@ import java.util.Map;
 import org.elasql.cache.CachedRecord;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.sql.PrimaryKey;
+import org.elasql.sql.PrimaryKeyBuilder;
+import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.IntegerConstant;
 
+/*
+ * See executeSql for more information about the transaction's logic
+ */
 public class ItgrTestProc extends TPartStoredProcedure<ItgrTestProcParamHelper> {
-	// Protected resource
-//	protected long txNum;
-//	protected H paramHelper;
-//	protected int localNodeId;
-//	protected Transaction tx;
-
+	Constant idCon, valueCon, overflowCon;
+	
+	private PrimaryKey addKey;
+	
 	public ItgrTestProc(long txNum) {
 		super(txNum, new ItgrTestProcParamHelper());
 	}
 
 	@Override
 	public double getWeight() {
-		// TODO Auto-generated method stub
-		return 0;
+		return 2;
 	}
 
 	@Override
 	protected void prepareKeys() {
-		// TODO Auto-generated method stub
-
+		PrimaryKeyBuilder builder = new PrimaryKeyBuilder("elasql_test_add");
+		
+		idCon = new IntegerConstant((int)(txNum % 10));
+		
+		builder.addFldVal("id", idCon);
+		addKey = builder.build();
+		
+		addReadKey(addKey);
+		addUpdateKey(addKey);
 	}
 
+	/*-
+	 * SELECT id, value, overflow FROM elasql_test WHERE id = my_tx_id's last digit;
+	 * 
+	 * Transaction's logic:
+	 * ---------------------------------------------------------
+	 * new_value = value * 10 + my_tx_id's last digit;
+	 * if (new_value > 1_000_000) {
+	 * 			new_value = 0;	
+	 * 			overflow += 1;
+	 * }
+	 * ---------------------------------------------------------
+	 * 
+	 * UPDATE elasql_test SET value=new_value, overflow=overflow where id = my_tx_id's last_digit;
+	 */
 	@Override
 	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
-		// TODO Auto-generated method stub
-
+		CachedRecord rec = null;
+		
+		rec = readings.get(addKey);
+		
+		int val = (int) rec.getVal("value").asJavaVal();
+		val = val * 10 + (int)(txNum % 10);
+		
+		int overflow = (int) rec.getVal("overflow").asJavaVal();
+		if (val > 1_000_000) {
+			val = 0;
+			overflow += 1;
+			rec.setVal("overflow", new IntegerConstant(overflow));
+		}
+		rec.setVal("value", new IntegerConstant(val));
+		
+		update(addKey, rec);
 	}
 }
