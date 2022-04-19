@@ -16,7 +16,9 @@ public class IntegrationTest {
 	private final static int PSEUDO_CLIENT_ID = 0;
 	private final static int ITGR_TEST_PROC_ID = 0;
 	private final static int ITGR_TEST_VALIDATION_PROC_ID = 1;
-	private final static int TX_NUMS = 100000;
+	private final static int TX_NUMS = 1000_000;
+
+	private ConcurrentLinkedQueue<Integer> completedTxs;
 
 	@BeforeClass
 	public static void init() {
@@ -27,39 +29,78 @@ public class IntegrationTest {
 			logger.info("Integration test begins");
 	}
 
-	@Test
-	public void testRecordCorrectness() {
-		ConcurrentLinkedQueue<Integer> completedTxs = ServerInit.getCompletedTxsContainer();
-		
+	void scheduleSpCall(int pid, int txId) {
 		Object[] psuedoPars = new Object[10];
 
-		for (int txId = 0; txId < TX_NUMS; txId++) {
-			StoredProcedureCall spc = new StoredProcedureCall(PSEUDO_CLIENT_ID, ITGR_TEST_PROC_ID, psuedoPars);
+		StoredProcedureCall spc = new StoredProcedureCall(PSEUDO_CLIENT_ID, pid, psuedoPars);
 
-			// set TxNum
-			spc.setTxNum(txId);
+		// set TxNum
+		spc.setTxNum(txId);
 
-			TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-			profiler.reset();
-			profiler.startExecution();
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		profiler.reset();
+		profiler.startExecution();
 
-			// set Profiler
-			spc.setProfiler(TransactionProfiler.takeOut());
+		// set Profiler
+		spc.setProfiler(TransactionProfiler.takeOut());
 
-			Elasql.scheduler().schedule(spc);
+		Elasql.scheduler().schedule(spc);
+	}
+
+	void scheduleTestSpCalls() {
+		for (int txId = 1; txId < TX_NUMS; txId++) {
+			scheduleSpCall(ITGR_TEST_PROC_ID, txId);
 		}
-		while (completedTxs.size() != TX_NUMS) {
+	}
+
+	void scheduleValidationSpCall() {
+		scheduleSpCall(ITGR_TEST_VALIDATION_PROC_ID, TX_NUMS + 1);
+	}
+
+	void waitForTxsCommit() {
+		// Tx id starts from 1 to 999999
+		while (completedTxs.size() != TX_NUMS - 1) {
 			if (logger.isLoggable(Level.INFO))
 				logger.info("Amount of comitted transaction: " + completedTxs.size());
 			try {
-				
+
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	void validateData() {
+		scheduleValidationSpCall();
+
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		if (completedTxs.size() == TX_NUMS) {
+			Assert.assertTrue(false);
+			if (logger.isLoggable(Level.INFO)) {
+				logger.info("Integration test failed");
+			}
+		}
 		
-		if (logger.isLoggable(Level.INFO))
+	}
+
+	@Test
+	public void testRecordCorrectness() {
+		completedTxs = ServerInit.getCompletedTxsContainer();
+
+		scheduleTestSpCalls();
+
+		waitForTxsCommit();
+
+		validateData();
+
+		if (logger.isLoggable(Level.INFO)) {
 			logger.info("PASS integration test");
+		}
 	}
 }

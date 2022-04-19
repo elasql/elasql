@@ -62,7 +62,9 @@ public class TPartStoredProcedureTask
 		
 		// Notify test module 
 		if (Elasql.testMode) {
-			Elasql.registerCompletedTxs((int)txNum);
+			if (rs.isCommitted()) {
+				Elasql.registerCompletedTxs((int)txNum);
+			}
 			return;
 		}
 		
