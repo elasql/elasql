@@ -2,6 +2,7 @@ package org.elasql.integration;
 
 import java.io.File;
 import java.sql.Connection;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,8 +19,9 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class ServerInit {
 	private static Logger logger = Logger.getLogger(ServerInit.class.getName());
 
-	static final String DB_MAIN_DIR = "elasql_testdbs";
 	static final int NODE_ID = 0;
+	static final String DB_MAIN_DIR = "elasql_testdbs";
+	static ConcurrentLinkedQueue<Integer> completedTxs = null;
 
 	static String resetDb(Class<?> testClass) {
 		String testClassName = testClass.getName();
@@ -56,6 +58,10 @@ public class ServerInit {
 
 	private static TPartStoredProcedureFactory getTpartSpFactory() {
 		return new ItgrTestStoredProcFactory();
+	}
+	
+	static ConcurrentLinkedQueue<Integer> getCompletedTxsContainer() {
+		return completedTxs;
 	}
 
 	static void init(Class<?> testClass) {
@@ -99,6 +105,9 @@ public class ServerInit {
 			logger.info("ElaSQL.DdLogMgr is initialized");
 		}
 
+		completedTxs = new ConcurrentLinkedQueue<Integer>();
+		Elasql.setCompletedTxsContainer(completedTxs);
+
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info("ElaSQL is initialized");
 		}
@@ -119,16 +128,16 @@ public class ServerInit {
 		planner.executeUpdate("CREATE INDEX id_idx ON elasql_test_add (id) USING BTREE", tx);
 
 		// Insert a few records
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (0, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (1, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (2, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (3, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (4, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (5, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (6, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (7, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (8, 0, 0)", tx);
-		planner.executeUpdate("INSERT INTO elasql_test (id, value, overflow) VALUES (9, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (0, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (1, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (2, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (3, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (4, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (5, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (6, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (7, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (8, 0, 0)", tx);
+		planner.executeUpdate("INSERT INTO elasql_test_add (id, value, overflow) VALUES (9, 0, 0)", tx);
 
 		tx.commit();
 

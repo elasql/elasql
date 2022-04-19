@@ -8,19 +8,15 @@ public class ItgrTestValidationProcParamHelper extends StoredProcedureParamHelpe
 
 	@Override
 	public void prepareParameters(Object... pars) {
-		// TODO Auto-generated method stub
-
 	}
 
 	@Override
 	public Schema getResultSetSchema() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
 	public SpResultRecord newResultSetRecord() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 

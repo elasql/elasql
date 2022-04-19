@@ -15,6 +15,7 @@
  *******************************************************************************/ 
 package org.elasql.server; 
  
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -59,7 +60,10 @@ public class Elasql extends VanillaDb {
 	private static Logger logger = Logger.getLogger(VanillaDb.class.getName()); 
  
 	public static final long START_TX_NUMBER = 0; 
-	public static final long START_TIME_MS = System.currentTimeMillis(); 
+	public static final long START_TIME_MS = System.currentTimeMillis();
+	public static boolean testMode = false;
+	
+	private static ConcurrentLinkedQueue<Integer> completedTxs = null;
  
 	/** 
 	 * The type of transactional execution engine supported by distributed 
@@ -101,8 +105,6 @@ public class Elasql extends VanillaDb {
 		ENABLE_STAND_ALONE_SEQUENCER = ElasqlProperties.getLoader().getPropertyAsBoolean( 
 				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false);
 	}
-	
-	public static boolean testMode = false;
  
 	// DD modules 
 	private static ConnectionMgr connMgr; 
@@ -117,7 +119,16 @@ public class Elasql extends VanillaDb {
 	private static PerformanceManager performanceMgr; 
  
 	// connection information 
-	private static int myNodeId; 
+	private static int myNodeId;
+	
+	// For Elasql.Test
+	public static void setCompletedTxsContainer(ConcurrentLinkedQueue<Integer> completedTxs) {
+		Elasql.completedTxs = completedTxs;
+	}
+	
+	public static void registerCompletedTxs(int txNum) {
+		Elasql.completedTxs.add(txNum);
+	}
 	 
 	/** 
 	 * Initializes the system. This method is called during system startup. For 

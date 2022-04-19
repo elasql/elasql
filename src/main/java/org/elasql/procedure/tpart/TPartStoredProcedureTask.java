@@ -60,6 +60,12 @@ public class TPartStoredProcedureTask
 		// Stop the profiler for the whole execution
 		profiler.stopExecution();
 		
+		// Notify test module 
+		if (Elasql.testMode) {
+			Elasql.registerCompletedTxs((int)txNum);
+			return;
+		}
+		
 		if (tsp.isMaster()) {
 			if (clientId != -1)
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
