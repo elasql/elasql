@@ -29,10 +29,17 @@ public class PartitionMetaMgr {
 	public static final int NUM_PARTITIONS;
 
 	static {
-		if (Elasql.ENABLE_STAND_ALONE_SEQUENCER) {
-			NUM_PARTITIONS = VanillaCommServer.getServerCount() - 1;
+		/*
+		 * We won't initializ vanillaComm in the test mode.
+		 */
+		if (Elasql.testMode) {
+			NUM_PARTITIONS = 1;
 		} else {
-			NUM_PARTITIONS = VanillaCommServer.getServerCount();
+			if (Elasql.ENABLE_STAND_ALONE_SEQUENCER) {
+				NUM_PARTITIONS = VanillaCommServer.getServerCount() - 1;
+			} else {
+				NUM_PARTITIONS = VanillaCommServer.getServerCount();
+			}
 		}
 	}
 

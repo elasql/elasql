@@ -60,25 +60,55 @@ public class ServerInit {
 
 	static void init(Class<?> testClass) {
 		String dbName = resetDb(testClass);
-		
+
 		VanillaDb.init(dbName);
-		
+
 		if (logger.isLoggable(Level.INFO)) {
-			logger.info("Vanilladb is initialized");
+			logger.info("VanillaCore is initialized");
 		}
-		
-		PartitionPlan partitionPlan = new HashPartitionPlan();
+
+		if (!VanillaDb.isInited()) {
+			throw new RuntimeException("Vanillacore hasn't been initialized");
+		}
+
+		/*
+		 * Enable testMode or we might get errors because lots of component depends on
+		 * VanillComm, which won't be initialized during the test.
+		 */
+		Elasql.testMode = true;
+
+		PartitionPlan partitionPlan = new HashPartitionPlan(1);
+
 		Elasql.initCacheMgr();
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info("ElaSQL.CacheMgr is initialized");
+		}
+
 		Elasql.initPartitionMetaMgr(partitionPlan);
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info("ElaSQL.PartitionMetaMgr is initialized");
+		}
+
 		Elasql.initScheduler(getTpartSpFactory(), null);
-		Elasql.initDdLogMgr(); 
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info("ElaSQL.Scheduler is initialized");
+		}
+
+		Elasql.initDdLogMgr();
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info("ElaSQL.DdLogMgr is initialized");
+		}
+
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info("ElaSQL is initialized");
+		}
 	}
 
 	static void loadTestBed() {
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info("Testing data is loading");
 		}
-		
+
 		Transaction tx = VanillaDb.txMgr().newTransaction(Connection.TRANSACTION_SERIALIZABLE, false);
 		Planner planner = VanillaDb.newPlanner();
 
