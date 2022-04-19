@@ -80,13 +80,7 @@ public class IntegrationTest {
 			e.printStackTrace();
 		}
 
-		if (completedTxs.size() == TX_NUMS) {
-			Assert.assertTrue(false);
-			if (logger.isLoggable(Level.INFO)) {
-				logger.info("Integration test failed");
-			}
-		}
-		
+		Assert.assertTrue(completedTxs.size() == TX_NUMS);
 	}
 
 	@Test
