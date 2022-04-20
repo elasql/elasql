@@ -25,8 +25,9 @@ public class IntegrationTest {
 		ServerInit.init(IntegrationTest.class);
 		ServerInit.loadTestBed();
 
-		if (logger.isLoggable(Level.INFO))
+		if (logger.isLoggable(Level.INFO)) {
 			logger.info("Integration test begins");
+		}
 	}
 
 	void scheduleSpCall(int pid, int txId) {
