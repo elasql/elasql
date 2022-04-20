@@ -16,9 +16,9 @@ public class IntegrationTest {
 	private final static int PSEUDO_CLIENT_ID = 0;
 	private final static int ITGR_TEST_PROC_ID = 0;
 	private final static int ITGR_TEST_VALIDATION_PROC_ID = 1;
-	private final static int TX_NUMS = 1000_000;
-
 	private ConcurrentLinkedQueue<Integer> completedTxs;
+
+	public static int TX_NUMS = 10000;
 
 	@BeforeClass
 	public static void init() {
