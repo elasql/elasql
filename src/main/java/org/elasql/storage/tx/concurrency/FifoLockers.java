@@ -110,7 +110,6 @@ public class FifoLockers {
 		 */
 		waitIfHeadIsNotSelf(myFifoLock);
 
-		long startTime = System.nanoTime();
 		long myTxNum = myFifoLock.getTxNum();
 		synchronized (myFifoLock) {
 			while (true) {
