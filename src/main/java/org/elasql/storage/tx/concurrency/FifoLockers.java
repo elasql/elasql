@@ -2,8 +2,6 @@ package org.elasql.storage.tx.concurrency;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * FifoLockers is used to keep which transaction possesses right to access a

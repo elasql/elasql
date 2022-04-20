@@ -59,8 +59,10 @@ public class ItgrTestProc extends TPartStoredProcedure<ItgrTestProcParamHelper> 
 		
 		rec = readings.get(addKey);
 		
+		int rid = (int) rec.getVal("id").asJavaVal();
+		
 		int val = (int) rec.getVal("value").asJavaVal();
-		val = val * 10 + (int)(txNum % 10);
+		val = val * 10 + rid;
 		
 		int overflow = (int) rec.getVal("overflow").asJavaVal();
 		if (val > 1_000_000) {

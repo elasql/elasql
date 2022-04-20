@@ -16,30 +16,8 @@ public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidat
 
 	private PrimaryKey[] addKeys = new PrimaryKey[10];
 
-	private int[] valueAns;
-	private int[] overflowAns;
-
 	public ItgrTestValidationProc(long txNum) {
 		super(txNum, new ItgrTestValidationProcParamHelper());
-
-		if (IntegrationTest.TX_NUMS == 100) {
-			int[] values = { 0, 111, 222, 333, 444, 555, 666, 777, 888, 999 };
-			int[] overflows = { 0, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-			valueAns = values;
-			overflowAns = overflows;
-		} else if (IntegrationTest.TX_NUMS == 10000) {
-			int[] values = { 0, 111111, 222222, 333333, 444444, 555555, 666666, 777777, 888888, 999999 };
-			int[] overflows = { 0, 142, 142, 142, 142, 142, 142, 142, 142, 142 };
-			valueAns = values;
-			overflowAns = overflows;
-		} else if (IntegrationTest.TX_NUMS == 1000000) {
-			int[] values = { 0, 11111, 22222, 33333, 44444, 55555, 66666, 77777, 88888, 99999 };
-			int[] overflows = { 0, 14285, 14285, 14285, 14285, 14285, 14285, 14285, 14285, 14285 };
-			valueAns = values;
-			overflowAns = overflows;
-		} else {
-			throw new RuntimeException("TX_NUMS should be 10000 or 1000000, otherwise you should add a new answer.");
-		}
 	}
 
 	@Override
@@ -51,8 +29,8 @@ public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidat
 	protected void prepareKeys() {
 		PrimaryKeyBuilder builder;
 
-		// only 10 ids in elasql_test_add table
-		for (int i = 0; i < 10; i++) {
+		// only IntegrationTest.TABLE_ROW_NUM ids in elasql_test_add table
+		for (int i = 0; i < IntegrationTest.TABLE_ROW_NUM; i++) {
 			builder = new PrimaryKeyBuilder("elasql_test_add");
 			builder.addFldVal("id", new IntegerConstant(i));
 			addKeys[i] = builder.build();
@@ -64,7 +42,12 @@ public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidat
 	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
 		CachedRecord rec = null;
 
-		for (int i = 0; i < 10; i++) {
+		int[] valueAns = new int[10];
+		int[] overflowAns = new int[10];
+
+		calculateCurrentAnswer(valueAns, overflowAns);
+
+		for (int i = 0; i < IntegrationTest.TABLE_ROW_NUM; i++) {
 			rec = readings.get(addKeys[i]);
 			int val = (int) rec.getVal("value").asJavaVal();
 			int overflow = (int) rec.getVal("overflow").asJavaVal();
@@ -79,7 +62,39 @@ public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidat
 				}
 			}
 		}
-
 	}
 
+	void calculateCurrentAnswer(int[] valueAns, int[] overflowAns) {
+		int[][] fakeTbl = new int[10][3];
+
+		// initialize fakeTbl
+		for (int rid = 0; rid < IntegrationTest.TABLE_ROW_NUM; rid++) {
+			fakeTbl[rid][0] = rid;
+			fakeTbl[rid][1] = 0;
+			fakeTbl[rid][2] = 0;
+		}
+
+		// deterministic calculate fakeTbl results
+		for (int txId = 0; txId < txNum; txId++) {
+			int rid = fakeTbl[txId % 10][0];
+
+			int value = fakeTbl[rid][1];
+			int overflow = fakeTbl[rid][2];
+
+			value = value * 10 + rid;
+			if (value > 1_000_000) {
+				value = 0;
+				overflow += 1;
+			}
+
+			fakeTbl[rid][1] = value;
+			fakeTbl[rid][2] = overflow;
+		}
+
+		// apply answer back
+		for (int rid = 0; rid < IntegrationTest.TABLE_ROW_NUM; rid++) {
+			valueAns[rid] = fakeTbl[rid][1];
+			overflowAns[rid] = fakeTbl[rid][2];
+		}
+	}
 }

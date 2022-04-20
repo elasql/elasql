@@ -64,6 +64,8 @@ public class TPartStoredProcedureTask
 		if (Elasql.testMode) {
 			if (rs.isCommitted()) {
 				Elasql.registerCompletedTxs((int)txNum);
+			} else {
+				Elasql.registerErrorTxs((int)txNum);
 			}
 			return;
 		}
