@@ -42,12 +42,9 @@ public class FifoLockers {
 
 	void addToRequestQueue(FifoLock fifoLock) {
 		requestQueue.add(fifoLock);
-//		System.out.println("head is " + requestQueue.peek().getTxNum() + " tail is " + requestQueue.peekLast().getTxNum());
 	}
 
-	private void waitIfHeadIsNotMe(FifoLock myFifoLock) {
-		long startTime = System.nanoTime();
-		
+	private void waitIfHeadIsNotSelf(FifoLock myFifoLock) {
 		while (true) {
 			synchronized (myFifoLock) {
 				FifoLock headFifoLock = requestQueue.peek();
@@ -66,9 +63,8 @@ public class FifoLockers {
 	}
 
 	void waitOrPossessSLock(FifoLock myFifoLock) {
-		waitIfHeadIsNotMe(myFifoLock);
-		
-		long startTime = System.nanoTime();
+		waitIfHeadIsNotSelf(myFifoLock);
+
 		long myTxNum = myFifoLock.getTxNum();
 		synchronized (myFifoLock) {
 			while (true) {
@@ -120,7 +116,7 @@ public class FifoLockers {
 		 * =========================================================
 		 * 
 		 */
-		waitIfHeadIsNotMe(myFifoLock);
+		waitIfHeadIsNotSelf(myFifoLock);
 
 		long startTime = System.nanoTime();
 		long myTxNum = myFifoLock.getTxNum();
@@ -144,13 +140,13 @@ public class FifoLockers {
 
 	void releaseSLock(FifoLock myFifoLock) {
 		long myTxNum = myFifoLock.getTxNum();
-		
+
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
 			sLockers.remove(myTxNum);
 			/*
-			 * Check again because there might be a transaction added after the
-			 * previous peek.
+			 * Check again because there might be a transaction added after the previous
+			 * peek.
 			 */
 			nextFifoLock = requestQueue.peek();
 			if (nextFifoLock != null) {
@@ -173,8 +169,8 @@ public class FifoLockers {
 			xLocker.set(-1);
 
 			/*
-			 * Check again because there might be a transaction added after the
-			 * previous peek.
+			 * Check again because there might be a transaction added after the previous
+			 * peek.
 			 */
 			nextFifoLock = requestQueue.peek();
 			if (nextFifoLock == null) {

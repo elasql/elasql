@@ -60,7 +60,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		this.localNodeId = Elasql.serverId();
 	}
 
-	public abstract double getWeight();
+	protected abstract double getWeight();
 
 	protected abstract void prepareKeys();
 
