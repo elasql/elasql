@@ -66,7 +66,7 @@ public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidat
 
 			if (val != valueAns[i] || overflow != overflowAns[i]) {
 				throw new RuntimeException(
-						String.format("row id: %d, value should be %d not %d, overflow should be %d not %d", i,
+						String.format("row id: %d, value should be %d and the real value is %d, overflow should be %d and the real overflow is %d", i,
 								valueAns[i], val, overflowAns[i], overflow));
 			} else {
 				if (logger.isLoggable(Level.INFO)) {
