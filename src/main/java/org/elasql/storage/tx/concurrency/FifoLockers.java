@@ -2,6 +2,8 @@ package org.elasql.storage.tx.concurrency;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * FifoLockers is used to keep which transaction possesses right to access a
@@ -42,7 +44,6 @@ public class FifoLockers {
 
 	void addToRequestQueue(FifoLock fifoLock) {
 		requestQueue.add(fifoLock);
-//		System.out.println("head is " + requestQueue.peek().getTxNum() + " tail is " + requestQueue.peekLast().getTxNum());
 	}
 
 	private void waitIfHeadIsNotSelf(FifoLock myFifoLock) {
@@ -128,13 +129,13 @@ public class FifoLockers {
 
 	void releaseSLock(FifoLock myFifoLock) {
 		long myTxNum = myFifoLock.getTxNum();
-		
+
 		FifoLock nextFifoLock = requestQueue.peek();
 		if (nextFifoLock == null) {
 			sLockers.remove(myTxNum);
 			/*
-			 * Check again because there might be a transaction added after the
-			 * previous peek.
+			 * Check again because there might be a transaction added after the previous
+			 * peek.
 			 */
 			nextFifoLock = requestQueue.peek();
 			if (nextFifoLock != null) {
@@ -157,8 +158,8 @@ public class FifoLockers {
 			xLocker.set(-1);
 
 			/*
-			 * Check again because there might be a transaction added after the
-			 * previous peek.
+			 * Check again because there might be a transaction added after the previous
+			 * peek.
 			 */
 			nextFifoLock = requestQueue.peek();
 			if (nextFifoLock == null) {

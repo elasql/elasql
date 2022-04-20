@@ -61,8 +61,9 @@ public class IntegrationTest {
 	void waitForTxsCommit() {
 		// Tx id starts from 1 to 999999
 		while (completedTxs.size() != TX_NUMS - 1) {
-			if (logger.isLoggable(Level.INFO))
+			if (logger.isLoggable(Level.INFO)) {
 				logger.info("Amount of comitted transaction: " + completedTxs.size());
+			}
 			try {
 
 				Thread.sleep(100);
