@@ -18,7 +18,7 @@ public class IntegrationTest {
 	private final static int ITGR_TEST_VALIDATION_PROC_ID = 1;
 	private ConcurrentLinkedQueue<Integer> completedTxs;
 
-	public static int TX_NUMS = 10000;
+	public static int TX_NUMS = 100;
 
 	@BeforeClass
 	public static void init() {

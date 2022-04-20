@@ -22,7 +22,12 @@ public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidat
 	public ItgrTestValidationProc(long txNum) {
 		super(txNum, new ItgrTestValidationProcParamHelper());
 
-		if (IntegrationTest.TX_NUMS == 10000) {
+		if (IntegrationTest.TX_NUMS == 100) {
+			int[] values = { 0, 111, 222, 333, 444, 555, 666, 777, 888, 999 };
+			int[] overflows = { 0, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+			valueAns = values;
+			overflowAns = overflows;
+		} else if (IntegrationTest.TX_NUMS == 10000) {
 			int[] values = { 0, 111111, 222222, 333333, 444444, 555555, 666666, 777777, 888888, 999999 };
 			int[] overflows = { 0, 142, 142, 142, 142, 142, 142, 142, 142, 142 };
 			valueAns = values;
@@ -65,9 +70,9 @@ public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidat
 			int overflow = (int) rec.getVal("overflow").asJavaVal();
 
 			if (val != valueAns[i] || overflow != overflowAns[i]) {
-				throw new RuntimeException(
-						String.format("row id: %d, value should be %d and the real value is %d, overflow should be %d and the real overflow is %d", i,
-								valueAns[i], val, overflowAns[i], overflow));
+				throw new RuntimeException(String.format(
+						"row id: %d, value should be %d and the real value is %d, overflow should be %d and the real overflow is %d",
+						i, valueAns[i], val, overflowAns[i], overflow));
 			} else {
 				if (logger.isLoggable(Level.INFO)) {
 					logger.info(String.format("row id %d is correct", i));
