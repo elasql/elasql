@@ -116,7 +116,7 @@ public class RandomizedLockTable {
 	 * @param txNum a transaction number
 	 * 
 	 */
-	void sLock(Object obj, long txNum, int series) {
+	void sLock(Object obj, long txNum) {
 		Object anchor = getRecordLatch(obj);
 
 		synchronized (anchor) {
@@ -238,7 +238,7 @@ public class RandomizedLockTable {
 	 * @param txNum a transaction number
 	 * 
 	 */
-	void xLock(Object obj, long txNum, int series) {
+	void xLock(Object obj, long txNum) {
 		// See the comments in sLock(..) for the explanation of the algorithm
 		Object anchor = getRecordLatch(obj);
 

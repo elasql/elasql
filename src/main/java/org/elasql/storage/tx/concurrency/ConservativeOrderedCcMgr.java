@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.tx.concurrency.RandomizedLockTable.LockType;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.tx.Transaction;
@@ -28,7 +29,6 @@ import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
 
 public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	protected static RandomizedLockTable randomizedLockTbl = new RandomizedLockTable();
-	protected static FifoOrderedLockTable fifoLockTbl = new FifoOrderedLockTable();
 
 	// For normal operations - using conservative locking
 	private Set<Object> bookedObjs, readObjs, writeObjs;
@@ -47,11 +47,14 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	}
 
 	public void bookReadKey(PrimaryKey key) {
-		if (key != null) {
-			bookKeyIfAbsent(key);
-
-			readObjs.add(key);
-		}
+		if (key != null) { 
+			// The key needs to be booked only once.  
+			if (!bookedObjs.contains(key)) 
+				randomizedLockTbl.requestLock(key, txNum); 
+			 
+			bookedObjs.add(key); 
+			readObjs.add(key); 
+		} 
 	}
 
 	/**
@@ -60,21 +63,27 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * @param keys the objects which the transaction intends to read
 	 */
 	public void bookReadKeys(Collection<PrimaryKey> keys) {
-		if (keys != null) {
-			for (PrimaryKey key : keys) {
-				bookKeyIfAbsent(key);
-
-				readObjs.add(key);
-			}
-		}
+		if (keys != null) { 
+			for (PrimaryKey key : keys) { 
+				// The key needs to be booked only once.  
+				if (!bookedObjs.contains(key)) 
+					randomizedLockTbl.requestLock(key, txNum); 
+			} 
+			 
+			bookedObjs.addAll(keys); 
+			readObjs.addAll(keys); 
+		} 
 	}
 
 	public void bookWriteKey(PrimaryKey key) {
-		if (key != null) {
-			bookKeyIfAbsent(key);
-
-			writeObjs.add(key);
-		}
+		if (key != null) { 
+			// The key needs to be booked only once.  
+			if (!bookedObjs.contains(key)) 
+				randomizedLockTbl.requestLock(key, txNum); 
+			 
+			bookedObjs.add(key); 
+			writeObjs.add(key); 
+		} 
 	}
 
 	/**
@@ -83,45 +92,41 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * @param keys the objects which the transaction intends to write
 	 */
 	public void bookWriteKeys(Collection<PrimaryKey> keys) {
-		if (keys != null) {
-			for (PrimaryKey key : keys) {
-				bookKeyIfAbsent(key);
-
-				writeObjs.add(key);
-			}
-		}
+		if (keys != null) { 
+			for (PrimaryKey key : keys) { 
+				// The key needs to be booked only once.  
+				if (!bookedObjs.contains(key)) 
+					randomizedLockTbl.requestLock(key, txNum); 
+			} 
+			 
+			bookedObjs.addAll(keys); 
+			writeObjs.addAll(keys); 
+		} 
 	}
 
-	private void bookKeyIfAbsent(PrimaryKey key) {
-		// The key needs to be booked only once.
-		if (!bookedObjs.contains(key)) {
-			fifoLockTbl.requestLock(key, myFifoLock);
-			bookedObjs.add(key);
-		}
-	}
+//	private void bookKeyIfAbsent(PrimaryKey key) {
+//		// The key needs to be booked only once.
+//		if (!bookedObjs.contains(key)) {
+//			fifoLockTbl.requestLock(key, myFifoLock);
+//			bookedObjs.add(key);
+//		}
+//	}
 
 	/**
 	 * Request (get the locks immediately) the locks which the transaction has
 	 * booked. If the locks can not be obtained in the time, it will make the thread
 	 * wait until it can obtain all locks it requests.
 	 */
-	public void requestLocks() {
-		bookedObjs.clear();
-
-		HashSet<Object> hasLockedSet = new HashSet<Object>();
-
-		for (Object obj : writeObjs) {
-			fifoLockTbl.xLock(obj, myFifoLock);
-			hasLockedSet.add(obj);
-		}
-
-		for (Object obj : readObjs) {
-			if (!writeObjs.contains(obj)) {
-				fifoLockTbl.sLock(obj, myFifoLock);
-				hasLockedSet.add(obj);
-			}
-		}
-	}
+	public void requestLocks() { 
+		bookedObjs.clear(); 
+		 
+		for (Object obj : writeObjs) 
+			randomizedLockTbl.xLock(obj, txNum); 
+		 
+		for (Object obj : readObjs) 
+			if (!writeObjs.contains(obj)) 
+				randomizedLockTbl.sLock(obj, txNum); 
+	} 
 
 	@Override
 	public void onTxCommit(Transaction tx) {
@@ -284,18 +289,15 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		// do nothing
 	}
 
-	private void releaseLocks() {
-		for (Object obj : writeObjs) {
-			fifoLockTbl.releaseXLock(obj, myFifoLock);
-		}
-
-		for (Object obj : readObjs) {
-			if (!writeObjs.contains(obj)) {
-				fifoLockTbl.releaseSLock(obj, myFifoLock);
-			}
-
-		}
-		readObjs.clear();
-		writeObjs.clear();
-	}
+	private void releaseLocks() { 
+		for (Object obj : writeObjs) 
+			randomizedLockTbl.release(obj, txNum, LockType.X_LOCK); 
+		 
+		for (Object obj : readObjs) 
+			if (!writeObjs.contains(obj)) 
+				randomizedLockTbl.release(obj, txNum, LockType.S_LOCK); 
+		 
+		readObjs.clear(); 
+		writeObjs.clear(); 
+	} 
 }
