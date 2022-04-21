@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.lang.ProcessBuilder.Redirect;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -46,11 +47,12 @@ public class PythonSubProcessEstimator implements Estimator {
 			logger.info("Pyhon SubProcess Estimator command is: " + cmd);
 
 			builder.command(cmd);
+			builder.redirectError(Redirect.INHERIT);
 			process = builder.start();
 
 			output = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "UTF-8"));
 			input = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"));
-			error = new BufferedReader(new InputStreamReader(process.getErrorStream(), "UTF-8"));
+//			error = new BufferedReader(new InputStreamReader(process.getErrorStream(), "UTF-8"));
 
 			waitForStart();
 		} catch (IOException e) {
@@ -89,6 +91,11 @@ public class PythonSubProcessEstimator implements Estimator {
 			builder.setSlaveCpuCost(slaveId, estimateSlaveCpuCost(features, slaveId));
 
 		return builder.build();
+	}
+
+	@Override
+	public void notifyTransactionRoute(long txNum, int masterId) {
+		// Do nothing
 	}
 
 	private double[] estimateLatency(TransactionFeatures features) {

@@ -8,7 +8,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
-import org.elasql.perf.tpart.ai.PythonSubProcessEstimator;
+import org.elasql.perf.tpart.ai.SumMaxEstimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
@@ -25,6 +25,7 @@ import org.elasql.remote.groupcomm.client.BatchSpcSender;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
@@ -48,7 +49,7 @@ public class SpCallPreprocessor extends Task {
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
 	
 	// XXX: Quick test
-	private Estimator testEstimator = new PythonSubProcessEstimator();
+	private Estimator testEstimator = new SumMaxEstimator();
 	
 	// XXX: Cache last tx's routing destination
 	private int lastTxRoutingDest = -1;
@@ -158,9 +159,11 @@ public class SpCallPreprocessor extends Task {
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 		
 		// XXX: Quick test
+		long startTime = System.nanoTime();
 		TransactionEstimation est = testEstimator.estimate(features);
-		System.out.println(String.format("Tx.%d's latencies: %s",
-				features.getTxNum(), est));
+		long elaspedTime = System.nanoTime() - startTime;
+		System.out.println(String.format("Tx.%d's estimation: %s, takes %d μs to estimate",
+				features.getTxNum(), est, elaspedTime / 1000));
 		
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
@@ -187,6 +190,14 @@ public class SpCallPreprocessor extends Task {
 		inserter.insertBatch(graph, batchedTasks);
 		
 		lastTxRoutingDest = timeRelatedFeatureMgr.pushInfo(graph);
+		
+		// XXX: Quick test
+		if (testEstimator != null) {
+			for (TxNode node : graph.getTxNodes()) {
+				testEstimator.notifyTransactionRoute(node.getTxNum(), node.getPartId());
+				System.out.println(String.format("Tx.%d's route: %d", node.getTxNum(), node.getPartId()));
+			}
+		}
 		
 		// add write back edges
 		graph.addWriteBackEdge();

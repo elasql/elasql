@@ -20,6 +20,11 @@ public class ConstantEstimator implements Estimator {
 		
 		return builder.build();
 	}
+
+	@Override
+	public void notifyTransactionRoute(long txNum, int masterId) {
+		// Do nothing
+	}
 	
 	private double estimateLatency(TransactionFeatures features, int masterId) {
 		return 0.3;
