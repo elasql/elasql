@@ -30,7 +30,7 @@ public class TransactionFeaturesRecorder extends Task {
 	private static final String FILENAME_PREFIX = "transaction-features";
 	private static final String TRANSACTION_ID_COLUMN = "Transaction ID";
 
-	private static final long TIME_TO_FLUSH = 10; // in seconds
+	private static final long TIME_TO_FLUSH = 30; // in seconds
 
 	private static class FeatureRow implements CsvRow, Comparable<FeatureRow> {
 
