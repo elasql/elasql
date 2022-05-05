@@ -74,6 +74,13 @@ public class TransactionMetricRecorder extends Task {
 					networkoutSizes.put(metricName, profiler.getComponentNetworkOutSize(component));
 				}
 
+				String metricNameForStartTime = metricName + " - Start Time";
+				metricNames.add(metricNameForStartTime);
+				latencies.put(metricNameForStartTime, profiler.getComponentStartTime(component));
+				
+				String metricNameForEndTime = metricName + " - End Time";
+				metricNames.add(metricNameForEndTime);
+				latencies.put(metricNameForEndTime, profiler.getComponentEndTime(component));
 			}
 		}
 	}
