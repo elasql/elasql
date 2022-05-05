@@ -6,24 +6,21 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.estimator.Constants;
 import org.elasql.estimator.model.SingleServerMasterModel;
 import org.elasql.estimator.model.SumMaxSequentialModel;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
+import org.vanilladb.core.util.TransactionProfiler;
 
 import smile.data.Tuple;
+import smile.data.type.StructField;
 import smile.data.type.StructType;
 
 public class SumMaxEstimator implements Estimator {
 	private static Logger logger = Logger.getLogger(SumMaxEstimator.class.getName());
 	
 	private static final String MODEL_DIR;
-	
-	private static final StructType FEATURE_SCHEMA = Constants.FEATURE_SCHEMA;
-	private static final String[] NON_ARRAY_FEATURES = Constants.NON_ARRAY_FEATURES;
-	private static final String[] ARRAY_FEATURES = Constants.ARRAY_FEATURES;
 	
 	private static final int SERVER_COUNT = PartitionMetaMgr.NUM_PARTITIONS;
 	
@@ -34,9 +31,11 @@ public class SumMaxEstimator implements Estimator {
 	}
 	
 	private SumMaxSequentialModel model;
+	private StructType featureSchema;
 	
 	public SumMaxEstimator() {
 		model = new SumMaxSequentialModel(loadModels());
+		featureSchema = model.schema();
 	}
 
 	@Override
@@ -65,16 +64,24 @@ public class SumMaxEstimator implements Estimator {
 	private double[] estimateLatency(TransactionFeatures features) {
 		Tuple[] serverFeatures = new Tuple[SERVER_COUNT];
 		
+		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+		
+		profiler.startComponentProfiler("- preprocess");
 		for (int serverId = 0; serverId < SERVER_COUNT; serverId++) {
 			serverFeatures[serverId] = preprocessFeatures(features, serverId);
 		}
-		
-		return model.predictNextTxnLatency(
+		profiler.stopComponentProfiler("- preprocess");
+
+		profiler.startComponentProfiler("- prediction");
+		double[] result = model.predictNextTxnLatency(
 			features.getTxNum(),
 			features.getDependencies(),
 			(Long) features.getFeature("Start Time"),
 			serverFeatures
 		);
+		profiler.stopComponentProfiler("- prediction");
+		
+		return result;
 	}
 
 	private long estimateMasterCpuCost(TransactionFeatures features, int masterId) {
@@ -86,11 +93,10 @@ public class SumMaxEstimator implements Estimator {
 	}
 	
 	private Tuple preprocessFeatures(TransactionFeatures features, int masterId) {
-		Object[] row = new Object[FEATURE_SCHEMA.length()];
+		Object[] row = new Object[featureSchema.length()];
 		
-		for (int i = 0; i < NON_ARRAY_FEATURES.length; i++) {
-			String fieldName = NON_ARRAY_FEATURES[i];
-			Object valObj = features.getFeature(fieldName);
+		for (StructField field : featureSchema.fields()) {
+			Object valObj = features.getFeature(field.name);
 			
 			double value = 1.0;
 			if (valObj.getClass().equals(Integer.class)) {
@@ -102,17 +108,7 @@ public class SumMaxEstimator implements Estimator {
 			} else if (valObj.getClass().equals(Double.class)) {
 				Double doubleVal = (Double) valObj;
 				value = doubleVal.doubleValue();
-			}
-
-			row[FEATURE_SCHEMA.fieldIndex(fieldName)] = value;
-		}
-		
-		for (int i = 0; i < ARRAY_FEATURES.length; i++) {
-			String fieldName = ARRAY_FEATURES[i];
-			Object valObj = features.getFeature(fieldName);
-			
-			double value = 1.0;
-			if (valObj.getClass().equals(Integer[].class)) {
+			} else if (valObj.getClass().equals(Integer[].class)) {
 				Integer[] intArray = (Integer[]) valObj;
 				value = intArray[masterId].doubleValue();
 			} else if (valObj.getClass().equals(Long[].class)) {
@@ -123,10 +119,10 @@ public class SumMaxEstimator implements Estimator {
 				value = doubleArray[masterId].doubleValue();
 			}
 
-			row[FEATURE_SCHEMA.fieldIndex(fieldName)] = value;
+			row[featureSchema.fieldIndex(field.name)] = value;
 		}
 		
-		return Tuple.of(row, FEATURE_SCHEMA);
+		return Tuple.of(row, featureSchema);
 	}
 	
 	private List<SingleServerMasterModel> loadModels() {
