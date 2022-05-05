@@ -41,7 +41,7 @@ public class StoredProcedureCall implements Serializable {
 	
 	// The timestamp to indicate the time that this request arrives
 	// at the database system. (-1 means 'not set')
-	private long arrivedTime = -1, ou0StartTime = -1, ou0StopTime = -1;
+	private long sequencerStartTime = -1, ou0StartTime = -1, ou0StopTime = -1;
 	
 	private transient TransactionProfiler profiler;
 
@@ -87,8 +87,8 @@ public class StoredProcedureCall implements Serializable {
 	}
 	
 	public void stampArrivedTime(long timestamp) {
-		if (arrivedTime == -1)
-			arrivedTime = timestamp;
+		if (sequencerStartTime == -1)
+			sequencerStartTime = timestamp;
 	}
 
 	public void stampOu0StartTime(long ou0StartTime) {
@@ -101,8 +101,8 @@ public class StoredProcedureCall implements Serializable {
 			this.ou0StopTime = ou0StopTime;
 	}
 	
-	public long getArrivedTime() {
-		return arrivedTime;
+	public long getSequencerStartTime() {
+		return sequencerStartTime;
 	}
 	
 	public long getOu0StartTime() {

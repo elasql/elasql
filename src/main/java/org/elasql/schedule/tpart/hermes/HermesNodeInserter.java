@@ -71,7 +71,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		// Debug: show the distribution of assigned masters
 		for (TxNode node : graph.getTxNodes())
 			assignedCounts[node.getPartId()]++;
-		reportRoutingDistribution(tasks.get(0).getArrivedTime());
+		reportRoutingDistribution(tasks.get(0).getSequencerStartTime());
 		
 //		System.out.println(String.format("Final loads: %s", Arrays.toString(loadPerPart)));
 	}
