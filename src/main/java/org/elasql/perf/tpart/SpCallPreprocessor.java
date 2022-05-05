@@ -148,7 +148,7 @@ public class SpCallPreprocessor extends Task {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), null, sp, null);
+					spc.getTxNum(), spc.getSequencerStartTime(), null, sp, null);
 		}
 		
 		return null;

@@ -141,11 +141,15 @@ public class TPartScheduler extends Task implements Scheduler {
 //		printImbalStatistics();
 //		collectGraphStatistics();
 		
+		
+		
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			// Record plan gen start time, CPU start time, disk IO count
-			for(TPartStoredProcedureTask task : batchedTasks) 
+			for(TPartStoredProcedureTask task : batchedTasks) {
+				task.getTxProfiler().startComponentProfiler("Server Side Elapsed Time");
 				task.getTxProfiler().startComponentProfiler("OU1 - Generate Plan");
+			}
 			
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 
@@ -175,7 +179,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, null, null);
+					call.getTxNum(), call.getSequencerStartTime(), profiler, null, null);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -193,7 +197,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation);
+					call.getTxNum(), call.getSequencerStartTime(), profiler, sp, estimation);
 		}
 	}
 
