@@ -57,13 +57,13 @@ public class FeatureExtractor {
 					task.getTxNum(), lastProcessedTxNum));
 		
 		// Preprocess time related features
-		timeRelatedFeatureMgr.calculate(task.getArrivedTime());
+		timeRelatedFeatureMgr.calculate(task.getSequencerStartTime());
 		
 		// Extract the features
 		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum(), lastTxRoutingDest);
 		
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
-		builder.addFeature("Start Time", task.getArrivedTime());
+		builder.addFeature("Start Time", task.getSequencerStartTime());
 		
 		// Get features (tx type related)
 		builder.addFeature("Tx Type", task.getWeight());

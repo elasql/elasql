@@ -50,7 +50,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 				insert(graph, task);
 
 				// Debug: show the distribution of assigned masters
-				reportRoutingDistribution(task.getArrivedTime());
+				reportRoutingDistribution(task.getSequencerStartTime());
 			}
 		}
 	}

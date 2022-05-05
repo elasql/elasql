@@ -35,7 +35,7 @@ public class TimeRelatedFeatureMgr {
 			TimeRelatedInfo[] timeRelatedInfos = new TimeRelatedInfo[SERVER_NUM];
 			for (int s = 0; s < SERVER_NUM; s++) {
 				timeRelatedInfos[s] = new TimeRelatedInfo();
-				timeRelatedInfos[s].time = task.getArrivedTime();
+				timeRelatedInfos[s].time = task.getSequencerStartTime();
 			}
 
 			// read

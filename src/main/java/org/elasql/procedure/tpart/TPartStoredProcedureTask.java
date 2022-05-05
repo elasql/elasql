@@ -26,17 +26,17 @@ public class TPartStoredProcedureTask
 	
 	// Timestamps
 	// The time that the stored procedure call arrives the system
-	private long arrivedTime;
+	private long sequencerStartTime;
 	private TransactionEstimation estimation;
 	private TransactionProfiler profiler;
 
-	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
+	public TPartStoredProcedureTask(int cid, int connId, long txNum, long sequencerStartTime,
 			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
 		this.txNum = txNum;
-		this.arrivedTime = arrivedTime;
+		this.sequencerStartTime = sequencerStartTime;
 		this.profiler = profiler;
 		this.tsp = sp;
 		this.estimation = estimation;
@@ -59,6 +59,7 @@ public class TPartStoredProcedureTask
 
 		// Stop the profiler for the whole execution
 		profiler.stopExecution();
+		profiler.stopComponentProfiler("Server Side Elapsed Time");
 		
 		// Notify test module 
 		if (Elasql.testMode) {
@@ -98,8 +99,8 @@ public class TPartStoredProcedureTask
 		return txNum;
 	}
 	
-	public long getArrivedTime() {
-		return arrivedTime;
+	public long getSequencerStartTime() {
+		return sequencerStartTime;
 	}
 
 	public Set<PrimaryKey> getReadSet() {
