@@ -90,7 +90,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		cache = new TPartTxLocalCache(tx);
 
 		// register locks
-		bookConservativeLocks();
+//		bookConservativeLocks();
 		
 //		System.out.println(Thread.currentThread().getName() + " is booking the keys for tx " + txNum);
 	}
@@ -118,11 +118,11 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	public SpResultSet execute() {
 		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 		try {
-			profiler.setStageIndicator(3);
-			profiler.startComponentProfiler("OU3 - Acquire Locks");
-			getConservativeLocks();
-			profiler.stopComponentProfiler("OU3 - Acquire Locks");
-			profiler.resetStageIndicator();
+//			profiler.setStageIndicator(3);
+//			profiler.startComponentProfiler("OU3 - Acquire Locks");
+//			getConservativeLocks();
+//			profiler.stopComponentProfiler("OU3 - Acquire Locks");
+//			profiler.resetStageIndicator();
 
 			executeTransactionLogic();
 
