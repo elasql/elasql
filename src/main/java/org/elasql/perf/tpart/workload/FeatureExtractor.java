@@ -66,24 +66,24 @@ public class FeatureExtractor {
 		builder.addFeature("Start Time", task.getSequencerStartTime());
 		
 		// Get features (tx type related)
-		builder.addFeature("Tx Type", task.getWeight());
+//		builder.addFeature("Tx Type", task.getWeight());
 		
-//		builder.addFeature("Number of Read Records", task.getReadSet().size());
-//		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
+		builder.addFeature("Number of Read Records", task.getReadSet().size());
+		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
 		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
 //		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
 //		
-		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
+//		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
 //		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
-		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
-		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
-		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
+//		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
+//		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
+//		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
 //		
-		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
+//		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
-//		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
-//		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
-//		builder.addFeature("Pinned Buffer Count", extractPinnedBufferCount());
+		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
+		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
+		builder.addFeature("Pinned Buffer Count", extractPinnedBufferCount());
 //		
 //		builder.addFeature("Buffer RL Wait Count", extractBufferReadWaitCount());
 //		builder.addFeature("Buffer WL Wait Count", extractBufferWriteWaitCount());
@@ -114,17 +114,17 @@ public class FeatureExtractor {
 		builder.addFeature("Number of Insert Record in Last 100 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(100));
 		builder.addFeature("Number of Commit Tx in Last 100 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(100));
 		
-		builder.addFeature("Number of Read Record in Last 500 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(500));
-		builder.addFeature("Number of Read Record Excluding Cache in Last 500 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(500));
-		builder.addFeature("Number of Update Record in Last 500 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(500));
-		builder.addFeature("Number of Insert Record in Last 500 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(500));
-		builder.addFeature("Number of Commit Tx in Last 500 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(500));
-		
 		builder.addFeature("Number of Read Record in Last 1000 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(1000));
 		builder.addFeature("Number of Read Record Excluding Cache in Last 1000 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(1000));
 		builder.addFeature("Number of Update Record in Last 1000 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(1000));
 		builder.addFeature("Number of Insert Record in Last 1000 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(1000));
 		builder.addFeature("Number of Commit Tx in Last 1000 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(1000));
+		
+		builder.addFeature("Number of Read Record in Last 10000 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(10000));
+		builder.addFeature("Number of Read Record Excluding Cache in Last 10000 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(10000));
+		builder.addFeature("Number of Update Record in Last 10000 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(10000));
+		builder.addFeature("Number of Insert Record in Last 10000 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(10000));
+		builder.addFeature("Number of Commit Tx in Last 10000 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(10000));
 		
 //		// Features for latches
 //		// Due to the complexity of getting individual latch features,
