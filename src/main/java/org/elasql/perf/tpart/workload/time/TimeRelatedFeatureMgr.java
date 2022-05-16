@@ -11,7 +11,7 @@ import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 public class TimeRelatedFeatureMgr {
-	public static final int[] WINDOW_SIZES = new int[] { 100, 500, 1000 };
+	public static final int[] WINDOW_SIZES = new int[] { 100, 1000, 10000 };
 	public static final int SERVER_NUM = PartitionMetaMgr.NUM_PARTITIONS;
 
 	private TimeRelatedInfoContainer[][] containers = new TimeRelatedInfoContainer[SERVER_NUM][WINDOW_SIZES.length];
