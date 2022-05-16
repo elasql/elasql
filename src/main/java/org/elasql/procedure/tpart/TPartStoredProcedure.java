@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import org.elasql.cache.CachedRecord;
 import org.elasql.cache.tpart.CachedEntryKey;
@@ -18,6 +19,7 @@ import org.elasql.schedule.tpart.sink.PushInfo;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
+import org.elasql.storage.tx.OccTransaction;
 import org.elasql.storage.tx.concurrency.ConservativeOrderedCcMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
@@ -48,6 +50,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	private TPartTxLocalCache cache;
 	private List<CachedEntryKey> cachedEntrySet = new ArrayList<CachedEntryKey>();
 	private boolean isCommitted = false;
+	private OccTransaction occTx;
 
 	public TPartStoredProcedure(long txNum, H paramHelper) {
 		super(paramHelper);
@@ -86,6 +89,8 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		tx = Elasql.txMgr().newTransaction(Connection.TRANSACTION_SERIALIZABLE, plan.isReadOnly(), txNum);
 		tx.addLifecycleListener(new DdRecoveryMgr(tx.getTransactionNumber()));
 
+		occTx = new OccTransaction(tx.getTransactionNumber());
+		
 		// create a local cache
 		cache = new TPartTxLocalCache(tx);
 
@@ -123,7 +128,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 //			getConservativeLocks();
 //			profiler.stopComponentProfiler("OU3 - Acquire Locks");
 //			profiler.resetStageIndicator();
-
+			
 			executeTransactionLogic();
 
 			profiler.startComponentProfiler("OU8 - Commit");
@@ -205,111 +210,137 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	}
 
 	private void executeTransactionLogic() {
-		int sinkId = plan.sinkProcessId();
-		TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
-
-		if (plan.isHereMaster()) {
-			Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
-
-			// Read the records from the local sink
-			profiler.setStageIndicator(4);
-			profiler.startComponentProfiler("OU4 - Read from Local");
-			for (PrimaryKey k : plan.getSinkReadingInfo()) {
-				readings.put(k, cache.readFromSink(k));
-			}
-			profiler.stopComponentProfiler("OU4 - Read from Local");
-			profiler.resetStageIndicator();
-
-			// Read all needed records
-			profiler.startComponentProfiler("OU5M - Read from Remote");
-			for (PrimaryKey k : plan.getReadSet()) {
-				if (!readings.containsKey(k)) {
-					long srcTxNum = plan.getReadSrcTxNum(k);
-					readings.put(k, cache.read(k, srcTxNum));
-					cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
-				}
-			}
-			profiler.stopComponentProfiler("OU5M - Read from Remote");
-
-			// Execute the SQLs defined by users
-			profiler.startComponentProfiler("OU6 - Execute Arithmetic Logic");
-			executeSql(readings);
-			profiler.stopComponentProfiler("OU6 - Execute Arithmetic Logic");
-
-			// Push the data to where they need at
-			profiler.startComponentProfiler("NonOU - Push to Remote");
-			Map<Integer, Set<PushInfo>> pi = plan.getPushingInfo();
-			if (pi != null) {
-				// read from local storage and send to remote site
-				for (Entry<Integer, Set<PushInfo>> entry : pi.entrySet()) {
-					int targetServerId = entry.getKey();
-
-					// Construct a tuple set
-					TupleSet rs = new TupleSet(sinkId);
-					for (PushInfo pushInfo : entry.getValue()) {
-						CachedRecord rec = cache.read(pushInfo.getRecord(), txNum);
-						cachedEntrySet.add(new CachedEntryKey(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum()));
-						rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
-					}
-
-					// Push to the remote
-					Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
-				}
-			}
-			profiler.stopComponentProfiler("NonOU - Push to Remote");
-		} else if (plan.hasSinkPush()) {
-			long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
-
-			for (Entry<Integer, Set<PushInfo>> entry : plan.getSinkPushingInfo().entrySet()) {
-				int targetServerId = entry.getKey();
-				TupleSet rs = new TupleSet(sinkId);
-
-				// Migration transactions
-//				if (getProcedureType() == ProcedureType.MIGRATION) {
-//					long destTxNum = -1;
-//					
-//					Set<RecordKey> keys = new HashSet<RecordKey>();
-//					for (PushInfo pushInfo : entry.getValue()) {
-//						keys.add(pushInfo.getRecord());
-//						// XXX: Not good
-//						if (destTxNum == -1)
-//							destTxNum = pushInfo.getDestTxNum();
-//					}
-//					
-//					Map<RecordKey, CachedRecord> recs = cache.batchReadFromSink(keys);
-//					
-//					for (Entry<RecordKey, CachedRecord> keyRecPair : recs.entrySet()) {
-//						RecordKey key = keyRecPair.getKey();
-//						CachedRecord rec = keyRecPair.getValue();
-//						rec.setSrcTxNum(sinkTxnNum);
-//						rs.addTuple(key, sinkTxnNum, destTxNum, rec);
-//					}
-//					
-//				} else {
-				// Normal transactions
+		while (true) {
+			occTx.setReadPhaseStartTime();
+			
+			Set<PrimaryKey> writeSet = getUpdateSet();
+			writeSet.addAll(getInsertSet());
+			occTx.setReadWriteSet(getReadSet(), writeSet);
+			
+			Elasql.occMgr().registerActiveTx(occTx);
+			
+			int sinkId = plan.sinkProcessId();
+			TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+	
+			if (plan.isHereMaster()) {
+				Map<PrimaryKey, CachedRecord> readings = new HashMap<PrimaryKey, CachedRecord>();
+	
+				// Read the records from the local sink
+				profiler.setStageIndicator(4);
 				profiler.startComponentProfiler("OU4 - Read from Local");
-				for (PushInfo pushInfo : entry.getValue()) {
-
-					CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
-					// TODO deal with null value record
-					rec.setSrcTxNum(sinkTxnNum);
-					rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
+				for (PrimaryKey k : plan.getSinkReadingInfo()) {
+					readings.put(k, cache.readFromSink(k));
 				}
 				profiler.stopComponentProfiler("OU4 - Read from Local");
-//				}
-
-				profiler.startComponentProfiler("OU5S - Push to Remote");
-				Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
-				profiler.stopComponentProfiler("OU5S - Push to Remote");
+				profiler.resetStageIndicator();
+	
+				// Read all needed records
+				profiler.startComponentProfiler("OU5M - Read from Remote");
+				for (PrimaryKey k : plan.getReadSet()) {
+					if (!readings.containsKey(k)) {
+						long srcTxNum = plan.getReadSrcTxNum(k);
+						readings.put(k, cache.read(k, srcTxNum));
+						cachedEntrySet.add(new CachedEntryKey(k, srcTxNum, txNum));
+					}
+				}
+				profiler.stopComponentProfiler("OU5M - Read from Remote");
+	
+				// Execute the SQLs defined by users
+				profiler.startComponentProfiler("OU6 - Execute Arithmetic Logic");
+				executeSql(readings);
+				profiler.stopComponentProfiler("OU6 - Execute Arithmetic Logic");
+	
+				// Push the data to where they need at
+				profiler.startComponentProfiler("NonOU - Push to Remote");
+				Map<Integer, Set<PushInfo>> pi = plan.getPushingInfo();
+				if (pi != null) {
+					// read from local storage and send to remote site
+					for (Entry<Integer, Set<PushInfo>> entry : pi.entrySet()) {
+						int targetServerId = entry.getKey();
+	
+						// Construct a tuple set
+						TupleSet rs = new TupleSet(sinkId);
+						for (PushInfo pushInfo : entry.getValue()) {
+							CachedRecord rec = cache.read(pushInfo.getRecord(), txNum);
+							cachedEntrySet.add(new CachedEntryKey(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum()));
+							rs.addTuple(pushInfo.getRecord(), txNum, pushInfo.getDestTxNum(), rec);
+						}
+	
+						// Push to the remote
+						Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
+					}
+				}
+				profiler.stopComponentProfiler("NonOU - Push to Remote");
+			} else if (plan.hasSinkPush()) {
+				long sinkTxnNum = TPartCacheMgr.toSinkId(Elasql.serverId());
+	
+				for (Entry<Integer, Set<PushInfo>> entry : plan.getSinkPushingInfo().entrySet()) {
+					int targetServerId = entry.getKey();
+					TupleSet rs = new TupleSet(sinkId);
+	
+					// Migration transactions
+	//				if (getProcedureType() == ProcedureType.MIGRATION) {
+	//					long destTxNum = -1;
+	//					
+	//					Set<RecordKey> keys = new HashSet<RecordKey>();
+	//					for (PushInfo pushInfo : entry.getValue()) {
+	//						keys.add(pushInfo.getRecord());
+	//						// XXX: Not good
+	//						if (destTxNum == -1)
+	//							destTxNum = pushInfo.getDestTxNum();
+	//					}
+	//					
+	//					Map<RecordKey, CachedRecord> recs = cache.batchReadFromSink(keys);
+	//					
+	//					for (Entry<RecordKey, CachedRecord> keyRecPair : recs.entrySet()) {
+	//						RecordKey key = keyRecPair.getKey();
+	//						CachedRecord rec = keyRecPair.getValue();
+	//						rec.setSrcTxNum(sinkTxnNum);
+	//						rs.addTuple(key, sinkTxnNum, destTxNum, rec);
+	//					}
+	//					
+	//				} else {
+					// Normal transactions
+					profiler.startComponentProfiler("OU4 - Read from Local");
+					for (PushInfo pushInfo : entry.getValue()) {
+	
+						CachedRecord rec = cache.readFromSink(pushInfo.getRecord());
+						// TODO deal with null value record
+						rec.setSrcTxNum(sinkTxnNum);
+						rs.addTuple(pushInfo.getRecord(), sinkTxnNum, pushInfo.getDestTxNum(), rec);
+					}
+					profiler.stopComponentProfiler("OU4 - Read from Local");
+	//				}
+	
+					profiler.startComponentProfiler("OU5S - Push to Remote");
+					Elasql.connectionMgr().pushTupleSet(targetServerId, rs);
+					profiler.stopComponentProfiler("OU5S - Push to Remote");
+				}
+			}
+			
+			try {
+				Elasql.occMgr().validationLock();
+				if (Elasql.occMgr().validate(occTx)) {
+					// Flush the cached data
+					// including the writes to the next transaction and local write backs
+					profiler.setStageIndicator(7);
+					profiler.startComponentProfiler("OU7 - Write to Local");
+					cache.flush(plan, cachedEntrySet);
+					profiler.stopComponentProfiler("OU7 - Write to Local");
+					profiler.resetStageIndicator();
+					
+					occTx.setWritePhaseEndTime();
+					Elasql.occMgr().dropSelfFromActiveTxs(occTx);
+					break;
+				} else {
+					// clean the cache and re-do
+					cache = new TPartTxLocalCache(tx);
+				}
+			} catch (Exception e) {
+				// do nothing now
+			} finally {
+				Elasql.occMgr().validationUnLock();
 			}
 		}
-
-		// Flush the cached data
-		// including the writes to the next transaction and local write backs
-		profiler.setStageIndicator(7);
-		profiler.startComponentProfiler("OU7 - Write to Local");
-		cache.flush(plan, cachedEntrySet);
-		profiler.stopComponentProfiler("OU7 - Write to Local");
-		profiler.resetStageIndicator();
 	}
 }

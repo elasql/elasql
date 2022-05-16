@@ -53,6 +53,7 @@ import org.elasql.storage.metadata.HashPartitionPlan;
 import org.elasql.storage.metadata.NotificationPartitionPlan;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.metadata.PartitionPlan;
+import org.elasql.storage.tx.concurrency.OccMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb; 
  
@@ -113,7 +114,8 @@ public class Elasql extends VanillaDb {
 	private static RemoteRecordReceiver remoteRecReceiver; 
 	private static Scheduler scheduler; 
 	private static DdLogMgr ddLogMgr; 
-	private static MigrationMgr migraMgr; 
+	private static MigrationMgr migraMgr;
+	private static OccMgr occMgr;
 	 
 	// Only for the sequencer 
 	private static MigrationSystemController migraSysControl; 
@@ -358,6 +360,10 @@ public class Elasql extends VanillaDb {
 	public static void initDdLogMgr() { 
 		ddLogMgr = new DdLogMgr(); 
 	} 
+	
+	public static void initOccMgr() {
+		occMgr = new OccMgr();
+	}
  
 	public static void initPerfMgr(DdStoredProcedureFactory<?> factory) {
 		switch (SERVICE_TYPE) { 
@@ -443,6 +449,10 @@ public class Elasql extends VanillaDb {
 	public static DdLogMgr DdLogMgr() { 
 		return ddLogMgr; 
 	} 
+	
+	public static OccMgr occMgr() {
+		return occMgr;
+	}
 	 
 	public static MigrationMgr migrationMgr() { 
 		return migraMgr; 
