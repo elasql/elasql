@@ -210,13 +210,12 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 	}
 
 	private void executeTransactionLogic() {
+		Set<PrimaryKey> writeSet = getUpdateSet();
+		writeSet.addAll(getInsertSet());
+		occTx.setReadWriteSet(getReadSet(), writeSet);
+		
 		while (true) {
 			occTx.setReadPhaseStartTime();
-			
-			Set<PrimaryKey> writeSet = getUpdateSet();
-			writeSet.addAll(getInsertSet());
-			occTx.setReadWriteSet(getReadSet(), writeSet);
-			
 			Elasql.occMgr().registerActiveTx(occTx);
 			
 			int sinkId = plan.sinkProcessId();
@@ -319,8 +318,12 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			}
 			
 			try {
+				profiler.startComponentProfiler("Validation Phase");
 				Elasql.occMgr().validationLock();
-				if (Elasql.occMgr().validate(occTx)) {
+				boolean validationResult = Elasql.occMgr().validate(occTx);
+				profiler.stopComponentProfiler("Validation Phase");
+				
+				if (validationResult) {
 					// Flush the cached data
 					// including the writes to the next transaction and local write backs
 					profiler.setStageIndicator(7);
@@ -340,6 +343,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 				// do nothing now
 			} finally {
 				Elasql.occMgr().validationUnLock();
+				
 			}
 		}
 	}
