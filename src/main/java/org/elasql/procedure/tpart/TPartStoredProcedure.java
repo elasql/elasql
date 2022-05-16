@@ -342,8 +342,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			} catch (Exception e) {
 				// do nothing now
 			} finally {
-				Elasql.occMgr().validationUnLock();
-				
+				Elasql.occMgr().validationUnLock();	
 			}
 		}
 	}

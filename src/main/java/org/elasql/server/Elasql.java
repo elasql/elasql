@@ -208,6 +208,7 @@ public class Elasql extends VanillaDb {
 		initScheduler(factory, migraComsFactory); 
 		startNetworkConnection();
 		initDdLogMgr(); 
+		initOccMgr();
 		if (migraComsFactory != null) 
 			migraMgr = migraComsFactory.newMigrationMgr(); 
 	} 
