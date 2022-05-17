@@ -133,7 +133,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			isCommitted = true;
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.out.println("Tx." + txNum + "'s plan: " + plan);
+//			System.out.println("Tx." + txNum + "'s plan: " + plan);
 			profiler.startComponentProfiler("Tx rollback");
 			tx.rollback();
 			profiler.stopComponentProfiler("Tx rollback");
