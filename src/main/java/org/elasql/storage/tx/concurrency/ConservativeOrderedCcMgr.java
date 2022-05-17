@@ -265,7 +265,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 	 * releaseRecordFileHeader to release a record file header. An optimization here
 	 * is to make locking a file header a single critical section.
 	 */
-	@Override
+
 	public ReentrantLock getLockForFileHeader(BlockId blk) {
 		return randomizedLockTbl.getFhpLatch(blk);
 	}
