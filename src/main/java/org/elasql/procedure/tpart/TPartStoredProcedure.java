@@ -2,6 +2,7 @@ package org.elasql.procedure.tpart;
 
 import java.sql.Connection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -74,6 +75,10 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 		// prepare parameters
 		paramHelper.prepareParameters(pars);
 
+		if (txNum % 10000 == 0) {
+			System.out.println(Arrays.toString(pars));
+		}
+		
 		// prepare keys
 		prepareKeys();
 	}

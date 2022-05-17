@@ -1,6 +1,5 @@
 package org.elasql.storage.tx;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -142,10 +141,6 @@ public class OccTest {
 				e.printStackTrace();
 			}
 		}
-
-		Assert.assertNotEquals(0, occMgr.getLeastReadPhaseStartTimeAmongActiveTxs());
-		Assert.assertEquals(occMgr.getLeastReadPhaseStartTimeAmongActiveTxs(),
-				(long) Collections.min(occMgr.getActiveTxsStartTimes()));
 
 		/*
 		 * Validate the transactions in order.

@@ -5,9 +5,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.elasql.sql.PrimaryKey;
@@ -15,28 +13,34 @@ import org.elasql.storage.tx.OccTransaction;
 
 public class OccMgr {
 	private ReentrantLock validationLatch = new ReentrantLock();
-
-	private AtomicLong leastReadPhaseStartTimeAmongActiveTxs = new AtomicLong(0);
+	private ReentrantLock cleanLatch = new ReentrantLock();
 	private Set<Long> activeTxsStartTimes = ConcurrentHashMap.newKeySet();
-	private AtomicInteger readyToCleanCount = new AtomicInteger(0);
-	private ConcurrentLinkedQueue<OccTransaction> recentCompletedTxs = new ConcurrentLinkedQueue<OccTransaction>();
+	private ConcurrentLinkedDeque<OccTransaction> recentCompletedTxs = new ConcurrentLinkedDeque<OccTransaction>();
 
 	public void registerActiveTx(OccTransaction occTx) {
 		activeTxsStartTimes.add(occTx.getReadPhaseStartTime());
-		leastReadPhaseStartTimeAmongActiveTxs.set(Collections.min(activeTxsStartTimes));
 		cleanRecentCompletedTxs();
 	}
 
 	private void cleanRecentCompletedTxs() {
-		for (int i = 0; i < readyToCleanCount.getAndSet(0); i++) {
-			recentCompletedTxs.poll();
+		// a transaction will be chosen to clean the recent completed transactions
+		if (cleanLatch.tryLock()) {
+			try {
+				long leastReadPhaseStartTimeAmongActiveTxs = Collections.min(activeTxsStartTimes);
+
+				OccTransaction lastTx = recentCompletedTxs.peekLast();
+
+				while (lastTx != null && lastTx.getWritePhaseEndTime() < leastReadPhaseStartTimeAmongActiveTxs) {
+					recentCompletedTxs.pollLast();
+					lastTx = recentCompletedTxs.peekLast();
+				}
+			} finally {
+				cleanLatch.unlock();
+			}
 		}
+
 	}
-	
-	public long getLeastReadPhaseStartTimeAmongActiveTxs() {
-		return leastReadPhaseStartTimeAmongActiveTxs.get();
-	}
-	
+
 	public Set<Long> getActiveTxsStartTimes() {
 		return activeTxsStartTimes;
 	}
@@ -61,15 +65,13 @@ public class OccMgr {
 
 		long myReadPhaseStartTime = curOccTx.getReadPhaseStartTime();
 
-		int headRemoveCount = 0;
+//		if (curOccTx.getTxNum() % 1000 == 0) {
+//			System.out.println("recentCompletedTxs size: " + recentCompletedTxs.size());
+//		}
+
 		Iterator<OccTransaction> iterator = recentCompletedTxs.iterator();
 		while (iterator.hasNext()) {
 			OccTransaction prevOccTx = iterator.next();
-
-			if (prevOccTx.getWritePhaseEndTime() < leastReadPhaseStartTimeAmongActiveTxs.get()) {
-				// the previous tx no long affects the recent transactions, remove it
-				headRemoveCount += 1;
-			}
 
 			// readPhaseStartTime(Tk) < writeEndTime(Ti) < validationPhaseStartTime(Tk)
 			if (myReadPhaseStartTime < prevOccTx.getWritePhaseEndTime()) {
@@ -78,17 +80,23 @@ public class OccMgr {
 				 * the current tx. If overlap, then abort
 				 */
 
+				if (prevOccTx.getWriteSet().isEmpty()) {
+					// early return if the previous transaction is read-only
+					continue;
+				}
+
 				Set<PrimaryKey> intersection = new HashSet<PrimaryKey>(prevOccTx.getWriteSet());
+
 				intersection.retainAll(curOccTx.getReadSet());
 				if (!intersection.isEmpty()) {
-					readyToCleanCount.set(headRemoveCount);
 					activeTxsStartTimes.remove(curOccTx.getReadPhaseStartTime());
 					return false;
 				}
+			} else {
+				return true;
 			}
 		}
 
-		readyToCleanCount.set(headRemoveCount);
 		return true;
 	}
 
@@ -98,7 +106,7 @@ public class OccMgr {
 					curOccTx.getTxNum()));
 		}
 
-		recentCompletedTxs.add(curOccTx);
+		recentCompletedTxs.addFirst(curOccTx);
 		activeTxsStartTimes.remove(curOccTx.getReadPhaseStartTime());
 	}
 }
