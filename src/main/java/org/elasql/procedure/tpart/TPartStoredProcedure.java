@@ -339,14 +339,16 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 					
 					occTx.setWritePhaseEndTime();
 					Elasql.occMgr().dropSelfFromActiveTxs(occTx);
+					
 					break;
 				} else {
 					// clean the cache and re-do
 					cache = new TPartTxLocalCache(tx);
 				}
 			} catch (Exception e) {
-				// do nothing now
-			} finally {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}finally {
 				Elasql.occMgr().validationUnLock();	
 			}
 		}

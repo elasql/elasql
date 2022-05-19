@@ -364,6 +364,7 @@ public class Elasql extends VanillaDb {
 	
 	public static void initOccMgr() {
 		occMgr = new OccMgr();
+		taskMgr().runTask(occMgr);
 	}
  
 	public static void initPerfMgr(DdStoredProcedureFactory<?> factory) {
