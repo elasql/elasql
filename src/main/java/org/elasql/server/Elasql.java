@@ -61,10 +61,10 @@ public class Elasql extends VanillaDb {
  
 	public static final long START_TX_NUMBER = 0; 
 	public static final long START_TIME_MS = System.currentTimeMillis();
-	public static boolean testMode = false;
-	
-	private static ConcurrentLinkedQueue<Integer> completedTxs = null;
-	private static ConcurrentLinkedQueue<Integer> errorTxs = null;
+	public static enum OperatingMode {
+		NORMAL, TEST
+	}
+	public static OperatingMode operatingMode = OperatingMode.NORMAL;
  
 	/** 
 	 * The type of transactional execution engine supported by distributed 
@@ -121,28 +121,6 @@ public class Elasql extends VanillaDb {
  
 	// connection information 
 	private static int myNodeId;
-	
-	/*
-	 * These method are used for ElaSql.Test.
-	 * The pattern is called dependency injection,
-	 * which is to inject outer objects into a inner class,
-	 * so that the inner class can dismiss the injected object.
-	 */
-	public static void setCompletedTxsContainer(ConcurrentLinkedQueue<Integer> completedTxs) {
-		Elasql.completedTxs = completedTxs;
-	}
-	
-	public static void setErrorTxsContainer(ConcurrentLinkedQueue<Integer> errorTxs) {
-		Elasql.errorTxs = errorTxs;
-	}
-	
-	public static void registerCompletedTxs(int txNum) {
-		Elasql.completedTxs.add(txNum);
-	}
-	
-	public static void registerErrorTxs(int txNum) {
-		Elasql.errorTxs.add(txNum);
-	}
 	 
 	/** 
 	 * Initializes the system. This method is called during system startup. For 

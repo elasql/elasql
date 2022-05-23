@@ -8,17 +8,18 @@ import org.elasql.sql.PrimaryKey;
 import org.elasql.sql.PrimaryKeyBuilder;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.IntegerConstant;
+import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
 /*
  * See executeSql for more information about the transaction's logic
  */
-public class ItgrTestProc extends TPartStoredProcedure<ItgrTestProcParamHelper> {
+public class ItgrTestProc extends TPartStoredProcedure<StoredProcedureParamHelper> {
 	Constant idCon, valueCon, overflowCon;
-	
+
 	private PrimaryKey addKey;
-	
+
 	public ItgrTestProc(long txNum) {
-		super(txNum, new ItgrTestProcParamHelper());
+		super(txNum, StoredProcedureParamHelper.newDefaultParamHelper());
 	}
 
 	@Override
@@ -29,18 +30,18 @@ public class ItgrTestProc extends TPartStoredProcedure<ItgrTestProcParamHelper> 
 	@Override
 	protected void prepareKeys() {
 		PrimaryKeyBuilder builder = new PrimaryKeyBuilder("elasql_test_add");
-		
-		idCon = new IntegerConstant((int)(txNum % 10));
-		
+
+		idCon = new IntegerConstant((int) (txNum % 10));
+
 		builder.addFldVal("id", idCon);
 		addKey = builder.build();
-		
+
 		addReadKey(addKey);
 		addUpdateKey(addKey);
 	}
 
 	/*-
-	 * SELECT id, value, overflow FROM elasql_test WHERE id = my_tx_id's last digit;
+	 * SELECT id, value, overflow FROM elasql_test_add WHERE id = my_tx_id's last digit;
 	 * 
 	 * Transaction's logic:
 	 * ---------------------------------------------------------
@@ -56,14 +57,14 @@ public class ItgrTestProc extends TPartStoredProcedure<ItgrTestProcParamHelper> 
 	@Override
 	protected void executeSql(Map<PrimaryKey, CachedRecord> readings) {
 		CachedRecord rec = null;
-		
+
 		rec = readings.get(addKey);
-		
+
 		int rid = (int) rec.getVal("id").asJavaVal();
-		
+
 		int val = (int) rec.getVal("value").asJavaVal();
 		val = val * 10 + rid;
-		
+
 		int overflow = (int) rec.getVal("overflow").asJavaVal();
 		if (val > 1_000_000) {
 			val = 0;
@@ -71,7 +72,7 @@ public class ItgrTestProc extends TPartStoredProcedure<ItgrTestProcParamHelper> 
 			rec.setVal("overflow", new IntegerConstant(overflow));
 		}
 		rec.setVal("value", new IntegerConstant(val));
-		
+
 		update(addKey, rec);
 	}
 }

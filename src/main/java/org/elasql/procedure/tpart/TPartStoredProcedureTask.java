@@ -61,11 +61,11 @@ public class TPartStoredProcedureTask
 		profiler.stopExecution();
 		
 		// Notify test module 
-		if (Elasql.testMode) {
+		if (Elasql.operatingMode == Elasql.OperatingMode.TEST) {
 			if (rs.isCommitted()) {
-				Elasql.registerCompletedTxs((int)txNum);
+				onSpCommit((int) txNum);
 			} else {
-				Elasql.registerErrorTxs((int)txNum);
+				onSpRollback((int) txNum);
 			}
 			return;
 		}

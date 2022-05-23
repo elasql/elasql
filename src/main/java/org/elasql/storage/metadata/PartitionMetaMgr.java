@@ -32,7 +32,7 @@ public class PartitionMetaMgr {
 		/*
 		 * We won't initializ vanillaComm in the test mode.
 		 */
-		if (Elasql.testMode) {
+		if (Elasql.operatingMode == Elasql.OperatingMode.TEST) {
 			NUM_PARTITIONS = 1;
 		} else {
 			if (Elasql.ENABLE_STAND_ALONE_SEQUENCER) {

@@ -10,14 +10,15 @@ import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.sql.PrimaryKeyBuilder;
 import org.vanilladb.core.sql.IntegerConstant;
+import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
 
-public class ItgrTestValidationProc extends TPartStoredProcedure<ItgrTestValidationProcParamHelper> {
+public class ItgrTestValidationProc extends TPartStoredProcedure<StoredProcedureParamHelper> {
 	private static Logger logger = Logger.getLogger(IntegrationTest.class.getName());
 
 	private PrimaryKey[] addKeys = new PrimaryKey[10];
 
 	public ItgrTestValidationProc(long txNum) {
-		super(txNum, new ItgrTestValidationProcParamHelper());
+		super(txNum, StoredProcedureParamHelper.newDefaultParamHelper());
 	}
 
 	@Override

@@ -7,6 +7,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.integration.procedure.ItgrTestStoredProcFactory;
+import org.elasql.procedure.SpEndListener;
+import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.HashPartitionPlan;
@@ -64,7 +66,7 @@ public class ServerInit {
 	static ConcurrentLinkedQueue<Integer> getCompletedTxsContainer() {
 		return completedTxs;
 	}
-	
+
 	static ConcurrentLinkedQueue<Integer> getErrorTxsContainer() {
 		return errorTxs;
 	}
@@ -83,10 +85,10 @@ public class ServerInit {
 		}
 
 		/*
-		 * Enable testMode or we might get errors because lots of component depends on
+		 * Enable test mode or we might get errors because lots of component depends on
 		 * VanillComm, which won't be initialized during the test.
 		 */
-		Elasql.testMode = true;
+		Elasql.operatingMode = Elasql.OperatingMode.TEST;
 
 		PartitionPlan partitionPlan = new HashPartitionPlan(1);
 
@@ -109,12 +111,6 @@ public class ServerInit {
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info("ElaSQL.DdLogMgr is initialized");
 		}
-
-		completedTxs = new ConcurrentLinkedQueue<Integer>();
-		Elasql.setCompletedTxsContainer(completedTxs);
-		
-		errorTxs = new ConcurrentLinkedQueue<Integer>();
-		Elasql.setErrorTxsContainer(errorTxs);
 
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info("ElaSQL is initialized");
@@ -146,5 +142,9 @@ public class ServerInit {
 		if (logger.isLoggable(Level.INFO)) {
 			logger.info("Testing data has been loaded");
 		}
+	}
+
+	static void registerSpEndListener(SpEndListener spEndListener) {
+		StoredProcedureTask.registerListener(spEndListener);
 	}
 }

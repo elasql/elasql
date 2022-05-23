@@ -45,7 +45,7 @@ public class DdRecoveryMgr extends RecoveryMgr {
 		DISABLE_STORAGE_LOGGING = ElasqlProperties.getLoader().getPropertyAsBoolean(
 				DdRecoveryMgr.class.getName() + ".DISABLE_STORAGE_LOGGING", false);
 		
-		if (DISABLE_STORAGE_LOGGING || Elasql.testMode)
+		if (DISABLE_STORAGE_LOGGING || Elasql.operatingMode == Elasql.OperatingMode.TEST)
 			RecoveryMgr.enableLogging(false);
 		
 		VanillaDb.taskMgr().runTask(new Task() {

@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.procedure.SpEndListener;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.server.Elasql;
 import org.junit.Assert;
@@ -12,15 +13,16 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.vanilladb.core.util.TransactionProfiler;
 
-public class IntegrationTest {
+public class IntegrationTest implements SpEndListener {
+	public final static int ITGR_TEST_PROC_ID = 0;
+	public final static int ITGR_TEST_VALIDATION_PROC_ID = 1;
+
 	private final static int PSEUDO_CLIENT_ID = 0;
-	private final static int ITGR_TEST_PROC_ID = 0;
-	private final static int ITGR_TEST_VALIDATION_PROC_ID = 1;
 	private final static int MAX_TESTING_TIME_IN_SECOND = 10;
 
 	private static Logger logger = Logger.getLogger(IntegrationTest.class.getName());
-	private ConcurrentLinkedQueue<Integer> completedTxs;
-	private ConcurrentLinkedQueue<Integer> errorTxs;
+	private ConcurrentLinkedQueue<Integer> completedTxs = new ConcurrentLinkedQueue<Integer>();
+	private ConcurrentLinkedQueue<Integer> errorTxs = new ConcurrentLinkedQueue<Integer>();
 
 	public static final int TABLE_ROW_NUM = 10;
 	public static int TX_NUMS = 999;
@@ -37,8 +39,7 @@ public class IntegrationTest {
 
 	@Test
 	public void testRecordCorrectness() {
-		completedTxs = ServerInit.getCompletedTxsContainer();
-		errorTxs = ServerInit.getErrorTxsContainer();
+		ServerInit.registerSpEndListener(this);
 
 		scheduleSpCalls();
 
@@ -110,5 +111,15 @@ public class IntegrationTest {
 		}
 
 		Assert.assertTrue(completedTxs.size() == TX_NUMS);
+	}
+
+	@Override
+	public void onSpCommit(int txNum) {
+		completedTxs.add(txNum);
+	}
+
+	@Override
+	public void onSpRollback(int txNum) {
+		errorTxs.add(txNum);
 	}
 }

@@ -15,10 +15,20 @@
  *******************************************************************************/
 package org.elasql.procedure;
 
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 import org.vanilladb.core.server.task.Task;
 import org.vanilladb.core.sql.storedprocedure.StoredProcedure;
 
 public abstract class StoredProcedureTask<S extends StoredProcedure<?>> extends Task {
+	// Notify the listeners after a sp ends
+	private static ConcurrentLinkedQueue<SpEndListener> spEndListeners = new ConcurrentLinkedQueue<SpEndListener>();
+	
+	public static void registerListener(SpEndListener spEndListener) {
+		spEndListeners.add(spEndListener);
+	}	
+		
 	protected S sp;
 	protected int clientId;
 	protected int connectionId;
@@ -35,5 +45,27 @@ public abstract class StoredProcedureTask<S extends StoredProcedure<?>> extends 
 
 	public long getTxNum() {
 		return txNum;
+	}
+	
+	protected void onSpCommit(int txNum) {
+		if (spEndListeners.isEmpty()) {
+			return;
+		}
+		
+		Iterator<SpEndListener> iterator = spEndListeners.iterator();
+		while(iterator.hasNext()) {
+			iterator.next().onSpCommit(txNum);
+		}
+	}
+	
+	protected void onSpRollback(int txNum) {
+		if (spEndListeners.isEmpty()) {
+			return;
+		}
+		
+		Iterator<SpEndListener> iterator = spEndListeners.iterator();
+		while(iterator.hasNext()) {
+			iterator.next().onSpRollback(txNum);
+		}
 	}
 }
