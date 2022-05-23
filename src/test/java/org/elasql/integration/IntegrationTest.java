@@ -13,6 +13,10 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.vanilladb.core.util.TransactionProfiler;
 
+/**
+ * This is the main test file of integration test.
+ * (Eclipse) To run the integration test, right click this file and run as JUnit test.
+ */
 public class IntegrationTest implements SpEndListener {
 	public final static int ITGR_TEST_PROC_ID = 0;
 	public final static int ITGR_TEST_VALIDATION_PROC_ID = 1;
