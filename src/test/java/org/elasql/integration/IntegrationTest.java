@@ -21,7 +21,7 @@ public class IntegrationTest implements SpEndListener {
 	public final static int ITGR_TEST_PROC_ID = 0;
 	public final static int ITGR_TEST_VALIDATION_PROC_ID = 1;
 
-	private final static int PSEUDO_CLIENT_ID = 0;
+	private final static int PSEUDO_CLIENT_ID = -1;
 	private final static int MAX_TESTING_TIME_IN_SECOND = 10;
 
 	private static Logger logger = Logger.getLogger(IntegrationTest.class.getName());

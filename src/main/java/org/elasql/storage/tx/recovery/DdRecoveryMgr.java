@@ -45,6 +45,10 @@ public class DdRecoveryMgr extends RecoveryMgr {
 		DISABLE_STORAGE_LOGGING = ElasqlProperties.getLoader().getPropertyAsBoolean(
 				DdRecoveryMgr.class.getName() + ".DISABLE_STORAGE_LOGGING", false);
 		
+		if (Elasql.operatingMode == Elasql.OperatingMode.NOT_INITIALIZED) {
+			throw new RuntimeException("Elasql has not been initialized");
+		}
+		
 		if (DISABLE_STORAGE_LOGGING || Elasql.operatingMode == Elasql.OperatingMode.TEST)
 			RecoveryMgr.enableLogging(false);
 		

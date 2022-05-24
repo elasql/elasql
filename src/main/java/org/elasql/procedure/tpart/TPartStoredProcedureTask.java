@@ -60,19 +60,16 @@ public class TPartStoredProcedureTask
 		// Stop the profiler for the whole execution
 		profiler.stopExecution();
 		
-		// Notify test module 
-		if (Elasql.operatingMode == Elasql.OperatingMode.TEST) {
-			if (rs.isCommitted()) {
-				onSpCommit((int) txNum);
-			} else {
-				onSpRollback((int) txNum);
-			}
-			return;
+		if (rs.isCommitted()) {
+			onSpCommit((int) txNum);
+		} else {
+			onSpRollback((int) txNum);
 		}
 		
 		if (tsp.isMaster()) {
-			if (clientId != -1)
+			if (clientId != -1) {
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
+			}
 
 			// TODO: Uncomment this when the migration module is migrated
 //			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
@@ -85,10 +82,11 @@ public class TPartStoredProcedureTask
 //			timer.addToGlobalStatistics();
 		}
 		
-		// Record the profiler result
-		String role = tsp.isMaster()? "Master" : "Slave";
-		
-		Elasql.performanceMgr().addTransactionMetics(txNum, role, tsp.isTxDistributed(), profiler);
+		if (Elasql.performanceMgr() != null) {
+			// Record the profiler result
+			String role = tsp.isMaster()? "Master" : "Slave";
+			Elasql.performanceMgr().addTransactionMetics(txNum, role, tsp.isTxDistributed(), profiler);
+		}
 	}
 
 	public long getTxNum() {
