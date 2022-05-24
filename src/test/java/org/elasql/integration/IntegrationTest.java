@@ -15,7 +15,15 @@ import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * This is the main test file of integration test.
- * (Eclipse) To run the integration test, right click this file and run as JUnit test.
+ * (Eclipse) To run the integration test, please follow the instructions.
+ * 1. Click run configuration and new launch a JUnit test configuration.
+ * 2. Set the test class to org.elasql.integration.IntegrationTest.
+ * 3. Set the arguments:
+ * 		-Djava.util.logging.config.file=src/test/resources/java/util/logging/logging.properties
+ * 		-Dorg.vanilladb.core.config.file=src/test/resources/org/vanilladb/core/vanilladb.properties
+ * 		-Dorg.elasql.config.file=src/test/resources/org/elasql/elasql.properties 
+ * 
+ * 4. Save and run.
  */
 public class IntegrationTest implements SpEndListener {
 	public final static int ITGR_TEST_PROC_ID = 0;
