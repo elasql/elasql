@@ -22,6 +22,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.server.task.Task;
@@ -44,7 +45,11 @@ public class DdRecoveryMgr extends RecoveryMgr {
 		DISABLE_STORAGE_LOGGING = ElasqlProperties.getLoader().getPropertyAsBoolean(
 				DdRecoveryMgr.class.getName() + ".DISABLE_STORAGE_LOGGING", false);
 		
-		if (DISABLE_STORAGE_LOGGING)
+		if (Elasql.operatingMode == Elasql.OperatingMode.NOT_INITIALIZED) {
+			throw new RuntimeException("Elasql has not been initialized");
+		}
+		
+		if (DISABLE_STORAGE_LOGGING || Elasql.operatingMode == Elasql.OperatingMode.TEST)
 			RecoveryMgr.enableLogging(false);
 		
 		VanillaDb.taskMgr().runTask(new Task() {

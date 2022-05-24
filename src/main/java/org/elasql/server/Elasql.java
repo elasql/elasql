@@ -59,7 +59,11 @@ public class Elasql extends VanillaDb {
 	private static Logger logger = Logger.getLogger(VanillaDb.class.getName()); 
  
 	public static final long START_TX_NUMBER = 0; 
-	public static final long START_TIME_MS = System.currentTimeMillis(); 
+	public static final long START_TIME_MS = System.currentTimeMillis();
+	public static enum OperatingMode {
+		NOT_INITIALIZED, NORMAL, TEST
+	}
+	public static OperatingMode operatingMode = OperatingMode.NOT_INITIALIZED;
  
 	/** 
 	 * The type of transactional execution engine supported by distributed 
@@ -100,7 +104,7 @@ public class Elasql extends VanillaDb {
 		SERVICE_TYPE = ServiceType.fromInteger(type); 
 		ENABLE_STAND_ALONE_SEQUENCER = ElasqlProperties.getLoader().getPropertyAsBoolean( 
 				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false);
-	} 
+	}
  
 	// DD modules 
 	private static ConnectionMgr connMgr; 
@@ -115,7 +119,7 @@ public class Elasql extends VanillaDb {
 	private static PerformanceManager performanceMgr; 
  
 	// connection information 
-	private static int myNodeId; 
+	private static int myNodeId;
 	 
 	/** 
 	 * Initializes the system. This method is called during system startup. For 
@@ -129,7 +133,9 @@ public class Elasql extends VanillaDb {
 	 * @param factory 
 	 *            the stored procedure factory 
 	 */ 
-	public static void init(String dirName, int id, DdStoredProcedureFactory<?> factory) { 
+	public static void init(String dirName, int id, DdStoredProcedureFactory<?> factory) {
+		operatingMode = OperatingMode.NORMAL;
+		
 		PartitionPlan partitionPlan = null; 
 		Class<?> planCls = ElasqlProperties.getLoader().getPropertyAsClass( 
 				Elasql.class.getName() + ".DEFAULT_PARTITION_PLAN", HashPartitionPlan.class, 
@@ -149,6 +155,8 @@ public class Elasql extends VanillaDb {
 	public static void init(String dirName, int id, DdStoredProcedureFactory<?> factory, 
 			PartitionPlan partitionPlan, MigrationComponentFactory migraComsFactory) { 
 		myNodeId = id; 
+		
+		operatingMode = OperatingMode.NORMAL;
  
 		if (logger.isLoggable(Level.INFO)) 
 			logger.info("ElaSQL initializing..."); 

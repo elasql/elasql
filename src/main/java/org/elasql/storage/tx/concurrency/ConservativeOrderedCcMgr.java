@@ -32,7 +32,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 
 	// For normal operations - using conservative locking
 	private Set<Object> bookedObjs, readObjs, writeObjs;
-	private FifoLock myFifoLock = new FifoLock(txNum);
+	private FifoLock myFifoLock;
 
 	// For Indexes - using crabbing locking
 	private Set<BlockId> readIndexBlks = new HashSet<BlockId>();
@@ -43,6 +43,7 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		bookedObjs = new HashSet<Object>();
 		readObjs = new HashSet<Object>();
 		writeObjs = new HashSet<Object>();
+		myFifoLock = new FifoLock(txNum);
 	}
 
 	public void bookReadKey(PrimaryKey key) {
@@ -110,25 +111,13 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		HashSet<Object> hasLockedSet = new HashSet<Object>();
 
 		for (Object obj : writeObjs) {
-			// XXX: Debugging code
-//			if (hasLockedSet.contains(obj)) {
-//				throw new RuntimeException("An key is tried to be locked twice");
-//			}
-
 			fifoLockTbl.xLock(obj, myFifoLock);
-
 			hasLockedSet.add(obj);
 		}
 
 		for (Object obj : readObjs) {
 			if (!writeObjs.contains(obj)) {
-				// XXX: Debugging code
-//				if (hasLockedSet.contains(obj)) {
-//					throw new RuntimeException("An key is tried to be locked twice");
-//				}
-
 				fifoLockTbl.sLock(obj, myFifoLock);
-
 				hasLockedSet.add(obj);
 			}
 		}

@@ -89,6 +89,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			try {
 				// blocked if the queue is empty
 				StoredProcedureCall call = spcQueue.take();
+
 				TransactionProfiler.setProfiler(call.getProfiler());
 				TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
 				
