@@ -18,6 +18,7 @@ public class TPartStoredProcedureTask
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
+		System.out.println("Concurrency control: OCC");
 	}
 
 	private TPartStoredProcedure<?> tsp;
