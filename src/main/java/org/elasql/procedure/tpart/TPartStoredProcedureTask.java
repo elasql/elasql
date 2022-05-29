@@ -18,6 +18,7 @@ public class TPartStoredProcedureTask
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
+		System.out.println("Concurrency control: 2 Phase Locking");
 	}
 
 	private TPartStoredProcedure<?> tsp;
