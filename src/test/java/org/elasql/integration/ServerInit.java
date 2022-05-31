@@ -84,12 +84,6 @@ public class ServerInit {
 			throw new RuntimeException("Vanillacore hasn't been initialized");
 		}
 
-		/*
-		 * Enable test mode or we might get errors because lots of component depends on
-		 * VanillComm, which won't be initialized during the test.
-		 */
-		Elasql.operatingMode = Elasql.OperatingMode.TEST;
-
 		PartitionPlan partitionPlan = new HashPartitionPlan(1);
 
 		Elasql.initCacheMgr();
