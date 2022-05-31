@@ -72,12 +72,13 @@ public class FeatureExtractor {
 //		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
 		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
 //		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
-//		
-		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
+		
+		builder.addFeature("Remote Reads", extractRemoteDistribution(task.getReadSet(), graph));
+		builder.addFeature("Read Data Distribution", extractLocalDistribution(task.getReadSet(), graph));
 //		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
 		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
-		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
+		builder.addFeature("Update Data Distribution", extractLocalDistribution(task.getUpdateSet(), graph));
 //		
 		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
@@ -324,21 +325,49 @@ public class FeatureExtractor {
 		return counts;
 	}
 	
-	private Integer[] extractRecordDistribution(Set<PrimaryKey> keys, TGraph graph) {
+	private Integer[] extractLocalDistribution(Set<PrimaryKey> keys, TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		int fullyRepCount = 0;
 		
+		// Count records
 		for (PrimaryKey key : keys) {
-			// Skip fully replicated records
-			if (partMgr.isFullyReplicated(key))
-				continue;
-			
-			int partId = graph.getResourcePosition(key).getPartId();
-			counts[partId]++;
+			if (partMgr.isFullyReplicated(key)) {
+				fullyRepCount++;
+			} else {
+				int partId = graph.getResourcePosition(key).getPartId();
+				counts[partId]++;
+			}
 		}
 		
+		// Add fully replicated records
 		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
-	    Arrays.setAll(newCounts, i -> counts[i]);
+		for (int partId = 0; partId < newCounts.length; partId++) {
+			newCounts[partId] = counts[partId] + fullyRepCount;
+		}
+	    
+		return newCounts;
+	}
+	
+	private Integer[] extractRemoteDistribution(Set<PrimaryKey> keys, TGraph graph) {
+		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		int totalCount = 0;
+		
+		// Count records
+		for (PrimaryKey key : keys) {
+			if (!partMgr.isFullyReplicated(key)) {
+				int partId = graph.getResourcePosition(key).getPartId();
+				counts[partId]++;
+				totalCount++;
+			}
+		}
+		
+		// Add fully replicated records
+		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
+		for (int partId = 0; partId < newCounts.length; partId++) {
+			newCounts[partId] = totalCount - counts[partId];
+		}
 	    
 		return newCounts;
 	}

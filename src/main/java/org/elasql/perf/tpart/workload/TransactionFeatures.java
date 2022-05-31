@@ -39,6 +39,7 @@ public class TransactionFeatures {
 		featureKeys.add("Number of Insert Records");
 //		featureKeys.add("Number of Fully Replicated Records");
 //		// - Data distribution
+		featureKeys.add("Remote Reads");
 		featureKeys.add("Read Data Distribution");
 //		featureKeys.add("Read Data Distribution in Bytes");
 		featureKeys.add("Read Data in Cache Distribution");
