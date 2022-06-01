@@ -133,7 +133,7 @@ public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper>
 			isCommitted = true;
 		} catch (Exception e) {
 			profiler.stopComponentProfiler("OU7 - Write to Local");
-			e.printStackTrace();
+//			e.printStackTrace();
 //			System.out.println("Tx." + txNum + "'s plan: " + plan);
 			profiler.startComponentProfiler("Tx rollback");
 			tx.rollback();
