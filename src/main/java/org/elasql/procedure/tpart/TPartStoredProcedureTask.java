@@ -4,6 +4,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.ai.TransactionEstimation;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
@@ -20,6 +22,8 @@ public class TPartStoredProcedureTask
 //		TimerStatistics.startReporting();
 	}
 
+	private BanditTransactionContext banditTransactionContext;
+
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
@@ -31,7 +35,8 @@ public class TPartStoredProcedureTask
 	private TransactionProfiler profiler;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
-			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
+			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation,
+			BanditTransactionContext banditTransactionContext) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
@@ -40,6 +45,7 @@ public class TPartStoredProcedureTask
 		this.profiler = profiler;
 		this.tsp = sp;
 		this.estimation = estimation;
+		this.banditTransactionContext = banditTransactionContext;
 	}
 
 	@Override
@@ -80,6 +86,11 @@ public class TPartStoredProcedureTask
 			
 			// For Debugging
 //			timer.addToGlobalStatistics();
+
+			// TODO: use reciprocal of the latency as the reward for now
+			double reward = 1./ (double) profiler.getExecutionTime();
+			BanditTransactionReward banditTransactionReward = new BanditTransactionReward(txNum, reward);
+			Elasql.connectionMgr().sendTransactionMetricReport(banditTransactionReward);
 		}
 		
 		if (Elasql.performanceMgr() != null) {
@@ -156,5 +167,13 @@ public class TPartStoredProcedureTask
 	
 	public TransactionEstimation getEstimation() {
 		return estimation;
+	}
+
+	public BanditTransactionContext getBanditTransactionContext() {
+		return banditTransactionContext;
+	}
+
+	public void setBanditTransactionContext(BanditTransactionContext banditTransactionContext) {
+		this.banditTransactionContext = banditTransactionContext;
 	}
 }

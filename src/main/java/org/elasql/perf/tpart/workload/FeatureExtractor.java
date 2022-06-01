@@ -68,7 +68,8 @@ public class FeatureExtractor {
 		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
 		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
-//		
+		builder.addFeature("Write Data Distribution", extractRecordDistribution(task.getWriteSet(), graph));
+
 		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
 //		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
@@ -332,6 +333,7 @@ public class FeatureExtractor {
 		case HERMES:
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_BANDIT:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			for (PrimaryKey key : keys) {
 				int partId = fusionTGraph.getCachedLocation(key);
@@ -355,6 +357,7 @@ public class FeatureExtractor {
 		case HERMES:
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_BANDIT:
 			for (PrimaryKey key : keys) {
 				if (!keyHasBeenRead.contains(key) ) {
 					counts += 1;
@@ -372,6 +375,7 @@ public class FeatureExtractor {
 		case HERMES:
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_BANDIT:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			return fusionTGraph.getFusionTableOverflowCount();
 		default:

@@ -34,7 +34,8 @@ public class PartitionMetaMgr {
 		 */
 		switch(Elasql.operatingMode) {
 		case NOT_INITIALIZED:
-			throw new RuntimeException("Elasql has not been initialized");
+			// XXX: commented out for now, since it cause client to throw exception
+//			throw new RuntimeException("Elasql has not been initialized");
 		case NORMAL:
 			if (Elasql.ENABLE_STAND_ALONE_SEQUENCER) {
 				NUM_PARTITIONS = VanillaCommServer.getServerCount() - 1;

@@ -9,6 +9,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
 import org.elasql.perf.tpart.workload.TransactionDependencyRecorder;
@@ -22,10 +24,10 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.client.BatchSpcSender;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
+import org.elasql.schedule.tpart.bandit.BanditBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.task.Task;
 
 /**
@@ -34,7 +36,8 @@ import org.vanilladb.core.server.task.Task;
  * @author Yu-Shan Lin
  */
 public class SpCallPreprocessor extends Task {
-	
+
+	private final BanditTransactionDataCollector banditTransactionDataCollector;
 	private BlockingQueue<StoredProcedureCall> spcQueue;
 	private FeatureExtractor featureExtractor;
 
@@ -53,7 +56,7 @@ public class SpCallPreprocessor extends Task {
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, TpartMetricWarehouse metricWarehouse,
-			Estimator performanceEstimator) {
+			Estimator performanceEstimator, BanditTransactionDataCollector banditTransactionDataCollector) {
 		
 		// For generating execution plan and sp task
 		this.factory = factory;
@@ -62,7 +65,8 @@ public class SpCallPreprocessor extends Task {
 		this.isBatching = isBatching;
 		this.performanceEstimator = performanceEstimator;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-		
+		this.banditTransactionDataCollector = banditTransactionDataCollector;
+
 		// For collecting features
 		featureExtractor = new FeatureExtractor(metricWarehouse);
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
@@ -70,6 +74,11 @@ public class SpCallPreprocessor extends Task {
 			featureRecorder.startRecording();
 			dependencyRecorder = new TransactionDependencyRecorder();
 			dependencyRecorder.startRecording();
+		}
+
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
+			BanditBasedRouter banditBasedRouter = (BanditBasedRouter) inserter;
+			((BanditBasedRouter) inserter).setBanditTransactionDataCollector(banditTransactionDataCollector);
 		}
 	}
 	
@@ -99,13 +108,11 @@ public class SpCallPreprocessor extends Task {
 				
 				// Add normal SPs to the task batch
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
+						task.getProcedureType() == ProcedureType.CONTROL ||
+						task.getProcedureType() == ProcedureType.BANDIT) {
 					// Pre-process the transaction 
-					if (TPartPerformanceManager.ENABLE_COLLECTING_DATA ||
-							performanceEstimator != null) {
-						preprocess(spc, task);
-					}
-					
+					preprocess(spc, task);
+
 					// Add to the schedule batch
 					batchedTasks.add(task);
 				}
@@ -134,7 +141,7 @@ public class SpCallPreprocessor extends Task {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), null, sp, null);
+					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null);
 		}
 		
 		return null;
@@ -142,31 +149,42 @@ public class SpCallPreprocessor extends Task {
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead);
-		
+
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
-		
+
 		// Record the feature if necessary
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
 				task.getProcedureType() != ProcedureType.CONTROL) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
 		}
-		
+
 		// Estimate the performance if necessary
 		if (performanceEstimator != null) {
 			TransactionEstimation estimation = performanceEstimator.estimate(features);
-			
+
 			// Save the estimation
 			spc.setMetadata(estimation.toBytes());
 			task.setEstimation(estimation);
+		// Bandit has no performanceEstimator
+		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
+			// Set transaction features that used in bandit
+			BanditTransactionContext banditTransactionContext = new BanditTransactionContext(task.getTxNum(), features);
+
+			banditTransactionDataCollector.addContext(banditTransactionContext);
+
+			// RealVector
+			// TODO: metadata type
+			spc.setMetadata(banditTransactionContext.getContext());
+			task.setBanditTransactionContext(banditTransactionContext);
 		}
 	}
 	
 	private void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
-		
+
 		// add write back edges
 		graph.addWriteBackEdge();
 		

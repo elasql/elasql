@@ -27,6 +27,7 @@ import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
+import org.elasql.perf.tpart.bandit.BanditStoredProcedureFactory;
 import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
@@ -40,6 +41,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
+import org.elasql.schedule.tpart.bandit.BanditBasedRouter;
 import org.elasql.schedule.tpart.control.ControlBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
@@ -70,7 +72,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB. 
 	 */ 
 	public enum ServiceType { 
-		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL; 
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL, HERMES_BANDIT;
  
 		static ServiceType fromInteger(int index) { 
 			switch (index) { 
@@ -88,6 +90,8 @@ public class Elasql extends VanillaDb {
 				return LEAP;
 			case 6:
 				return HERMES_CONTROL;
+			case 7:
+				return HERMES_BANDIT;
 			default: 
 				throw new RuntimeException("Unsupport service type"); 
 			} 
@@ -208,6 +212,7 @@ public class Elasql extends VanillaDb {
 		case G_STORE: 
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_BANDIT:
 			remoteRecReceiver = new TPartCacheMgr(); 
 			break; 
  
@@ -236,13 +241,20 @@ public class Elasql extends VanillaDb {
 		case G_STORE: 
 		case LEAP: 
 		case HERMES_CONTROL:
-			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
+			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
 			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
-			scheduler = initTPartScheduler(tpartFactory); 
-			break; 
-		default: 
+			scheduler = initTPartScheduler(tpartFactory);
+			break;
+		case HERMES_BANDIT:
+			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			tpartFactory = (TPartStoredProcedureFactory) factory;
+			tpartFactory = new BanditStoredProcedureFactory(tpartFactory);
+			scheduler = initTPartScheduler(tpartFactory);
+			break;
+		default:
 			throw new UnsupportedOperationException(); 
 		} 
 	} 
@@ -300,9 +312,16 @@ public class Elasql extends VanillaDb {
 			inserter = new ControlBasedRouter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
-			break; 
-		default: 
-			throw new IllegalArgumentException("Not supported"); 
+			break;
+		case HERMES_BANDIT:
+			table = new FusionTable();
+			graph = new FusionTGraph(table);
+			inserter = new BanditBasedRouter();
+			sinker = new FusionSinker(table);
+			isBatching = false;
+			break;
+		default:
+			throw new IllegalArgumentException("Not supported");
 		} 
 		 
 		// TODO: Uncomment this when the migration module is migrated 
@@ -347,14 +366,21 @@ public class Elasql extends VanillaDb {
 		case G_STORE:
 		case LEAP:
 		case HERMES_CONTROL:
-			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
+			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
 			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
 			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
-		default: 
-			performanceMgr = null; 
+		case HERMES_BANDIT:
+			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
+				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
+			tpartFactory = (TPartStoredProcedureFactory) factory;
+			tpartFactory = new BanditStoredProcedureFactory(tpartFactory);
+			performanceMgr = newTPartPerfMgr(tpartFactory);
+			break;
+		default:
+			performanceMgr = null;
 		} 
 	}
 	
@@ -390,7 +416,12 @@ public class Elasql extends VanillaDb {
 				graph = new FusionTGraph(new FusionTable()); 
 				inserter = new ControlBasedRouter();
 				isBatching = false;
-				break; 
+				break;
+			case HERMES_BANDIT:
+				graph = new FusionTGraph(new FusionTable());
+				inserter = new BanditBasedRouter();
+				isBatching = false;
+				break;
 			default: 
 				throw new IllegalArgumentException("Not supported"); 
 			} 

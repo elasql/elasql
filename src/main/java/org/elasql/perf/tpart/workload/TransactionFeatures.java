@@ -41,6 +41,7 @@ public class TransactionFeatures {
 		featureKeys.add("Read Data in Cache Distribution");
 		featureKeys.add("Read Data with IO Distribution");
 		featureKeys.add("Update Data Distribution");
+		featureKeys.add("Write Data Distribution");
 //
 //		// Fusion Table
 		featureKeys.add("Number of Overflows in Fusion Table");

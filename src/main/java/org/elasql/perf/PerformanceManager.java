@@ -41,7 +41,14 @@ public interface PerformanceManager {
 	 * @param report the metric report
 	 */
 	void receiveMetricReport(MetricReport report);
-	
+
+	/**
+	 * Receives transaction metric report from master node.
+	 *
+	 * @param report the transaction latency report
+	 */
+	void receiveTransactionMetricReport(TransactionMetricReport report);
+
 	/**
 	 * Get the instance of MetricWarehouse.
 	 */
