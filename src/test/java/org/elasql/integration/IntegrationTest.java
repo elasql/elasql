@@ -21,6 +21,7 @@ import org.vanilladb.core.util.TransactionProfiler;
  * 3. Set the arguments:
  * 		-Djava.util.logging.config.file=src/test/resources/java/util/logging/logging.properties
  * 		-Dorg.vanilladb.core.config.file=src/test/resources/org/vanilladb/core/vanilladb.properties
+ *      -Dorg.vanilladb.comm.config.file=src/test/resources/org/vanilladb/comm/vanillacomm.properties
  * 		-Dorg.elasql.config.file=src/test/resources/org/elasql/elasql.properties 
  * 
  * 4. Save and run.
