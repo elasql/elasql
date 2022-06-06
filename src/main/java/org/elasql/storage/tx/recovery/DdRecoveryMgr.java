@@ -34,7 +34,7 @@ public class DdRecoveryMgr extends RecoveryMgr {
 	private static BlockingQueue<StoredProcedureCall> spcLogQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 
 	public static final boolean DISABLE_STORAGE_LOGGING;
-	
+
 	private static final Object spcLoggerSyncObj = new Object();
 	private static final Lock spcLoggerLock = new ReentrantLock();
 	private static final Condition spcLoggerCondition = spcLoggerLock.newCondition();
@@ -42,20 +42,20 @@ public class DdRecoveryMgr extends RecoveryMgr {
 	private static long lastLoggedTxn = -1;
 
 	static {
-		DISABLE_STORAGE_LOGGING = ElasqlProperties.getLoader().getPropertyAsBoolean(
-				DdRecoveryMgr.class.getName() + ".DISABLE_STORAGE_LOGGING", false);
-		
+		DISABLE_STORAGE_LOGGING = ElasqlProperties.getLoader()
+				.getPropertyAsBoolean(DdRecoveryMgr.class.getName() + ".DISABLE_STORAGE_LOGGING", false);
+
 		if (DISABLE_STORAGE_LOGGING || Elasql.testMode)
 			RecoveryMgr.enableLogging(false);
-		
+
 		VanillaDb.taskMgr().runTask(new Task() {
 			@Override
 			public void run() {
 				while (true) {
 					try {
 						StoredProcedureCall spc = spcLogQueue.take();
-						new StoredProcRequestRecord(spc.getTxNum(), spc.getClientId(), spc.getConnectionId(), spc.getPid(),
-								spc.getPars()).writeToLog();
+						new StoredProcRequestRecord(spc.getTxNum(), spc.getClientId(), spc.getConnectionId(),
+								spc.getPid(), spc.getPars()).writeToLog();
 						// synchronized (spcLoggerSyncObj) {
 						try {
 							spcLoggerLock.lock();
@@ -85,22 +85,20 @@ public class DdRecoveryMgr extends RecoveryMgr {
 	@Override
 	public void onTxCommit(Transaction tx) {
 		// TODO Commented for experiment
-		// if (!tx.isReadOnly()) {
-		// // synchronized (spcLoggerSyncObj) {
-		// try {
-		// spcLoggerLock.lock();
-		// while (tx.getTransactionNumber() > lastLoggedTxn) {
-		// try {
-		// // spcLoggerSyncObj.wait();
-		// spcLoggerCondition.await();
-		// } catch (InterruptedException e) {
-		// e.printStackTrace();
-		// }
-		// }
-		// } finally {
-		// spcLoggerLock.unlock();
-		// }
-		// }
+		if (!tx.isReadOnly()) {
+			try {
+				spcLoggerLock.lock();
+				while (tx.getTransactionNumber() > lastLoggedTxn) {
+					try {
+						spcLoggerCondition.await();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			} finally {
+				spcLoggerLock.unlock();
+			}
+		}
 	}
 	// log sunk tx's remote readings
 }
