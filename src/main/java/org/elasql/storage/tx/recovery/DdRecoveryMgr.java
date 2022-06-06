@@ -84,6 +84,7 @@ public class DdRecoveryMgr extends RecoveryMgr {
 
 	@Override
 	public void onTxCommit(Transaction tx) {
+		super.onTxCommit(tx);
 		// TODO Commented for experiment
 		if (!tx.isReadOnly()) {
 			try {
