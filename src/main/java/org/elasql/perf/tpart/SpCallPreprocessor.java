@@ -8,7 +8,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
-import org.elasql.perf.tpart.ai.SumMaxEstimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
@@ -47,9 +46,6 @@ public class SpCallPreprocessor extends Task {
 	private boolean isBatching;
 	private Estimator performanceEstimator;
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
-	
-	// XXX: Quick test
-	private Estimator testEstimator = new SumMaxEstimator();
 	
 	// XXX: Cache last tx's routing destination
 	private int lastTxRoutingDest = -1;
@@ -156,21 +152,16 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
+		if (task.getProcedureType() == ProcedureType.CONTROL)
+			return;
 		
-		// XXX: Quick test
-		long startTime = System.nanoTime();
-		TransactionEstimation est = testEstimator.estimate(features);
-		long elaspedTime = System.nanoTime() - startTime;
-		System.out.println(String.format("Tx.%d's estimation: %s, takes %d μs to estimate",
-				features.getTxNum(), est, elaspedTime / 1000));
+		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 		
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
 		
 		// Record the feature if necessary
-		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
-				task.getProcedureType() != ProcedureType.CONTROL) {
+		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
 		}
@@ -191,11 +182,10 @@ public class SpCallPreprocessor extends Task {
 		
 		lastTxRoutingDest = timeRelatedFeatureMgr.pushInfo(graph);
 		
-		// XXX: Quick test
-		if (testEstimator != null) {
+		// Notify the estimator where the transactions are routed
+		if (performanceEstimator != null) {
 			for (TxNode node : graph.getTxNodes()) {
-				testEstimator.notifyTransactionRoute(node.getTxNum(), node.getPartId());
-				System.out.println(String.format("Tx.%d's route: %d", node.getTxNum(), node.getPartId()));
+				performanceEstimator.notifyTransactionRoute(node.getTxNum(), node.getPartId());
 			}
 		}
 		
