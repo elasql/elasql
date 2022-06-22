@@ -14,6 +14,7 @@ import org.elasql.perf.tpart.workload.FeatureExtractor;
 import org.elasql.perf.tpart.workload.TransactionDependencyRecorder;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.perf.tpart.workload.TransactionFeaturesRecorder;
+import org.elasql.perf.tpart.workload.time.TimeRelatedFeatureMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -23,9 +24,9 @@ import org.elasql.remote.groupcomm.client.BatchSpcSender;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.task.Task;
 
 /**
@@ -44,11 +45,15 @@ public class SpCallPreprocessor extends Task {
 	private TGraph graph;
 	private boolean isBatching;
 	private Estimator performanceEstimator;
-	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>(); 
+	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
+	
+	// XXX: Cache last tx's routing destination
+	private int lastTxRoutingDest = -1;
 	
 	// For collecting features
 	private TransactionFeaturesRecorder featureRecorder;
 	private TransactionDependencyRecorder dependencyRecorder;
+	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
 	
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
@@ -64,7 +69,8 @@ public class SpCallPreprocessor extends Task {
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
 		// For collecting features
-		featureExtractor = new FeatureExtractor(metricWarehouse);
+		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
+		featureExtractor = new FeatureExtractor(metricWarehouse, timeRelatedFeatureMgr);
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder = new TransactionFeaturesRecorder();
 			featureRecorder.startRecording();
@@ -76,6 +82,11 @@ public class SpCallPreprocessor extends Task {
 	public void preprocessSpCall(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall())
 			spcQueue.add(spc);
+	}
+	
+	public void onTransactionCommit(long txNum, int masterId) {
+		featureExtractor.onTransactionCommit(txNum);
+		timeRelatedFeatureMgr.onTxCommit(masterId);
 	}
 
 	@Override
@@ -90,7 +101,7 @@ public class SpCallPreprocessor extends Task {
 			try {
 				// Take a SP call
 				StoredProcedureCall spc = spcQueue.take();
-
+				
 				// Add to the sending list
 				sendingList.add(spc);
 				
@@ -141,14 +152,16 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead);
+		if (task.getProcedureType() == ProcedureType.CONTROL)
+			return;
+		
+		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 		
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
 		
 		// Record the feature if necessary
-		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
-				task.getProcedureType() != ProcedureType.CONTROL) {
+		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
 		}
@@ -166,6 +179,15 @@ public class SpCallPreprocessor extends Task {
 	private void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
+		
+		lastTxRoutingDest = timeRelatedFeatureMgr.pushInfo(graph);
+		
+		// Notify the estimator where the transactions are routed
+		if (performanceEstimator != null) {
+			for (TxNode node : graph.getTxNodes()) {
+				performanceEstimator.notifyTransactionRoute(node.getTxNum(), node.getPartId());
+			}
+		}
 		
 		// add write back edges
 		graph.addWriteBackEdge();

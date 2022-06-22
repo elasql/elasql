@@ -6,4 +6,6 @@ public interface Estimator {
 	
 	TransactionEstimation estimate(TransactionFeatures features);
 	
+	void notifyTransactionRoute(long txNum, int masterId);
+	
 }

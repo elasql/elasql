@@ -1,12 +1,11 @@
 package org.elasql.perf.tpart.workload;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.elasql.storage.metadata.PartitionMetaMgr;
 
 /**
  * An object to store the features for a transaction request.
@@ -17,7 +16,6 @@ public class TransactionFeatures {
 
 	// Defines a read-only list for feature keys
 	public static final List<String> FEATURE_KEYS;
-	public static final int SERVER_COUNT = PartitionMetaMgr.NUM_PARTITIONS;
 
 	static {
 		List<String> featureKeys = new ArrayList<String>();
@@ -30,12 +28,18 @@ public class TransactionFeatures {
 		// - Transaction Type Related
 		featureKeys.add("Tx Type");
 		
+		// Transaction Dependency
+		featureKeys.add("Dependency - Max Depth");
+		featureKeys.add("Dependency - First Layer Tx Count");
+		featureKeys.add("Dependency - Total Tx Count");
+		
 		// - Number of records
 //		featureKeys.add("Number of Read Records");
 //		featureKeys.add("Number of Update Records");
 		featureKeys.add("Number of Insert Records");
 //		featureKeys.add("Number of Fully Replicated Records");
 //		// - Data distribution
+		featureKeys.add("Remote Reads");
 		featureKeys.add("Read Data Distribution");
 //		featureKeys.add("Read Data Distribution in Bytes");
 		featureKeys.add("Read Data in Cache Distribution");
@@ -68,6 +72,24 @@ public class TransactionFeatures {
 		featureKeys.add("I/O Read Bytes");
 		featureKeys.add("I/O Write Bytes");
 		featureKeys.add("I/O Queue Length");
+		
+		featureKeys.add("Number of Read Record in Last 100 us");
+		featureKeys.add("Number of Read Record Excluding Cache in Last 100 us");
+		featureKeys.add("Number of Update Record in Last 100 us");
+		featureKeys.add("Number of Insert Record in Last 100 us");
+		featureKeys.add("Number of Commit Tx in Last 100 us");
+		
+		featureKeys.add("Number of Read Record in Last 500 us");
+		featureKeys.add("Number of Read Record Excluding Cache in Last 500 us");
+		featureKeys.add("Number of Update Record in Last 500 us");
+		featureKeys.add("Number of Insert Record in Last 500 us");
+		featureKeys.add("Number of Commit Tx in Last 500 us");
+		
+		featureKeys.add("Number of Read Record in Last 1000 us");
+		featureKeys.add("Number of Read Record Excluding Cache in Last 1000 us");
+		featureKeys.add("Number of Update Record in Last 1000 us");
+		featureKeys.add("Number of Insert Record in Last 1000 us");
+		featureKeys.add("Number of Commit Tx in Last 1000 us");
 //
 //		featureKeys.add("Latch Features");
 
@@ -83,11 +105,13 @@ public class TransactionFeatures {
 	// - checks the correctness before building an object
 	public static class Builder {
 		private long txNum;
+		private int lastTxRoutingDest;
 		private Map<String, Object> features;
 		private List<Long> dependentTxns;
 
-		public Builder(long txNum) {
+		public Builder(long txNum, int lastTxRoutingDest) {
 			this.txNum = txNum;
+			this.lastTxRoutingDest = lastTxRoutingDest;
 			this.features = new HashMap<String, Object>();
 			this.dependentTxns = new ArrayList<Long>();
 		}
@@ -115,19 +139,21 @@ public class TransactionFeatures {
 			// Sort the dependencies
 			Collections.sort(dependentTxns);
 
-			return new TransactionFeatures(txNum, features, dependentTxns);
+			return new TransactionFeatures(txNum, features, dependentTxns, lastTxRoutingDest);
 		}
 	}
 
 	private long txNum;
+	private int lastTxRoutingDest;
 	private Map<String, Object> features;
 	// Transaction dependencies are handled separately
 	private List<Long> dependentTxns;
 
 	// Builder Pattern: set the constructor to private to avoid creating an object
 	// from outside
-	private TransactionFeatures(long txNum, Map<String, Object> features, List<Long> dependentTxns) {
+	private TransactionFeatures(long txNum, Map<String, Object> features, List<Long> dependentTxns, int lastTxRoutingDest) {
 		this.txNum = txNum;
+		this.lastTxRoutingDest = lastTxRoutingDest;
 		this.features = features;
 		this.dependentTxns = dependentTxns;
 	}
@@ -143,5 +169,48 @@ public class TransactionFeatures {
 	public List<Long> getDependencies() {
 		// Use 'unmodifiableList' to avoid the list is modified outside
 		return Collections.unmodifiableList(dependentTxns);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		
+		// The starting character
+		sb.append('[');
+		
+		// Transaction ID
+		sb.append(txNum);
+		sb.append(',');
+		
+		// Transaction Dependencies
+		sb.append(dependentTxns);
+		sb.append(',');
+		
+		// Last tx's routing destination
+		sb.append(lastTxRoutingDest);
+		sb.append(',');
+		
+		// Non-array features
+		for (String key : FEATURE_KEYS) {
+			Object val = features.get(key);
+			if (!val.getClass().isArray()) {
+				sb.append(val);
+				sb.append(',');
+			}
+		}
+		
+		// Array features
+		for (String key : FEATURE_KEYS) {
+			Object val = features.get(key);
+			if (val.getClass().isArray()) {
+				sb.append(Arrays.toString((Object[]) val));
+				sb.append(',');
+			}
+		}
+		
+		// The ending character
+		sb.setCharAt(sb.length() - 1, ']');
+		
+		return sb.toString();
 	}
 }

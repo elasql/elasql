@@ -6,6 +6,7 @@ import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
+import org.elasql.perf.tpart.ai.SumMaxEstimator;
 import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
@@ -67,6 +68,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 			return new ConstantEstimator();
 		case 1:
 			return new ReadCountEstimator();
+		case 2:
+			return new SumMaxEstimator();
 		default:
 			throw new IllegalArgumentException("Not supported");
 		}
@@ -115,5 +118,10 @@ public class TPartPerformanceManager implements PerformanceManager {
 	@Override
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
+	}
+	
+	@Override
+	public void onTransactionCommit(long txNum, int masterId) {
+		spCallPreprocessor.onTransactionCommit(txNum, masterId);
 	}
 }

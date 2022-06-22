@@ -43,6 +43,11 @@ public class ReadCountEstimator implements Estimator {
 		
 		return builder.build();
 	}
+
+	@Override
+	public void notifyTransactionRoute(long txNum, int masterId) {
+		// Do nothing
+	}
 	
 	private double estimateLatency(TransactionFeatures features, int masterId) {
 		Integer[] readDistribution = (Integer[]) features.getFeature("Read Data Distribution");
