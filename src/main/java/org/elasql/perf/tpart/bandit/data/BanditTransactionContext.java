@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.bandit.data;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.RealVector;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 
 import java.io.Serializable;
@@ -16,17 +17,17 @@ public class BanditTransactionContext implements Serializable {
 	public BanditTransactionContext(long txNum, TransactionFeatures transactionFeatures) {
 		Double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Read Data Distribution")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
 		Double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Write Data Distribution")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
-		Double[] processCpuLoads = (Double[]) transactionFeatures.getFeature("Process CPU Load");
+		Double[] systemCpuLoads = (Double[]) transactionFeatures.getFeature("System CPU Load");
 		ArrayList<Double> context = new ArrayList<>();
 		Collections.addAll(context, readDataDistributions);
 		Collections.addAll(context, writeDataDistributions);
-		Collections.addAll(context, processCpuLoads);
+		Collections.addAll(context, systemCpuLoads);
 		this.context = new ArrayRealVector(context.stream().mapToDouble(v -> v).toArray(), false);
 		this.txNum = txNum;
 	}
 
-	public BanditTransactionContext(long txNum, ArrayRealVector context) {
-		this.context = context;
+	public BanditTransactionContext(long txNum, RealVector context) {
+		this.context = new ArrayRealVector(context);
 		this.txNum = txNum;
 	}
 
