@@ -185,7 +185,7 @@ public class Elasql extends VanillaDb {
  
 		if (isStandAloneSequencer()) { 
 			logger.info("initializing as the stand alone sequencer"); 
-			VanillaDb.initTaskMgr();
+			VanillaDb.initCustomizedTaskMgr();
 			initPartitionMetaMgr(partitionPlan); // must be before TPartPerformanceMgr
 			initConnectionMgr(myNodeId);
 			initPerfMgr(factory); 
