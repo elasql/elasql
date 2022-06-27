@@ -22,8 +22,8 @@ public class BanditBasedRouter implements BatchNodeInserter {
 
 	public BanditBasedRouter() {
 		// TODO: Number of features hard coded
-//		model = new LinUCB(PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS, 18);
-		model = new HybridLinUCB(PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS, 18);
+//		model = new LinUCB(PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS, 1);
+		model = new HybridLinUCB(PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS, 5);
 	}
 
 	@Override
@@ -46,20 +46,23 @@ public class BanditBasedRouter implements BatchNodeInserter {
 	}
 
 	private void receiveReward(BanditRewardUpdateParamHelper paramHelper) {
+		long startTime = System.nanoTime();
 		RealVector[] context = paramHelper.getContext();
 		model.receiveRewards(Arrays.stream(context).map(c -> c.append(c)).toArray(RealVector[]::new), paramHelper.getArm(), paramHelper.getReward());
+//		model.receiveRewards(context, paramHelper.getArm(), paramHelper.getReward());
 
 		// Debug
-		logger.info(String.format("Receive rewards for %d transactions. sample: %s%n", context.length, paramHelper.getReward()[0]));
+		logger.info(String.format("Receive rewards for %d transactions. Takes %f µs. Sample: %s", context.length, (System.nanoTime() - startTime) / 1000. ,paramHelper.getReward()[0]));
 	}
 
 	private int insert(TGraph graph, TPartStoredProcedureTask task) {
+		long startTime = System.nanoTime();
 		ArrayRealVector context = task.getBanditTransactionContext().getContext();
 		int arm = model.chooseArm(context.append(context));
 		graph.insertTxNode(task, arm);
 
 		// Debug
-		logger.info(String.format("Choose arm %d for transaction %d%n", arm, task.getTxNum()));
+		logger.info(String.format("Choose arm %d for transaction %d. Takes %f µs. Context: %s", arm, task.getTxNum(), (System.nanoTime() - startTime) / 1000., context));
 
 		return arm;
 	}
