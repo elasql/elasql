@@ -14,14 +14,15 @@ public class BanditTransactionContext implements Serializable {
 
 	private final long txNum;
 	private final ArrayRealVector context;
+
 	public BanditTransactionContext(long txNum, TransactionFeatures transactionFeatures) {
 		Double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Read Data Distribution")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
 		Double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Write Data Distribution")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
-		Double[] systemCpuLoads = (Double[]) transactionFeatures.getFeature("System CPU Load");
+//		Double[] systemCpuLoads = (Double[]) transactionFeatures.getFeature("System CPU Load");
 		ArrayList<Double> context = new ArrayList<>();
 		Collections.addAll(context, readDataDistributions);
 		Collections.addAll(context, writeDataDistributions);
-		Collections.addAll(context, systemCpuLoads);
+//		Collections.addAll(context, systemCpuLoads);
 		this.context = new ArrayRealVector(context.stream().mapToDouble(v -> v).toArray(), false);
 		this.txNum = txNum;
 	}

@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.bandit;
 
 import org.elasql.perf.tpart.bandit.data.BanditTransactionData;
+import org.elasql.perf.tpart.workload.BanditTransactionDataRecorder;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.server.task.Task;
 
@@ -22,6 +23,8 @@ public class RoutingBanditActuator extends Task {
 
 	private final BlockingQueue<BanditTransactionData> queue = new LinkedBlockingQueue<>();
 
+	private final BanditTransactionDataRecorder banditTransactionDataRecorder = new BanditTransactionDataRecorder();
+
 	public RoutingBanditActuator() {}
 
 	public void addTransactionData(BanditTransactionData banditTransactionData) {
@@ -33,7 +36,9 @@ public class RoutingBanditActuator extends Task {
 		Thread.currentThread().setName("routing-bandit-actuator");
 		
 		waitForServersReady();
-		
+
+		banditTransactionDataRecorder.startRecording();
+
 		if (logger.isLoggable(Level.INFO))
 			logger.info("Starting the routing bandit actuator");
 
@@ -41,11 +46,13 @@ public class RoutingBanditActuator extends Task {
 
 		while (true) {
 			try {
-				BanditTransactionData banditTransactionData = queue.poll(3000, TimeUnit.MILLISECONDS);
+				BanditTransactionData banditTransactionData = queue.poll(1000, TimeUnit.MILLISECONDS);
 
 				if (banditTransactionData != null) {
 					pendingList.add(banditTransactionData);
-					if (pendingList.size() >= 100) {
+					banditTransactionDataRecorder.record(banditTransactionData);
+
+					if (pendingList.size() >= 1000) {
 						// Issue an update transaction
 						issueRewardUpdateTransaction(pendingList);
 						pendingList.clear();
@@ -73,9 +80,30 @@ public class RoutingBanditActuator extends Task {
 	}
 	
 	private void issueRewardUpdateTransaction(List<BanditTransactionData> banditTransactionDataList) {
+//		ArrayList<BanditTransactionData> normalizedBanditTransactionDataList = new ArrayList<>(banditTransactionDataList.size());
+//
+//		double minReward = banditTransactionDataList.stream().mapToDouble(BanditTransactionData::getReward).min().orElse(Double.NaN);
+//		double maxReward = banditTransactionDataList.stream().mapToDouble(BanditTransactionData::getReward).max().orElse(Double.NaN);
+//		if (Double.isNaN(minReward) || Double.isNaN(maxReward)) {
+//			throw new RuntimeException("Min or max of rewards is NaN");
+//		}
+//		double rewardRange = maxReward != minReward ? maxReward - minReward : maxReward;
+//
+//		for (BanditTransactionData banditTransactionData : banditTransactionDataList) {
+//			BanditTransactionData.Builder builder = new BanditTransactionData.Builder();
+//			long txNum = banditTransactionData.getTransactionNumber();
+//			double reward = (banditTransactionData.getReward() - minReward) / rewardRange;
+//			builder.addTransactionArm(new BanditTransactionArm(txNum, banditTransactionData.getArm()));
+//			builder.addBanditTransactionContext(new BanditTransactionContext(txNum, banditTransactionData.getContext()));
+//			builder.addTransactionReward(new BanditTransactionReward(txNum, reward));
+//			normalizedBanditTransactionDataList.add(builder.build());
+//		}
+//
+//
+//		Object[] params = normalizedBanditTransactionDataList.toArray();
 		Object[] params = banditTransactionDataList.toArray();
 		// Send a store procedure call
-		Elasql.connectionMgr().sendStoredProcedureCall(false, 
+		Elasql.connectionMgr().sendStoredProcedureCall(false,
 				BanditStoredProcedureFactory.SP_BANDIT_RECEIVE_REWARDS, params);
 	}
 }
