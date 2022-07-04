@@ -35,7 +35,6 @@ public class CsvLoader {
 		StructType schema = inferSchema(path);
 		List<Function<String, Object>> valParsers = schema.parser();
 
-		
 		Memory memory;
 		List<CSVRecord> csvRecords = null;
 		try (CSVParser csv = newCsvParser(path)) {
@@ -47,14 +46,14 @@ public class CsvLoader {
 		memory = new Memory(csvRecords.size() - 1);
 		Transition transition = null;
 		csvRecords.remove(0);
-		for (CSVRecord record : csvRecords) {
-			transition = parseCsvRecord(record, schema, valParsers);
+		for (int rowId = 0; rowId < csvRecords.size() - 1; rowId++) {
+			transition = parseCsvRecord(csvRecords.get(rowId), csvRecords.get(rowId + 1), schema, valParsers);
 			memory.add(transition);
 		}
 		return memory;
 	}
 
-	private static Transition parseCsvRecord(CSVRecord record, StructType schema,
+	private static Transition parseCsvRecord(CSVRecord record, CSVRecord nextRecord, StructType schema,
 			List<Function<String, Object>> valParsers) {
 		StructField[] fields = schema.fields();
 		int txId = 0;
@@ -73,23 +72,24 @@ public class CsvLoader {
 
 			if (i == 0) {
 				txId = ((Float) valParsers.get(i).apply(valStr)).intValue();
-			} else if (i == 1) {
-				state = parseFloatArray(valStr);
-			} else if (i == 2) {
-				state_next = parseFloatArray(valStr);
 			} else if (i == 3) {
+				state = parseFloatArray(valStr);
+			} else if (i == 1) {
 				action = ((Float) valParsers.get(i).apply(valStr)).intValue();
-			} else if (i == 4) {
-				reward = (float) valParsers.get(i).apply(valStr);
+			} else if (i == 2) {
+				reward = 10000 / (float) valParsers.get(i).apply(valStr);
 			}
 		}
+
+		state_next = parseFloatArray(nextRecord.get(3).trim());
+
 		return new Transition(state, state_next, action, reward, false);
 	}
 
 	private static float[] parseFloatArray(String s) {
 		// strip surrounding []
 		if (s.length() == 2)
-			return null; 
+			return null;
 		String[] elements = s.substring(1, s.length() - 1).split(",");
 		float[] array = new float[elements.length];
 		for (int ei = 0; ei < elements.length; ei++) {

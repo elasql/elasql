@@ -25,6 +25,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
+import org.elasql.schedule.tpart.rl.Agent;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
@@ -45,6 +46,7 @@ public class SpCallPreprocessor extends Task {
 	private TGraph graph;
 	private boolean isBatching;
 	private Estimator performanceEstimator;
+	private Agent agent;
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
 	
 	// XXX: Cache last tx's routing destination
@@ -58,7 +60,7 @@ public class SpCallPreprocessor extends Task {
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, TpartMetricWarehouse metricWarehouse,
-			Estimator performanceEstimator) {
+			Estimator performanceEstimator, Agent agent) {
 		
 		// For generating execution plan and sp task
 		this.factory = factory;
@@ -66,6 +68,7 @@ public class SpCallPreprocessor extends Task {
 		this.graph = graph;
 		this.isBatching = isBatching;
 		this.performanceEstimator = performanceEstimator;
+		this.agent = agent;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
 		// For collecting features
@@ -113,7 +116,7 @@ public class SpCallPreprocessor extends Task {
 						task.getProcedureType() == ProcedureType.CONTROL) {
 					// Pre-process the transaction 
 					if (TPartPerformanceManager.ENABLE_COLLECTING_DATA ||
-							performanceEstimator != null) {
+							performanceEstimator != null || agent != null) {
 						preprocess(spc, task);
 					}
 					
@@ -173,6 +176,11 @@ public class SpCallPreprocessor extends Task {
 			// Save the estimation
 			spc.setMetadata(estimation.toBytes());
 			task.setEstimation(estimation);
+		}
+		
+		if (agent != null) {
+			int route = agent.react(graph, task);
+			task.setRoute(route);
 		}
 	}
 	

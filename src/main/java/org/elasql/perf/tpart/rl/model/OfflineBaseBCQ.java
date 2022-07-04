@@ -3,6 +3,7 @@ package org.elasql.perf.tpart.rl.model;
 import java.util.Random;
 
 import org.elasql.perf.tpart.rl.util.Memory;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 
 import ai.djl.Model;
 import ai.djl.engine.Engine;
@@ -24,9 +25,9 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
 
     protected final Random random = new Random(0);
     protected Memory memory = new Memory(80);
-
-    private final int dim_of_state_space;
-    private final int num_of_actions;
+    // TODO state space 應該是 features 的 space
+    private final int dim_of_state_space = PartitionMetaMgr.NUM_PARTITIONS * 2;
+    private final int num_of_actions = PartitionMetaMgr.NUM_PARTITIONS;
     private final int hidden_size;
     private final float learning_rate;
 
@@ -47,30 +48,15 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     private int iteration = 0;
     protected float epsilon = 1.0f;
 
-    protected OfflineBaseBCQ(int dim_of_state_space, int num_of_actions, int hidden_size, int batch_size,
-            int sync_net_interval, float gamma, float learning_rate) {
-        this.dim_of_state_space = dim_of_state_space;
-        this.num_of_actions = num_of_actions;
-        this.hidden_size = hidden_size;
-        this.batch_size = batch_size;
-        this.sync_net_interval = sync_net_interval;
-        this.gamma = gamma;
-        this.learning_rate = learning_rate;
-
-        reset();
-    }
-    
-    protected OfflineBaseBCQ(int dim_of_state_space, int num_of_actions, int hidden_size, int batch_size,
+    protected OfflineBaseBCQ(int hidden_size, int batch_size,
             int sync_net_interval, float gamma, float learning_rate, Memory memory) {
-        this.dim_of_state_space = dim_of_state_space;
-        this.num_of_actions = num_of_actions;
         this.hidden_size = hidden_size;
         this.batch_size = batch_size;
         this.sync_net_interval = sync_net_interval;
         this.gamma = gamma;
         this.learning_rate = learning_rate;
         this.memory = memory;
-
+        
         reset();
     }
 

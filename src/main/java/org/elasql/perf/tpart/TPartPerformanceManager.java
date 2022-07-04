@@ -15,6 +15,7 @@ import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.rl.Agent;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.util.TransactionProfiler;
@@ -38,7 +39,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 		Elasql.taskMgr().runTask(metricWarehouse);
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator());
+				metricWarehouse, newEstimator(), newAgent(metricWarehouse));
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
@@ -73,6 +74,14 @@ public class TPartPerformanceManager implements PerformanceManager {
 		default:
 			throw new IllegalArgumentException("Not supported");
 		}
+	}
+	
+	private static Agent newAgent(TpartMetricWarehouse metricWarehouse) {
+		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_RL) {
+			return null;
+		}
+		
+		return new Agent(metricWarehouse);
 	}
 
 	// On the sequencer

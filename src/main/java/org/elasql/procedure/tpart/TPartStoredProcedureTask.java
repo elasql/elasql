@@ -15,6 +15,8 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
 	
+	public static final int NO_ROUTE = -1;
+	
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
@@ -28,6 +30,7 @@ public class TPartStoredProcedureTask
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
 	private TransactionEstimation estimation;
+	private int route = NO_ROUTE;
 	private TransactionProfiler profiler;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
@@ -90,6 +93,14 @@ public class TPartStoredProcedureTask
 			String role = tsp.isMaster()? "Master" : "Slave";
 			Elasql.performanceMgr().addTransactionMetics(txNum, role, tsp.isTxDistributed(), profiler);
 		}
+	}
+	
+	public int getRoute() {
+		return route;
+	}
+	
+	public void setRoute(int route) {
+		this.route = route;
 	}
 
 	public long getTxNum() {
