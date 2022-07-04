@@ -10,6 +10,7 @@ import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
+import org.elasql.perf.tpart.ai.SumMaxEstimator;
 import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.*;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -74,6 +75,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 			return new ConstantEstimator();
 		case 1:
 			return new ReadCountEstimator();
+		case 2:
+			return new SumMaxEstimator();
 		default:
 			throw new IllegalArgumentException("Not supported");
 		}
@@ -148,5 +151,10 @@ public class TPartPerformanceManager implements PerformanceManager {
 	@Override
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
+	}
+
+	@Override
+	public void onTransactionCommit(long txNum, int masterId) {
+		spCallPreprocessor.onTransactionCommit(txNum, masterId);
 	}
 }

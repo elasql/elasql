@@ -18,7 +18,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 	private static Logger logger = Logger.getLogger(ControlBasedRouter.class.getName());
 	
 	private static final double LATENCY_EXP = 1.0;
-	private static final double TIE_CLOSENESS = 0.0001;
+	private static final double TIE_CLOSENESS = 0.01; // 1%. Note that scores are in 0 ~ 1
 	
 	private double[] paramAlpha;
 	private double[] paramBeta;
@@ -72,29 +72,27 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		
 		if (estimation == null)
 			throw new IllegalArgumentException("there is no estimation for transaction " + task.getTxNum());
-
-		int bestMasterId = 0;
-		double highestScore = calculateRoutingScore(estimation, 0);
-		ties.clear();
-		ties.add(bestMasterId);
 		
-		for (int masterId = 1; masterId < PartitionMetaMgr.NUM_PARTITIONS; masterId++) {
-			double score = calculateRoutingScore(estimation, masterId);
-			
-			if (Math.abs(score - highestScore) < TIE_CLOSENESS) { // Ties
-				ties.add(masterId);
-			} else if (score > highestScore) {
-				bestMasterId = masterId;
-				highestScore = score;
-				ties.clear();
-				ties.add(masterId);
-			}
+		// Calculate score for each node
+		double[] scores = new double[PartitionMetaMgr.NUM_PARTITIONS];
+		for (int masterId = 0; masterId < PartitionMetaMgr.NUM_PARTITIONS; masterId++) {
+			scores[masterId] = calculateRoutingScore(estimation, masterId);
 		}
 		
-		// Handles ties to avoid always sending txs to the same node
-		if (ties.size() > 1) {
-			int chooseTiePart = (int) (task.getTxNum() % ties.size());
-			bestMasterId = ties.get(chooseTiePart);
+		if (task.getTxNum() % 10000 == 0) {
+			System.out.println(String.format("Tx.%d's estimation: %s", task.getTxNum(), estimation));
+			System.out.println(String.format("Tx.%d's scores: %s", task.getTxNum(), Arrays.toString(scores)));
+		}
+		
+		// Normalize the score to 0 ~ 1 (for checking ties)
+		normalizeScores(scores);
+		
+		// Select the node with highest score and check ties
+		int bestMasterId = findBestMaster(scores, task.getTxNum());
+		
+		// Debug
+		if (task.getTxNum() % 10000 == 0) {
+			System.out.println(String.format("Tx.%d's scores (normalized): %s", task.getTxNum(), Arrays.toString(scores)));
 		}
 		
 		// Debug
@@ -113,6 +111,52 @@ public class ControlBasedRouter implements BatchNodeInserter {
 		return e - paramAlpha[masterId] * cpuFactor;
 	}
 	
+	private void normalizeScores(double[] scores) {
+		double min = Double.MAX_VALUE;
+		double max = Double.MIN_VALUE;
+		
+		for (double score : scores) {
+			if (min > score) {
+				min = score;
+			}
+			if (max < score) {
+				max = score;
+			}
+		}
+		
+		double scale = max - min;
+		for (int i = 0; i < scores.length; i++) {
+			scores[i] = (scores[i] - min) / scale; 
+		}
+	}
+	
+	private int findBestMaster(double[] scores, long txNum) {
+		int bestMasterId = 0;
+		double highestScore = scores[bestMasterId];
+		ties.clear();
+		ties.add(bestMasterId);
+		
+		for (int masterId = 1; masterId < PartitionMetaMgr.NUM_PARTITIONS; masterId++) {
+			if (Math.abs(scores[masterId] - highestScore) < TIE_CLOSENESS) { // Ties
+				ties.add(masterId);
+			} else if (scores[masterId] > highestScore) {
+				bestMasterId = masterId;
+				highestScore = scores[masterId];
+				ties.clear();
+				ties.add(masterId);
+			}
+		}
+		
+		// Handles ties to avoid always sending txs to the same node
+		if (ties.size() > 1) {
+			int chooseTiePart = (int) (txNum % ties.size());
+			bestMasterId = ties.get(chooseTiePart);
+		}
+		
+		return bestMasterId;
+	}
+	
+	// Debug
 //	private boolean isPartition0Tx(TPartStoredProcedureTask task) {
 //		// Find the warehouse record and check w_id
 //		for (PrimaryKey key : task.getReadSet()) {

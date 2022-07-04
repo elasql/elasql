@@ -16,6 +16,7 @@ import org.elasql.perf.tpart.workload.FeatureExtractor;
 import org.elasql.perf.tpart.workload.TransactionDependencyRecorder;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.perf.tpart.workload.TransactionFeaturesRecorder;
+import org.elasql.perf.tpart.workload.time.TimeRelatedFeatureMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -26,6 +27,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.bandit.BanditBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
@@ -49,10 +51,14 @@ public class SpCallPreprocessor extends Task {
 	private Estimator performanceEstimator;
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>(); 
 	
+	// XXX: Cache last tx's routing destination
+	private int lastTxRoutingDest = -1;
+
 	// For collecting features
 	private TransactionFeaturesRecorder featureRecorder;
 	private TransactionDependencyRecorder dependencyRecorder;
-	
+	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
+
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, TpartMetricWarehouse metricWarehouse,
@@ -68,7 +74,8 @@ public class SpCallPreprocessor extends Task {
 		this.banditTransactionDataCollector = banditTransactionDataCollector;
 
 		// For collecting features
-		featureExtractor = new FeatureExtractor(metricWarehouse);
+		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
+		featureExtractor = new FeatureExtractor(metricWarehouse, timeRelatedFeatureMgr);
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder = new TransactionFeaturesRecorder();
 			featureRecorder.startRecording();
@@ -85,6 +92,11 @@ public class SpCallPreprocessor extends Task {
 	public void preprocessSpCall(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall())
 			spcQueue.add(spc);
+	}
+
+	public void onTransactionCommit(long txNum, int masterId) {
+		featureExtractor.onTransactionCommit(txNum);
+		timeRelatedFeatureMgr.onTxCommit(masterId);
 	}
 
 	@Override
@@ -148,11 +160,14 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead);
+		if (task.getProcedureType() == ProcedureType.CONTROL || task.getProcedureType() == ProcedureType.BANDIT){
+			return;
+		}
+		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
-
+		
 		// Record the feature if necessary
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
 				task.getProcedureType() != ProcedureType.CONTROL) {
@@ -184,6 +199,15 @@ public class SpCallPreprocessor extends Task {
 	private void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
+
+		lastTxRoutingDest = timeRelatedFeatureMgr.pushInfo(graph);
+
+		// Notify the estimator where the transactions are routed
+		if (performanceEstimator != null) {
+			for (TxNode node : graph.getTxNodes()) {
+				performanceEstimator.notifyTransactionRoute(node.getTxNum(), node.getPartId());
+			}
+		}
 
 		// add write back edges
 		graph.addWriteBackEdge();

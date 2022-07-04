@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.perf.tpart.workload.time.TimeRelatedFeatureMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
@@ -25,10 +26,15 @@ public class FeatureExtractor {
 	private TransactionDependencyAnalyzer dependencyAnalyzer =
 			new TransactionDependencyAnalyzer();
 	
+	private DependencyTreeAnalyzer treeAnalyzer =
+			new DependencyTreeAnalyzer();
+
 	private TpartMetricWarehouse metricWarehouse;
-	
-	public FeatureExtractor(TpartMetricWarehouse metricWarehouse) {
+	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
+
+	public FeatureExtractor(TpartMetricWarehouse metricWarehouse, TimeRelatedFeatureMgr timeRelatedFeatureMgr) {
 		this.metricWarehouse = metricWarehouse;
+		this.timeRelatedFeatureMgr = timeRelatedFeatureMgr;
 	}
 	
 	/**
@@ -41,7 +47,8 @@ public class FeatureExtractor {
 	 * @param graph the latest T-graph
 	 * @return the features of the stored procedure for cost estimation
 	 */
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph, HashSet<PrimaryKey> keyHasBeenRead) {
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph,
+			HashSet<PrimaryKey> keyHasBeenRead, int lastTxRoutingDest) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
@@ -49,8 +56,11 @@ public class FeatureExtractor {
 					+ "in the total order: %d, last processed tx: %d",
 					task.getTxNum(), lastProcessedTxNum));
 		
+		// Preprocess time related features
+		timeRelatedFeatureMgr.calculate(task.getArrivedTime());
+
 		// Extract the features
-		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
+		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum(), lastTxRoutingDest);
 		
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
 		builder.addFeature("Start Time", task.getArrivedTime());
@@ -62,14 +72,15 @@ public class FeatureExtractor {
 //		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
 		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
 //		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
-//		
-		builder.addFeature("Read Data Distribution", extractRecordDistribution(task.getReadSet(), graph));
+
+		builder.addFeature("Remote Reads", extractRemoteDistribution(task.getReadSet(), graph));
+		builder.addFeature("Read Data Distribution", extractLocalDistribution(task.getReadSet(), graph));
 //		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
 		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
-		builder.addFeature("Update Data Distribution", extractRecordDistribution(task.getUpdateSet(), graph));
-		builder.addFeature("Write Data Distribution", extractRecordDistribution(task.getWriteSet(), graph));
-
+		builder.addFeature("Update Data Distribution", extractLocalDistribution(task.getUpdateSet(), graph));
+		builder.addFeature("Write Data Distribution", extractLocalDistribution(task.getWriteSet(), graph));
+//		
 		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
 //		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
@@ -97,7 +108,26 @@ public class FeatureExtractor {
 		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
 		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
 		builder.addFeature("I/O Queue Length", extractIOQueueLength());
-//		
+
+		// Time-related features
+		builder.addFeature("Number of Read Record in Last 100 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(100));
+		builder.addFeature("Number of Read Record Excluding Cache in Last 100 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(100));
+		builder.addFeature("Number of Update Record in Last 100 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(100));
+		builder.addFeature("Number of Insert Record in Last 100 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(100));
+		builder.addFeature("Number of Commit Tx in Last 100 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(100));
+
+		builder.addFeature("Number of Read Record in Last 500 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(500));
+		builder.addFeature("Number of Read Record Excluding Cache in Last 500 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(500));
+		builder.addFeature("Number of Update Record in Last 500 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(500));
+		builder.addFeature("Number of Insert Record in Last 500 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(500));
+		builder.addFeature("Number of Commit Tx in Last 500 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(500));
+
+		builder.addFeature("Number of Read Record in Last 1000 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(1000));
+		builder.addFeature("Number of Read Record Excluding Cache in Last 1000 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(1000));
+		builder.addFeature("Number of Update Record in Last 1000 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(1000));
+		builder.addFeature("Number of Insert Record in Last 1000 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(1000));
+		builder.addFeature("Number of Commit Tx in Last 1000 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(1000));
+
 //		// Features for latches
 //		// Due to the complexity of getting individual latch features,
 //		// we just pass a huge string that consists of key latch features
@@ -115,9 +145,17 @@ public class FeatureExtractor {
 		for (Long dependentTx : dependentTxs)
 			builder.addDependency(dependentTx);
 		
+		// Generate tree features
+		treeAnalyzer.addTransaction(task.getTxNum(), dependentTxs);
+		treeAnalyzer.addDependencyTreeFeatures(task.getTxNum(), builder);
+
 		return builder.build();
 	}
 	
+	public void onTransactionCommit(long txNum) {
+		treeAnalyzer.onTransactionCommit(txNum);
+	}
+
 	private Double[] extractBufferHitRate() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
 		Double[] bufferHitRates = new Double[serverCount];
@@ -288,21 +326,49 @@ public class FeatureExtractor {
 		return counts;
 	}
 	
-	private Integer[] extractRecordDistribution(Set<PrimaryKey> keys, TGraph graph) {
+	private Integer[] extractLocalDistribution(Set<PrimaryKey> keys, TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
-		
+		int fullyRepCount = 0;
+
+		// Count records
 		for (PrimaryKey key : keys) {
-			// Skip fully replicated records
-			if (partMgr.isFullyReplicated(key))
-				continue;
-			
-			int partId = graph.getResourcePosition(key).getPartId();
-			counts[partId]++;
+			if (partMgr.isFullyReplicated(key)) {
+				fullyRepCount++;
+			} else {
+				int partId = graph.getResourcePosition(key).getPartId();
+				counts[partId]++;
+			}
+		}
+
+		// Add fully replicated records
+		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
+		for (int partId = 0; partId < newCounts.length; partId++) {
+			newCounts[partId] = counts[partId] + fullyRepCount;
+		}
+
+		return newCounts;
+	}
+
+	private Integer[] extractRemoteDistribution(Set<PrimaryKey> keys, TGraph graph) {
+		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		int totalCount = 0;
+
+		// Count records
+		for (PrimaryKey key : keys) {
+			if (!partMgr.isFullyReplicated(key)) {
+				int partId = graph.getResourcePosition(key).getPartId();
+				counts[partId]++;
+				totalCount++;
+			}
 		}
 		
+		// Add fully replicated records
 		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
-	    Arrays.setAll(newCounts, i -> counts[i]);
+		for (int partId = 0; partId < newCounts.length; partId++) {
+			newCounts[partId] = totalCount - counts[partId];
+		}
 	    
 		return newCounts;
 	}

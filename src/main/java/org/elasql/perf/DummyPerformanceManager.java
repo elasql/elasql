@@ -34,4 +34,9 @@ public class DummyPerformanceManager implements PerformanceManager {
 	public MetricWarehouse getMetricWarehouse() {
 		throw new RuntimeException("Invalid function call on a dummy performance manager");
 	}
+	
+	@Override
+	public void onTransactionCommit(long txNum, int masterId) {
+		// Do nothing
+	}
 }

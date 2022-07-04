@@ -53,4 +53,9 @@ public interface PerformanceManager {
 	 * Get the instance of MetricWarehouse.
 	 */
 	MetricWarehouse getMetricWarehouse();
+	
+	/**
+	 * Receives a commit message of a transaction.
+	 */
+	void onTransactionCommit(long txNum, int masterId);
 }
