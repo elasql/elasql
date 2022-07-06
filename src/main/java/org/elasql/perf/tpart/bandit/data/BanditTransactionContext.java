@@ -18,6 +18,8 @@ public class BanditTransactionContext implements Serializable {
 	public BanditTransactionContext(long txNum, TransactionFeatures transactionFeatures) {
 		Double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Read Data Distribution")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
 		Double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Write Data Distribution")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
+		normalize(readDataDistributions);
+		normalize(writeDataDistributions);
 //		Double[] systemCpuLoads = (Double[]) transactionFeatures.getFeature("System CPU Load");
 		ArrayList<Double> context = new ArrayList<>();
 		Collections.addAll(context, readDataDistributions);
@@ -38,6 +40,13 @@ public class BanditTransactionContext implements Serializable {
 
 	public long getTransactionNumber() {
 		return txNum;
+	}
+
+	private void normalize(Double[] array) {
+		double sum = Arrays.stream(array).mapToDouble(Double::new).sum();
+		for (int i = 0; i < array.length; i++) {
+			array[i] /= sum;
+		}
 	}
 
 //	public byte[] toBytes() {
