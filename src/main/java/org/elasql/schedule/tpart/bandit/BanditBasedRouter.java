@@ -23,7 +23,7 @@ public class BanditBasedRouter implements BatchNodeInserter {
 	public BanditBasedRouter() {
 		// TODO: Number of features hard coded
 //		model = new LinUCB(PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS, 1);
-		model = new HybridLinUCB(PartitionMetaMgr.NUM_PARTITIONS * 2, PartitionMetaMgr.NUM_PARTITIONS * 2, PartitionMetaMgr.NUM_PARTITIONS, 5);
+		model = new HybridLinUCB(PartitionMetaMgr.NUM_PARTITIONS * 2, PartitionMetaMgr.NUM_PARTITIONS * 2, PartitionMetaMgr.NUM_PARTITIONS, 10);
 	}
 
 	@Override
