@@ -1,12 +1,8 @@
 package org.elasql.perf.tpart.rl.util;
 
 import java.util.Arrays;
-import java.util.Map;
 
 import org.elasql.util.CsvRow;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 public final class Transition extends Snapshot implements CsvRow {
 
@@ -29,6 +25,7 @@ public final class Transition extends Snapshot implements CsvRow {
 
 	@Override
 	public String toString() {
+		// TODO
 //		try {
 //			return new ObjectMapper().writeValueAsString(Map.of("state", getState(), "state_next", state_next==null?"Not exist":state_next, "action",
 //					action, "reward", getReward(), "mask", isMasked()));

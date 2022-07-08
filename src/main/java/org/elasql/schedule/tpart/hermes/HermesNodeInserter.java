@@ -19,18 +19,18 @@ import org.elasql.util.ElasqlProperties;
 
 public class HermesNodeInserter implements BatchNodeInserter {
 	
-	private static final double IMBALANCED_TOLERANCE;
+	protected static final double IMBALANCED_TOLERANCE;
 
 	static {
 		IMBALANCED_TOLERANCE = ElasqlProperties.getLoader()
 				.getPropertyAsDouble(HermesNodeInserter.class.getName() + ".IMBALANCED_TOLERANCE", 0.25);
 	}
 	
-	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+	protected PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 	private double[] loadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
-	private Set<Integer> overloadedParts = new HashSet<Integer>();
+	protected Set<Integer> overloadedParts = new HashSet<Integer>();
 	private Set<Integer> saturatedParts = new HashSet<Integer>();
-	private int overloadedThreshold;
+	protected int overloadedThreshold;
 
 	// Debug: show the distribution of assigned masters
 	private long lastReportTime = -1;
@@ -76,13 +76,13 @@ public class HermesNodeInserter implements BatchNodeInserter {
 //		System.out.println(String.format("Final loads: %s", Arrays.toString(loadPerPart)));
 	}
 	
-	private void resetStatistics() {
+	protected void resetStatistics() {
 		Arrays.fill(loadPerPart, 0);
 		overloadedParts.clear();
 		saturatedParts.clear();
 	}
 	
-	private void insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
+	protected void insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
 		int bestPartId = 0;
 		int minRemoteEdgeCount = task.getReadSet().size();
 		
@@ -119,7 +119,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		return remoteEdgeCount;
 	}
 	
-	private List<TxNode> findTxNodesOnOverloadedParts(TGraph graph, int batchSize) {
+	protected List<TxNode> findTxNodesOnOverloadedParts(TGraph graph, int batchSize) {
 		
 		// Find the overloaded parts
 		for (int partId = 0; partId < loadPerPart.length; partId++) {
@@ -144,7 +144,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		return nodesOnOverloadedParts;
 	}
 	
-	private List<TxNode> rerouteTxNodesToUnderloadedParts(List<TxNode> candidateTxNodes, int increaseTolerence) {
+	protected List<TxNode> rerouteTxNodesToUnderloadedParts(List<TxNode> candidateTxNodes, int increaseTolerence) {
 		List<TxNode> nextCandidates = new ArrayList<TxNode>();
 		
 		for (TxNode node : candidateTxNodes) {

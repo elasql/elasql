@@ -5,6 +5,7 @@ import org.elasql.perf.tpart.rl.util.Helper;
 import org.elasql.perf.tpart.rl.util.Memory;
 import org.elasql.perf.tpart.rl.util.MemoryBatch;
 
+import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
@@ -14,9 +15,9 @@ import ai.djl.translate.TranslateException;
 public class OfflineBCQ extends OfflineBaseBCQ {
     private final L2Loss loss_func = new L2Loss();
 
-    public OfflineBCQ(int dim_of_state_space, int num_of_actions, int hidden_size, int batch_size, int sync_net_interval,
+    public OfflineBCQ(int hidden_size, int batch_size, int sync_net_interval,
             float gamma, float learning_rate, Memory memory) {
-        super(dim_of_state_space, num_of_actions, hidden_size, batch_size, sync_net_interval, gamma, learning_rate, memory);
+        super(hidden_size, batch_size, sync_net_interval, gamma, learning_rate, memory);
     }
 
     @Override
@@ -26,6 +27,7 @@ public class OfflineBCQ extends OfflineBaseBCQ {
     	NDArray score = target_predictor.predict(new NDList(manager.create(state))).singletonOrThrow();
         return ActionSampler.epsilonGreedy(score, imitation, random, 0);
     }
+    
 
     @Override
 	public void updateModel(NDManager manager) throws TranslateException {

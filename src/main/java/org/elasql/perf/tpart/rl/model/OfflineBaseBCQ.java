@@ -24,7 +24,7 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     protected static final float DECAY_EXPLORE_RATE = 0.99f;
 
     protected final Random random = new Random(0);
-    protected Memory memory = new Memory(80);
+    protected Memory memory;
     // TODO state space 應該是 features 的 space
     private final int dim_of_state_space = PartitionMetaMgr.NUM_PARTITIONS * 2;
     private final int num_of_actions = PartitionMetaMgr.NUM_PARTITIONS;
@@ -75,6 +75,15 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     @Override
     public final void collect(float reward, boolean done) {
         // do nothing
+    }
+    
+    @Override
+    public final Predictor<NDList, NDList> takeoutPredictor() {
+    	return target_net.newPredictor(new NoopTranslator());
+    }
+
+    public final Predictor<NDList, NDList> takeoutImitationPredictor() {
+    	return imitation_net.newPredictor(new NoopTranslator());
     }
 
     @Override

@@ -1,10 +1,5 @@
 package org.elasql.perf.tpart.rl.util;
 
-import java.util.Map;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 public class Snapshot {
     private final float[] state;
     private final float reward;

@@ -1,5 +1,7 @@
 package org.elasql.perf.tpart.rl.model;
 
+import ai.djl.inference.Predictor;
+import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
 
@@ -24,6 +26,8 @@ public abstract class BaseAgent {
     public abstract void collect(float reward, boolean done);
 
     public abstract void saveFile();
+    
+    public abstract Predictor<NDList, NDList> takeoutPredictor();
     /**
      * Reset the agent.
      */

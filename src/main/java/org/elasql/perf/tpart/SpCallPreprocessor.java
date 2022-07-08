@@ -2,6 +2,7 @@ package org.elasql.perf.tpart;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -10,6 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.perf.tpart.rl.agent.Agent;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
 import org.elasql.perf.tpart.workload.TransactionDependencyRecorder;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
@@ -25,7 +27,6 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
-import org.elasql.schedule.tpart.rl.Agent;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
@@ -52,7 +53,12 @@ public class SpCallPreprocessor extends Task {
 	// XXX: Cache last tx's routing destination
 	private int lastTxRoutingDest = -1;
 	
+	// for rl 
+	private long startTrainTxNum = 150_000;
+	private HashMap<Long, Long> latencyHistory = new HashMap<Long, Long>();
+	
 	// For collecting features
+	private TpartMetricWarehouse metricWarehouse;
 	private TransactionFeaturesRecorder featureRecorder;
 	private TransactionDependencyRecorder dependencyRecorder;
 	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
@@ -72,6 +78,7 @@ public class SpCallPreprocessor extends Task {
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
 		// For collecting features
+		this.metricWarehouse = metricWarehouse;
 		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
 		featureExtractor = new FeatureExtractor(metricWarehouse, timeRelatedFeatureMgr);
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
@@ -81,13 +88,19 @@ public class SpCallPreprocessor extends Task {
 			dependencyRecorder.startRecording();
 		}
 	}
-	
+
 	public void preprocessSpCall(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall())
 			spcQueue.add(spc);
 	}
 	
 	public void onTransactionCommit(long txNum, int masterId) {
+		// collect rl's action and reward
+		if (agent != null && !agent.isEval()) {
+			agent.collectAction(txNum, masterId);
+			agent.collectReward(txNum, calReward(txNum), false);
+		}
+		
 		featureExtractor.onTransactionCommit(txNum);
 		timeRelatedFeatureMgr.onTxCommit(masterId);
 	}
@@ -110,6 +123,9 @@ public class SpCallPreprocessor extends Task {
 				
 				// Get the read-/write-set by creating a SP task
 				TPartStoredProcedureTask task = createSpTask(spc);
+				
+				// Record start time to calculate latency for rl agent
+				latencyHistory.put(task.getTxNum(), System.nanoTime());
 				
 				// Add normal SPs to the task batch
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
@@ -179,8 +195,15 @@ public class SpCallPreprocessor extends Task {
 		}
 		
 		if (agent != null) {
-			int route = agent.react(graph, task);
-			task.setRoute(route);
+			if (task.getTxNum() < startTrainTxNum) {
+				agent.collectState(task.getTxNum(), agent.prepareState(graph, task, metricWarehouse));
+			} else if(task.getTxNum() == startTrainTxNum) {
+				agent.train();
+			} else if (agent.isprepare()) {	
+				System.out.println(task.getTxNum());
+				int route = agent.react(graph, task, metricWarehouse);
+				task.setRoute(route);	
+			}
 		}
 	}
 	
@@ -208,5 +231,12 @@ public class SpCallPreprocessor extends Task {
 		for (PrimaryKey key : task.getReadSet()) {
 			keyHasBeenRead.add(key);
 		}
+	}
+	
+	private float calReward(long txNum) {
+		long endTime = System.nanoTime();
+		long latency = endTime - latencyHistory.get(txNum);
+		latencyHistory.remove(txNum);
+		return (float) 1/latency;
 	}
 }

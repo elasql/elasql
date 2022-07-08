@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -16,10 +17,10 @@ public final class Memory {
 	private final int capacity;
 	private final Transition[] memory;
 
-	private float[] state_prev;
-	private int action;
-	private float reward;
-	private boolean mask;
+	private HashMap<Long, float[]> state;
+	private int[] action;
+	private float[] reward;
+	private boolean[] mask;
 	private int stage;
 	private int head;
 	private int size;
@@ -32,41 +33,50 @@ public final class Memory {
 		this.capacity = capacity;
 		this.memory = new Transition[capacity];
 		this.random = new Random(seed);
-
-		reset();
+		this.state = new HashMap<Long, float[]>(capacity);
+		this.action = new int[capacity];
+		this.reward = new float[capacity];
+		this.mask = new boolean[capacity];
+		this.size = capacity;
+		System.out.print("size = ");
+		System.out.println(size);
 	}
 
-	public void setState(float[] state) {
-		assertStage(0);
-		if (state_prev != null) {
-			add(new Transition(state_prev, state, action, reward, mask));
-		}
-		state_prev = state;
-
+	public void setState(long txNum, float[] state) {
+//		assertStage(0);
+//		if (state_prev != null) {
+//		add(new Transition(state_prev, state, action, reward, mask));
+//		}
+//		state_prev = state;
+		long index = ((txNum - 1) % capacity);
+		this.state.put(index, state.clone());
 	}
 
-	public void setAction(int action) {
-		assertStage(1);
-		this.action = action;
+	public void setAction(long txNum, int action) {
+//		assertStage(1);
+//		this.action = action;
+		int index = (int) ((txNum - 1)  % capacity);
+		this.action[index] = action;
 	}
 
-	public void setRewardAndMask(float reward, boolean mask) {
-		assertStage(2);
-		this.reward = reward;
-		this.mask = mask;
+	public void setRewardAndMask(long txNum, float reward, boolean mask) {
+//		assertStage(2);
+		int index = (int) ((txNum - 1)  % capacity);
+		this.reward[index] = reward;
+		this.mask[index] = mask;
 
-		if (mask) {
-			add(new Transition(state_prev, null, action, reward, mask));
-			state_prev = null;
-			action = -1;
-		}
+//		if (mask) {
+//			add(new Transition(state_prev, null, action, reward, mask));
+//			state_prev = null;
+//			action = -1;
+//		}
 
 	}
 
 	public Transition[] sample(int sample_size) {
 		Transition[] chunk = new Transition[sample_size];
 		for (int i = 0; i < sample_size; i++) {
-			chunk[i] = memory[random.nextInt(size)];
+			chunk[i] = get(random.nextInt(size));
 		}
 
 		return chunk;
@@ -84,6 +94,13 @@ public final class Memory {
 		if (index < 0 || index >= size) {
 			throw new ArrayIndexOutOfBoundsException("Index out of bound " + index);
 		}
+		if (memory[index] == null) {
+			int previousIndex = index -1;
+			if (previousIndex == -1) {
+				previousIndex = capacity - 1;
+			}
+			memory[index] = new Transition(state.get(Long.valueOf(previousIndex)), state.get(Long.valueOf(index)), action[previousIndex], reward[previousIndex], mask[previousIndex]);
+		}
 		return memory[index];
 	}
 
@@ -92,10 +109,10 @@ public final class Memory {
 	}
 
 	public void reset() {
-		state_prev = null;
-		action = -1;
-		reward = 0.0F;
-		mask = false;
+		this.state = new HashMap<Long, float[]>(capacity);
+		this.action = new int[capacity];
+		this.reward = new float[capacity];
+		this.mask = new boolean[capacity];
 		stage = 0;
 		head = -1;
 		size = 0;
@@ -184,7 +201,6 @@ public final class Memory {
 				try {
 					csvSaver.writeRecord(writer, i, memory[i], columnCount);
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}

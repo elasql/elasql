@@ -11,11 +11,13 @@ import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.perf.tpart.rl.agent.Agent;
+import org.elasql.perf.tpart.rl.agent.FullyOfflineAgent;
+import org.elasql.perf.tpart.rl.agent.OfflineAgent;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
-import org.elasql.schedule.tpart.rl.Agent;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.util.TransactionProfiler;
@@ -24,12 +26,15 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	public static final boolean ENABLE_COLLECTING_DATA;
 	public static final int ESTIMATOR_TYPE;
+	public static final int RL_TYPE;
 
 	static {
 		ENABLE_COLLECTING_DATA = ElasqlProperties.getLoader()
 				.getPropertyAsBoolean(TPartPerformanceManager.class.getName() + ".ENABLE_COLLECTING_DATA", false);
 		ESTIMATOR_TYPE = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
+		RL_TYPE = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".RL_TYPE", 2);
 	}
 
 	public static TPartPerformanceManager newForSequencer(TPartStoredProcedureFactory factory,
@@ -39,7 +44,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 		Elasql.taskMgr().runTask(metricWarehouse);
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator(), newAgent(metricWarehouse));
+				metricWarehouse, newEstimator(), newAgent());
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
@@ -76,18 +81,30 @@ public class TPartPerformanceManager implements PerformanceManager {
 		}
 	}
 	
-	private static Agent newAgent(TpartMetricWarehouse metricWarehouse) {
+	private static Agent newAgent() {
 		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_RL) {
 			return null;
 		}
 		
-		return new Agent(metricWarehouse);
+		switch (RL_TYPE) {
+		case 0:
+			return new FullyOfflineAgent();
+		case 1:
+			return new OfflineAgent();
+//		case 2:
+//			return new OnlineAgent();
+//		case 3:
+//			return new BanditAgent();
+		default:
+			throw new IllegalArgumentException("Not supported");
+		}
 	}
 
 	// On the sequencer
 	private SpCallPreprocessor spCallPreprocessor;
 	private TpartMetricWarehouse metricWarehouse;
 	private RoutingControlActuator actuator;
+	private Agent agent;
 
 	// On each DB machine
 	private MetricCollector localMetricCollector;

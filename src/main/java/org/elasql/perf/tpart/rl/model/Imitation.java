@@ -25,7 +25,7 @@ public class Imitation {
 	protected static final float DECAY_EXPLORE_RATE = 0.99f;
 
 	protected final Random random = new Random(0);
-	protected Memory memory = new Memory(80);
+	protected Memory memory;
 	protected Model imitation_net;
 
 	protected final int dim_of_state_space;
