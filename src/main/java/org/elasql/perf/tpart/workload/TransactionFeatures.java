@@ -44,6 +44,7 @@ public class TransactionFeatures {
 //		featureKeys.add("Read Data Distribution in Bytes");
 		featureKeys.add("Read Data in Cache Distribution");
 		featureKeys.add("Read Data with IO Distribution");
+		featureKeys.add("Remote Writes");
 		featureKeys.add("Update Data Distribution");
 		featureKeys.add("Write Data Distribution");
 //

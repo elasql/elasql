@@ -78,9 +78,10 @@ public class FeatureExtractor {
 //		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
 		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
 		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
+		builder.addFeature("Remote Writes", extractRemoteDistribution(task.getWriteSet(), graph));
 		builder.addFeature("Update Data Distribution", extractLocalDistribution(task.getUpdateSet(), graph));
 		builder.addFeature("Write Data Distribution", extractLocalDistribution(task.getWriteSet(), graph));
-//		
+//
 		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
 //		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
