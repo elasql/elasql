@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
@@ -54,8 +55,7 @@ public class SpCallPreprocessor extends Task {
 	private int lastTxRoutingDest = -1;
 	
 	// for rl 
-	private long startTrainTxNum = 150_000;
-	private HashMap<Long, Long> latencyHistory = new HashMap<Long, Long>();
+	private ConcurrentHashMap<Long, Long> latencyHistory = new ConcurrentHashMap<Long, Long>();
 	
 	// For collecting features
 	private TpartMetricWarehouse metricWarehouse;
@@ -195,15 +195,7 @@ public class SpCallPreprocessor extends Task {
 		}
 		
 		if (agent != null) {
-			if (task.getTxNum() < startTrainTxNum) {
-				agent.collectState(task.getTxNum(), agent.prepareState(graph, task, metricWarehouse));
-			} else if(task.getTxNum() == startTrainTxNum) {
-				agent.train();
-			} else if (agent.isprepare()) {	
-				System.out.println(task.getTxNum());
-				int route = agent.react(graph, task, metricWarehouse);
-				task.setRoute(route);	
-			}
+			agent.react(graph, task, metricWarehouse);
 		}
 	}
 	

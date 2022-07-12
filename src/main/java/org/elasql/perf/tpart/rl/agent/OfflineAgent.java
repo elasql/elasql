@@ -18,11 +18,11 @@ public class OfflineAgent extends Agent {
 		float[] state = prepareState(graph, task, metricWarehouse);
 
 		int action = -1;
-		if (task.getTxNum() < startTrainTxNum) {
-			this.collectState(task.getTxNum(), this.prepareState(graph, task, metricWarehouse));
-		} else if (task.getTxNum() == startTrainTxNum) {
+		this.collectState(task.getTxNum(), this.prepareState(graph, task, metricWarehouse));
+		if (isTrainTxNum(task.getTxNum())) {
 			train();
-		} else if (prepared) {
+		} 
+		if (prepared) {
 			action = trainedAgent.react(state);
 			task.setRoute(action);
 		}
@@ -33,5 +33,9 @@ public class OfflineAgent extends Agent {
 		agent = new OfflineBCQ(64, 32, 32, 0.99f, 0.001f, memory);
 		Elasql.taskMgr().runTask(trainer);
 		trainedAgent = new TrainedBCQ();
+	}
+	
+	private boolean isTrainTxNum(long txNum) {
+		return txNum == startTrainTxNum || (txNum - startTrainTxNum) % 10_000 == 0;
 	}
 }
