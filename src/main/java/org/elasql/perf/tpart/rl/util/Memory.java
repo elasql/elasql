@@ -4,24 +4,49 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
+import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;
 
 import ai.djl.ndarray.NDManager;
 
 public final class Memory {
+
+	private static final String FILENAME_PREFIX = "memory";
+	
+	private class MemoryCsvRow implements CsvRow {
+		int rowId;
+		
+		MemoryCsvRow(int rowId) {
+			this.rowId = rowId;
+		}
+		
+		public String getVal(int index) {
+			switch (index) {
+			case 0:
+				return Long.toString(txNums[rowId]);
+			case 1:
+				return String.format("\"%s\"", Arrays.toString(states[rowId]));
+			case 2:
+				return Integer.toString(actions[rowId]);
+			case 3:
+				return Float.toString(rewards[rowId]);
+			default:
+				return "";
+			}
+		}
+	}
+	
 	private final Random random;
 	private final int capacity;
-	private final Transition[] memory;
-
-	private HashMap<Long, float[]> state;
-	private int[] action;
-	private float[] reward;
-	private boolean[] mask;
-	private int stage;
+	
+	private long[] txNums;
+	private float[][] states;
+	private int[] actions;
+	private float[] rewards;
+	private boolean[] masks;
 	private int head;
 	private int size;
 
@@ -31,46 +56,25 @@ public final class Memory {
 
 	public Memory(int capacity, int seed) {
 		this.capacity = capacity;
-		this.memory = new Transition[capacity];
 		this.random = new Random(seed);
-		this.state = new HashMap<Long, float[]>(capacity);
-		this.action = new int[capacity];
-		this.reward = new float[capacity];
-		this.mask = new boolean[capacity];
+		this.txNums = new long[capacity];
+		this.states = new float[capacity][];
+		this.actions = new int[capacity];
+		this.rewards = new float[capacity];
+		this.masks = new boolean[capacity];
 		this.size = capacity;
 		System.out.print("size = ");
 		System.out.println(size);
 	}
-
-	public void setState(long txNum, float[] state) {
-//		assertStage(0);
-//		if (state_prev != null) {
-//		add(new Transition(state_prev, state, action, reward, mask));
-//		}
-//		state_prev = state;
-		long index = ((txNum - 1) % capacity);
-		this.state.put(index, state.clone());
-	}
-
-	public void setAction(long txNum, int action) {
-//		assertStage(1);
-//		this.action = action;
-		int index = (int) ((txNum - 1)  % capacity);
-		this.action[index] = action;
-	}
-
-	public void setRewardAndMask(long txNum, float reward, boolean mask) {
-//		assertStage(2);
-		int index = (int) ((txNum - 1)  % capacity);
-		this.reward[index] = reward;
-		this.mask[index] = mask;
-
-//		if (mask) {
-//			add(new Transition(state_prev, null, action, reward, mask));
-//			state_prev = null;
-//			action = -1;
-//		}
-
+	
+	public void setStep(long txNum, float[] state, int action, float reward,
+			boolean mask) {
+		int index = (int) ((txNum - 1) % capacity);
+		txNums[index] = txNum;
+		states[index] = state;
+		actions[index] = action;
+		rewards[index] = reward;
+		masks[index] = mask;
 	}
 
 	public Transition[] sample(int sample_size) {
@@ -86,22 +90,18 @@ public final class Memory {
 		return getBatch(sample(sample_size), manager, sample_size);
 	}
 
-	public MemoryBatch getOrderedBatch(NDManager manager) {
-		return getBatch(memory, manager, size());
-	}
-
+	// Returns null if the transition on the given index is unavailable
 	public Transition get(int index) {
 		if (index < 0 || index >= size) {
 			throw new ArrayIndexOutOfBoundsException("Index out of bound " + index);
 		}
-		if (memory[index] == null) {
-			int previousIndex = index -1;
-			if (previousIndex == -1) {
-				previousIndex = capacity - 1;
-			}
-			memory[index] = new Transition(state.get(Long.valueOf(previousIndex)), state.get(Long.valueOf(index)), action[previousIndex], reward[previousIndex], mask[previousIndex]);
-		}
-		return memory[index];
+		
+		// Check if the next state is available by checking the tx number
+		int nextIndex = (index + 1) % capacity;
+		if (txNums[index] + 1 != txNums[nextIndex])
+			return null;
+		
+		return new Transition(states[index], states[nextIndex], actions[index], rewards[index], masks[index]);
 	}
 
 	public int size() {
@@ -109,55 +109,19 @@ public final class Memory {
 	}
 
 	public void reset() {
-		this.state = new HashMap<Long, float[]>(capacity);
-		this.action = new int[capacity];
-		this.reward = new float[capacity];
-		this.mask = new boolean[capacity];
-		stage = 0;
+		this.txNums = new long[capacity];
+		this.states = new float[capacity][];
+		this.actions = new int[capacity];
+		this.rewards = new float[capacity];
+		this.masks = new boolean[capacity];
 		head = -1;
 		size = 0;
 	}
 
 	@Override
 	public String toString() {
-		return Arrays.toString(memory);
-	}
-
-	public void add(Transition transition) {
-		head += 1;
-		if (head >= capacity) {
-			head = 0;
-		}
-
-		memory[head] = transition;
-		if (size < capacity) {
-			size++;
-		}
-	}
-
-	private void assertStage(int i) {
-		if (i != stage) {
-			String info_name;
-			switch (stage) {
-			case 0:
-				info_name = "State";
-				break;
-			case 1:
-				info_name = "Action";
-				break;
-			case 2:
-				info_name = "Reward and Mask";
-				break;
-			default:
-				info_name = null;
-			}
-			throw new IllegalStateException("Expected information: " + info_name);
-		} else {
-			stage++;
-			if (stage > 2) {
-				stage = 0;
-			}
-		}
+		// TODO
+		return "Memory";
 	}
 
 	private MemoryBatch getBatch(Transition[] transitions, NDManager manager, int batch_size) {
@@ -191,15 +155,15 @@ public final class Memory {
 		int columnCount = header.size();
 
 		// Save to CSV
-		CsvSaver<Transition> csvSaver = new CsvSaver<Transition>(FILENAME_PREFIX);
+		CsvSaver<MemoryCsvRow> csvSaver = new CsvSaver<MemoryCsvRow>(FILENAME_PREFIX);
 
 		try (BufferedWriter writer = csvSaver.createOutputFile()) {
 			csvSaver.writeHeader(writer, header);
 
 			// write the rows
-			for (int i = 0; i < capacity; i++) {
+			for (int rowId = 0; rowId < capacity; rowId++) {
 				try {
-					csvSaver.writeRecord(writer, i, memory[i], columnCount);
+					csvSaver.writeRecord(writer, new MemoryCsvRow(rowId), columnCount);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -210,14 +174,11 @@ public final class Memory {
 
 	}
 
-	private static final String FILENAME_PREFIX = "memory";
-
 	private List<String> initHeader() {
 		List<String> header = new ArrayList<String>();
 		
 		header.add("txId");
 		header.add("state");
-		header.add("nextState");
 		header.add("action");
 		header.add("reward");
 		

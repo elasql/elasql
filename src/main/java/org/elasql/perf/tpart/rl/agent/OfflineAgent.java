@@ -18,13 +18,12 @@ public class OfflineAgent extends Agent {
 		float[] state = prepareState(graph, task, metricWarehouse);
 
 		int action = -1;
-		this.collectState(task.getTxNum(), this.prepareState(graph, task, metricWarehouse));
+		cacheTxState(task.getTxNum(), state);
 		if (isTrainTxNum(task.getTxNum())) {
 			train();
 		} 
 		if (prepared) {
 			action = trainedAgent.react(state);
-			task.setRoute(action);
 		}
 		return action;
 	}
@@ -36,6 +35,6 @@ public class OfflineAgent extends Agent {
 	}
 	
 	private boolean isTrainTxNum(long txNum) {
-		return txNum == startTrainTxNum || (txNum - startTrainTxNum) % 10_000 == 0;
+		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % 10_000 == 0;
 	}
 }

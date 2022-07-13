@@ -3,6 +3,7 @@ package org.elasql.schedule.tpart;
 import java.util.List;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.graph.TGraph;
 
 public class PresetRouteInserter implements BatchNodeInserter {
@@ -11,7 +12,7 @@ public class PresetRouteInserter implements BatchNodeInserter {
 		for (TPartStoredProcedureTask task : tasks) {
 			int route = task.getRoute();
 			
-			if (route == TPartStoredProcedureTask.NO_ROUTE)
+			if (route == StoredProcedureCall.NO_ROUTE)
 				throw new RuntimeException("No route defined in tx." + task.getTxNum());
 			
 			graph.insertTxNode(task, route);

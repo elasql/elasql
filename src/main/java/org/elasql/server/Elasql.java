@@ -46,7 +46,7 @@ import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
-import org.elasql.schedule.tpart.rl.RLRouter;
+import org.elasql.schedule.tpart.rl.PresetOrHermesRouter;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashPartitionPlan;
@@ -301,7 +301,7 @@ public class Elasql extends VanillaDb {
 		case HERMES_RL:
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new RLRouter();//PresetRouteInserter(); 
+			inserter = new PresetOrHermesRouter();//PresetRouteInserter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
 			break; 
@@ -398,7 +398,7 @@ public class Elasql extends VanillaDb {
 				break; 
 			case HERMES_RL:
 				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new RLRouter();//PresetRouteInserter();
+				inserter = new PresetOrHermesRouter();//PresetRouteInserter();
 				isBatching = false;
 				break; 
 			default: 

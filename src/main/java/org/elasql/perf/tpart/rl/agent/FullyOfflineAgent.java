@@ -6,6 +6,7 @@ import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.model.OfflineBCQ;
 import org.elasql.perf.tpart.rl.model.TrainedBCQ;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 
@@ -14,17 +15,16 @@ public class FullyOfflineAgent extends Agent{
 	
 	private long startTrainTxNum = 150_000;
 
-	public int react (TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
+	public int react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		float[] state = prepareState(graph, task, metricWarehouse);
 		
-		int action = -1;
+		int action = StoredProcedureCall.NO_ROUTE;
 		if (task.getTxNum() < startTrainTxNum) {
-			this.collectState(task.getTxNum(), this.prepareState(graph, task, metricWarehouse));
+			cacheTxState(task.getTxNum(), state);
 		} else if(task.getTxNum() == startTrainTxNum) {
 			train();
 		} else if (prepared) {
 			action = trainedAgent.react(state);
-			task.setRoute(action);
 		}
 		return action;
 	}

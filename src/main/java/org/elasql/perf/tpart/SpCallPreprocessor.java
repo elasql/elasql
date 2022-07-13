@@ -55,7 +55,7 @@ public class SpCallPreprocessor extends Task {
 	private int lastTxRoutingDest = -1;
 	
 	// for rl 
-	private ConcurrentHashMap<Long, Long> latencyHistory = new ConcurrentHashMap<Long, Long>();
+	private ConcurrentHashMap<Long, Long> txStartTimes = new ConcurrentHashMap<Long, Long>();
 	
 	// For collecting features
 	private TpartMetricWarehouse metricWarehouse;
@@ -95,10 +95,11 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	public void onTransactionCommit(long txNum, int masterId) {
+		long txLatency = (System.nanoTime() / 1000) - txStartTimes.remove(txNum);
+		
 		// collect rl's action and reward
-		if (agent != null && !agent.isEval()) {
-			agent.collectAction(txNum, masterId);
-			agent.collectReward(txNum, calReward(txNum), false);
+		if (agent != null) {
+			agent.onTxCommit(txNum, masterId, txLatency);
 		}
 		
 		featureExtractor.onTransactionCommit(txNum);
@@ -125,7 +126,7 @@ public class SpCallPreprocessor extends Task {
 				TPartStoredProcedureTask task = createSpTask(spc);
 				
 				// Record start time to calculate latency for rl agent
-				latencyHistory.put(task.getTxNum(), System.nanoTime());
+				txStartTimes.put(task.getTxNum(), System.nanoTime() / 1000);
 				
 				// Add normal SPs to the task batch
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
@@ -164,7 +165,7 @@ public class SpCallPreprocessor extends Task {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), null, sp, null);
+					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, StoredProcedureCall.NO_ROUTE);
 		}
 		
 		return null;
@@ -195,7 +196,9 @@ public class SpCallPreprocessor extends Task {
 		}
 		
 		if (agent != null) {
-			agent.react(graph, task, metricWarehouse);
+			int route = agent.react(graph, task, metricWarehouse);
+			spc.setRoute(route);
+			task.setRoute(route);
 		}
 	}
 	
@@ -223,12 +226,5 @@ public class SpCallPreprocessor extends Task {
 		for (PrimaryKey key : task.getReadSet()) {
 			keyHasBeenRead.add(key);
 		}
-	}
-	
-	private float calReward(long txNum) {
-		long endTime = System.nanoTime();
-		long latency = endTime - latencyHistory.get(txNum);
-		latencyHistory.remove(txNum);
-		return (float) 1/latency;
 	}
 }

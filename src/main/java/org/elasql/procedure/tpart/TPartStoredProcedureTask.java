@@ -15,8 +15,6 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
 	
-	public static final int NO_ROUTE = -1;
-	
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
@@ -30,11 +28,12 @@ public class TPartStoredProcedureTask
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
 	private TransactionEstimation estimation;
-	private int route = NO_ROUTE;
+	private int route;
 	private TransactionProfiler profiler;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
-			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
+			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation,
+			int route) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
@@ -43,6 +42,7 @@ public class TPartStoredProcedureTask
 		this.profiler = profiler;
 		this.tsp = sp;
 		this.estimation = estimation;
+		this.route = route;
 	}
 
 	@Override

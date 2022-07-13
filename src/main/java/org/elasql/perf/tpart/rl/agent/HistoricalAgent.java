@@ -5,10 +5,10 @@ import java.util.logging.Logger;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.model.OfflineBCQ;
 import org.elasql.perf.tpart.rl.model.TrainedBCQ;
+import org.elasql.perf.tpart.rl.util.MemoryCsvLoader;
 import org.elasql.perf.tpart.rl.util.Memory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
-import org.elasql.util.CsvLoader;
 
 public class HistoricalAgent extends Agent{
 	private static Logger logger = Logger.getLogger(HistoricalAgent.class.getName());
@@ -38,6 +38,6 @@ public class HistoricalAgent extends Agent{
 	}
 
 	private Memory prepareTrainingData() {
-		return CsvLoader.loadCsvAsDataFrame();
+		return MemoryCsvLoader.loadCsvAsDataFrame();
 	}
 }

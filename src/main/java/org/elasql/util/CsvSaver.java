@@ -57,7 +57,6 @@ public class CsvSaver<R extends CsvRow> {
 		sb.deleteCharAt(sb.length() - 1);
 		sb.append('\n');
 
-		writer.append(sb.toString());
 	}
 
 	public void writeRecord(BufferedWriter writer, R row, int columnCount) throws IOException {
@@ -68,24 +67,6 @@ public class CsvSaver<R extends CsvRow> {
 			sb.append(',');
 		}
 		sb.deleteCharAt(sb.length() - 1);
-		sb.append('\n');
-
-		writer.append(sb.toString());
-	}
-	
-	public void writeRecord(BufferedWriter writer,int id, R row, int columnCount) throws IOException {
-		StringBuilder sb = new StringBuilder();
-
-		sb.append(id);
-		sb.append(", ");
-		sb.append(row.getVal(0)); // state
-		sb.append(", ");
-		sb.append(row.getVal(1)); // netState
-		sb.append(", ");
-		sb.append(row.getVal(2)); // action
-		sb.append(", ");
-		sb.append(row.getVal(3)); // reward
-
 		sb.append('\n');
 
 		writer.append(sb.toString());

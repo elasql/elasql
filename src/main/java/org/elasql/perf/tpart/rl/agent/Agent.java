@@ -1,6 +1,8 @@
 package org.elasql.perf.tpart.rl.agent;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,6 +53,7 @@ public abstract class Agent {
 	protected int episode = 1_000;
 	protected Memory memory = new Memory(30_000);
 	protected Trainer trainer = new Trainer();
+	protected Map<Long, float[]> cachedStates = new ConcurrentHashMap<Long, float[]>();
 	
 	private boolean isEval = false;
 	protected boolean prepared = false;
@@ -77,6 +80,8 @@ public abstract class Agent {
 		}
 	}
 	
+	public abstract int react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse);
+	
 	public void train() {
 		if (firstTime) {
 			prepareAgent();
@@ -85,29 +90,21 @@ public abstract class Agent {
 		trainer.train();
 	}
 	
-	public int react (TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
-		float[] state = prepareState(graph, task, metricWarehouse);
-		if (!isEval) {
-            memory.setState(task.getTxNum(), state);
+	public void cacheTxState(long txNum, float[] state) {
+		if (!agent.isEval()) {
+			cachedStates.put(txNum, state);
 		}
-		int action = trainedAgent.react(state);
-		if (!isEval) {
-            memory.setAction(task.getTxNum(), action);
-		}
-		return action;
 	}
 	
-	public void collectState(long txNum, float[] state) {
-		 memory.setState(txNum, state);
-    }
-	
-	public void collectAction(long txNum, int action) {
-		memory.setAction(txNum, action);
-    }
-	
-    public void collectReward(long txNum, float reward, boolean done) {
-        memory.setRewardAndMask(txNum, reward, done);
-    }
+	public void onTxCommit(long txNum, int masterId, long latency) {
+		if (!agent.isEval()) {
+			float reward = calReward(latency);
+			float[] state = cachedStates.remove(txNum);
+			if (state == null)
+				throw new RuntimeException("Cannot find cached state for tx." + txNum);
+			memory.setStep(txNum, state, masterId, reward, false);
+		}
+	}
 
 	public float[] prepareState(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		float[] state = new float[PartitionMetaMgr.NUM_PARTITIONS * 2];
@@ -161,6 +158,10 @@ public abstract class Agent {
 		if (!prepared) {
 			prepared = true;
 		}
+	}
+	
+	private float calReward(long latency) {
+		return (float) 1.0f / (float) latency;
 	}
 	
 	// TODO : this method should not be here

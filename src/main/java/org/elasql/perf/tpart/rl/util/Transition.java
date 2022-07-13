@@ -1,10 +1,6 @@
 package org.elasql.perf.tpart.rl.util;
 
-import java.util.Arrays;
-
-import org.elasql.util.CsvRow;
-
-public final class Transition extends Snapshot implements CsvRow {
+public final class Transition extends Snapshot {
 
 	private final float[] state_next;
 	private final int action;
@@ -32,34 +28,6 @@ public final class Transition extends Snapshot implements CsvRow {
 //		} catch (JsonProcessingException e) {
 //			throw new RuntimeException(e);
 //		}
-		return null;
-	}
-
-	@Override
-	public String getVal(int index) {
-		
-		if (index == 0) {
-			if (getState() == null)
-				return "";
-			else
-				return quoteString(Arrays.toString(getState()));
-		} else if (index == 1) {
-			if (getNextState() == null) {
-				return "[]";
-			}
-			else {
-				return quoteString(Arrays.toString(getNextState()));
-			}
-		} else if (index == 2) {
-			return Integer.toString(getAction());
-		} else if (index == 3) {
-			return Float.toString(getReward());
-		} else {
-			throw new RuntimeException();
-		}
-	}
-	
-	private String quoteString(String str) {
-		return "\"" + str + "\"";
+		return "Transition";
 	}
 }
