@@ -87,7 +87,10 @@ public class BanditBasedRouter implements BatchNodeInserter {
 	private int insert(TGraph graph, TPartStoredProcedureTask task) {
 		long startTime = System.nanoTime();
 		ArrayRealVector context = task.getBanditTransactionContext().getContext();
-		int arm = model.chooseArm(context.append(context));
+		if (LIN_UCB_TYPE == UcbType.HYBRID_LIN_UCB) {
+			context = context.append(context);
+		}
+		int arm = model.chooseArm(context);
 		graph.insertTxNode(task, arm);
 
 		// Debug
