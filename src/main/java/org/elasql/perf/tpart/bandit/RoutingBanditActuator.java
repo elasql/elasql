@@ -2,7 +2,9 @@ package org.elasql.perf.tpart.bandit;
 
 import org.elasql.perf.tpart.bandit.data.BanditTransactionData;
 import org.elasql.perf.tpart.workload.BanditTransactionDataRecorder;
+import org.elasql.schedule.tpart.bandit.BanditBasedRouter;
 import org.elasql.server.Elasql;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
 
 import java.util.ArrayList;
@@ -19,6 +21,16 @@ import java.util.logging.Logger;
  * @author Yi-Sia Gao
  */
 public class RoutingBanditActuator extends Task {
+	private static final int MAX_BATCH_SIZE;
+	private static final int POLL_TIME_OUT;
+
+	static {
+		MAX_BATCH_SIZE = ElasqlProperties.getLoader().getPropertyAsInteger(
+				BanditBasedRouter.class.getName() + ".MAX_BATCH_SIZE", 1000);
+		POLL_TIME_OUT = ElasqlProperties.getLoader().getPropertyAsInteger(
+				BanditBasedRouter.class.getName() + ".POLL_TIME_OUT", 1000);
+	}
+
 	private static final Logger logger = Logger.getLogger(RoutingBanditActuator.class.getName());
 
 	private final BlockingQueue<BanditTransactionData> queue = new LinkedBlockingQueue<>();
@@ -46,13 +58,13 @@ public class RoutingBanditActuator extends Task {
 
 		while (true) {
 			try {
-				BanditTransactionData banditTransactionData = queue.poll(1000, TimeUnit.MILLISECONDS);
+				BanditTransactionData banditTransactionData = queue.poll(POLL_TIME_OUT, TimeUnit.MILLISECONDS);
 
 				if (banditTransactionData != null) {
 					pendingList.add(banditTransactionData);
 					banditTransactionDataRecorder.record(banditTransactionData);
 
-					if (pendingList.size() >= 1000) {
+					if (pendingList.size() >= MAX_BATCH_SIZE) {
 						// Issue an update transaction
 						issueRewardUpdateTransaction(pendingList);
 						pendingList.clear();

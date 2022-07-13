@@ -10,20 +10,47 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.util.ElasqlProperties;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
+import static org.elasql.perf.tpart.bandit.data.BanditTransactionContext.NUMBER_OF_CONTEXT;
+
 public class BanditBasedRouter implements BatchNodeInserter {
+
+	enum UcbType {
+		LIN_UCB,
+		HYBRID_LIN_UCB
+	}
+
+	private static final UcbType LIN_UCB_TYPE;
+	private static final double ALPHA;
+
+	static {
+		LIN_UCB_TYPE = UcbType.values()[ElasqlProperties.getLoader().getPropertyAsInteger(
+				BanditBasedRouter.class.getName() + ".LIN_UCB_TYPE", 0)];
+		ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
+				BanditBasedRouter.class.getName() + ".ALPHA", 5.0);
+	}
+
 	private static final Logger logger = Logger.getLogger(BanditBasedRouter.class.getName());
 	private final LinUCB model;
 	private BanditTransactionDataCollector banditTransactionDataCollector;
 
 	public BanditBasedRouter() {
-		// TODO: Number of features hard coded
-//		model = new LinUCB(PartitionMetaMgr.NUM_PARTITIONS * 3, PartitionMetaMgr.NUM_PARTITIONS, 1);
-		model = new HybridLinUCB(PartitionMetaMgr.NUM_PARTITIONS * 2, PartitionMetaMgr.NUM_PARTITIONS * 2, PartitionMetaMgr.NUM_PARTITIONS, 10);
+		switch (LIN_UCB_TYPE) {
+			case LIN_UCB:
+				model = new LinUCB(NUMBER_OF_CONTEXT, PartitionMetaMgr.NUM_PARTITIONS, ALPHA);
+				break;
+			case HYBRID_LIN_UCB:
+				// use the same set of context for shared and non-shared features
+				model = new HybridLinUCB(NUMBER_OF_CONTEXT, NUMBER_OF_CONTEXT, PartitionMetaMgr.NUM_PARTITIONS, ALPHA);
+				break;
+			default:
+				throw new RuntimeException("Unknown model type " + LIN_UCB_TYPE);
+		}
 	}
 
 	@Override
@@ -48,8 +75,10 @@ public class BanditBasedRouter implements BatchNodeInserter {
 	private void receiveReward(BanditRewardUpdateParamHelper paramHelper) {
 		long startTime = System.nanoTime();
 		RealVector[] context = paramHelper.getContext();
-		model.receiveRewards(Arrays.stream(context).map(c -> c.append(c)).toArray(RealVector[]::new), paramHelper.getArm(), paramHelper.getReward());
-//		model.receiveRewards(context, paramHelper.getArm(), paramHelper.getReward());
+		if (LIN_UCB_TYPE == UcbType.HYBRID_LIN_UCB) {
+			context = Arrays.stream(context).map(c -> c.append(c)).toArray(RealVector[]::new);
+		}
+		model.receiveRewards(context, paramHelper.getArm(), paramHelper.getReward());
 
 		// Debug
 		logger.info(String.format("Receive rewards for %d transactions. Takes %f µs. Sample: %s", context.length, (System.nanoTime() - startTime) / 1000. ,paramHelper.getReward()[0]));

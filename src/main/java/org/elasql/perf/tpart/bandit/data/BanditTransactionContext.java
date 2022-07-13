@@ -3,6 +3,7 @@ package org.elasql.perf.tpart.bandit.data;
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealVector;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
+import org.elasql.storage.metadata.PartitionMetaMgr;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Collections;
 
 public class BanditTransactionContext implements Serializable {
 	private static final long serialVersionUID = 1;
+	public static final int NUMBER_OF_CONTEXT = PartitionMetaMgr.NUM_PARTITIONS * 2;
 
 	private final long txNum;
 	private final ArrayRealVector context;
