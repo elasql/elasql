@@ -2,7 +2,6 @@ package org.elasql.perf.tpart.bandit;
 
 import org.elasql.perf.tpart.bandit.data.BanditTransactionData;
 import org.elasql.perf.tpart.workload.BanditTransactionDataRecorder;
-import org.elasql.schedule.tpart.bandit.BanditBasedRouter;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
@@ -26,9 +25,9 @@ public class RoutingBanditActuator extends Task {
 
 	static {
 		MAX_BATCH_SIZE = ElasqlProperties.getLoader().getPropertyAsInteger(
-				BanditBasedRouter.class.getName() + ".MAX_BATCH_SIZE", 1000);
+				RoutingBanditActuator.class.getName() + ".MAX_BATCH_SIZE", 1000);
 		POLL_TIME_OUT = ElasqlProperties.getLoader().getPropertyAsInteger(
-				BanditBasedRouter.class.getName() + ".POLL_TIME_OUT", 1000);
+				RoutingBanditActuator.class.getName() + ".POLL_TIME_OUT", 1000);
 	}
 
 	private static final Logger logger = Logger.getLogger(RoutingBanditActuator.class.getName());
