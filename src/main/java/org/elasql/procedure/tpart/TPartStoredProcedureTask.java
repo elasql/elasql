@@ -92,7 +92,7 @@ public class TPartStoredProcedureTask
 
 			if (Elasql.SERVICE_TYPE.equals(Elasql.ServiceType.HERMES_BANDIT)) {
 				// TODO: use reciprocal of the latency as the reward for now
-				double reward = 10000 * 1./ (double) profiler.getExecutionTime();
+				double reward = 100 * 1./ (double) profiler.getExecutionTime();
 				Elasql.connectionMgr().sendTransactionMetricReport(new BanditTransactionReward(txNum, reward));
 			}
 		}
