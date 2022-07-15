@@ -9,10 +9,12 @@ import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -20,24 +22,26 @@ import static org.elasql.perf.tpart.bandit.data.BanditTransactionContext.NUMBER_
 
 public class BanditBasedRouter implements BatchNodeInserter {
 
-	enum UcbType {
-		LIN_UCB,
-		HYBRID_LIN_UCB
-	}
-
 	private static final UcbType LIN_UCB_TYPE;
 	private static final double ALPHA;
+	private static final OperationMode OPERATION_MODE;
+	private static final long BOOTSTRAPPING_COUNT;
+	private static final Logger logger = Logger.getLogger(BanditBasedRouter.class.getName());
 
 	static {
 		LIN_UCB_TYPE = UcbType.values()[ElasqlProperties.getLoader().getPropertyAsInteger(
 				BanditBasedRouter.class.getName() + ".LIN_UCB_TYPE", 0)];
 		ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
 				BanditBasedRouter.class.getName() + ".ALPHA", 5.0);
+		OPERATION_MODE = OperationMode.values()[ElasqlProperties.getLoader().getPropertyAsInteger(
+				BanditBasedRouter.class.getName() + ".OPERATION_MODE", 0)];
+		BOOTSTRAPPING_COUNT = ElasqlProperties.getLoader().getPropertyAsLong(
+				BanditBasedRouter.class.getName() + ".BOOTSTRAPPING_COUNT", 200000);
 	}
 
-	private static final Logger logger = Logger.getLogger(BanditBasedRouter.class.getName());
 	private final LinUCB model;
 	private BanditTransactionDataCollector banditTransactionDataCollector;
+	private BatchNodeInserter boostrapInserter;
 
 	public BanditBasedRouter() {
 		switch (LIN_UCB_TYPE) {
@@ -50,6 +54,16 @@ public class BanditBasedRouter implements BatchNodeInserter {
 				break;
 			default:
 				throw new RuntimeException("Unknown model type " + LIN_UCB_TYPE);
+		}
+		switch (OPERATION_MODE) {
+			case RL:
+				boostrapInserter = null;
+				break;
+			case BOOTSTRAPPING:
+				boostrapInserter = new HermesNodeInserter();
+				break;
+			default:
+				throw new RuntimeException("Unknown operation mode" + OPERATION_MODE);
 		}
 	}
 
@@ -81,22 +95,45 @@ public class BanditBasedRouter implements BatchNodeInserter {
 		model.receiveRewards(context, paramHelper.getArm(), paramHelper.getReward());
 
 		// Debug
-		logger.info(String.format("Receive rewards for %d transactions. Takes %f µs. Sample: %s", context.length, (System.nanoTime() - startTime) / 1000. ,paramHelper.getReward()[0]));
+		logger.info(String.format("Receive rewards for %d transactions. Takes %f µs. Sample: %s", context.length, (System.nanoTime() - startTime) / 1000., paramHelper.getReward()[0]));
 	}
 
 	private int insert(TGraph graph, TPartStoredProcedureTask task) {
-		long startTime = System.nanoTime();
+		long insertionStartTime = System.nanoTime();
 		ArrayRealVector context = task.getBanditTransactionContext().getContext();
 		if (LIN_UCB_TYPE == UcbType.HYBRID_LIN_UCB) {
 			context = context.append(context);
 		}
-		int arm = model.chooseArm(context);
-		graph.insertTxNode(task, arm);
 
-		// Debug
-		logger.info(String.format("Choose arm %d for transaction %d. Takes %f µs. Context: %s", arm, task.getTxNum(), (System.nanoTime() - startTime) / 1000., context));
+		int arm;
+		String status;
+		if (boostrapInserter != null) {
+			boostrapInserter.insertBatch(graph, Collections.singletonList(task));
+			arm = graph.getLastInsertedTxNode().getPartId();
+			if (task.getTxNum() > BOOTSTRAPPING_COUNT) {
+				boostrapInserter = null;
+			}
+			status = "Bootstrapping";
+		} else {
+			arm = model.chooseArm(context);
+			graph.insertTxNode(task, arm);
+			status = "RL";
+		}
+
+		logger.info(String.format("Status: %s. Choose arm %d for transaction %d. Takes %f µs. Context: %s",
+				status, arm, task.getTxNum(), (System.nanoTime() - insertionStartTime) / 1000., context));
 
 		return arm;
+	}
+
+	enum UcbType {
+		LIN_UCB,
+		HYBRID_LIN_UCB
+	}
+
+	enum OperationMode {
+		RL,
+		BOOTSTRAPPING,
 	}
 }
 
