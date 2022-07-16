@@ -115,29 +115,29 @@ public class BanditBasedRouter implements BatchNodeInserter {
 	}
 
 	private int insert(TGraph graph, TPartStoredProcedureTask task) {
-		long insertionStartTime = System.nanoTime();
+//		long insertionStartTime = System.nanoTime();
 		ArrayRealVector context = task.getBanditTransactionContext().getContext();
 		if (LIN_UCB_TYPE == UcbType.HYBRID_LIN_UCB) {
 			context = context.append(context);
 		}
 
 		int arm;
-		String status;
+//		String status;
 		if (boostrapInserter != null) {
 			boostrapInserter.insertBatch(graph, Collections.singletonList(task));
 			arm = graph.getLastInsertedTxNode().getPartId();
 			if (task.getTxNum() > BOOTSTRAPPING_COUNT) {
 				boostrapInserter = null;
 			}
-			status = "Bootstrapping";
+//			status = "Bootstrapping";
 		} else {
 			arm = model.chooseArm(context);
 			graph.insertTxNode(task, arm);
-			status = "RL";
+//			status = "RL";
 		}
 
-		logger.info(String.format("Status: %s. Choose arm %d for transaction %d. Takes %f µs. Context: %s",
-				status, arm, task.getTxNum(), (System.nanoTime() - insertionStartTime) / 1000., context));
+//		logger.info(String.format("Status: %s. Choose arm %d for transaction %d. Takes %f µs. Context: %s",
+//				status, arm, task.getTxNum(), (System.nanoTime() - insertionStartTime) / 1000., context));
 
 		return arm;
 	}
