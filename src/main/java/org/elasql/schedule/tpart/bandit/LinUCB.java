@@ -93,6 +93,24 @@ public class LinUCB {
         }
     }
 
+    public LinUCB(LinUCB other) {
+        n = other.n;
+        d = other.d;
+        alpha = other.alpha;
+        A_a = copyMatrices(other.A_a);
+        A_a_inverse = copyMatrices(other.A_a_inverse);
+        b_a = copyMatrices(other.b_a);
+        theta_hat_a = copyMatrices(other.theta_hat_a);
+    }
+
+    protected RealMatrix[] copyMatrices(RealMatrix[] other) {
+        RealMatrix[] matrices = new RealMatrix[other.length];
+        for (int i = 0; i < other.length; i++) {
+            matrices[i] = other[i].copy();
+        }
+        return matrices;
+    }
+
     /**
      * Receive a reward for the given context and arm. Update the regression parameters accordingly.
      */

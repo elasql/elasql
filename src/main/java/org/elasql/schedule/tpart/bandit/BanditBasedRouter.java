@@ -10,6 +10,7 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
+import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
@@ -39,9 +40,10 @@ public class BanditBasedRouter implements BatchNodeInserter {
 				BanditBasedRouter.class.getName() + ".BOOTSTRAPPING_COUNT", 200000);
 	}
 
-	private final LinUCB model;
+	private LinUCB model;
 	private BanditTransactionDataCollector banditTransactionDataCollector;
 	private BatchNodeInserter boostrapInserter;
+	private final BanditModelUpdater banditModelUpdater;
 
 	public BanditBasedRouter() {
 		switch (LIN_UCB_TYPE) {
@@ -65,14 +67,20 @@ public class BanditBasedRouter implements BatchNodeInserter {
 			default:
 				throw new RuntimeException("Unknown operation mode" + OPERATION_MODE);
 		}
+		banditModelUpdater = new BanditModelUpdater();
+		Elasql.taskMgr().runTask(banditModelUpdater);
 	}
 
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
 		for (TPartStoredProcedureTask task : tasks) {
+			LinUCB updatedModel = banditModelUpdater.getUpdatedModel(task.getTxNum());
+			if (updatedModel != null) {
+				model = updatedModel;
+			}
 			if (task.getProcedure().getClass().equals(BanditRewardUpdateProcedure.class)) {
 				BanditRewardUpdateProcedure procedure = (BanditRewardUpdateProcedure) task.getProcedure();
-				receiveReward(procedure.getParamHelper());
+				receiveReward(procedure.getParamHelper(), task.getTxNum());
 			} else {
 				int arm = insert(graph, task);
 				if (banditTransactionDataCollector != null) {
@@ -86,16 +94,24 @@ public class BanditBasedRouter implements BatchNodeInserter {
 		this.banditTransactionDataCollector = banditTransactionDataCollector;
 	}
 
-	private void receiveReward(BanditRewardUpdateParamHelper paramHelper) {
+	private void receiveReward(BanditRewardUpdateParamHelper paramHelper, long transactionNumber) {
 		long startTime = System.nanoTime();
+
 		RealVector[] context = paramHelper.getContext();
+		LinUCB copiedModel;
 		if (LIN_UCB_TYPE == UcbType.HYBRID_LIN_UCB) {
 			context = Arrays.stream(context).map(c -> c.append(c)).toArray(RealVector[]::new);
+			copiedModel = new HybridLinUCB((HybridLinUCB) model);
+		} else {
+			copiedModel = new LinUCB(model);
 		}
-		model.receiveRewards(context, paramHelper.getArm(), paramHelper.getReward());
+
+		banditModelUpdater.receiveRewards(copiedModel, transactionNumber,
+				context, paramHelper.getArm(), paramHelper.getReward());
 
 		// Debug
-		logger.info(String.format("Receive rewards for %d transactions. Takes %f µs. Sample: %s", context.length, (System.nanoTime() - startTime) / 1000., paramHelper.getReward()[0]));
+		logger.info(String.format("Receive rewards for %d transactions. Takes %f µs. Sample: %s",
+				context.length, (System.nanoTime() - startTime) / 1000., paramHelper.getReward()[0]));
 	}
 
 	private int insert(TGraph graph, TPartStoredProcedureTask task) {

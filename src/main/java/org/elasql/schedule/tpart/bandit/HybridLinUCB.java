@@ -75,6 +75,15 @@ public class HybridLinUCB extends LinUCB {
         }
     }
 
+    public HybridLinUCB(HybridLinUCB other) {
+        super(other);
+        beta_hat = other.beta_hat.copy();
+        B_a = copyMatrices(other.B_a);
+        A_0 = other.A_0.copy();
+        b_0 = other.b_0.copy();
+        k = other.k;
+    }
+
     /**
      * Receive a reward for the given context and arm. Update the regression parameters accordingly.
      */
