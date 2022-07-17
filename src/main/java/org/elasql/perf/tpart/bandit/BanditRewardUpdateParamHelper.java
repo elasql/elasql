@@ -1,6 +1,6 @@
 package org.elasql.perf.tpart.bandit;
 
-import org.apache.commons.math3.linear.RealVector;
+import org.apache.commons.math3.linear.ArrayRealVector;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionData;
 import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.sql.storedprocedure.SpResultRecord;
@@ -13,13 +13,13 @@ import org.vanilladb.core.sql.storedprocedure.StoredProcedureParamHelper;
  */
 public class BanditRewardUpdateParamHelper extends StoredProcedureParamHelper {
 	
-	private RealVector[] context;
+	private ArrayRealVector[] context;
 	private int[] arm;
 	private double[] reward;
 
 	@Override
 	public void prepareParameters(Object... pars) {
-		context = new RealVector[pars.length];
+		context = new ArrayRealVector[pars.length];
 		arm = new int[pars.length];
 		reward = new double[pars.length];
 
@@ -31,7 +31,7 @@ public class BanditRewardUpdateParamHelper extends StoredProcedureParamHelper {
 		}
 	}
 
-	public RealVector[] getContext() {
+	public ArrayRealVector[] getContext() {
 		return context;
 	}
 

@@ -74,17 +74,18 @@ public class BanditBasedRouter implements BatchNodeInserter {
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
 		for (TPartStoredProcedureTask task : tasks) {
-			LinUCB updatedModel = banditModelUpdater.getUpdatedModel(task.getTxNum());
+			long transactionNumber = task.getTxNum();
+			LinUCB updatedModel = banditModelUpdater.getUpdatedModel(transactionNumber);
 			if (updatedModel != null) {
 				model = updatedModel;
 			}
 			if (task.getProcedure().getClass().equals(BanditRewardUpdateProcedure.class)) {
 				BanditRewardUpdateProcedure procedure = (BanditRewardUpdateProcedure) task.getProcedure();
-				receiveReward(procedure.getParamHelper(), task.getTxNum());
+				receiveReward(procedure.getParamHelper(), transactionNumber);
 			} else {
 				int arm = insert(graph, task);
 				if (banditTransactionDataCollector != null) {
-					banditTransactionDataCollector.addArm(new BanditTransactionArm(task.getTxNum(), arm));
+					banditTransactionDataCollector.addArm(new BanditTransactionArm(transactionNumber, arm));
 				}
 			}
 		}

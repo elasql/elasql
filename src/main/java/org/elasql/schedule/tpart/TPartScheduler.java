@@ -120,8 +120,7 @@ public class TPartScheduler extends Task implements Scheduler {
 				profiler.stopComponentProfiler("OU0 - ROUTE");
 				
 				// sink current t-graph if # pending tx exceeds threshold
-				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
-						|| !batchingEnabled) {
+				if (!batchingEnabled || batchedTasks.size() >= SCHEDULE_BATCH_SIZE) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
 				}

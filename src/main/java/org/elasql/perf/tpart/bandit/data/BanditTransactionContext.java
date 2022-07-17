@@ -6,28 +6,20 @@ import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 
 public class BanditTransactionContext implements Serializable {
-	private static final long serialVersionUID = 1;
 	public static final int NUMBER_OF_CONTEXT = PartitionMetaMgr.NUM_PARTITIONS * 2;
-
+	private static final long serialVersionUID = 1;
 	private final long txNum;
 	private final ArrayRealVector context;
 
 	public BanditTransactionContext(long txNum, TransactionFeatures transactionFeatures) {
-		Double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Reads")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
-		Double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Writes")).mapToDouble(Double::new).boxed().toArray(Double[]::new);
+		double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Reads")).mapToDouble((v) -> v).toArray();
+		double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Writes")).mapToDouble((v) -> v).toArray();
 		normalize(readDataDistributions);
 		normalize(writeDataDistributions);
-//		Double[] systemCpuLoads = (Double[]) transactionFeatures.getFeature("System CPU Load");
-		ArrayList<Double> context = new ArrayList<>();
-		Collections.addAll(context, readDataDistributions);
-		Collections.addAll(context, writeDataDistributions);
-//		Collections.addAll(context, systemCpuLoads);
-		this.context = new ArrayRealVector(context.stream().mapToDouble(v -> v).toArray(), false);
+		this.context = new ArrayRealVector(readDataDistributions, writeDataDistributions);
 		this.txNum = txNum;
 	}
 
@@ -44,8 +36,8 @@ public class BanditTransactionContext implements Serializable {
 		return txNum;
 	}
 
-	private void normalize(Double[] array) {
-		double sum = Arrays.stream(array).mapToDouble(Double::new).sum();
+	private void normalize(double[] array) {
+		double sum = Arrays.stream(array).sum();
 		for (int i = 0; i < array.length; i++) {
 			array[i] /= sum;
 		}

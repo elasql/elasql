@@ -18,8 +18,8 @@ public class BanditTransactionData implements Serializable {
 		this.txNum = txNum;
 	}
 
-	public RealVector getContext() {
-		return RealVector.unmodifiableRealVector(context);
+	public ArrayRealVector getContext() {
+		return context;
 	}
 
 	public double getReward() {

@@ -136,8 +136,7 @@ public class SpCallPreprocessor extends Task {
 				}
 				
 				// Process the batch as TPartScheduler does
-				if ((isBatching && batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE)
-						|| !isBatching) {
+				if (!isBatching || batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE) {
 					// Route the task batch
 					routeBatch(batchedTasks);
 					batchedTasks.clear();
