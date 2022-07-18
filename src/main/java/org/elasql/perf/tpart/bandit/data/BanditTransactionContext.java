@@ -9,7 +9,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class BanditTransactionContext implements Serializable {
-	public static final int NUMBER_OF_CONTEXT = PartitionMetaMgr.NUM_PARTITIONS * 2;
+	public static final int NUMBER_OF_CONTEXT = PartitionMetaMgr.NUM_PARTITIONS;
 	private static final long serialVersionUID = 1;
 	private final long txNum;
 	private final ArrayRealVector context;
@@ -19,7 +19,10 @@ public class BanditTransactionContext implements Serializable {
 		double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Writes")).mapToDouble((v) -> v).toArray();
 		normalize(readDataDistributions);
 		normalize(writeDataDistributions);
-		this.context = new ArrayRealVector(readDataDistributions, writeDataDistributions);
+		for (int i = 0; i < readDataDistributions.length; i++) {
+			readDataDistributions[i] = readDataDistributions[i] * 0.5 + writeDataDistributions[i] * 0.5;
+		}
+		this.context = new ArrayRealVector(readDataDistributions, false);
 		this.txNum = txNum;
 	}
 
