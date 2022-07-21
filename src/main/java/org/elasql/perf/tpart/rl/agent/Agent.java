@@ -64,15 +64,18 @@ public abstract class Agent {
 		
 		@Override
 		public void run() {
-			long startTime = System.nanoTime();
-			while ((System.nanoTime() - startTime) / 1000_000 < 1_000) {
+			while (true) {
 				if (train) {
 					updateAgent(episode);
-					break;
+					train = false;
+				} else {
+					try {
+						Thread.sleep(5_000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
 				}
-				startTime = System.nanoTime();
 			}	
-			train = false;
 		}
 		
 		public void train() {
@@ -82,6 +85,13 @@ public abstract class Agent {
 	
 	public abstract int react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse);
 	
+	public Agent() {
+		loadLib();
+	}
+	
+	private void loadLib() {
+		NDManager.newBaseManager();
+	}
 	public void train() {
 		if (firstTime) {
 			prepareAgent();

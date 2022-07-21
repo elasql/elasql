@@ -79,8 +79,13 @@ public final class Memory {
 
 	public Transition[] sample(int sample_size) {
 		Transition[] chunk = new Transition[sample_size];
-		for (int i = 0; i < sample_size; i++) {
-			chunk[i] = get(random.nextInt(size));
+		int i = 0;
+		while (i < sample_size) {
+			Transition transition = get(random.nextInt(size));
+			if (transition != null) {
+				chunk[i] = transition;
+				i++;
+			}
 		}
 
 		return chunk;
@@ -125,7 +130,6 @@ public final class Memory {
 	}
 
 	private MemoryBatch getBatch(Transition[] transitions, NDManager manager, int batch_size) {
-
 		float[][] states = new float[batch_size][];
 		float[][] next_states = new float[batch_size][];
 		int[] actions = new int[batch_size];
