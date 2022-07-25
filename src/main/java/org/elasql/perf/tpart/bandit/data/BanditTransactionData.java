@@ -1,7 +1,6 @@
 package org.elasql.perf.tpart.bandit.data;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
-import org.apache.commons.math3.linear.RealVector;
 
 import java.io.Serializable;
 
@@ -35,9 +34,9 @@ public class BanditTransactionData implements Serializable {
 	}
 
 	public static class Builder {
-		private BanditTransactionContext banditTransactionContext;
-		private BanditTransactionReward banditTransactionReward;
-		private BanditTransactionArm banditTransactionArm;
+		private volatile BanditTransactionContext banditTransactionContext;
+		private volatile BanditTransactionReward banditTransactionReward;
+		private volatile BanditTransactionArm banditTransactionArm;
 
 		public Builder() {
 
