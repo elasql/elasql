@@ -94,6 +94,9 @@ public class TPartScheduler extends Task implements Scheduler {
 
 				TransactionProfiler.setProfiler(call.getProfiler());
 				TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+
+				profiler.stopComponentProfiler("OU0 - Dispatch to router");
+				profiler.startComponentProfiler("OU0 - ROUTE");
 				
 				TPartStoredProcedureTask task = createStoredProcedureTask(call, profiler);
 
@@ -116,9 +119,7 @@ public class TPartScheduler extends Task implements Scheduler {
 						task.getProcedureType() == ProcedureType.BANDIT) {
 					batchedTasks.add(task);
 				}
-				
-				profiler.stopComponentProfiler("OU0 - ROUTE");
-				
+
 				// sink current t-graph if # pending tx exceeds threshold
 				if (!batchingEnabled || batchedTasks.size() >= SCHEDULE_BATCH_SIZE) {
 					processBatch(batchedTasks);
@@ -146,8 +147,11 @@ public class TPartScheduler extends Task implements Scheduler {
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			// Record plan gen start time, CPU start time, disk IO count
-			for(TPartStoredProcedureTask task : batchedTasks) 
-				task.getTxProfiler().startComponentProfiler("OU1 - Generate Plan");
+			for(TPartStoredProcedureTask task : batchedTasks) {
+				TransactionProfiler profiler = task.getTxProfiler();
+				profiler.stopComponentProfiler("OU0 - ROUTE");
+				profiler.startComponentProfiler("OU1 - Generate Plan");
+			}
 			
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 

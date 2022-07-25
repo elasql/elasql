@@ -246,7 +246,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			e.printStackTrace();
 		}
 		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, networkSize, 0, 0);
-		profiler.startComponentProfiler("OU0 - ROUTE");
+		profiler.startComponentProfiler("OU0 - Dispatch to router");
 		
 		spc.setProfiler(TransactionProfiler.takeOut());
 	}
