@@ -8,6 +8,7 @@ import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContextFactory;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
 import org.elasql.perf.tpart.ai.SumMaxEstimator;
@@ -40,8 +41,9 @@ public class TPartPerformanceManager implements PerformanceManager {
 		Elasql.taskMgr().runTask(metricWarehouse);
 
 		BanditTransactionDataCollector banditTransactionDataCollector = newBanditTransactionCollector();
+		BanditTransactionContextFactory banditTransactionContextFactory = newBanditTransactionContextFactory();
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator(), banditTransactionDataCollector);
+				metricWarehouse, newEstimator(), banditTransactionDataCollector, banditTransactionContextFactory);
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
@@ -85,6 +87,14 @@ public class TPartPerformanceManager implements PerformanceManager {
 	private static BanditTransactionDataCollector newBanditTransactionCollector() {
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
 			return new BanditTransactionDataCollector();
+		}
+
+		return null;
+	}
+
+	private static BanditTransactionContextFactory newBanditTransactionContextFactory() {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
+			return new BanditTransactionContextFactory();
 		}
 
 		return null;
