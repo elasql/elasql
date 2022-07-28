@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.rl.model;
 
 import ai.djl.inference.Predictor;
+import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
@@ -64,6 +65,6 @@ public abstract class BaseAgent {
         return offline_training;
     }
 
-	public abstract void updateModel(NDManager submanager) throws TranslateException;
+	public abstract NDArray updateModel(NDManager submanager) throws TranslateException;
     
 }

@@ -49,6 +49,7 @@ public class OnlineAgent extends Agent {
 	protected void prepareAgent() {
 		agent = new DQN(64, 32, 32, 0.99f, 0.001f, memory);
 		Elasql.taskMgr().runTask(trainer);
+		trainedAgent = new TrainedDQN();
 	}
 	
 	@Override
@@ -70,7 +71,7 @@ public class OnlineAgent extends Agent {
 		if (logger.isLoggable(Level.INFO))
 			logger.info(String.format("Training finished!!"));
 		
-		trainedAgent = new TrainedDQN();
+//		trainedAgent = new TrainedDQN();
 		trainedAgent.setPredictor(agent.takeoutPredictor());
 		if (logger.isLoggable(Level.INFO))
 			logger.info(String.format("Setting predictor finished!!"));
@@ -81,6 +82,6 @@ public class OnlineAgent extends Agent {
 	}
 	
 	private boolean isTrainTxNum(long txNum) {
-		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % 10_000 == 0;
+		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % 5_000 == 0;
 	}
 }

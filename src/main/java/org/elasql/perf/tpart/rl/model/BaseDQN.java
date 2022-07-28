@@ -4,7 +4,6 @@ import java.util.Random;
 
 import org.elasql.perf.tpart.rl.agent.Agent;
 import org.elasql.perf.tpart.rl.util.Memory;
-import org.elasql.storage.metadata.PartitionMetaMgr;
 
 import ai.djl.Model;
 import ai.djl.engine.Engine;
@@ -143,6 +142,7 @@ public abstract class BaseDQN extends BaseAgent {
                 NDArray params_arr = params.getValue().getArray();
                 optimizer.update(params.getKey(), params_arr, params_arr.getGradient());
             }
+        } catch (ai.djl.engine.EngineException e){
         }
 
         if (iteration++ % sync_net_interval == 0) {
