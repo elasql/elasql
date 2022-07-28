@@ -20,12 +20,12 @@ public class ScoreModel extends BaseModel {
     private final int hidden_size;
     private final int output_size;
     
-    private final Block hidden;
+//    private final Block hidden;
 
     protected ScoreModel(NDManager manager, int hidden_size, int output_size) {
         super(manager);
         this.linear_input = addChildBlock("linear_input", Linear.builder().setUnits(hidden_size).build());
-        this.hidden = addChildBlock("hidden", Linear.builder().setUnits(hidden_size).build());
+//        this.hidden = addChildBlock("hidden", Linear.builder().setUnits(hidden_size).build());
         this.linear_output = addChildBlock("linear_output", Linear.builder().setUnits(output_size).build());
 
         this.hidden_size = hidden_size;
@@ -45,7 +45,7 @@ public class ScoreModel extends BaseModel {
     public void initializeChildBlocks(NDManager manager, DataType data_type, Shape... input_shapes) {
         setInitializer(new XavierInitializer(), Type.WEIGHT);
         linear_input.initialize(manager, data_type, input_shapes[0]);
-        hidden.initialize(manager, data_type, new Shape(hidden_size));
+//        hidden.initialize(manager, data_type, new Shape(hidden_size));
         linear_output.initialize(manager, data_type, new Shape(hidden_size));
     }
 
@@ -59,8 +59,8 @@ public class ScoreModel extends BaseModel {
 		NDList current = inputs;
 		current = linear_input.forward(parameter_store, current, training);
         current = new NDList(Activation.relu(current.singletonOrThrow()));
-        current = hidden.forward(parameter_store, current, training);
-        current = new NDList(Activation.relu(current.singletonOrThrow()));
+//        current = hidden.forward(parameter_store, current, training);
+//        current = new NDList(Activation.relu(current.singletonOrThrow()));
         current = linear_output.forward(parameter_store, current, training);
         return current;
 	}

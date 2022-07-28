@@ -87,7 +87,7 @@ public class Imitation {
 		}
 	}
 
-	public void updateModel(NDManager manager) throws TranslateException {
+	public NDArray updateModel(NDManager manager) throws TranslateException {
 		MemoryBatch batch = memory.sampleBatch(batch_size, manager);
 		NDArray action = batch.getActions();
 
@@ -98,7 +98,7 @@ public class Imitation {
         i_loss.setRequiresGradient(true);
 //        System.out.println(i_loss.toString());
 		gradientUpdate(i_loss);
-
+		return i_loss;
 	}
 	
 	public Model getImitationNet() {

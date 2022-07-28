@@ -2,8 +2,8 @@ package org.elasql.perf.tpart.rl.model;
 
 import java.util.Random;
 
+import org.elasql.perf.tpart.rl.agent.Agent;
 import org.elasql.perf.tpart.rl.util.Memory;
-import org.elasql.storage.metadata.PartitionMetaMgr;
 
 import ai.djl.Model;
 import ai.djl.engine.Engine;
@@ -25,9 +25,9 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
 
     protected final Random random = new Random(0);
     protected Memory memory;
-    // TODO state space 應該是 features 的 space
-    private final int dim_of_state_space = PartitionMetaMgr.NUM_PARTITIONS * 2;
-    private final int num_of_actions = PartitionMetaMgr.NUM_PARTITIONS;
+
+    private final int dim_of_state_space = Agent.STATE_DIM;
+    private final int num_of_actions = Agent.ACTION_DIM;
     private final int hidden_size;
     private final float learning_rate;
 
@@ -39,6 +39,7 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     private Model policy_net;
     private Model target_net;
     private Model imitation_net;
+    private Model final_net;
 
     protected NDManager manager;
     protected Predictor<NDList, NDList> policy_predictor;
@@ -79,7 +80,14 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     
     @Override
     public final Predictor<NDList, NDList> takeoutPredictor() {
-    	return target_net.newPredictor(new NoopTranslator());
+    	for (Pair<String, Parameter> params : target_net.getBlock().getParameters()) {
+            final_net.getBlock().getParameters().get(params.getKey()).close();
+            final_net.getBlock().getParameters().get(params.getKey()).setShape(null);
+            final_net.getBlock().getParameters().get(params.getKey()).setArray(params.getValue().getArray().duplicate());
+        }
+
+        return final_net.newPredictor(new NoopTranslator());
+//    	return target_net.newPredictor(new NoopTranslator());
     }
 
     public final Predictor<NDList, NDList> takeoutImitationPredictor() {
@@ -96,6 +104,7 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
         manager = NDManager.newBaseManager();
         policy_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
         target_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
+        final_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
         imitation_net = prepareImitationNet();
         policy_predictor = policy_net.newPredictor(new NoopTranslator());
         imitation_predictor = imitation_net.newPredictor(new NoopTranslator());
@@ -137,10 +146,14 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     private Model prepareImitationNet() {
     	Imitation imitation_model = new Imitation(dim_of_state_space, num_of_actions, hidden_size, batch_size, 0.001f, memory);
     	int episode = 0;
-		while (episode < 5_000) {
+		while (episode < 700) {
 			episode++;
 			try (NDManager submanager = NDManager.newBaseManager().newSubManager()) {
 				imitation_model.updateModel(submanager);
+				if (episode == 700) {
+					System.out.print("Imitation model loss: ");
+					System.out.println(imitation_model.updateModel(submanager).toString());
+				}
 			} catch (TranslateException e) {
 				e.printStackTrace();
 			}

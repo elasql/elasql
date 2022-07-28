@@ -30,7 +30,7 @@ public class OfflineBCQ extends OfflineBaseBCQ {
     
 
     @Override
-	public void updateModel(NDManager manager) throws TranslateException {
+	public NDArray updateModel(NDManager manager) throws TranslateException {
         MemoryBatch batch = memory.sampleBatch(batch_size, manager);
         
         NDArray policy = policy_predictor.predict(new NDList(batch.getStates())).singletonOrThrow();
@@ -44,9 +44,8 @@ public class OfflineBCQ extends OfflineBaseBCQ {
 		//i_loss = F.nll_loss(imt, action.reshape(-1))
 		//Q_loss = q_loss + i_loss + 1e-2 * i.pow(2).mean()
         NDArray q_loss = loss_func.evaluate(new NDList(expected_returns), new NDList(next_returns));
-//        System.out.println(q_loss.toString());
         gradientUpdate(q_loss);
-
+        return q_loss;
     }
 
 }
