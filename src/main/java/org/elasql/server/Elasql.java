@@ -398,7 +398,7 @@ public class Elasql extends VanillaDb {
 				break; 
 			case HERMES_RL:
 				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new PresetOrHermesRouter();//PresetRouteInserter();
+				inserter = new PresetOrHermesRouter();
 				isBatching = false;
 				break; 
 			default: 

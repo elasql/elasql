@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -34,7 +35,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 
 	// Debug: show the distribution of assigned masters
 	private long lastReportTime = -1;
-	private int[] assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	protected int[] assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
@@ -82,7 +83,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		saturatedParts.clear();
 	}
 	
-	protected void insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
+	protected int insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
 		int bestPartId = 0;
 		int minRemoteEdgeCount = task.getReadSet().size();
 		
@@ -98,9 +99,14 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			}
 		}
 		
-		graph.insertTxNode(task, bestPartId);
+		if (task.getTxNum() % 10_000 == 0) {
+			System.out.println("Hermes : " + bestPartId);
+		}
+		if (task.getRoute() == StoredProcedureCall.NO_ROUTE)
+			graph.insertTxNode(task, bestPartId);
 		
 		loadPerPart[bestPartId]++;
+		return bestPartId;
 	}
 	
 	private int countRemoteReadEdge(TGraph graph, TPartStoredProcedureTask task, int partId) {
@@ -238,7 +244,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 	}
 
 	// Debug: show the distribution of assigned masters
-	private void reportRoutingDistribution(long currentTime) {
+	protected void reportRoutingDistribution(long currentTime) {
 		if (lastReportTime == -1) {
 			lastReportTime = currentTime;
 		} else if (currentTime - lastReportTime > 5_000_000) {

@@ -56,7 +56,8 @@ public class CsvSaver<R extends CsvRow> {
 		}
 		sb.deleteCharAt(sb.length() - 1);
 		sb.append('\n');
-
+		
+		writer.append(sb.toString());
 	}
 
 	public void writeRecord(BufferedWriter writer, R row, int columnCount) throws IOException {

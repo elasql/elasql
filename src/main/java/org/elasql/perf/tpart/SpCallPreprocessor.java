@@ -2,7 +2,6 @@ package org.elasql.perf.tpart;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -31,6 +30,8 @@ import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.TimerStatistics;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * A collector that collects the features of transactions.
@@ -38,6 +39,10 @@ import org.vanilladb.core.server.task.Task;
  * @author Yu-Shan Lin
  */
 public class SpCallPreprocessor extends Task {
+	
+	static {
+//		TimerStatistics.startReporting(5);
+	}
 	
 	private BlockingQueue<StoredProcedureCall> spcQueue;
 	private FeatureExtractor featureExtractor;
@@ -119,6 +124,10 @@ public class SpCallPreprocessor extends Task {
 				// Take a SP call
 				StoredProcedureCall spc = spcQueue.take();
 				
+				// XXX: Debug
+				TransactionProfiler.getLocalProfiler().reset();
+				TransactionProfiler.getLocalProfiler().startComponentProfiler("Schedule");
+				
 				// Add to the sending list
 				sendingList.add(spc);
 				
@@ -154,6 +163,10 @@ public class SpCallPreprocessor extends Task {
 					routeBatch(batchedTasks);
 					batchedTasks.clear();
 				}
+				
+				// XXX: Debug
+				TransactionProfiler.getLocalProfiler().stopComponentProfiler("Schedule");
+				TransactionProfiler.getLocalProfiler().addToGlobalStatistics();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -196,7 +209,11 @@ public class SpCallPreprocessor extends Task {
 		}
 		
 		if (agent != null) {
+
+			TransactionProfiler.getLocalProfiler().startComponentProfiler("React");
 			int route = agent.react(graph, task, metricWarehouse);
+			TransactionProfiler.getLocalProfiler().stopComponentProfiler("React");
+			
 			spc.setRoute(route);
 			task.setRoute(route);
 		}
@@ -214,7 +231,14 @@ public class SpCallPreprocessor extends Task {
 				performanceEstimator.notifyTransactionRoute(node.getTxNum(), node.getPartId());
 			}
 		}
-		
+		TransactionProfiler.getLocalProfiler().startComponentProfiler("OnTxRouting");
+		if (agent != null) {
+			for (TxNode node : graph.getTxNodes()) {
+				agent.onTxRouting(node.getTxNum(), node.getPartId());
+			}
+		}
+		TransactionProfiler.getLocalProfiler().stopComponentProfiler("OnTxRouting");
+
 		// add write back edges
 		graph.addWriteBackEdge();
 		
