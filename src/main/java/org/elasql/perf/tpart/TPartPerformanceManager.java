@@ -14,6 +14,7 @@ import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.agent.Agent;
 import org.elasql.perf.tpart.rl.agent.FullyOfflineAgent;
 import org.elasql.perf.tpart.rl.agent.OfflineAgent;
+import org.elasql.perf.tpart.rl.agent.OnlineAgent;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
@@ -91,8 +92,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 			return new FullyOfflineAgent();
 		case 1:
 			return new OfflineAgent();
-//		case 2:
-//			return new OnlineAgent();
+		case 2:
+			return new OnlineAgent();
 //		case 3:
 //			return new BanditAgent();
 		default:
