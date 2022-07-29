@@ -27,6 +27,7 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.MetricReport;
+import org.elasql.perf.TransactionMetricReport;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.CommitNotification;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -103,6 +104,11 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, report);
 	}
 
+	public void sendTransactionMetricReport(TransactionMetricReport report) {
+		// XXX: is vanilacomm thread safe?
+		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, report);
+	}
+
 	@Override
 	public void onServerReady() {
 		synchronized (this) {
@@ -135,6 +141,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			} else if (message instanceof MetricReport) {
 				MetricReport report = (MetricReport) message;
 				Elasql.performanceMgr().receiveMetricReport(report);
+			} else if (message instanceof TransactionMetricReport) {
+				TransactionMetricReport transactionMetricReport = (TransactionMetricReport) message;
+				Elasql.performanceMgr().receiveTransactionMetricReport(transactionMetricReport);
 			} else
 				throw new IllegalArgumentException("the sequencer doesn't know how to handle "
 						+ message);

@@ -10,7 +10,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.commons.math3.linear.ArrayRealVector;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -110,15 +112,15 @@ public class TPartScheduler extends Task implements Scheduler {
 //				}
 
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
+						task.getProcedureType() == ProcedureType.CONTROL ||
+						task.getProcedureType() == ProcedureType.BANDIT) {
 					batchedTasks.add(task);
 				}
 				
 				profiler.stopComponentProfiler("OU0 - ROUTE");
 				
 				// sink current t-graph if # pending tx exceeds threshold
-				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
-						|| !batchingEnabled) {
+				if (!batchingEnabled || batchedTasks.size() >= SCHEDULE_BATCH_SIZE) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
 				}
@@ -175,7 +177,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, null, null);
+					call.getTxNum(), call.getArrivedTime(), profiler, null, null, null);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -185,15 +187,19 @@ public class TPartScheduler extends Task implements Scheduler {
 			
 			// Take out the transaction estimation
 			TransactionEstimation estimation = null;
+			BanditTransactionContext banditTransactionContext = null;
 			if (call.getMetadata() != null) {
 				if (call.getMetadata().getClass().equals(byte[].class)) {
 					byte[] data = (byte[]) call.getMetadata();
 					estimation = TransactionEstimation.fromBytes(data);
+				} else if (call.getMetadata() instanceof ArrayRealVector) {
+					ArrayRealVector context = (ArrayRealVector) call.getMetadata();
+					banditTransactionContext = new BanditTransactionContext(call.getTxNum(), context);
 				}
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation);
+					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, banditTransactionContext);
 		}
 	}
 

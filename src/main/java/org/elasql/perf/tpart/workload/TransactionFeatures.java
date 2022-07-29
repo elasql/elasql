@@ -23,31 +23,33 @@ public class TransactionFeatures {
 		// Transaction Features:
 		// (Modify this part to add/remove features)
 		// - Transaction start time (the time entering the system)
-		featureKeys.add("Start Time");
+//		featureKeys.add("Start Time");
 		
 		// - Transaction Type Related
-		featureKeys.add("Tx Type");
+//		featureKeys.add("Tx Type");
 		
 		// Transaction Dependency
-		featureKeys.add("Dependency - Max Depth");
-		featureKeys.add("Dependency - First Layer Tx Count");
-		featureKeys.add("Dependency - Total Tx Count");
+//		featureKeys.add("Dependency - Max Depth");
+//		featureKeys.add("Dependency - First Layer Tx Count");
+//		featureKeys.add("Dependency - Total Tx Count");
 		
 		// - Number of records
 //		featureKeys.add("Number of Read Records");
 //		featureKeys.add("Number of Update Records");
-		featureKeys.add("Number of Insert Records");
+//		featureKeys.add("Number of Insert Records");
 //		featureKeys.add("Number of Fully Replicated Records");
 //		// - Data distribution
 		featureKeys.add("Remote Reads");
-		featureKeys.add("Read Data Distribution");
+//		featureKeys.add("Read Data Distribution");
 //		featureKeys.add("Read Data Distribution in Bytes");
-		featureKeys.add("Read Data in Cache Distribution");
-		featureKeys.add("Read Data with IO Distribution");
-		featureKeys.add("Update Data Distribution");
+//		featureKeys.add("Read Data in Cache Distribution");
+//		featureKeys.add("Read Data with IO Distribution");
+		featureKeys.add("Remote Writes");
+//		featureKeys.add("Update Data Distribution");
+//		featureKeys.add("Write Data Distribution");
 //
 //		// Fusion Table
-		featureKeys.add("Number of Overflows in Fusion Table");
+//		featureKeys.add("Number of Overflows in Fusion Table");
 
 //		featureKeys.add("Buffer Hit Rate");
 //		featureKeys.add("Avg Pin Count");
@@ -64,32 +66,32 @@ public class TransactionFeatures {
 //		featureKeys.add("Page GetVal Release Count");
 //		featureKeys.add("Page SetVal Release Count");
 //
-		featureKeys.add("System CPU Load");
-		featureKeys.add("Process CPU Load");
-		featureKeys.add("System Load Average");
-		featureKeys.add("Thread Active Count");
+//		featureKeys.add("System CPU Load");
+//		featureKeys.add("Process CPU Load");
+//		featureKeys.add("System Load Average");
+//		featureKeys.add("Thread Active Count");
 //
-		featureKeys.add("I/O Read Bytes");
-		featureKeys.add("I/O Write Bytes");
-		featureKeys.add("I/O Queue Length");
-		
-		featureKeys.add("Number of Read Record in Last 100 us");
-		featureKeys.add("Number of Read Record Excluding Cache in Last 100 us");
-		featureKeys.add("Number of Update Record in Last 100 us");
-		featureKeys.add("Number of Insert Record in Last 100 us");
-		featureKeys.add("Number of Commit Tx in Last 100 us");
-		
-		featureKeys.add("Number of Read Record in Last 500 us");
-		featureKeys.add("Number of Read Record Excluding Cache in Last 500 us");
-		featureKeys.add("Number of Update Record in Last 500 us");
-		featureKeys.add("Number of Insert Record in Last 500 us");
-		featureKeys.add("Number of Commit Tx in Last 500 us");
-		
-		featureKeys.add("Number of Read Record in Last 1000 us");
-		featureKeys.add("Number of Read Record Excluding Cache in Last 1000 us");
-		featureKeys.add("Number of Update Record in Last 1000 us");
-		featureKeys.add("Number of Insert Record in Last 1000 us");
-		featureKeys.add("Number of Commit Tx in Last 1000 us");
+//		featureKeys.add("I/O Read Bytes");
+//		featureKeys.add("I/O Write Bytes");
+//		featureKeys.add("I/O Queue Length");
+//
+//		featureKeys.add("Number of Read Record in Last 100 us");
+//		featureKeys.add("Number of Read Record Excluding Cache in Last 100 us");
+//		featureKeys.add("Number of Update Record in Last 100 us");
+//		featureKeys.add("Number of Insert Record in Last 100 us");
+//		featureKeys.add("Number of Commit Tx in Last 100 us");
+//
+//		featureKeys.add("Number of Read Record in Last 500 us");
+//		featureKeys.add("Number of Read Record Excluding Cache in Last 500 us");
+//		featureKeys.add("Number of Update Record in Last 500 us");
+//		featureKeys.add("Number of Insert Record in Last 500 us");
+//		featureKeys.add("Number of Commit Tx in Last 500 us");
+//
+//		featureKeys.add("Number of Read Record in Last 1000 us");
+//		featureKeys.add("Number of Read Record Excluding Cache in Last 1000 us");
+//		featureKeys.add("Number of Update Record in Last 1000 us");
+//		featureKeys.add("Number of Insert Record in Last 1000 us");
+//		featureKeys.add("Number of Commit Tx in Last 1000 us");
 //
 //		featureKeys.add("Latch Features");
 
