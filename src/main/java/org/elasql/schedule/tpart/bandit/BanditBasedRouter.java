@@ -14,7 +14,6 @@ import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
@@ -101,7 +100,6 @@ public class BanditBasedRouter implements BatchNodeInserter {
 		RealVector[] context = paramHelper.getContext();
 		LinUCB copiedModel;
 		if (LIN_UCB_TYPE == UcbType.HYBRID_LIN_UCB) {
-			context = Arrays.stream(context).map(c -> c.append(c)).toArray(RealVector[]::new);
 			copiedModel = new HybridLinUCB((HybridLinUCB) model);
 		} else {
 			copiedModel = new LinUCB(model);
