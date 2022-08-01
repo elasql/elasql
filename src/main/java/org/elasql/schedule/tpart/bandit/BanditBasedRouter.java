@@ -2,10 +2,13 @@ package org.elasql.schedule.tpart.bandit;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealVector;
+import org.elasql.perf.tpart.bandit.model.BanditModelUpdater;
 import org.elasql.perf.tpart.bandit.BanditRewardUpdateParamHelper;
 import org.elasql.perf.tpart.bandit.BanditRewardUpdateProcedure;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionArm;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
+import org.elasql.perf.tpart.bandit.model.linucb.HybridLinUCB;
+import org.elasql.perf.tpart.bandit.model.linucb.LinUCB;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -143,12 +146,12 @@ public class BanditBasedRouter implements BatchNodeInserter {
 		return arm;
 	}
 
-	enum UcbType {
+	public enum UcbType {
 		LIN_UCB,
 		HYBRID_LIN_UCB
 	}
 
-	enum OperationMode {
+	public enum OperationMode {
 		RL,
 		BOOTSTRAPPING,
 	}

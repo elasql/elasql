@@ -9,6 +9,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
+import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionArm;
+import org.elasql.perf.tpart.bandit.model.BanditModel;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
@@ -34,12 +37,13 @@ import org.vanilladb.core.server.task.Task;
 
 /**
  * A collector that collects the features of transactions.
- * 
+ *
  * @author Yu-Shan Lin
  */
 public class SpCallPreprocessor extends Task {
 
 	private final BanditTransactionDataCollector banditTransactionDataCollector;
+	private final BanditModel banditModel;
 	private BlockingQueue<StoredProcedureCall> spcQueue;
 	private FeatureExtractor featureExtractor;
 
@@ -49,8 +53,8 @@ public class SpCallPreprocessor extends Task {
 	private TGraph graph;
 	private boolean isBatching;
 	private Estimator performanceEstimator;
-	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>(); 
-	
+	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
+
 	// XXX: Cache last tx's routing destination
 	private int lastTxRoutingDest = -1;
 
@@ -59,11 +63,12 @@ public class SpCallPreprocessor extends Task {
 	private TransactionDependencyRecorder dependencyRecorder;
 	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
 
-	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
+	public SpCallPreprocessor(TPartStoredProcedureFactory factory,
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, TpartMetricWarehouse metricWarehouse,
-			Estimator performanceEstimator, BanditTransactionDataCollector banditTransactionDataCollector) {
-		
+			Estimator performanceEstimator, BanditTransactionDataCollector banditTransactionDataCollector,
+			RoutingBanditActuator routingBanditActuator) {
+
 		// For generating execution plan and sp task
 		this.factory = factory;
 		this.inserter = inserter;
@@ -85,10 +90,15 @@ public class SpCallPreprocessor extends Task {
 
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
 			BanditBasedRouter banditBasedRouter = (BanditBasedRouter) inserter;
-			((BanditBasedRouter) inserter).setBanditTransactionDataCollector(banditTransactionDataCollector);
+			banditBasedRouter.setBanditTransactionDataCollector(banditTransactionDataCollector);
+		}
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+			banditModel = new BanditModel(routingBanditActuator);
+		} else {
+			banditModel = null;
 		}
 	}
-	
+
 	public void preprocessSpCall(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall())
 			spcQueue.add(spc);
@@ -101,12 +111,12 @@ public class SpCallPreprocessor extends Task {
 
 	@Override
 	public void run() {
-		List<TPartStoredProcedureTask> batchedTasks = 
+		List<TPartStoredProcedureTask> batchedTasks =
 				new ArrayList<TPartStoredProcedureTask>();
 		List<Serializable> sendingList = new ArrayList<Serializable>();
-		
+
 		Thread.currentThread().setName("sp-call-preprocessor");
-		
+
 		while (true) {
 			try {
 				// Take a SP call
@@ -114,10 +124,10 @@ public class SpCallPreprocessor extends Task {
 
 				// Add to the sending list
 				sendingList.add(spc);
-				
+
 				// Get the read-/write-set by creating a SP task
 				TPartStoredProcedureTask task = createSpTask(spc);
-				
+
 				// Add normal SPs to the task batch
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
 						task.getProcedureType() == ProcedureType.CONTROL ||
@@ -128,13 +138,13 @@ public class SpCallPreprocessor extends Task {
 					// Add to the schedule batch
 					batchedTasks.add(task);
 				}
-				
+
 				if (sendingList.size() >= BatchSpcSender.COMM_BATCH_SIZE) {
 					// Send the SP call batch to total ordering
 					Elasql.connectionMgr().sendTotalOrderRequest(sendingList);
 					sendingList = new ArrayList<Serializable>();
 				}
-				
+
 				// Process the batch as TPartScheduler does
 				if (!isBatching || batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE) {
 					// Route the task batch
@@ -146,27 +156,34 @@ public class SpCallPreprocessor extends Task {
 			}
 		}
 	}
-	
+
 	private TPartStoredProcedureTask createSpTask(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall()) {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null);
+					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null, -1);
 		}
-		
+
 		return null;
 	}
-	
+
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		if (task.getProcedureType() == ProcedureType.CONTROL || task.getProcedureType() == ProcedureType.BANDIT){
+		if (task.getProcedureType() == ProcedureType.CONTROL){
+			return;
+		}
+		if (task.getProcedureType() == ProcedureType.BANDIT) {
+			if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+				return;
+			}
+			banditModel.receiveReward(spc.getTxNum());
 			return;
 		}
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
-		
+
 		// Record the feature if necessary
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
 				task.getProcedureType() != ProcedureType.CONTROL) {
@@ -188,13 +205,24 @@ public class SpCallPreprocessor extends Task {
 
 			banditTransactionDataCollector.addContext(banditTransactionContext);
 
-			// RealVector
 			// TODO: metadata type
 			spc.setMetadata(banditTransactionContext.getContext());
 			task.setBanditTransactionContext(banditTransactionContext);
+		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+			// Set transaction features that used in bandit
+			BanditTransactionContext banditTransactionContext = new BanditTransactionContext(task.getTxNum(), features);
+
+			int arm = banditModel.chooseArm(task.getTxNum(), banditTransactionContext.getContext());
+
+			banditTransactionDataCollector.addContext(banditTransactionContext);
+			banditTransactionDataCollector.addArm(new BanditTransactionArm(spc.getTxNum(), arm));
+
+			// TODO: metadata type
+			spc.setMetadata(arm);
+			task.setAssignedPartition(arm);
 		}
 	}
-	
+
 	private void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
@@ -210,11 +238,11 @@ public class SpCallPreprocessor extends Task {
 
 		// add write back edges
 		graph.addWriteBackEdge();
-		
+
 		// Clean up the tx nodes
 		graph.clear();
 	}
-	
+
 	private void bookKeepKeys(TPartStoredProcedureTask task) {
 		for (PrimaryKey key : task.getReadSet()) {
 			keyHasBeenRead.add(key);
