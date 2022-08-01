@@ -6,6 +6,7 @@ import org.elasql.perf.tpart.bandit.model.linucb.LinUCB;
 import org.vanilladb.core.server.task.Task;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -54,8 +55,13 @@ public class BanditModelUpdater extends Task {
 		while (true) {
 			try {
 				ModelUpdate modelUpdate = pendingModelUpdates.take();
+				RealVector[] context = modelUpdate.context;
 
-				modelUpdate.model.receiveRewards(modelUpdate.context, modelUpdate.arm, modelUpdate.reward);
+				if (modelUpdate.model.getClass().equals(HybridLinUCB.class)) {
+					context = Arrays.stream(context).map(c -> c.append(c)).toArray(RealVector[]::new);
+				}
+
+				modelUpdate.model.receiveRewards(context, modelUpdate.arm, modelUpdate.reward);
 
 				updatedModels.put(new Pair<>(modelUpdate.updateTransactionNumber, modelUpdate.model));
 			} catch (InterruptedException e) {
