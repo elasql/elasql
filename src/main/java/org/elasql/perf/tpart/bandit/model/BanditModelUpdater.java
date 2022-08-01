@@ -2,6 +2,7 @@ package org.elasql.perf.tpart.bandit.model;
 
 import org.apache.commons.math3.linear.RealVector;
 import org.apache.commons.math3.util.Pair;
+import org.elasql.perf.tpart.bandit.model.linucb.HybridLinUCB;
 import org.elasql.perf.tpart.bandit.model.linucb.LinUCB;
 import org.vanilladb.core.server.task.Task;
 
