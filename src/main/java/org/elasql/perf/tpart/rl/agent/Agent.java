@@ -1,10 +1,13 @@
 package org.elasql.perf.tpart.rl.agent;
 
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -43,7 +46,7 @@ public abstract class Agent {
 	protected TrainedAgent trainedAgent;
 
 	protected int episode = 2_000;
-	protected Memory memory = new Memory(10_000);
+	protected Memory memory = new Memory(20_000);
 	protected Trainer trainer = new Trainer();
 	protected Map<Long, float[]> cachedStates = new ConcurrentHashMap<Long, float[]>();
 	protected Map<Long, int[]> cachedRemote = new ConcurrentHashMap<Long, int[]>();
@@ -53,11 +56,18 @@ public abstract class Agent {
 	protected boolean prepared = false;
 	protected boolean firstTime = true;
 
-	private double[] loadPerPart = new double[ACTION_DIM];
-	private double[] recordPerPart = new double[ACTION_DIM];
+	private float[] loadPerPart = new float[ACTION_DIM];
+	private float[] recordPerPart = new float[ACTION_DIM];
+
+	private Queue<Integer> loadHistory;
+//	private Queue<float[]> recordHistory;
+	private static final int WINDOW_SIZE = 100;
+
+	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
 	public class Trainer extends Task {
 		private boolean train = false;
+
 		@Override
 		public void run() {
 			Thread.currentThread().setName("agent-trainer");
@@ -69,7 +79,7 @@ public abstract class Agent {
 					train = false;
 				} else {
 					try {
-						Thread.sleep(3_000);
+						Thread.sleep(5_000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -86,8 +96,10 @@ public abstract class Agent {
 
 	public Agent() {
 		loadLib();
-		Arrays.fill(loadPerPart, 0);
-		Arrays.fill(recordPerPart, 0);
+		loadHistory = new ArrayDeque<Integer>();
+//		recordHistory = new ArrayDeque<float[]>();
+//		Arrays.fill(loadPerPart, 0);
+//		Arrays.fill(recordPerPart, 0);
 	}
 
 	private void loadLib() {
@@ -124,7 +136,8 @@ public abstract class Agent {
 		if (state == null)
 			throw new RuntimeException("Cannot find cached state for tx." + txNum);
 		if (!isEval) {
-			float reward = REWARD_TYPE == 0 ? calReward(latency) : cachedReward.remove(txNum);
+			float reward = cachedReward.remove(txNum);
+			reward = REWARD_TYPE == 0 ? calReward(latency) : reward;
 			memory.setStep(txNum, state, masterId, reward, false);
 		}
 	}
@@ -153,18 +166,44 @@ public abstract class Agent {
 		return remoteEdgeCount;
 	}
 
-	public void onTxRouting(long txNum, int partId) {
-		loadPerPart[partId]++;
-		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			loadPerPart[nodeId] -= 1 / PartitionMetaMgr.NUM_PARTITIONS;
-		}
+//	public void onTxRouting(long txNum, int partId) {
+//		loadPerPart[partId]++;
+//		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+//			loadPerPart[nodeId] -= 1 / PartitionMetaMgr.NUM_PARTITIONS;
+//		}
+//
+//		float[] txWriteSet = cachedStates.get(txNum);
+//		recordPerPart[partId] += txWriteSet[partId];
+//
+//		if (!isEval) {
+////			System.out.println(calReward());
+//			cachedReward.put(txNum, calReward(txNum, partId, txWriteSet));
+//		}
+//	}
 
-		float[] txWriteSet = cachedStates.get(txNum);
-		recordPerPart[partId] += txWriteSet[partId];
+	public void onTxRouting(long txNum, int partId) {
+		loadHistory.add(partId);
+
+		if (loadHistory.size() > WINDOW_SIZE)
+			loadHistory.remove();
+
+		float[] state = cachedStates.get(txNum);
+
+		// record history
+//		float[] writeSet = new float[ACTION_DIM];
+//		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
+//			if(nodeId != partId) {
+//				writeSet[partId] += state[nodeId];
+//			}
+//		}
+//		recordHistory.add(writeSet);
+//
+//		if (recordHistory.size() > WINDOW_SIZE)
+//			recordHistory.remove();
 
 		if (!isEval) {
 //			System.out.println(calReward());
-			cachedReward.put(txNum, calReward(txNum, partId, txWriteSet));
+			cachedReward.put(txNum, calReward(txNum, partId, state));
 		}
 	}
 
@@ -178,19 +217,38 @@ public abstract class Agent {
 		}
 
 		// Tx distribution
-		long txCount = task.getTxNum() + 1;
-		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
-			state[nodeId + ACTION_DIM] = (float) (loadPerPart[nodeId] / txCount) > 0.5? 1:0;
+//		long txCount = task.getTxNum() + 1;
+//		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
+//			state[nodeId + ACTION_DIM] = (float) (loadPerPart[nodeId] / txCount) > 0.5? 1:0;
+//		}
+		loadPerPart = new float[ACTION_DIM];
+		for (int load : loadHistory) {
+			loadPerPart[load] += 1;
 		}
-
+		float load = 0.0f;
+		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
+			load = (float) (loadPerPart[nodeId] / loadHistory.size());
+			state[nodeId + ACTION_DIM] = load > 0.5 ? 1 : load < 0.3 ? -1 : 0;
+		}
 		// node written record distribution
-		float writtenCount = 0.0f;
-		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
-			writtenCount += recordPerPart[nodeId];
-		}
-		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
-			state[nodeId + ACTION_DIM + ACTION_DIM] = (float) (recordPerPart[nodeId] / writtenCount) > 0.5? 1:0;
-		}
+//		float writtenCount = 0.0f;
+//		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
+//			writtenCount += recordPerPart[nodeId];
+//		}
+//		for (int nodeId = 0; nodeId < ACTION_DIM; nodeId++) {
+//			state[nodeId + ACTION_DIM + ACTION_DIM] = (float) (recordPerPart[nodeId] / writtenCount) > 0.5? 1:0;
+//		}
+//		float writtenCount = 0.0f;
+//		recordPerPart = new float[ACTION_DIM];
+//		for (float[] records : recordHistory) {
+//			for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+//				recordPerPart[nodeId] += records[nodeId];
+//				writtenCount += records[nodeId];
+//			}
+//		}
+//		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
+//			state[nodeId + ACTION_DIM + ACTION_DIM] = (float) (recordPerPart[nodeId] / writtenCount) > 0.5? 1:0;
+//		}
 
 		// node's CPU state
 //		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
@@ -219,10 +277,9 @@ public abstract class Agent {
 	protected abstract void prepareAgent();
 
 	protected void updateAgent(int episode) {
-		long startTrainTime = System.nanoTime();
 		while (episode > 0) {
-			try (NDManager submanager = NDManager.newBaseManager().newSubManager()) {
-				agent.updateModel(submanager);
+			try {
+				agent.updateModel();
 //				if (episode == 1) {
 //					System.out.print("RL model loss: ");
 //					System.out.println(agent.updateModel(submanager).toString());
@@ -236,7 +293,13 @@ public abstract class Agent {
 		if (logger.isLoggable(Level.INFO))
 			logger.info(String.format("Training finished!!"));
 //		trainedAgent = new TrainedBCQ();
-		trainedAgent.setPredictor(agent.takeoutPredictor(), ((OfflineBCQ) agent).takeoutImitationPredictor());
+		lock.writeLock().lock();
+		try {
+			trainedAgent.setPredictor(agent.takeoutPredictor(), ((OfflineBCQ) agent).takeoutImitationPredictor());
+		} finally {
+			lock.writeLock().unlock();
+		}
+
 		if (!prepared) {
 			prepared = true;
 		}
@@ -276,18 +339,16 @@ public abstract class Agent {
 				maxRecordCount = state[nodeId];
 		}
 		float readRecordScore = state[partId] / maxRecordCount;
-		readRecordScore = (float) Math.pow(2, readRecordScore);
+//		readRecordScore = (float) Math.pow(2, readRecordScore);
 
 		// Load balancing score
 		float loadBalScore = 1 - state[partId + ACTION_DIM];
-		
 
 		// Record balancing score
-		float recordBalScore = 1 - state[partId + ACTION_DIM + ACTION_DIM];
-		
+//		float recordBalScore = 1 - state[partId + ACTION_DIM + ACTION_DIM];
 
 //				float reward = readRecordScore * 0.5f + loadBalScore * 0.5f;
-		float reward = readRecordScore + loadBalScore + recordBalScore - 1.0f;
+		float reward = readRecordScore + loadBalScore;
 
 		return reward;
 	}
