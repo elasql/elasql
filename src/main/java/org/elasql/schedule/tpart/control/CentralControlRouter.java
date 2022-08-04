@@ -14,8 +14,8 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class ControlBasedRouter implements BatchNodeInserter {
-	private static Logger logger = Logger.getLogger(ControlBasedRouter.class.getName());
+public class CentralControlRouter implements BatchNodeInserter {
+	private static Logger logger = Logger.getLogger(CentralControlRouter.class.getName());
 	
 	private static final double LATENCY_EXP = 1.0;
 	private static final double TIE_CLOSENESS = 0.01; // 1%. Note that scores are in 0 ~ 1
@@ -30,7 +30,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 	private long lastReportTime = -1;
 	private int[] assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 	
-	public ControlBasedRouter() {
+	public CentralControlRouter() {
 		paramAlpha = new double[PartitionMetaMgr.NUM_PARTITIONS];
 		Arrays.fill(paramAlpha, 1.0);
 		paramBeta = new double[PartitionMetaMgr.NUM_PARTITIONS];
@@ -43,9 +43,9 @@ public class ControlBasedRouter implements BatchNodeInserter {
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
 		for (TPartStoredProcedureTask task : tasks) {
 			if (task.getProcedure().getClass().equals(ControlParamUpdateProcedure.class)) {
-				ControlParamUpdateProcedure procedure = 
-						(ControlParamUpdateProcedure) task.getProcedure();
-				updateParameters(procedure.getParamHelper());
+//				ControlParamUpdateProcedure procedure = 
+//						(ControlParamUpdateProcedure) task.getProcedure();
+//				updateParameters(procedure.getParamHelper());
 			} else {
 				insert(graph, task);
 
@@ -104,6 +104,7 @@ public class ControlBasedRouter implements BatchNodeInserter {
 	
 	private double calculateRoutingScore(TransactionEstimation estimation, int masterId) {
 		double latency = estimation.estimateLatency(masterId);
+		latency /= 1000_000; // translate to seconds
 		double e = Math.pow(1 / latency, LATENCY_EXP);
 		double cpuFactor = estimation.estimateMasterCpuCost(masterId) -
 				estimation.estimateSlaveCpuCost(masterId);
