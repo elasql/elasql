@@ -9,12 +9,12 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class BanditTransactionContext implements Serializable {
-	public static final int NUMBER_OF_CONTEXT = PartitionMetaMgr.NUM_PARTITIONS;
+	public static final int NUMBER_OF_CONTEXT = PartitionMetaMgr.NUM_PARTITIONS * 2;
 	private static final long serialVersionUID = 1;
 	private final long txNum;
 	private final ArrayRealVector context;
 
-	public BanditTransactionContext(long txNum, TransactionFeatures transactionFeatures) {
+	public BanditTransactionContext(long txNum, TransactionFeatures transactionFeatures, int[] machineLoad) {
 		double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Reads")).mapToDouble((v) -> v).toArray();
 		double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Writes")).mapToDouble((v) -> v).toArray();
 		normalize(readDataDistributions);
@@ -22,7 +22,9 @@ public class BanditTransactionContext implements Serializable {
 		for (int i = 0; i < readDataDistributions.length; i++) {
 			readDataDistributions[i] = readDataDistributions[i] * 0.5 + writeDataDistributions[i] * 0.5;
 		}
-		this.context = new ArrayRealVector(readDataDistributions, false);
+		double[] normalizedLoad = Arrays.stream(machineLoad).mapToDouble(v -> v).toArray();
+		normalize(normalizedLoad);
+		this.context = new ArrayRealVector(readDataDistributions, normalizedLoad);
 		this.txNum = txNum;
 	}
 
@@ -41,6 +43,9 @@ public class BanditTransactionContext implements Serializable {
 
 	private void normalize(double[] array) {
 		double sum = Arrays.stream(array).sum();
+		if (sum == 0) {
+			return;
+		}
 		for (int i = 0; i < array.length; i++) {
 			array[i] /= sum;
 		}

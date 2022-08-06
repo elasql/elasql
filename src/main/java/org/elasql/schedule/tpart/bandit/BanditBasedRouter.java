@@ -6,6 +6,7 @@ import org.elasql.perf.tpart.bandit.model.BanditModelUpdater;
 import org.elasql.perf.tpart.bandit.BanditRewardUpdateParamHelper;
 import org.elasql.perf.tpart.bandit.BanditRewardUpdateProcedure;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionArm;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContextFactory;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.bandit.model.linucb.HybridLinUCB;
 import org.elasql.perf.tpart.bandit.model.linucb.LinUCB;
@@ -44,6 +45,7 @@ public class BanditBasedRouter implements BatchNodeInserter {
 
 	private LinUCB model;
 	private BanditTransactionDataCollector banditTransactionDataCollector;
+	private BanditTransactionContextFactory banditTransactionContextFactory;
 	private BatchNodeInserter boostrapInserter;
 	private final BanditModelUpdater banditModelUpdater;
 
@@ -89,12 +91,19 @@ public class BanditBasedRouter implements BatchNodeInserter {
 				if (banditTransactionDataCollector != null) {
 					banditTransactionDataCollector.addArm(new BanditTransactionArm(transactionNumber, arm));
 				}
+				if (banditTransactionContextFactory != null) {
+					banditTransactionContextFactory.addArm(arm);
+				}
 			}
 		}
 	}
 
 	public void setBanditTransactionDataCollector(BanditTransactionDataCollector banditTransactionDataCollector) {
 		this.banditTransactionDataCollector = banditTransactionDataCollector;
+	}
+
+	public void setBanditTransactionContextFactory(BanditTransactionContextFactory banditTransactionContextFactory) {
+		this.banditTransactionContextFactory = banditTransactionContextFactory;
 	}
 
 	private void receiveReward(BanditRewardUpdateParamHelper paramHelper, long transactionNumber) {
