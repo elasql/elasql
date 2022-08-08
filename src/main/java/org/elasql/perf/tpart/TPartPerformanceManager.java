@@ -46,7 +46,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
 				metricWarehouse, newEstimator(), banditTransactionDataCollector, routingBanditActuator,
-				banditTransactionContextFactory);
+				banditTransactionContextFactory, routingBanditActuator);
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
@@ -97,7 +97,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	private static BanditTransactionContextFactory newBanditTransactionContextFactory() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
+				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			return new BanditTransactionContextFactory();
 		}
 
