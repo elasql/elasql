@@ -112,6 +112,7 @@ public class SpCallPreprocessor extends Task {
 	public void onTransactionCommit(long txNum, int masterId) {
 		featureExtractor.onTransactionCommit(txNum);
 		timeRelatedFeatureMgr.onTxCommit(masterId);
+		banditTransactionContextFactory.removePartitionLoad(masterId);
 	}
 
 	@Override
@@ -224,7 +225,7 @@ public class SpCallPreprocessor extends Task {
 			banditTransactionDataCollector.addContext(banditTransactionContext);
 			banditTransactionDataCollector.addArm(new BanditTransactionArm(spc.getTxNum(), arm));
 
-			banditTransactionContextFactory.addArm(arm);
+			banditTransactionContextFactory.addPartitionLoad(arm);
 
 			// TODO: metadata type
 			spc.setMetadata(arm);
