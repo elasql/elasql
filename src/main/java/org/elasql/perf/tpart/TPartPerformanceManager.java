@@ -40,8 +40,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
 
-		BanditTransactionDataCollector banditTransactionDataCollector = newBanditTransactionCollector();
 		RoutingBanditActuator routingBanditActuator = newAndRunRoutingBanditActuator();
+		BanditTransactionDataCollector banditTransactionDataCollector = newBanditTransactionCollector();
 		BanditTransactionContextFactory banditTransactionContextFactory = newBanditTransactionContextFactory();
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,

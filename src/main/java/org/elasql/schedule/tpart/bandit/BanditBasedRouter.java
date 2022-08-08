@@ -92,7 +92,7 @@ public class BanditBasedRouter implements BatchNodeInserter {
 					banditTransactionDataCollector.addArm(new BanditTransactionArm(transactionNumber, arm));
 				}
 				if (banditTransactionContextFactory != null) {
-					banditTransactionContextFactory.addArm(arm);
+					banditTransactionContextFactory.addPartitionLoad(arm);
 				}
 			}
 		}
