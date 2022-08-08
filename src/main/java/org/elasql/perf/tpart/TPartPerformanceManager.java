@@ -40,24 +40,27 @@ public class TPartPerformanceManager implements PerformanceManager {
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
 
+		RoutingBanditActuator routingBanditActuator = newAndRunRoutingBanditActuator();
 		BanditTransactionDataCollector banditTransactionDataCollector = newBanditTransactionCollector();
 		BanditTransactionContextFactory banditTransactionContextFactory = newBanditTransactionContextFactory();
+
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator(), banditTransactionDataCollector, banditTransactionContextFactory);
+				metricWarehouse, newEstimator(), banditTransactionDataCollector, routingBanditActuator,
+				banditTransactionContextFactory);
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
-		RoutingControlActuator actuator = null;
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
-			actuator = new RoutingControlActuator(metricWarehouse);
+			RoutingControlActuator actuator = new RoutingControlActuator(metricWarehouse);
 			Elasql.taskMgr().runTask(actuator);
-		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
-			RoutingBanditActuator routingBanditActuator = new RoutingBanditActuator();
-			Elasql.taskMgr().runTask(routingBanditActuator);
-			return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, banditTransactionDataCollector, routingBanditActuator);
+			return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, actuator);
+		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
+				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+			return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, banditTransactionDataCollector,
+					routingBanditActuator);
 		}
 
-		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, actuator);
+		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, null);
 	}
 
 	public static TPartPerformanceManager newForDbServer() {
@@ -85,7 +88,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	private static BanditTransactionDataCollector newBanditTransactionCollector() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
+				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			return new BanditTransactionDataCollector();
 		}
 
@@ -93,11 +97,23 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	private static BanditTransactionContextFactory newBanditTransactionContextFactory() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
+				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			return new BanditTransactionContextFactory();
 		}
 
 		return null;
+	}
+
+	private static RoutingBanditActuator newAndRunRoutingBanditActuator() {
+		RoutingBanditActuator routingBanditActuator = null;
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
+				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+			routingBanditActuator = new RoutingBanditActuator();
+			Elasql.taskMgr().runTask(routingBanditActuator);
+		}
+
+		return routingBanditActuator;
 	}
 
 	// On the sequencer

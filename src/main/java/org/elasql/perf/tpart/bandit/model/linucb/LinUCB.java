@@ -16,7 +16,7 @@
     Contact: https://github.com/thunfischtoast or christian.roemer[at]udo.edu
 */
 
-package org.elasql.schedule.tpart.bandit;
+package org.elasql.perf.tpart.bandit.model.linucb;
 
 import org.apache.commons.math3.linear.*;
 

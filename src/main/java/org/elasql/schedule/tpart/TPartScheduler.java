@@ -1,6 +1,7 @@
 package org.elasql.schedule.tpart;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -181,7 +182,8 @@ public class TPartScheduler extends Task implements Scheduler {
 			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, null, null, null);
+					call.getTxNum(), call.getArrivedTime(), profiler, null, null, null,
+					-1);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -192,18 +194,23 @@ public class TPartScheduler extends Task implements Scheduler {
 			// Take out the transaction estimation
 			TransactionEstimation estimation = null;
 			BanditTransactionContext banditTransactionContext = null;
-			if (call.getMetadata() != null) {
-				if (call.getMetadata().getClass().equals(byte[].class)) {
-					byte[] data = (byte[]) call.getMetadata();
+			int assignedPartition = -1;
+			Serializable metadata = call.getMetadata();
+			if (metadata != null) {
+				if (metadata.getClass().equals(byte[].class)) {
+					byte[] data = (byte[]) metadata;
 					estimation = TransactionEstimation.fromBytes(data);
-				} else if (call.getMetadata() instanceof ArrayRealVector) {
-					ArrayRealVector context = (ArrayRealVector) call.getMetadata();
+				} else if (metadata instanceof ArrayRealVector) {
+					ArrayRealVector context = (ArrayRealVector) metadata;
 					banditTransactionContext = new BanditTransactionContext(call.getTxNum(), context);
+				} else if (metadata.getClass().equals(Integer.class)) {
+					assignedPartition = (int) metadata;
 				}
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, banditTransactionContext);
+					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, banditTransactionContext,
+					assignedPartition);
 		}
 	}
 
