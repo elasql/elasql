@@ -59,7 +59,7 @@ public class MetricCollector extends Task {
 				startTime = System.nanoTime();
 
 				// Read disk info
-				initDiskStore();
+				updateDiskStore();
 
 				// Collect the metrics
 				TPartSystemMetrics metrics = collectSystemMetrics();
@@ -83,10 +83,11 @@ public class MetricCollector extends Task {
 		os = si.getOperatingSystem();
 		HardwareAbstractionLayer hal = si.getHardware();
 		cpu = hal.getProcessor();
+		hwds = new SystemInfo().getHardware().getDiskStores().get(0);
 	}
 
-	private void initDiskStore() {
-		hwds = new SystemInfo().getHardware().getDiskStores().get(0);
+	private void updateDiskStore() {
+		hwds.updateAttributes();
 	}
 
 	private TPartSystemMetrics collectSystemMetrics() {

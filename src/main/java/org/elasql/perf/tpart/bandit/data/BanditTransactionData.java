@@ -1,9 +1,10 @@
 package org.elasql.perf.tpart.bandit.data;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
-import org.apache.commons.math3.linear.RealVector;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 public class BanditTransactionData implements Serializable {
 	private final ArrayRealVector context;
@@ -35,9 +36,9 @@ public class BanditTransactionData implements Serializable {
 	}
 
 	public static class Builder {
-		private BanditTransactionContext banditTransactionContext;
-		private BanditTransactionReward banditTransactionReward;
-		private BanditTransactionArm banditTransactionArm;
+		private volatile BanditTransactionContext banditTransactionContext;
+		private volatile BanditTransactionReward banditTransactionReward;
+		private volatile BanditTransactionArm banditTransactionArm;
 
 		public Builder() {
 
@@ -55,13 +56,26 @@ public class BanditTransactionData implements Serializable {
 			this.banditTransactionArm = banditTransactionArm;
 		}
 
-		public boolean isReadyToBuild() {
-			return banditTransactionContext != null && banditTransactionReward != null && banditTransactionArm != null;
+		public List<String> missingComponents() {
+			ArrayList<String> missingComponents = new ArrayList<>();
+			if (banditTransactionContext == null) {
+				missingComponents.add("banditTransactionContext");
+			}
+			if (banditTransactionArm == null) {
+				missingComponents.add("banditTransactionArm");
+			}
+			if (banditTransactionReward == null) {
+				missingComponents.add("banditTransactionReward");
+			}
+			return missingComponents;
 		}
 
 		public BanditTransactionData build() {
-			if (!isReadyToBuild()) {
-				throw new RuntimeException("BanditTransactionData is not ready to build yet");
+			List<String> missingComponents = missingComponents();
+			if (!missingComponents.isEmpty()) {
+				throw new RuntimeException(
+						String.format("BanditTransactionData is not ready to build yet. %s are missing.",
+								missingComponents));
 			}
 			if (banditTransactionContext.getTransactionNumber() != banditTransactionReward.getTransactionNumber() || banditTransactionReward.getTransactionNumber() != banditTransactionArm.getTransactionNumber()) {
 				throw new RuntimeException("Cannot build BanditTransactionData: transaction number does not match");

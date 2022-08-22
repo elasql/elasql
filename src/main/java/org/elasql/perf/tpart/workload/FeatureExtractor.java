@@ -401,6 +401,7 @@ public class FeatureExtractor {
 		case LEAP:
 		case HERMES_CONTROL:
 		case HERMES_BANDIT:
+		case HERMES_BANDIT_SEQUENCER:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			for (PrimaryKey key : keys) {
 				int partId = fusionTGraph.getCachedLocation(key);
@@ -425,6 +426,7 @@ public class FeatureExtractor {
 		case LEAP:
 		case HERMES_CONTROL:
 		case HERMES_BANDIT:
+		case HERMES_BANDIT_SEQUENCER:
 			for (PrimaryKey key : keys) {
 				if (!keyHasBeenRead.contains(key) ) {
 					counts += 1;
@@ -443,6 +445,7 @@ public class FeatureExtractor {
 		case LEAP:
 		case HERMES_CONTROL:
 		case HERMES_BANDIT:
+		case HERMES_BANDIT_SEQUENCER:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			return fusionTGraph.getFusionTableOverflowCount();
 		default:
