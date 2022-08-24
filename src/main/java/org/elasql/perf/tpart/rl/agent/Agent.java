@@ -1,22 +1,18 @@
 package org.elasql.perf.tpart.rl.agent;
 
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.model.BaseAgent;
 import org.elasql.perf.tpart.rl.model.OfflineBCQ;
 import org.elasql.perf.tpart.rl.model.TrainedAgent;
-import org.elasql.perf.tpart.rl.model.TrainedBCQ;
 import org.elasql.perf.tpart.rl.util.Memory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -25,7 +21,6 @@ import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
-import org.vanilladb.core.util.TimerStatistics;
 
 import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
@@ -97,9 +92,6 @@ public abstract class Agent {
 	public Agent() {
 		loadLib();
 		loadHistory = new ArrayDeque<Integer>();
-//		recordHistory = new ArrayDeque<float[]>();
-//		Arrays.fill(loadPerPart, 0);
-//		Arrays.fill(recordPerPart, 0);
 	}
 
 	private void loadLib() {
@@ -278,12 +270,8 @@ public abstract class Agent {
 
 	protected void updateAgent(int episode) {
 		while (episode > 0) {
-			try {
-				agent.updateModel();
-//				if (episode == 1) {
-//					System.out.print("RL model loss: ");
-//					System.out.println(agent.updateModel(submanager).toString());
-//				}
+			try (NDManager submanager = NDManager.newBaseManager().newSubManager()) {
+				agent.updateModel(submanager);
 			} catch (TranslateException e) {
 				e.printStackTrace();
 			}
@@ -292,7 +280,6 @@ public abstract class Agent {
 		}
 		if (logger.isLoggable(Level.INFO))
 			logger.info(String.format("Training finished!!"));
-//		trainedAgent = new TrainedBCQ();
 		lock.writeLock().lock();
 		try {
 			trainedAgent.setPredictor(agent.takeoutPredictor(), ((OfflineBCQ) agent).takeoutImitationPredictor());
@@ -303,7 +290,6 @@ public abstract class Agent {
 		if (!prepared) {
 			prepared = true;
 		}
-//		System.out.println("Train time:" + (System.nanoTime() - startTrainTime));
 	}
 
 	private float calReward() {
