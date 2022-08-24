@@ -278,8 +278,9 @@ public abstract class Agent {
 
 	protected void updateAgent(int episode) {
 		while (episode > 0) {
-			try {
-				agent.updateModel();
+			try (NDManager submanager = NDManager.newBaseManager().newSubManager()) {
+				agent.updateModel(submanager);
+
 //				if (episode == 1) {
 //					System.out.print("RL model loss: ");
 //					System.out.println(agent.updateModel(submanager).toString());
