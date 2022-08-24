@@ -10,9 +10,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionArm;
+import org.elasql.perf.tpart.bandit.data.*;
 import org.elasql.perf.tpart.bandit.model.BanditModel;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContextFactory;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
@@ -43,7 +44,9 @@ import org.vanilladb.core.server.task.Task;
 public class SpCallPreprocessor extends Task {
 
 	private final BanditTransactionDataCollector banditTransactionDataCollector;
+	private final BanditTransactionContextFactory banditTransactionContextFactory;
 	private final BanditModel banditModel;
+	private final RoutingBanditActuator banditActuator;
 	private BlockingQueue<StoredProcedureCall> spcQueue;
 	private FeatureExtractor featureExtractor;
 
@@ -64,10 +67,12 @@ public class SpCallPreprocessor extends Task {
 	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
 
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory,
-			BatchNodeInserter inserter, TGraph graph,
-			boolean isBatching, TpartMetricWarehouse metricWarehouse,
-			Estimator performanceEstimator, BanditTransactionDataCollector banditTransactionDataCollector,
-			RoutingBanditActuator routingBanditActuator) {
+							  BatchNodeInserter inserter, TGraph graph,
+							  boolean isBatching, TpartMetricWarehouse metricWarehouse,
+							  Estimator performanceEstimator, BanditTransactionDataCollector banditTransactionDataCollector,
+							  RoutingBanditActuator routingBanditActuator,
+							  BanditTransactionContextFactory banditTransactionContextFactory,
+							  RoutingBanditActuator banditActuator) {
 
 		// For generating execution plan and sp task
 		this.factory = factory;
@@ -75,8 +80,10 @@ public class SpCallPreprocessor extends Task {
 		this.graph = graph;
 		this.isBatching = isBatching;
 		this.performanceEstimator = performanceEstimator;
+		this.banditActuator = banditActuator;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		this.banditTransactionDataCollector = banditTransactionDataCollector;
+		this.banditTransactionContextFactory = banditTransactionContextFactory;
 
 		// For collecting features
 		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
@@ -91,6 +98,7 @@ public class SpCallPreprocessor extends Task {
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
 			BanditBasedRouter banditBasedRouter = (BanditBasedRouter) inserter;
 			banditBasedRouter.setBanditTransactionDataCollector(banditTransactionDataCollector);
+			banditBasedRouter.setBanditTransactionContextFactory(banditTransactionContextFactory);
 		}
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			banditModel = new BanditModel(routingBanditActuator);
@@ -107,6 +115,7 @@ public class SpCallPreprocessor extends Task {
 	public void onTransactionCommit(long txNum, int masterId) {
 		featureExtractor.onTransactionCommit(txNum);
 		timeRelatedFeatureMgr.onTxCommit(masterId);
+		banditTransactionContextFactory.removePartitionLoad(masterId);
 	}
 
 	@Override
@@ -201,7 +210,8 @@ public class SpCallPreprocessor extends Task {
 		// Bandit has no performanceEstimator
 		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
 			// Set transaction features that used in bandit
-			BanditTransactionContext banditTransactionContext = new BanditTransactionContext(task.getTxNum(), features);
+			BanditTransactionContext banditTransactionContext =
+					banditTransactionContextFactory.buildContext(task.getTxNum(), features);
 
 			banditTransactionDataCollector.addContext(banditTransactionContext);
 
@@ -210,12 +220,21 @@ public class SpCallPreprocessor extends Task {
 			task.setBanditTransactionContext(banditTransactionContext);
 		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			// Set transaction features that used in bandit
-			BanditTransactionContext banditTransactionContext = new BanditTransactionContext(task.getTxNum(), features);
+			BanditTransactionContext banditTransactionContext =
+					banditTransactionContextFactory.buildContext(task.getTxNum(), features);
 
 			int arm = banditModel.chooseArm(task.getTxNum(), banditTransactionContext.getContext());
 
 			banditTransactionDataCollector.addContext(banditTransactionContext);
 			banditTransactionDataCollector.addArm(new BanditTransactionArm(spc.getTxNum(), arm));
+
+			banditTransactionContextFactory.addPartitionLoad(arm);
+
+			double reward = calculateReward(features, arm);
+
+			BanditTransactionReward banditTransactionReward = new BanditTransactionReward(task.getTxNum(), reward);
+			banditActuator.addTransactionData(
+					banditTransactionDataCollector.addRewardAndTakeOut(banditTransactionReward));
 
 			// TODO: metadata type
 			spc.setMetadata(arm);
@@ -247,5 +266,22 @@ public class SpCallPreprocessor extends Task {
 		for (PrimaryKey key : task.getReadSet()) {
 			keyHasBeenRead.add(key);
 		}
+	}
+
+	private double calculateReward(TransactionFeatures features, int arm) {
+		Integer[] readDataDistributions = (Integer[]) features.getFeature("Remote Reads");
+		Integer[] writeDataDistributions = (Integer[]) features.getFeature("Remote Writes");
+
+		int readWriteCount = 0;
+		for (int i = 0; i < readDataDistributions.length; i++) {
+			readWriteCount += readDataDistributions[i] + writeDataDistributions[i];
+		}
+
+		double reward = 0.5;
+
+		reward += 0.5 * ((double) (readDataDistributions[arm] + writeDataDistributions[arm]) / (double) readWriteCount);
+		reward -= 0.5 * banditTransactionContextFactory.getPartitionLoad(arm);
+
+		return reward;
 	}
 }

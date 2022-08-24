@@ -5,7 +5,6 @@ import java.util.Set;
 
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
@@ -92,13 +91,6 @@ public class TPartStoredProcedureTask
 			// For Debugging
 //			timer.addToGlobalStatistics();
 
-			if (Elasql.SERVICE_TYPE.equals(Elasql.ServiceType.HERMES_BANDIT) ||
-					Elasql.SERVICE_TYPE.equals(Elasql.ServiceType.HERMES_BANDIT_SEQUENCER)) {
-				// TODO: use reciprocal of the latency as the reward for now
-				double reward = 10 * 1./ (double) (profiler.getExecutionTime() -
-						profiler.getComponentTime("OU0 - Dispatch to router"));
-				Elasql.connectionMgr().sendTransactionMetricReport(new BanditTransactionReward(txNum, reward));
-			}
 		}
 
 		if (Elasql.performanceMgr() != null) {
