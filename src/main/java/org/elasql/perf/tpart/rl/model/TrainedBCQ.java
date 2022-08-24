@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Random;
 
+import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.rl.util.ActionSampler;
 
 import ai.djl.inference.Predictor;
@@ -19,6 +20,7 @@ public class TrainedBCQ extends TrainedAgent{
 	protected NDManager manager;
 	protected Predictor<NDList, NDList> target_predictor;
 	protected Predictor<NDList, NDList> imitation_predictor;
+	private float epsilon = 0.1f;
 
     private HashMap<Integer, Integer> stateActionMap = new HashMap<Integer, Integer>();
 
@@ -47,15 +49,15 @@ public class TrainedBCQ extends TrainedAgent{
     }
     
     private int getAction(NDManager manager, float[] state) throws TranslateException { 
-    	NDArray imitation = imitation_predictor.predict(new NDList(manager.create(state))).singletonOrThrow();
-    	imitation = imitation.softmax(-1);
+    	
     	NDArray score = target_predictor.predict(new NDList(manager.create(state))).singletonOrThrow();
-    	int action = ActionSampler.greedy(score, imitation);
+    	int action;
+    	if(TPartPerformanceManager.RL_TYPE!=2) {
+    		NDArray imitation = imitation_predictor.predict(new NDList(manager.create(state))).singletonOrThrow();
+        	imitation = imitation.softmax(-1);
+        	action = ActionSampler.greedy(score, imitation);
+    	} else 
+    		action = ActionSampler.epsilonGreedy(score, random, epsilon);
         return action;
     }
-
-	@Override
-	public void setPredictor(Predictor<NDList, NDList> target_predictor) {
-		throw new UnsupportedOperationException();
-	}
 }
