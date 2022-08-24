@@ -8,17 +8,19 @@ import org.elasql.util.ElasqlProperties;
 import ai.djl.ndarray.NDArray;
 
 public final class ActionSampler {
-	
+
 	private final static double THRESHOLD;
-	static {  
-		THRESHOLD = ElasqlProperties.getLoader().getPropertyAsDouble( 
-				ActionSampler.class.getName() + ".THRESHOLD", 0.5);
+	static {
+		THRESHOLD = ElasqlProperties.getLoader().getPropertyAsDouble(ActionSampler.class.getName() + ".THRESHOLD", 0.5);
 	}
-	
+
+	public static int random(Random random) {
+		return random.nextInt(Agent.ACTION_DIM);
+	}
+
 	public static int epsilonGreedy(NDArray distribution, Random random, float epsilon) {
 		if (random.nextFloat() < epsilon) {
 			return random.nextInt((int) distribution.size());
-
 		} else {
 			return greedy(distribution);
 		}
@@ -26,10 +28,6 @@ public final class ActionSampler {
 
 	public static int greedy(NDArray distribution) {
 		return (int) distribution.argMax().getLong();
-	}
-	
-	public static int greedy(NDArray distribution, NDArray imitation) {
-		return greedy(distribution, imitation, THRESHOLD);
 	}
 
 	public static int epsilonGreedy(NDArray distribution, NDArray imitation, Random random, float epsilon) {
@@ -40,19 +38,15 @@ public final class ActionSampler {
 			return greedy(distribution, imitation, THRESHOLD);
 		}
 	}
-	
-	public static int random(Random random) {
-		return random.nextInt(Agent.ACTION_DIM);
-	}
 
 	private static int greedy(NDArray distribution, NDArray imitation, double threshold) {
-		// Select the actions > threshold
-		// imt = (imt/imt.max(1, keepdim=True)[0] > self.threshold).float()
-		// Choose the max
-		// int((imt * q + (1. - imt) * -1e8).argmax(1))
 		NDArray result = imitation.gte(imitation.max().toFloatArray()[0] * threshold);
 		distribution = result.mul(distribution);
 		return (int) distribution.argMax().getLong();
+	}
+
+	public static int greedy(NDArray distribution, NDArray imitation) {
+		return greedy(distribution, imitation, THRESHOLD);
 	}
 
 	public static int sampleMultinomial(NDArray distribution, Random random) {
