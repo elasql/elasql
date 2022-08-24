@@ -14,8 +14,6 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class OfflineAgent extends Agent {
 	private static Logger logger = Logger.getLogger(OfflineAgent.class.getName());
 
-	private long startTrainTxNum = 100_000;
-
 	public int react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		float[] state = prepareState(graph, task, metricWarehouse);
 
@@ -39,9 +37,9 @@ public class OfflineAgent extends Agent {
 		agent = new OfflineBCQ(64, 32, 32, 0.99f, 0.001f, memory);
 		Elasql.taskMgr().runTask(trainer);
 		trainedAgent = new TrainedBCQ();
+		
+		startTrainTxNum = 100_000;
+		trainingPeriod = 5_000;
 	}
 	
-	private boolean isTrainTxNum(long txNum) {
-		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % 5_000 == 0;
-	}
 }

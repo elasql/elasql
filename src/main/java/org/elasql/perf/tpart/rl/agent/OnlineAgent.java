@@ -16,8 +16,7 @@ import org.vanilladb.core.util.TransactionProfiler;
 public class OnlineAgent extends Agent {
 	private static Logger logger = Logger.getLogger(OnlineAgent.class.getName());
 	private final Random random = new Random(0);
-	private long startTrainTxNum = 30_000;
-
+	
 	public OnlineAgent() {
 		prepareAgent();
 	}
@@ -29,7 +28,6 @@ public class OnlineAgent extends Agent {
 		cacheTxState(task.getTxNum(), state);
 		
 		if (isTrainTxNum(task.getTxNum())) {
-
 			TransactionProfiler.getLocalProfiler().startComponentProfiler("Train");
 			train();
 			TransactionProfiler.getLocalProfiler().stopComponentProfiler("Train");
@@ -48,14 +46,13 @@ public class OnlineAgent extends Agent {
 		agent = new OfflineBCQ(64, 32, 32, 0.99f, 0.001f, memory);
 		Elasql.taskMgr().runTask(trainer);
 		trainedAgent = new TrainedBCQ();
+		
+		startTrainTxNum = 30_000;
+		trainingPeriod = 5_000;
 	}
 	
 	@Override
 	public void train() {
 		trainer.train();
-	}
-
-	private boolean isTrainTxNum(long txNum) {
-		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % 5_000 == 0;
 	}
 }

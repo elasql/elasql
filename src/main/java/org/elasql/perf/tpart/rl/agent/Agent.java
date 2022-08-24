@@ -57,6 +57,9 @@ public abstract class Agent {
 	private Queue<Integer> loadHistory;
 //	private Queue<float[]> recordHistory;
 	private static final int WINDOW_SIZE = 100;
+	
+	protected long startTrainTxNum;
+	protected int trainingPeriod;
 
 	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -290,6 +293,10 @@ public abstract class Agent {
 		if (!prepared) {
 			prepared = true;
 		}
+	}
+	
+	protected boolean isTrainTxNum(long txNum) {
+		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % trainingPeriod == 0;
 	}
 
 	private float calReward() {
