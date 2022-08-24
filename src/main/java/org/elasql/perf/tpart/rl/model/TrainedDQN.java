@@ -27,9 +27,9 @@ public class TrainedDQN extends TrainedAgent{
     	manager = NDManager.newBaseManager();
     }
     
-    public final void setPredictor(Predictor<NDList, NDList> target_predictor) {
+    public final void setPredictor(Predictor<NDList, NDList> target_predictor, Predictor<NDList, NDList> imitation_predictor) {
     	this.target_predictor = target_predictor;
-    	stateActionMap = new HashMap<Integer, Integer>();
+        stateActionMap = new HashMap<Integer, Integer>();
     }
 
     public final int react(float[] state) {
@@ -57,9 +57,4 @@ public class TrainedDQN extends TrainedAgent{
         return action;
     }
 
-	@Override
-	public void setPredictor(Predictor<NDList, NDList> target_predictor,
-			Predictor<NDList, NDList> imitation_predictor) {
-		throw new UnsupportedOperationException();
-	}
 }

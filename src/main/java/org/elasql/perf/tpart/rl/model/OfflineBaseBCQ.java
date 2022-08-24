@@ -2,6 +2,7 @@ package org.elasql.perf.tpart.rl.model;
 
 import java.util.Random;
 
+import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.rl.agent.Agent;
 import org.elasql.perf.tpart.rl.util.Memory;
 
@@ -91,6 +92,8 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     }
 
     public final Predictor<NDList, NDList> takeoutImitationPredictor() {
+    	if(imitation_net == null)
+    		return null;
     	return imitation_net.newPredictor(new NoopTranslator());
     }
 
@@ -105,9 +108,11 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
         policy_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
         target_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
         final_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
-        imitation_net = prepareImitationNet();
+        if(TPartPerformanceManager.RL_TYPE!=2) {
+        	imitation_net = prepareImitationNet();
+        	imitation_predictor = imitation_net.newPredictor(new NoopTranslator());
+        }
         policy_predictor = policy_net.newPredictor(new NoopTranslator());
-        imitation_predictor = imitation_net.newPredictor(new NoopTranslator());
         syncNets();
     }
     
