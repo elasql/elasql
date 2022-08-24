@@ -8,6 +8,7 @@ import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContextFactory;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
 import org.elasql.perf.tpart.ai.SumMaxEstimator;
@@ -46,11 +47,14 @@ public class TPartPerformanceManager implements PerformanceManager {
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
 
-		BanditTransactionDataCollector banditTransactionDataCollector = newBanditTransactionCollector();
 		RoutingBanditActuator routingBanditActuator = newAndRunRoutingBanditActuator();
+		BanditTransactionDataCollector banditTransactionDataCollector = newBanditTransactionCollector();
+		BanditTransactionContextFactory banditTransactionContextFactory = newBanditTransactionContextFactory();
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator(), newAgent(), banditTransactionDataCollector, routingBanditActuator);
+				metricWarehouse, newEstimator(), newAgent(), banditTransactionDataCollector, routingBanditActuator,
+				banditTransactionContextFactory, routingBanditActuator);
+
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
@@ -119,6 +123,15 @@ public class TPartPerformanceManager implements PerformanceManager {
 		return null;
 	}
 
+	private static BanditTransactionContextFactory newBanditTransactionContextFactory() {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
+				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+			return new BanditTransactionContextFactory();
+		}
+
+		return null;
+	}
+
 	private static RoutingBanditActuator newAndRunRoutingBanditActuator() {
 		RoutingBanditActuator routingBanditActuator = null;
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
@@ -137,6 +150,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	private Agent agent;
 	private BanditTransactionDataCollector banditTransactionDataCollector;
 	private RoutingBanditActuator banditActuator;
+
 
 	// On each DB machine
 	private MetricCollector localMetricCollector;
