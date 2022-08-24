@@ -4,6 +4,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.ai.TransactionEstimation;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.schedule.tpart.sink.SunkPlan;
@@ -14,16 +16,19 @@ import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
 		extends StoredProcedureTask<TPartStoredProcedure<?>> {
-	
+
 	static {
 		// For Debugging
 //		TimerStatistics.startReporting();
 	}
 
+	private BanditTransactionContext banditTransactionContext;
+	private int assignedPartition;
+
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
-	
+
 	// Timestamps
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
@@ -33,7 +38,7 @@ public class TPartStoredProcedureTask
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
 			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation,
-			int route) {
+			BanditTransactionContext banditTransactionContext, int assignedPartition) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
@@ -42,13 +47,14 @@ public class TPartStoredProcedureTask
 		this.profiler = profiler;
 		this.tsp = sp;
 		this.estimation = estimation;
-		this.route = route;
+		this.banditTransactionContext = banditTransactionContext;
+		this.assignedPartition = assignedPartition;
 	}
 
 	@Override
 	public void run() {
 		SpResultSet rs = null;
-		
+
 		Thread.currentThread().setName("Tx." + txNum);
 		// Initialize a thread-local profiler which is from scheduler
 		TransactionProfiler.setProfiler(profiler);
@@ -56,24 +62,24 @@ public class TPartStoredProcedureTask
 
 		// OU2
 		profiler.stopComponentProfiler("OU2 - Initialize Thread");
-		
+
 		// Transaction Execution
 		rs = tsp.execute();
 
 		// Stop the profiler for the whole execution
 		profiler.stopExecution();
-		
+
 		if (rs.isCommitted()) {
 			onSpCommit((int) txNum);
 		} else {
 			onSpRollback((int) txNum);
 		}
-		
+
 		if (tsp.isMaster()) {
 			if (clientId != -1) {
 				Elasql.connectionMgr().sendClientResponse(clientId, connectionId, txNum, rs);
 			}
-			
+
 			// Notify the sequencer that this transaction commits
 			Elasql.connectionMgr().sendCommitNotification(txNum);
 
@@ -83,11 +89,19 @@ public class TPartStoredProcedureTask
 //				TupleSet ts = new TupleSet(MigrationMgr.MSG_COLD_FINISH);
 //				Elasql.connectionMgr().pushTupleSet(PartitionMetaMgr.NUM_PARTITIONS, ts);
 //			}
-			
+
 			// For Debugging
 //			timer.addToGlobalStatistics();
+
+			if (Elasql.SERVICE_TYPE.equals(Elasql.ServiceType.HERMES_BANDIT) ||
+					Elasql.SERVICE_TYPE.equals(Elasql.ServiceType.HERMES_BANDIT_SEQUENCER)) {
+				// TODO: use reciprocal of the latency as the reward for now
+				double reward = 10 * 1./ (double) (profiler.getExecutionTime() -
+						profiler.getComponentTime("OU0 - Dispatch to router"));
+				Elasql.connectionMgr().sendTransactionMetricReport(new BanditTransactionReward(txNum, reward));
+			}
 		}
-		
+
 		if (Elasql.performanceMgr() != null) {
 			// Record the profiler result
 			String role = tsp.isMaster()? "Master" : "Slave";
@@ -106,7 +120,7 @@ public class TPartStoredProcedureTask
 	public long getTxNum() {
 		return txNum;
 	}
-	
+
 	public long getArrivedTime() {
 		return arrivedTime;
 	}
@@ -114,18 +128,18 @@ public class TPartStoredProcedureTask
 	public Set<PrimaryKey> getReadSet() {
 		return tsp.getReadSet();
 	}
-	
+
 	public Set<PrimaryKey> getWriteSet() {
 		Set<PrimaryKey> writeSet = new HashSet<PrimaryKey>();
 		writeSet.addAll(tsp.getUpdateSet());
 		writeSet.addAll(tsp.getInsertSet());
 		return writeSet;
 	}
-	
+
 	public Set<PrimaryKey> getUpdateSet() {
 		return tsp.getUpdateSet();
 	}
-	
+
 	public Set<PrimaryKey> getInsertSet() {
 		return tsp.getInsertSet();
 	}
@@ -153,7 +167,7 @@ public class TPartStoredProcedureTask
 	public TransactionProfiler getTxProfiler() {
 		return profiler;
 	}
-	
+
 	public ProcedureType getProcedureType() {
 		if (tsp == null)
 			return ProcedureType.NOP;
@@ -163,12 +177,31 @@ public class TPartStoredProcedureTask
 	public boolean isReadOnly() {
 		return tsp.isReadOnly();
 	}
-	
+
 	public void setEstimation(TransactionEstimation estimation) {
 		this.estimation = estimation;
 	}
-	
+
 	public TransactionEstimation getEstimation() {
 		return estimation;
+	}
+
+	public BanditTransactionContext getBanditTransactionContext() {
+		return banditTransactionContext;
+	}
+
+	public void setBanditTransactionContext(BanditTransactionContext banditTransactionContext) {
+		this.banditTransactionContext = banditTransactionContext;
+	}
+
+	public void setAssignedPartition(int assignedPartition) {
+		this.assignedPartition = assignedPartition;
+	}
+
+	public int getAssignedPartition() {
+		if (assignedPartition < 0) {
+			throw new RuntimeException("Partition not assigned");
+		}
+		return assignedPartition;
 	}
 }

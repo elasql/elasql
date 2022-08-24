@@ -1,6 +1,7 @@
 package org.elasql.schedule.tpart;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -10,7 +11,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.commons.math3.linear.ArrayRealVector;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
+import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -92,6 +95,9 @@ public class TPartScheduler extends Task implements Scheduler {
 
 				TransactionProfiler.setProfiler(call.getProfiler());
 				TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+
+				profiler.stopComponentProfiler("OU0 - Dispatch to router");
+				profiler.startComponentProfiler("OU0 - ROUTE");
 				
 				TPartStoredProcedureTask task = createStoredProcedureTask(call, profiler);
 
@@ -110,15 +116,13 @@ public class TPartScheduler extends Task implements Scheduler {
 //				}
 
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
+						task.getProcedureType() == ProcedureType.CONTROL ||
+						task.getProcedureType() == ProcedureType.BANDIT) {
 					batchedTasks.add(task);
 				}
-				
-				profiler.stopComponentProfiler("OU0 - ROUTE");
-				
+
 				// sink current t-graph if # pending tx exceeds threshold
-				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
-						|| !batchingEnabled) {
+				if (!batchingEnabled || batchedTasks.size() >= SCHEDULE_BATCH_SIZE) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
 				}
@@ -144,8 +148,11 @@ public class TPartScheduler extends Task implements Scheduler {
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			// Record plan gen start time, CPU start time, disk IO count
-			for(TPartStoredProcedureTask task : batchedTasks) 
-				task.getTxProfiler().startComponentProfiler("OU1 - Generate Plan");
+			for(TPartStoredProcedureTask task : batchedTasks) {
+				TransactionProfiler profiler = task.getTxProfiler();
+				profiler.stopComponentProfiler("OU0 - ROUTE");
+				profiler.startComponentProfiler("OU1 - Generate Plan");
+			}
 			
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 
@@ -175,7 +182,8 @@ public class TPartScheduler extends Task implements Scheduler {
 			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, null, null, call.getRoute());
+					call.getTxNum(), call.getArrivedTime(), profiler, null, null, null,
+					-1);
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -185,15 +193,24 @@ public class TPartScheduler extends Task implements Scheduler {
 			
 			// Take out the transaction estimation
 			TransactionEstimation estimation = null;
-			if (call.getMetadata() != null) {
-				if (call.getMetadata().getClass().equals(byte[].class)) {
-					byte[] data = (byte[]) call.getMetadata();
+			BanditTransactionContext banditTransactionContext = null;
+			int assignedPartition = -1;
+			Serializable metadata = call.getMetadata();
+			if (metadata != null) {
+				if (metadata.getClass().equals(byte[].class)) {
+					byte[] data = (byte[]) metadata;
 					estimation = TransactionEstimation.fromBytes(data);
+				} else if (metadata instanceof ArrayRealVector) {
+					ArrayRealVector context = (ArrayRealVector) metadata;
+					banditTransactionContext = new BanditTransactionContext(call.getTxNum(), context);
+				} else if (metadata.getClass().equals(Integer.class)) {
+					assignedPartition = (int) metadata;
 				}
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, call.getRoute());
+					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, banditTransactionContext,
+					assignedPartition);
 		}
 	}
 
