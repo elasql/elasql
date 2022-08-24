@@ -88,7 +88,6 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
         }
 
         return final_net.newPredictor(new NoopTranslator());
-//    	return target_net.newPredictor(new NoopTranslator());
     }
 
     public final Predictor<NDList, NDList> takeoutImitationPredictor() {

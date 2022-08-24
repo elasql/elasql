@@ -11,7 +11,6 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
-import org.vanilladb.core.util.TransactionProfiler;
 
 public class OnlineAgent extends Agent {
 	private static Logger logger = Logger.getLogger(OnlineAgent.class.getName());
@@ -28,14 +27,10 @@ public class OnlineAgent extends Agent {
 		cacheTxState(task.getTxNum(), state);
 		
 		if (isTrainTxNum(task.getTxNum())) {
-			TransactionProfiler.getLocalProfiler().startComponentProfiler("Train");
 			train();
-			TransactionProfiler.getLocalProfiler().stopComponentProfiler("Train");
 		} 
 		if (prepared) {
-			TransactionProfiler.getLocalProfiler().startComponentProfiler("Base React");
 			action = trainedAgent.react(state);
-			TransactionProfiler.getLocalProfiler().stopComponentProfiler("Base React");
 		} else {
 			action = ActionSampler.random(random);
 		}

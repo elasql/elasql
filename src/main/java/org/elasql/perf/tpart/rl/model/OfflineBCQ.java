@@ -5,7 +5,6 @@ import org.elasql.perf.tpart.rl.util.Helper;
 import org.elasql.perf.tpart.rl.util.Memory;
 import org.elasql.perf.tpart.rl.util.MemoryBatch;
 
-import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
