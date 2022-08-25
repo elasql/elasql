@@ -183,7 +183,7 @@ public class TPartScheduler extends Task implements Scheduler {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
 					call.getTxNum(), call.getArrivedTime(), profiler, null, null, null,
-					-1);
+					call.getRoute());
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -205,12 +205,13 @@ public class TPartScheduler extends Task implements Scheduler {
 					banditTransactionContext = new BanditTransactionContext(call.getTxNum(), context);
 				} else if (metadata.getClass().equals(Integer.class)) {
 					assignedPartition = (int) metadata;
+					call.setRoute(assignedPartition);
 				}
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
 					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, banditTransactionContext,
-					assignedPartition);
+					call.getRoute());
 		}
 	}
 

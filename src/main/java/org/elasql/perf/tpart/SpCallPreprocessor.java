@@ -139,7 +139,10 @@ public class SpCallPreprocessor extends Task {
 		
 		featureExtractor.onTransactionCommit(txNum);
 		timeRelatedFeatureMgr.onTxCommit(masterId);
-		banditTransactionContextFactory.removePartitionLoad(masterId);
+		
+		if(banditTransactionContextFactory != null) {
+			banditTransactionContextFactory.removePartitionLoad(masterId);
+		}
 	}
 
 	@Override
@@ -220,7 +223,9 @@ public class SpCallPreprocessor extends Task {
 			if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 				return;
 			}
+			TransactionProfiler.getLocalProfiler().startComponentProfiler("receive reward");
 			banditModel.receiveReward(spc.getTxNum());
+			TransactionProfiler.getLocalProfiler().stopComponentProfiler("receive reward");
 			return;
 		}
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
@@ -256,11 +261,13 @@ public class SpCallPreprocessor extends Task {
 			task.setBanditTransactionContext(banditTransactionContext);
 		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			// Set transaction features that used in bandit
-			BanditTransactionContext banditTransactionContext =
-					banditTransactionContextFactory.buildContext(task.getTxNum(), features);
+			TransactionProfiler.getLocalProfiler().startComponentProfiler("context");
+			BanditTransactionContext banditTransactionContext = banditTransactionContextFactory.buildContext(task.getTxNum(), features);
 
+			TransactionProfiler.getLocalProfiler().stopComponentProfiler("context");
+			TransactionProfiler.getLocalProfiler().startComponentProfiler("choose arm");
 			int arm = banditModel.chooseArm(task.getTxNum(), banditTransactionContext.getContext());
-
+			TransactionProfiler.getLocalProfiler().stopComponentProfiler("choose arm");
 			banditTransactionDataCollector.addContext(banditTransactionContext);
 			banditTransactionDataCollector.addArm(new BanditTransactionArm(spc.getTxNum(), arm));
 
@@ -274,7 +281,7 @@ public class SpCallPreprocessor extends Task {
 
 			// TODO: metadata type
 			spc.setMetadata(arm);
-			task.setAssignedPartition(arm);
+			task.setRoute(arm);
 		}
 		
 		if (agent != null) {

@@ -14,7 +14,7 @@ public class PuppetInserter implements BatchNodeInserter {
 			if (task.getProcedure().getClass().equals(BanditRewardUpdateProcedure.class)) {
 				continue;
 			}
-			graph.insertTxNode(task, task.getAssignedPartition());
+			graph.insertTxNode(task, task.getRoute());
 		}
 	}
 }

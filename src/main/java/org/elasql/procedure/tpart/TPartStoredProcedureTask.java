@@ -7,6 +7,7 @@ import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
@@ -22,7 +23,6 @@ public class TPartStoredProcedureTask
 	}
 
 	private BanditTransactionContext banditTransactionContext;
-	private int assignedPartition;
 
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
@@ -32,12 +32,12 @@ public class TPartStoredProcedureTask
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
 	private TransactionEstimation estimation;
-	private int route;
+	private int route = StoredProcedureCall.NO_ROUTE;
 	private TransactionProfiler profiler;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
 			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation,
-			BanditTransactionContext banditTransactionContext, int assignedPartition) {
+			BanditTransactionContext banditTransactionContext, int route) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
@@ -47,7 +47,7 @@ public class TPartStoredProcedureTask
 		this.tsp = sp;
 		this.estimation = estimation;
 		this.banditTransactionContext = banditTransactionContext;
-		this.assignedPartition = assignedPartition;
+		this.route = route;
 	}
 
 	@Override
@@ -184,16 +184,5 @@ public class TPartStoredProcedureTask
 
 	public void setBanditTransactionContext(BanditTransactionContext banditTransactionContext) {
 		this.banditTransactionContext = banditTransactionContext;
-	}
-
-	public void setAssignedPartition(int assignedPartition) {
-		this.assignedPartition = assignedPartition;
-	}
-
-	public int getAssignedPartition() {
-		if (assignedPartition < 0) {
-			throw new RuntimeException("Partition not assigned");
-		}
-		return assignedPartition;
 	}
 }
