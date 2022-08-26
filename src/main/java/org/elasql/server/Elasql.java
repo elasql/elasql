@@ -48,6 +48,7 @@ import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
 import org.elasql.schedule.tpart.hermes.MirrorDescentRouter;
+import org.elasql.schedule.tpart.hermes.RemoteReadFocusRouter;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashPartitionPlan;
@@ -329,8 +330,10 @@ public class Elasql extends VanillaDb {
 		case 0:
 			return new HermesNodeInserter();
 		case 1:
-			return new ControlRouter();
+			return new RemoteReadFocusRouter();
 		case 2:
+			return new ControlRouter();
+		case 3:
 			return new MirrorDescentRouter();
 		default:
 			throw new IllegalArgumentException("No such router with id: " + HERMES_ROUTER_TYPE);
