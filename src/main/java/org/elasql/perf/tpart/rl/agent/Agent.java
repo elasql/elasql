@@ -9,6 +9,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.model.BaseAgent;
 import org.elasql.perf.tpart.rl.model.OfflineBCQ;
@@ -58,8 +59,8 @@ public abstract class Agent {
 //	private Queue<float[]> recordHistory;
 	private static final int WINDOW_SIZE = 100;
 	
-	protected long startTrainTxNum;
-	protected int trainingPeriod;
+	protected long startTrainTxNum = TPartPerformanceManager.RL_TYPE == 2 ? 30_000 : 100_000;
+	protected int trainingPeriod = 5_000;;
 
 	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 

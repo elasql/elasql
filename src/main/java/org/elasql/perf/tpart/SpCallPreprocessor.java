@@ -140,8 +140,12 @@ public class SpCallPreprocessor extends Task {
 		featureExtractor.onTransactionCommit(txNum);
 		timeRelatedFeatureMgr.onTxCommit(masterId);
 		
-		if(banditTransactionContextFactory != null) {
-			banditTransactionContextFactory.removePartitionLoad(masterId);
+		if (banditTransactionContextFactory != null && Agent.REWARD_TYPE == 0) {
+			double reward = (float) 100.0f / (float) txLatency;
+
+			BanditTransactionReward banditTransactionReward = new BanditTransactionReward(txNum, reward);
+			banditActuator.addTransactionData(
+					banditTransactionDataCollector.addRewardAndTakeOut(banditTransactionReward));
 		}
 	}
 
@@ -273,14 +277,14 @@ public class SpCallPreprocessor extends Task {
 
 			banditTransactionContextFactory.addPartitionLoad(arm);
 
-			double reward = calculateReward(features, arm);
-
-			BanditTransactionReward banditTransactionReward = new BanditTransactionReward(task.getTxNum(), reward);
-			banditActuator.addTransactionData(
-					banditTransactionDataCollector.addRewardAndTakeOut(banditTransactionReward));
-
-			// TODO: metadata type
-			spc.setMetadata(arm);
+			if(Agent.REWARD_TYPE == 1) {
+				double reward = calculateReward(features, arm);
+	
+				BanditTransactionReward banditTransactionReward = new BanditTransactionReward(task.getTxNum(), reward);
+				banditActuator.addTransactionData(
+						banditTransactionDataCollector.addRewardAndTakeOut(banditTransactionReward));
+			}
+			spc.setRoute(arm);
 			task.setRoute(arm);
 		}
 		
@@ -330,18 +334,17 @@ public class SpCallPreprocessor extends Task {
 	}
 
 	private double calculateReward(TransactionFeatures features, int arm) {
-		Integer[] readDataDistributions = (Integer[]) features.getFeature("Remote Reads");
-		Integer[] writeDataDistributions = (Integer[]) features.getFeature("Remote Writes");
+		Integer[] readDataDistributions = (Integer[]) features.getFeature("Read Data Distribution");
+		Integer[] writeDataDistributions = (Integer[]) features.getFeature("Write Data Distribution");
 
 		int readWriteCount = 0;
 		for (int i = 0; i < readDataDistributions.length; i++) {
 			readWriteCount += readDataDistributions[i] + writeDataDistributions[i];
 		}
 
-		double reward = 0.5;
-
-		reward += 0.5 * ((double) (readDataDistributions[arm] + writeDataDistributions[arm]) / (double) readWriteCount);
-		reward -= 0.5 * banditTransactionContextFactory.getPartitionLoad(arm);
+		double readRecordScore = ((double) (readDataDistributions[arm] + writeDataDistributions[arm]) / (double) readWriteCount);
+		double loadBalScore = 1 - banditTransactionContextFactory.getPartitionLoad(arm);
+		double reward = readRecordScore + loadBalScore;
 
 		return reward;
 	}

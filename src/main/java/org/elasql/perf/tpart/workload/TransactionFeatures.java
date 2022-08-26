@@ -39,14 +39,14 @@ public class TransactionFeatures {
 //		featureKeys.add("Number of Insert Records");
 //		featureKeys.add("Number of Fully Replicated Records");
 //		// - Data distribution
-		featureKeys.add("Remote Reads");
-//		featureKeys.add("Read Data Distribution");
+//		featureKeys.add("Remote Reads");
+		featureKeys.add("Read Data Distribution");
 //		featureKeys.add("Read Data Distribution in Bytes");
 //		featureKeys.add("Read Data in Cache Distribution");
 //		featureKeys.add("Read Data with IO Distribution");
-		featureKeys.add("Remote Writes");
+//		featureKeys.add("Remote Writes");
 //		featureKeys.add("Update Data Distribution");
-//		featureKeys.add("Write Data Distribution");
+		featureKeys.add("Write Data Distribution");
 //
 //		// Fusion Table
 //		featureKeys.add("Number of Overflows in Fusion Table");

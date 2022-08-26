@@ -203,10 +203,10 @@ public class TPartScheduler extends Task implements Scheduler {
 				} else if (metadata instanceof ArrayRealVector) {
 					ArrayRealVector context = (ArrayRealVector) metadata;
 					banditTransactionContext = new BanditTransactionContext(call.getTxNum(), context);
-				} else if (metadata.getClass().equals(Integer.class)) {
-					assignedPartition = (int) metadata;
-					call.setRoute(assignedPartition);
-				}
+				}// else if (metadata.getClass().equals(Integer.class)) {
+//					assignedPartition = (int) metadata;
+//					call.setRoute(assignedPartition);
+//				}
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),

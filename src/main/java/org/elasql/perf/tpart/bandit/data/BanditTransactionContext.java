@@ -15,8 +15,8 @@ public class BanditTransactionContext implements Serializable {
 	private final ArrayRealVector context;
 
 	public BanditTransactionContext(long txNum, TransactionFeatures transactionFeatures, int[] machineLoad) {
-		double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Reads")).mapToDouble((v) -> v).toArray();
-		double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Remote Writes")).mapToDouble((v) -> v).toArray();
+		double[] readDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Read Data Distribution")).mapToDouble((v) -> v).toArray();
+		double[] writeDataDistributions = Arrays.stream((Integer[]) transactionFeatures.getFeature("Write Data Distribution")).mapToDouble((v) -> v).toArray();
 		normalize(readDataDistributions);
 		normalize(writeDataDistributions);
 		for (int i = 0; i < readDataDistributions.length; i++) {

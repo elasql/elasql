@@ -31,9 +31,6 @@ public class OfflineAgent extends Agent {
 		agent = new OfflineBCQ(64, 32, 32, 0.99f, 0.001f, memory);
 		Elasql.taskMgr().runTask(trainer);
 		trainedAgent = new TrainedBCQ();
-		
-		startTrainTxNum = 100_000;
-		trainingPeriod = 5_000;
 	}
 	
 }
