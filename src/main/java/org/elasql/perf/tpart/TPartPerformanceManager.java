@@ -62,8 +62,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 			RoutingControlActuator actuator = new RoutingControlActuator(metricWarehouse);
 			Elasql.taskMgr().runTask(actuator);
 			return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, actuator);
-		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
-				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, banditTransactionDataCollector,
 					routingBanditActuator);
 		}
@@ -115,8 +114,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	private static BanditTransactionDataCollector newBanditTransactionCollector() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
-				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			return new BanditTransactionDataCollector();
 		}
 
@@ -124,8 +122,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	private static BanditTransactionContextFactory newBanditTransactionContextFactory() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
-				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			return new BanditTransactionContextFactory();
 		}
 
@@ -134,8 +131,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	private static RoutingBanditActuator newAndRunRoutingBanditActuator() {
 		RoutingBanditActuator routingBanditActuator = null;
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT ||
-				Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			routingBanditActuator = new RoutingBanditActuator();
 			Elasql.taskMgr().runTask(routingBanditActuator);
 		}

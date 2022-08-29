@@ -41,7 +41,6 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
-import org.elasql.schedule.tpart.bandit.BanditBasedRouter;
 import org.elasql.schedule.tpart.bandit.PuppetInserter;
 import org.elasql.schedule.tpart.control.ControlBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -70,7 +69,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB. 
 	 */ 
 	public enum ServiceType { 
-		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL, HERMES_RL, HERMES_BANDIT, HERMES_BANDIT_SEQUENCER;
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL, HERMES_RL, HERMES_BANDIT_SEQUENCER;
  
 		static ServiceType fromInteger(int index) { 
 			switch (index) { 
@@ -90,8 +89,6 @@ public class Elasql extends VanillaDb {
 				return HERMES_CONTROL;
 			case 7:
 				return HERMES_RL;
-			case 8:
-				return HERMES_BANDIT;
 			case 9:
 				return HERMES_BANDIT_SEQUENCER;
 			default:
@@ -211,7 +208,6 @@ public class Elasql extends VanillaDb {
 		case LEAP:
 		case HERMES_CONTROL:
 		case HERMES_RL:
-		case HERMES_BANDIT:
 		case HERMES_BANDIT_SEQUENCER:
 			remoteRecReceiver = new TPartCacheMgr(); 
 			break; 
@@ -248,7 +244,6 @@ public class Elasql extends VanillaDb {
 			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
 			scheduler = initTPartScheduler(tpartFactory);
 			break;
-		case HERMES_BANDIT:
 		case HERMES_BANDIT_SEQUENCER:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
@@ -321,13 +316,6 @@ public class Elasql extends VanillaDb {
 			inserter = new PresetOrHermesRouter();//PresetRouteInserter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
-			break; 
-		case HERMES_BANDIT:
-			table = new FusionTable();
-			graph = new FusionTGraph(table);
-			inserter = new BanditBasedRouter();
-			sinker = new FusionSinker(table);
-			isBatching = false;
 			break;
 		case HERMES_BANDIT_SEQUENCER:
 			table = new FusionTable();
@@ -389,7 +377,6 @@ public class Elasql extends VanillaDb {
 			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
 			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
-		case HERMES_BANDIT:
 		case HERMES_BANDIT_SEQUENCER:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
@@ -438,11 +425,6 @@ public class Elasql extends VanillaDb {
 			case HERMES_RL:
 				graph = new FusionTGraph(new FusionTable()); 
 				inserter = new PresetOrHermesRouter();
-				isBatching = false;
-				break; 
-			case HERMES_BANDIT:
-				graph = new FusionTGraph(new FusionTable());
-				inserter = new BanditBasedRouter();
 				isBatching = false;
 				break;
 			case HERMES_BANDIT_SEQUENCER:

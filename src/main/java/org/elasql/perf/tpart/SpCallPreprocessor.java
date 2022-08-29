@@ -12,11 +12,11 @@ import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionArm;
-import org.elasql.perf.tpart.bandit.model.BanditModel;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionContextFactory;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
+import org.elasql.perf.tpart.bandit.model.BanditModel;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.agent.Agent;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
@@ -32,13 +32,11 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.client.BatchSpcSender;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
-import org.elasql.schedule.tpart.bandit.BanditBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
-import org.vanilladb.core.util.TimerStatistics;
 import org.vanilladb.core.util.TransactionProfiler;
 
 /**
@@ -111,12 +109,7 @@ public class SpCallPreprocessor extends Task {
 			dependencyRecorder = new TransactionDependencyRecorder();
 			dependencyRecorder.startRecording();
 		}
-
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
-			BanditBasedRouter banditBasedRouter = (BanditBasedRouter) inserter;
-			banditBasedRouter.setBanditTransactionDataCollector(banditTransactionDataCollector);
-			banditBasedRouter.setBanditTransactionContextFactory(banditTransactionContextFactory);
-		}
+		
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			banditModel = new BanditModel(routingBanditActuator);
 		} else {
@@ -253,16 +246,6 @@ public class SpCallPreprocessor extends Task {
 			task.setEstimation(estimation);
 			
 		// Bandit has no performanceEstimator
-		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
-			// Set transaction features that used in bandit
-			BanditTransactionContext banditTransactionContext =
-					banditTransactionContextFactory.buildContext(task.getTxNum(), features);
-
-			banditTransactionDataCollector.addContext(banditTransactionContext);
-
-			// TODO: metadata type
-			spc.setMetadata(banditTransactionContext.getContext());
-			task.setBanditTransactionContext(banditTransactionContext);
 		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			// Set transaction features that used in bandit
 			TransactionProfiler.getLocalProfiler().startComponentProfiler("context");

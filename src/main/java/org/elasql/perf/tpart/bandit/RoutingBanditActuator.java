@@ -116,9 +116,7 @@ public class RoutingBanditActuator extends Task {
 //
 //		Object[] params = normalizedBanditTransactionDataList.toArray();
 		Object[] params = new Object[0];
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT) {
-			params = banditTransactionDataList.toArray();
-		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
 			try {
 				pendingModelData.put(new ModelUpdateData(banditTransactionDataList));
 			} catch (InterruptedException e) {
