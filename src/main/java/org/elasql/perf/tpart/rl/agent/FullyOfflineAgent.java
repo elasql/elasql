@@ -6,22 +6,23 @@ import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.model.OfflineBCQ;
 import org.elasql.perf.tpart.rl.model.TrainedBCQ;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.Route;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.util.TransactionProfiler;
 
-public class FullyOfflineAgent extends Agent{
+public class FullyOfflineAgent extends Agent {
 	private static Logger logger = Logger.getLogger(FullyOfflineAgent.class.getName());
 	
 	private long startTrainTxNum = 150_000;
 
-	public int react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
+	public Route react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		TransactionProfiler.getLocalProfiler().startComponentProfiler("Prepare state");
 		float[] state = prepareState(graph, task, metricWarehouse);
 		int[] remote = countRemote(graph, task);
 		TransactionProfiler.getLocalProfiler().stopComponentProfiler("Prepare state");
-		int action = StoredProcedureCall.NO_ROUTE;
+		Route action = null;
 		// cache state for reward
 		cacheTxState(task.getTxNum(), state);
 		if (task.getTxNum() < startTrainTxNum) {
@@ -31,7 +32,7 @@ public class FullyOfflineAgent extends Agent{
 			eval();
 		} else if (prepared) {
 			TransactionProfiler.getLocalProfiler().startComponentProfiler("Base React");
-				action = trainedAgent.react(state);
+				action = new Route(trainedAgent.react(state));
 				TransactionProfiler.getLocalProfiler().stopComponentProfiler("Base React");
 		}
 		return action;

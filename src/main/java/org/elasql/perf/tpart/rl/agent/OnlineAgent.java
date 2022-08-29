@@ -8,7 +8,7 @@ import org.elasql.perf.tpart.rl.model.OfflineBCQ;
 import org.elasql.perf.tpart.rl.model.TrainedBCQ;
 import org.elasql.perf.tpart.rl.util.ActionSampler;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 
@@ -20,19 +20,19 @@ public class OnlineAgent extends Agent {
 		prepareAgent();
 	}
 	
-	public int react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
+	public Route react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		float[] state = prepareState(graph, task, metricWarehouse);
 
-		int action = StoredProcedureCall.NO_ROUTE;
+		Route action = null;
 		cacheTxState(task.getTxNum(), state);
 		
 		if (isTrainTxNum(task.getTxNum())) {
 			train();
 		} 
 		if (prepared) {
-			action = trainedAgent.react(state);
+			action = new Route(trainedAgent.react(state));
 		} else {
-			action = ActionSampler.random(random);
+			action = new Route(ActionSampler.random(random));
 		}
 		return action;
 	}

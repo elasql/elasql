@@ -7,7 +7,7 @@ import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
-import org.elasql.remote.groupcomm.StoredProcedureCall;
+import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
@@ -32,12 +32,12 @@ public class TPartStoredProcedureTask
 	// The time that the stored procedure call arrives the system
 	private long arrivedTime;
 	private TransactionEstimation estimation;
-	private int route = StoredProcedureCall.NO_ROUTE;
+	private Route route;
 	private TransactionProfiler profiler;
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
 			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation,
-			BanditTransactionContext banditTransactionContext, int route) {
+			BanditTransactionContext banditTransactionContext, Route route) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
@@ -101,11 +101,11 @@ public class TPartStoredProcedureTask
 		}
 	}
 	
-	public int getRoute() {
+	public Route getRoute() {
 		return route;
 	}
 	
-	public void setRoute(int route) {
+	public void setRoute(Route route) {
 		this.route = route;
 	}
 

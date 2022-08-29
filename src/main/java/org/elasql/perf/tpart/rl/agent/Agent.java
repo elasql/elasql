@@ -16,6 +16,7 @@ import org.elasql.perf.tpart.rl.model.OfflineBCQ;
 import org.elasql.perf.tpart.rl.model.TrainedAgent;
 import org.elasql.perf.tpart.rl.util.Memory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
@@ -91,7 +92,7 @@ public abstract class Agent {
 		}
 	}
 
-	public abstract int react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse);
+	public abstract Route react(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse);
 
 	public Agent() {
 		loadLib();

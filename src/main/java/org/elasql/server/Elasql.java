@@ -40,8 +40,8 @@ import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
+import org.elasql.schedule.tpart.PresetRouter;
 import org.elasql.schedule.tpart.TPartScheduler;
-import org.elasql.schedule.tpart.bandit.PuppetInserter;
 import org.elasql.schedule.tpart.control.ControlBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
@@ -320,7 +320,7 @@ public class Elasql extends VanillaDb {
 		case HERMES_BANDIT_SEQUENCER:
 			table = new FusionTable();
 			graph = new FusionTGraph(table);
-			inserter = new PuppetInserter();
+			inserter = new PresetRouter();
 			sinker = new FusionSinker(table);
 			isBatching = false;
 			break;
@@ -429,7 +429,7 @@ public class Elasql extends VanillaDb {
 				break;
 			case HERMES_BANDIT_SEQUENCER:
 				graph = new FusionTGraph(new FusionTable());
-				inserter = new PuppetInserter();
+				inserter = new PresetRouter();
 				isBatching = false;
 				break;
 			default: 

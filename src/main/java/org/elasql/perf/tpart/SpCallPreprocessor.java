@@ -28,6 +28,7 @@ import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.Route;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.client.BatchSpcSender;
 import org.elasql.schedule.tpart.BatchNodeInserter;
@@ -206,7 +207,7 @@ public class SpCallPreprocessor extends Task {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null, StoredProcedureCall.NO_ROUTE);
+					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null, null);
 		}
 
 		return null;
@@ -250,11 +251,12 @@ public class SpCallPreprocessor extends Task {
 			// Set transaction features that used in bandit
 			TransactionProfiler.getLocalProfiler().startComponentProfiler("context");
 			BanditTransactionContext banditTransactionContext = banditTransactionContextFactory.buildContext(task.getTxNum(), features);
-
 			TransactionProfiler.getLocalProfiler().stopComponentProfiler("context");
+			
 			TransactionProfiler.getLocalProfiler().startComponentProfiler("choose arm");
 			int arm = banditModel.chooseArm(task.getTxNum(), banditTransactionContext.getContext());
 			TransactionProfiler.getLocalProfiler().stopComponentProfiler("choose arm");
+			
 			banditTransactionDataCollector.addContext(banditTransactionContext);
 			banditTransactionDataCollector.addArm(new BanditTransactionArm(spc.getTxNum(), arm));
 
@@ -267,14 +269,14 @@ public class SpCallPreprocessor extends Task {
 				banditActuator.addTransactionData(
 						banditTransactionDataCollector.addRewardAndTakeOut(banditTransactionReward));
 			}
-			spc.setRoute(arm);
-			task.setRoute(arm);
+			spc.setRoute(new Route(arm));
+			task.setRoute(new Route(arm));
 		}
 		
 		if (agent != null) {
 
 			TransactionProfiler.getLocalProfiler().startComponentProfiler("React");
-			int route = agent.react(graph, task, metricWarehouse);
+			Route route = agent.react(graph, task, metricWarehouse);
 			TransactionProfiler.getLocalProfiler().stopComponentProfiler("React");
 			
 			spc.setRoute(route);

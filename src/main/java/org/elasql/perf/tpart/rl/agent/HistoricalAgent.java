@@ -5,9 +5,10 @@ import java.util.logging.Logger;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.rl.model.OfflineBCQ;
 import org.elasql.perf.tpart.rl.model.TrainedBCQ;
-import org.elasql.perf.tpart.rl.util.MemoryCsvLoader;
 import org.elasql.perf.tpart.rl.util.Memory;
+import org.elasql.perf.tpart.rl.util.MemoryCsvLoader;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.graph.TGraph;
 
 public class HistoricalAgent extends Agent{
@@ -15,10 +16,9 @@ public class HistoricalAgent extends Agent{
 
 	private Memory memory = new Memory(30_000);
 	
-	public int react (TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
+	public Route react (TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		float[] state = prepareState(graph, task, metricWarehouse);
-		int action = trainedAgent.react(state);
-		return action;
+		return new Route(trainedAgent.react(state));
 	}
 	
 	@Override

@@ -27,8 +27,6 @@ import org.vanilladb.core.util.TransactionProfiler;
  */
 public class StoredProcedureCall implements Serializable {
 	
-	public static final int NO_ROUTE = -1;
-	
 	private static final long serialVersionUID = 8807383803517134106L;
 
 	public static final int PID_NO_OPERATION = Integer.MIN_VALUE;
@@ -40,7 +38,7 @@ public class StoredProcedureCall implements Serializable {
 	// Some metadata for the stored procedure call
 	// This currently only used by TPartPerformanceMgr.
 	private Serializable metadata;
-	private int route = NO_ROUTE;
+	private Route route;
 	
 	// The timestamp to indicate the time that this request arrives
 	// at the database system. (-1 means 'not set')
@@ -140,11 +138,11 @@ public class StoredProcedureCall implements Serializable {
 		return metadata;
 	}
 	
-	public int getRoute() {
+	public Route getRoute() {
 		return route;
 	}
 	
-	public void setRoute(int route) {
+	public void setRoute(Route route) {
 		this.route = route;
 	}
 	

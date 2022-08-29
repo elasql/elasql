@@ -102,7 +102,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		if (task.getTxNum() % 10_000 == 0) {
 			System.out.println("Hermes : " + bestPartId);
 		}
-		if (task.getRoute() == StoredProcedureCall.NO_ROUTE)
+		if (task.getRoute() == null)
 			graph.insertTxNode(task, bestPartId);
 		
 		loadPerPart[bestPartId]++;
