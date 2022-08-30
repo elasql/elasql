@@ -28,7 +28,6 @@ import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
-import org.elasql.perf.tpart.mdp.bandit.BanditStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -244,13 +243,6 @@ public class Elasql extends VanillaDb {
 			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
 			scheduler = initTPartScheduler(tpartFactory);
 			break;
-		case HERMES_BANDIT_SEQUENCER:
-			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
-				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
-			tpartFactory = (TPartStoredProcedureFactory) factory;
-			tpartFactory = new BanditStoredProcedureFactory(tpartFactory);
-			scheduler = initTPartScheduler(tpartFactory);
-			break;
 		default:
 			throw new UnsupportedOperationException(); 
 		} 
@@ -375,13 +367,6 @@ public class Elasql extends VanillaDb {
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
 			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
-			performanceMgr = newTPartPerfMgr(tpartFactory);
-			break;
-		case HERMES_BANDIT_SEQUENCER:
-			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass()))
-				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
-			tpartFactory = (TPartStoredProcedureFactory) factory;
-			tpartFactory = new BanditStoredProcedureFactory(tpartFactory);
 			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
 		default:

@@ -128,8 +128,7 @@ public class SpCallPreprocessor extends Task {
 				
 				// Add normal SPs to the task batch
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL ||
-						task.getProcedureType() == ProcedureType.BANDIT) {
+						task.getProcedureType() == ProcedureType.CONTROL) {
 					// Pre-process the transaction 
 					preprocess(spc, task);
 

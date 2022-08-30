@@ -11,6 +11,7 @@ import java.util.logging.Logger;
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionData;
 import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionDataRecorder;
+import org.elasql.perf.tpart.mdp.bandit.model.BanditModel;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
@@ -35,10 +36,11 @@ public class RoutingBanditActuator extends Task {
 	private final BlockingQueue<BanditTransactionData> queue = new LinkedBlockingQueue<>();
 
 	private final BanditTransactionDataRecorder banditTransactionDataRecorder = new BanditTransactionDataRecorder();
+	
+	private final BanditModel model;
 
-	private final BlockingQueue<ModelUpdateData> pendingModelData = new LinkedBlockingQueue<>();
-
-	public RoutingBanditActuator() {
+	public RoutingBanditActuator(BanditModel model) {
+		this.model = model;
 	}
 
 	public void addTransactionData(BanditTransactionData banditTransactionData) {
@@ -57,23 +59,24 @@ public class RoutingBanditActuator extends Task {
 			logger.info("Starting the routing bandit actuator");
 
 		ArrayList<BanditTransactionData> pendingList = new ArrayList<>();
+		long lastTxNum = -1;
 
 		while (true) {
 			try {
 				BanditTransactionData banditTransactionData = queue.poll(POLL_TIME_OUT, TimeUnit.MILLISECONDS);
 
 				if (banditTransactionData != null) {
+					lastTxNum = banditTransactionData.getTransactionNumber();
 					pendingList.add(banditTransactionData);
 					banditTransactionDataRecorder.record(banditTransactionData);
 
 					if (pendingList.size() >= MAX_BATCH_SIZE) {
-						// Issue an update transaction
-						issueRewardUpdateTransaction(pendingList);
+						updateModel(lastTxNum, pendingList);
 						pendingList.clear();
 					}
 				} else {
 					if (pendingList.size() > 0) {
-						issueRewardUpdateTransaction(pendingList);
+						updateModel(lastTxNum, pendingList);
 						pendingList.clear();
 					}
 				}
@@ -92,45 +95,9 @@ public class RoutingBanditActuator extends Task {
 			}
 		}
 	}
-
-	private void issueRewardUpdateTransaction(List<BanditTransactionData> banditTransactionDataList) {
-//		ArrayList<BanditTransactionData> normalizedBanditTransactionDataList = new ArrayList<>(banditTransactionDataList.size());
-//
-//		double minReward = banditTransactionDataList.stream().mapToDouble(BanditTransactionData::getReward).min().orElse(Double.NaN);
-//		double maxReward = banditTransactionDataList.stream().mapToDouble(BanditTransactionData::getReward).max().orElse(Double.NaN);
-//		if (Double.isNaN(minReward) || Double.isNaN(maxReward)) {
-//			throw new RuntimeException("Min or max of rewards is NaN");
-//		}
-//		double rewardRange = maxReward != minReward ? maxReward - minReward : maxReward;
-//
-//		for (BanditTransactionData banditTransactionData : banditTransactionDataList) {
-//			BanditTransactionData.Builder builder = new BanditTransactionData.Builder();
-//			long txNum = banditTransactionData.getTransactionNumber();
-//			double reward = (banditTransactionData.getReward() - minReward) / rewardRange;
-//			builder.addTransactionArm(new BanditTransactionArm(txNum, banditTransactionData.getArm()));
-//			builder.addBanditTransactionContext(new BanditTransactionContext(txNum, banditTransactionData.getContext()));
-//			builder.addTransactionReward(new BanditTransactionReward(txNum, reward));
-//			normalizedBanditTransactionDataList.add(builder.build());
-//		}
-//
-//
-//		Object[] params = normalizedBanditTransactionDataList.toArray();
-		Object[] params = new Object[0];
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-			try {
-				pendingModelData.put(new ModelUpdateData(banditTransactionDataList));
-			} catch (InterruptedException e) {
-				throw new RuntimeException(e);
-			}
-		}
-
-		// Send a store procedure call
-		Elasql.connectionMgr().sendStoredProcedureCall(false,
-				BanditStoredProcedureFactory.SP_BANDIT_RECEIVE_REWARDS, params);
-	}
-
-	public ModelUpdateData getModelUpdateData() {
-		return pendingModelData.poll();
+	
+	private void updateModel(long lastTxNum, List<BanditTransactionData> banditTransactionDataList) {
+		model.receiveReward(lastTxNum, new ModelUpdateData(banditTransactionDataList));
 	}
 
 	public static class ModelUpdateData {

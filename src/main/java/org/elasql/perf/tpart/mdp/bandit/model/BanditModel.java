@@ -36,13 +36,9 @@ public class BanditModel {
 	}
 
 	private final BanditModelUpdater banditModelUpdater;
-	private final RoutingBanditActuator routingBanditActuator;
 	private LinUCB model;
 
-	public BanditModel(RoutingBanditActuator routingBanditActuator) {
-		if (routingBanditActuator == null) {
-			throw new NullPointerException(RoutingBanditActuator.class.getName() + " can not be null");
-		}
+	public BanditModel() {
 		switch (LIN_UCB_TYPE) {
 		case LIN_UCB:
 			model = new LinUCB(NUMBER_OF_CONTEXT, PartitionMetaMgr.NUM_PARTITIONS, ALPHA);
@@ -62,7 +58,6 @@ public class BanditModel {
 		default:
 			throw new RuntimeException("Unknown operation mode" + OPERATION_MODE);
 		}
-		this.routingBanditActuator = routingBanditActuator;
 		this.banditModelUpdater = new BanditModelUpdater();
 		Elasql.taskMgr().runTask(banditModelUpdater);
 	}
@@ -79,13 +74,13 @@ public class BanditModel {
 		return model.chooseArm(context);
 	}
 
-	public void receiveReward(long transactionNumber) {
+	public void receiveReward(long lastTxNum, RoutingBanditActuator.ModelUpdateData modelUpdateData) {
 		long startTime = System.nanoTime();
 
-		RoutingBanditActuator.ModelUpdateData modelUpdateData = routingBanditActuator.getModelUpdateData();
 		if (modelUpdateData == null) {
 			throw new RuntimeException("Model update data is not ready");
 		}
+		
 		RealVector[] context = modelUpdateData.getContext();
 		int[] arm = modelUpdateData.getArm();
 		double[] reward = modelUpdateData.getReward();
@@ -97,7 +92,7 @@ public class BanditModel {
 			copiedModel = new LinUCB(model);
 		}
 
-		banditModelUpdater.receiveRewards(copiedModel, transactionNumber, context, arm, reward);
+		banditModelUpdater.receiveRewards(copiedModel, lastTxNum, context, arm, reward);
 
 		// Debug
 		logger.info(String.format("Receive rewards for %d transactions. Takes %f µs. Sample: %s", context.length,

@@ -12,7 +12,6 @@ import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionDataCollector;
 import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionReward;
 import org.elasql.perf.tpart.mdp.bandit.model.BanditModel;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
-import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -31,18 +30,13 @@ public class BanditAgent implements CentralRoutingAgent {
 	public BanditAgent() {
 		dataCollector = new BanditTransactionDataCollector();
 		contextFactory = new BanditTransactionContextFactory();
-		actuator = new RoutingBanditActuator();
-		model = new BanditModel(actuator);
+		model = new BanditModel();
+		actuator = new RoutingBanditActuator(model);
 		Elasql.taskMgr().runTask(actuator);
 	}
 
 	@Override
 	public Route suggestRoute(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
-		if (task.getProcedureType() == ProcedureType.BANDIT) {
-			model.receiveReward(task.getTxNum());
-			return null;
-		}
-		
 		State state = env.getCurrentState(graph, task, metricWarehouse);
 		
 		// Cache the state for later training
