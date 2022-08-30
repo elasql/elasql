@@ -10,15 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
-import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionArm;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionContextFactory;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
-import org.elasql.perf.tpart.bandit.model.BanditModel;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
-import org.elasql.perf.tpart.rl.agent.Agent;
 import org.elasql.perf.tpart.workload.FeatureExtractor;
 import org.elasql.perf.tpart.workload.TransactionDependencyRecorder;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
@@ -50,11 +42,6 @@ public class SpCallPreprocessor extends Task {
 	static {
 //		TimerStatistics.startReporting(5);
 	}
-	
-	private final BanditTransactionDataCollector banditTransactionDataCollector;
-	private final BanditTransactionContextFactory banditTransactionContextFactory;
-	private final BanditModel banditModel;
-	private final RoutingBanditActuator banditActuator;
 
 	private BlockingQueue<StoredProcedureCall> spcQueue;
 	private FeatureExtractor featureExtractor;
@@ -65,13 +52,12 @@ public class SpCallPreprocessor extends Task {
 	private TGraph graph;
 	private boolean isBatching;
 	private Estimator performanceEstimator;
-	private Agent agent;
+	private CentralRoutingAgent routingAgent;
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
 
 	// XXX: Cache last tx's routing destination
 	private int lastTxRoutingDest = -1;
 	
-	// for rl 
 	private ConcurrentHashMap<Long, Long> txStartTimes = new ConcurrentHashMap<Long, Long>();
 
 	// For collecting features
@@ -83,10 +69,7 @@ public class SpCallPreprocessor extends Task {
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory,
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, TpartMetricWarehouse metricWarehouse,
-			Estimator performanceEstimator, Agent agent, BanditTransactionDataCollector banditTransactionDataCollector,
-			RoutingBanditActuator routingBanditActuator,
-			  BanditTransactionContextFactory banditTransactionContextFactory,
-			  RoutingBanditActuator banditActuator) {
+			Estimator performanceEstimator, CentralRoutingAgent routingAgent) {
 
 		// For generating execution plan and sp task
 		this.factory = factory;
@@ -94,11 +77,8 @@ public class SpCallPreprocessor extends Task {
 		this.graph = graph;
 		this.isBatching = isBatching;
 		this.performanceEstimator = performanceEstimator;
-		this.agent = agent;
-		this.banditActuator = banditActuator;
+		this.routingAgent = routingAgent;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-		this.banditTransactionDataCollector = banditTransactionDataCollector;
-		this.banditTransactionContextFactory = banditTransactionContextFactory;
 
 		// For collecting features
 		this.metricWarehouse = metricWarehouse;
@@ -109,12 +89,6 @@ public class SpCallPreprocessor extends Task {
 			featureRecorder.startRecording();
 			dependencyRecorder = new TransactionDependencyRecorder();
 			dependencyRecorder.startRecording();
-		}
-		
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-			banditModel = new BanditModel(routingBanditActuator);
-		} else {
-			banditModel = null;
 		}
 	}
 
@@ -127,20 +101,12 @@ public class SpCallPreprocessor extends Task {
 		long txLatency = (System.nanoTime() / 1000) - txStartTimes.remove(txNum);
 		
 		// collect rl's action and reward
-		if (agent != null) {
-			agent.onTxCommit(txNum, masterId, txLatency);
+		if (routingAgent != null) {
+			routingAgent.onTxCommitted(txNum, masterId, txLatency);
 		}
 		
 		featureExtractor.onTransactionCommit(txNum);
 		timeRelatedFeatureMgr.onTxCommit(masterId);
-		
-		if (banditTransactionContextFactory != null && Agent.REWARD_TYPE == 0) {
-			double reward = (float) 100.0f / (float) txLatency;
-
-			BanditTransactionReward banditTransactionReward = new BanditTransactionReward(txNum, reward);
-			banditActuator.addTransactionData(
-					banditTransactionDataCollector.addRewardAndTakeOut(banditTransactionReward));
-		}
 	}
 
 	@Override
@@ -217,15 +183,6 @@ public class SpCallPreprocessor extends Task {
 		if (task.getProcedureType() == ProcedureType.CONTROL){
 			return;
 		}
-		if (task.getProcedureType() == ProcedureType.BANDIT) {
-			if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-				return;
-			}
-			TransactionProfiler.getLocalProfiler().startComponentProfiler("receive reward");
-			banditModel.receiveReward(spc.getTxNum());
-			TransactionProfiler.getLocalProfiler().stopComponentProfiler("receive reward");
-			return;
-		}
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 
 		// records must be read from disk if they are never read.
@@ -245,40 +202,10 @@ public class SpCallPreprocessor extends Task {
 			// Save the estimation
 			spc.setMetadata(estimation.toBytes());
 			task.setEstimation(estimation);
-			
-		// Bandit has no performanceEstimator
-		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-			// Set transaction features that used in bandit
-			TransactionProfiler.getLocalProfiler().startComponentProfiler("context");
-			BanditTransactionContext banditTransactionContext = banditTransactionContextFactory.buildContext(task.getTxNum(), features);
-			TransactionProfiler.getLocalProfiler().stopComponentProfiler("context");
-			
-			TransactionProfiler.getLocalProfiler().startComponentProfiler("choose arm");
-			int arm = banditModel.chooseArm(task.getTxNum(), banditTransactionContext.getContext());
-			TransactionProfiler.getLocalProfiler().stopComponentProfiler("choose arm");
-			
-			banditTransactionDataCollector.addContext(banditTransactionContext);
-			banditTransactionDataCollector.addArm(new BanditTransactionArm(spc.getTxNum(), arm));
-
-			banditTransactionContextFactory.addPartitionLoad(arm);
-
-			if(Agent.REWARD_TYPE == 1) {
-				double reward = calculateReward(features, arm);
-	
-				BanditTransactionReward banditTransactionReward = new BanditTransactionReward(task.getTxNum(), reward);
-				banditActuator.addTransactionData(
-						banditTransactionDataCollector.addRewardAndTakeOut(banditTransactionReward));
-			}
-			spc.setRoute(new Route(arm));
-			task.setRoute(new Route(arm));
 		}
 		
-		if (agent != null) {
-
-			TransactionProfiler.getLocalProfiler().startComponentProfiler("React");
-			Route route = agent.react(graph, task, metricWarehouse);
-			TransactionProfiler.getLocalProfiler().stopComponentProfiler("React");
-			
+		if (routingAgent != null) {
+			Route route = routingAgent.suggestRoute(graph, task, metricWarehouse);
 			spc.setRoute(route);
 			task.setRoute(route);
 		}
@@ -297,13 +224,11 @@ public class SpCallPreprocessor extends Task {
 			}
 		}
 		
-		TransactionProfiler.getLocalProfiler().startComponentProfiler("OnTxRouting");
-		if (agent != null) {
+		if (routingAgent != null) {
 			for (TxNode node : graph.getTxNodes()) {
-				agent.onTxRouting(node.getTxNum(), node.getPartId());
+				routingAgent.onTxRouted(node.getTxNum(), node.getPartId());
 			}
 		}
-		TransactionProfiler.getLocalProfiler().stopComponentProfiler("OnTxRouting");
 
 		// add write back edges
 		graph.addWriteBackEdge();
@@ -316,21 +241,5 @@ public class SpCallPreprocessor extends Task {
 		for (PrimaryKey key : task.getReadSet()) {
 			keyHasBeenRead.add(key);
 		}
-	}
-
-	private double calculateReward(TransactionFeatures features, int arm) {
-		Integer[] readDataDistributions = (Integer[]) features.getFeature("Read Data Distribution");
-		Integer[] writeDataDistributions = (Integer[]) features.getFeature("Write Data Distribution");
-
-		int readWriteCount = 0;
-		for (int i = 0; i < readDataDistributions.length; i++) {
-			readWriteCount += readDataDistributions[i] + writeDataDistributions[i];
-		}
-
-		double readRecordScore = ((double) (readDataDistributions[arm] + writeDataDistributions[arm]) / (double) readWriteCount);
-		double loadBalScore = 1 - banditTransactionContextFactory.getPartitionLoad(arm);
-		double reward = readRecordScore + loadBalScore;
-
-		return reward;
 	}
 }

@@ -1,7 +1,7 @@
 package org.elasql.perf.tpart.workload;
 
 import org.apache.commons.math3.linear.RealVectorFormat;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionData;
+import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionData;
 import org.elasql.server.Elasql;
 import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;

@@ -7,17 +7,15 @@ import org.elasql.perf.TransactionMetricReport;
 import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
-import org.elasql.perf.tpart.bandit.RoutingBanditActuator;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionContextFactory;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionDataCollector;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionReward;
 import org.elasql.perf.tpart.ai.SumMaxEstimator;
 import org.elasql.perf.tpart.control.RoutingControlActuator;
-import org.elasql.perf.tpart.metric.*;
-import org.elasql.perf.tpart.rl.agent.Agent;
-import org.elasql.perf.tpart.rl.agent.FullyOfflineAgent;
-import org.elasql.perf.tpart.rl.agent.OfflineAgent;
-import org.elasql.perf.tpart.rl.agent.OnlineAgent;
+import org.elasql.perf.tpart.mdp.bandit.BanditAgent;
+import org.elasql.perf.tpart.mdp.rl.agent.FullyOfflineAgent;
+import org.elasql.perf.tpart.mdp.rl.agent.OfflineAgent;
+import org.elasql.perf.tpart.mdp.rl.agent.OnlineAgent;
+import org.elasql.perf.tpart.metric.MetricCollector;
+import org.elasql.perf.tpart.metric.TPartSystemMetrics;
+import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
@@ -47,13 +45,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
 
-		RoutingBanditActuator routingBanditActuator = newAndRunRoutingBanditActuator();
-		BanditTransactionDataCollector banditTransactionDataCollector = newBanditTransactionCollector();
-		BanditTransactionContextFactory banditTransactionContextFactory = newBanditTransactionContextFactory();
-
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator(), newAgent(), banditTransactionDataCollector, routingBanditActuator,
-				banditTransactionContextFactory, routingBanditActuator);
+				metricWarehouse, newEstimator(), newRoutingAgent());
 
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
@@ -61,13 +54,9 @@ public class TPartPerformanceManager implements PerformanceManager {
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
 			RoutingControlActuator actuator = new RoutingControlActuator(metricWarehouse);
 			Elasql.taskMgr().runTask(actuator);
-			return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, actuator);
-		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-			return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, banditTransactionDataCollector,
-					routingBanditActuator);
 		}
 
-		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, null);
+		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse);
 	}
 
 	public static TPartPerformanceManager newForDbServer() {
@@ -94,76 +83,35 @@ public class TPartPerformanceManager implements PerformanceManager {
 		}
 	}
 	
-	private static Agent newAgent() {
-		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_RL) {
+	private static CentralRoutingAgent newRoutingAgent() {
+		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_RL) {
+			switch (RL_TYPE) {
+			case 0:
+				return new FullyOfflineAgent();
+			case 1:
+				return new OfflineAgent();
+			case 2:
+				return new OnlineAgent();
+			default:
+				throw new IllegalArgumentException("Not supported");
+			}
+		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+			return new BanditAgent();
+		} else {
 			return null;
 		}
-		
-		switch (RL_TYPE) {
-		case 0:
-			return new FullyOfflineAgent();
-		case 1:
-			return new OfflineAgent();
-		case 2:
-			return new OnlineAgent();
-//		case 3:
-//			return new BanditAgent();
-		default:
-			throw new IllegalArgumentException("Not supported");
-		}
-	}
-
-	private static BanditTransactionDataCollector newBanditTransactionCollector() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-			return new BanditTransactionDataCollector();
-		}
-
-		return null;
-	}
-
-	private static BanditTransactionContextFactory newBanditTransactionContextFactory() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-			return new BanditTransactionContextFactory();
-		}
-
-		return null;
-	}
-
-	private static RoutingBanditActuator newAndRunRoutingBanditActuator() {
-		RoutingBanditActuator routingBanditActuator = null;
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
-			routingBanditActuator = new RoutingBanditActuator();
-			Elasql.taskMgr().runTask(routingBanditActuator);
-		}
-
-		return routingBanditActuator;
 	}
 
 	// On the sequencer
 	private SpCallPreprocessor spCallPreprocessor;
 	private TpartMetricWarehouse metricWarehouse;
-	private RoutingControlActuator actuator;
-	private Agent agent;
-	private BanditTransactionDataCollector banditTransactionDataCollector;
-	private RoutingBanditActuator banditActuator;
-
-
+	
 	// On each DB machine
 	private MetricCollector localMetricCollector;
 
-	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse,
-			RoutingControlActuator actuator) {
+	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse) {
 		this.spCallPreprocessor = spCallPreprocessor;
 		this.metricWarehouse = metricWarehouse;
-		this.actuator = actuator;
-	}
-
-	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse,
-									BanditTransactionDataCollector banditTransactionDataCollector, RoutingBanditActuator banditActuator) {
-		this.spCallPreprocessor = spCallPreprocessor;
-		this.metricWarehouse = metricWarehouse;
-		this.banditTransactionDataCollector = banditTransactionDataCollector;
-		this.banditActuator = banditActuator;
 	}
 
 	private TPartPerformanceManager(MetricCollector localMetricCollector) {
@@ -193,10 +141,10 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	@Override
 	public void receiveTransactionMetricReport(TransactionMetricReport report) {
-		if (banditTransactionDataCollector == null || banditActuator == null) {
-			throw new RuntimeException("Cannot receive transaction metric report");
-		}
-		banditActuator.addTransactionData(banditTransactionDataCollector.addRewardAndTakeOut((BanditTransactionReward) report));
+//		if (banditTransactionDataCollector == null || banditActuator == null) {
+//			throw new RuntimeException("Cannot receive transaction metric report");
+//		}
+//		banditActuator.addTransactionData(banditTransactionDataCollector.addRewardAndTakeOut((BanditTransactionReward) report));
 	}
 
 	@Override

@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
-import org.elasql.perf.tpart.bandit.data.BanditTransactionContext;
+import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionContext;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
