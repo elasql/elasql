@@ -7,7 +7,6 @@ import org.elasql.perf.tpart.mdp.rl.model.TrainedBCQ;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.Route;
-import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.vanilladb.core.util.TransactionProfiler;
@@ -20,7 +19,6 @@ public class FullyOfflineAgent extends RlAgent {
 	public Route suggestRoute(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		TransactionProfiler.getLocalProfiler().startComponentProfiler("Prepare state");
 		float[] state = getCurrentState(graph, task, metricWarehouse);
-		int[] remote = countRemote(graph, task);
 		TransactionProfiler.getLocalProfiler().stopComponentProfiler("Prepare state");
 		Route action = null;
 		if (task.getTxNum() < startTrainTxNum) {

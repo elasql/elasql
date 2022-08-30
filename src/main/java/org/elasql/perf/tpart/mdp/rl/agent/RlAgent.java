@@ -19,8 +19,6 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
-import org.elasql.sql.PrimaryKey;
-import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.vanilladb.core.server.task.Task;
 
 import ai.djl.ndarray.NDManager;
@@ -117,32 +115,6 @@ public abstract class RlAgent implements CentralRoutingAgent {
 			float reward = env.calcReward(state, masterId, latency);
 			memory.setStep(txNum, state.toFloatArray(), masterId, reward, false);
 		}
-	}
-	
-	/// XXX
-	protected int[] countRemote(TGraph graph, TPartStoredProcedureTask task) {
-		int[] remote = new int[PartitionMetaMgr.NUM_PARTITIONS];
-		for (int partId = 0; partId < PartitionMetaMgr.NUM_PARTITIONS; partId++) {
-			remote[partId] = countRemoteReadEdge(graph, task, partId);
-		}
-		return remote;
-	}
-
-	/// XXX
-	private int countRemoteReadEdge(TGraph graph, TPartStoredProcedureTask task, int partId) {
-		int remoteEdgeCount = 0;
-
-		for (PrimaryKey key : task.getReadSet()) {
-			// Skip replicated records
-			if (Elasql.partitionMetaMgr().isFullyReplicated(key))
-				continue;
-
-			if (graph.getResourcePosition(key).getPartId() != partId) {
-				remoteEdgeCount++;
-			}
-		}
-
-		return remoteEdgeCount;
 	}
 
 	public float[] getCurrentState(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
