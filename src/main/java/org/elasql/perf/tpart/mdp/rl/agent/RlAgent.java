@@ -1,7 +1,9 @@
 package org.elasql.perf.tpart.mdp.rl.agent;
 
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,6 +29,23 @@ import ai.djl.translate.TranslateException;
 public abstract class RlAgent implements CentralRoutingAgent {
 
 	private static Logger logger = Logger.getLogger(RlAgent.class.getName());
+	
+	private static class Step {
+		long txNum;
+		float[] state;
+		int action;
+		float reward;
+		boolean mask;
+		
+		public Step(long txNum, float[] state, int action, float reward,
+			boolean mask) {
+			this.txNum = txNum;
+			this.state = state;
+			this.action = action;
+			this.reward = reward;
+			this.mask = mask;
+		}
+	}
 
 	protected BaseAgent agent;
 	protected TrainedAgent trainedAgent;
@@ -34,11 +53,10 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	protected int episode = 2_000;
 	protected Memory memory = new Memory(20_000);
 	protected Trainer trainer = new Trainer();
+	
 	protected Map<Long, State> cachedStates = new ConcurrentHashMap<Long, State>();
 
 	private boolean isEval = false;
-	
-	private TransactionRoutingEnvironment env = new TransactionRoutingEnvironment();
 	
 	protected boolean prepared = false;
 	protected boolean firstTime = true;
@@ -47,6 +65,9 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	protected int trainingPeriod = 5_000;
 
 	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+	
+	private TransactionRoutingEnvironment env = new TransactionRoutingEnvironment();
+	private final BlockingQueue<Step> stepQueue = new LinkedBlockingQueue<Step>();
 
 	public class Trainer extends Task {
 		private boolean train = false;
@@ -58,6 +79,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 			while (true) {
 				if (train) {
 					episode = 100;
+					drainStepQueue();
 					updateAgent(episode);
 					train = false;
 				} else {
@@ -72,6 +94,13 @@ public abstract class RlAgent implements CentralRoutingAgent {
 
 		public void train() {
 			train = true;
+		}
+		
+		private void drainStepQueue() {
+			Step step = null;
+			while ((step = stepQueue.poll()) != null) {
+				memory.setStep(step.txNum, step.state, step.action, step.reward, step.mask);
+			}
 		}
 	}
 
@@ -113,7 +142,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 				throw new RuntimeException("Cannot find cached state for tx." + txNum);
 			
 			float reward = env.calcReward(state, masterId, latency);
-			memory.setStep(txNum, state.toFloatArray(), masterId, reward, false);
+			stepQueue.add(new Step(txNum, state.toFloatArray(), masterId, reward, false));
 		}
 	}
 
