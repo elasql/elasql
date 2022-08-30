@@ -2,7 +2,6 @@ package org.elasql.perf.tpart.mdp.rl.util;
 
 import java.util.Random;
 
-import org.elasql.perf.tpart.mdp.rl.agent.RlAgent;
 import org.elasql.util.ElasqlProperties;
 
 import ai.djl.ndarray.NDArray;

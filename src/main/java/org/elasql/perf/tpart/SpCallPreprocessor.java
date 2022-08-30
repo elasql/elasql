@@ -170,9 +170,9 @@ public class SpCallPreprocessor extends Task {
 	}
 
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		if (task.getProcedureType() == ProcedureType.CONTROL){
+		if (task.getProcedureType() == ProcedureType.CONTROL)
 			return;
-		}
+		
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
 
 		// records must be read from disk if they are never read.
