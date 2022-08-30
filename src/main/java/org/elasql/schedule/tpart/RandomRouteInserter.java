@@ -3,7 +3,6 @@ package org.elasql.schedule.tpart;
 import java.util.List;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 

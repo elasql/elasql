@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.perf.tpart.ai.Estimator;
@@ -57,8 +56,6 @@ public class SpCallPreprocessor extends Task {
 
 	// XXX: Cache last tx's routing destination
 	private int lastTxRoutingDest = -1;
-	
-	private ConcurrentHashMap<Long, Long> txStartTimes = new ConcurrentHashMap<Long, Long>();
 
 	// For collecting features
 	private TpartMetricWarehouse metricWarehouse;
@@ -97,10 +94,7 @@ public class SpCallPreprocessor extends Task {
 			spcQueue.add(spc);
 	}
 
-	public void onTransactionCommit(long txNum, int masterId) {
-		long txLatency = (System.nanoTime() / 1000) - txStartTimes.remove(txNum);
-		
-		// collect rl's action and reward
+	public void onTransactionCommit(long txNum, int masterId, long txLatency) {
 		if (routingAgent != null) {
 			routingAgent.onTxCommitted(txNum, masterId, txLatency);
 		}
@@ -131,9 +125,6 @@ public class SpCallPreprocessor extends Task {
 
 				// Get the read-/write-set by creating a SP task
 				TPartStoredProcedureTask task = createSpTask(spc);
-				
-				// Record start time to calculate latency for rl agent
-				txStartTimes.put(task.getTxNum(), System.nanoTime() / 1000);
 				
 				// Add normal SPs to the task batch
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
@@ -173,7 +164,7 @@ public class SpCallPreprocessor extends Task {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null, null);
+					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null);
 		}
 
 		return null;

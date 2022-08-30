@@ -4,7 +4,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.ai.TransactionEstimation;
-import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionContext;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.remote.groupcomm.Route;
@@ -22,8 +21,6 @@ public class TPartStoredProcedureTask
 //		TimerStatistics.startReporting();
 	}
 
-	private BanditTransactionContext banditTransactionContext;
-
 	private TPartStoredProcedure<?> tsp;
 	private int clientId, connectionId, parId;
 	private long txNum;
@@ -37,7 +34,7 @@ public class TPartStoredProcedureTask
 
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long arrivedTime,
 			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation,
-			BanditTransactionContext banditTransactionContext, Route route) {
+			Route route) {
 		super(cid, connId, txNum, sp);
 		this.clientId = cid;
 		this.connectionId = connId;
@@ -46,7 +43,6 @@ public class TPartStoredProcedureTask
 		this.profiler = profiler;
 		this.tsp = sp;
 		this.estimation = estimation;
-		this.banditTransactionContext = banditTransactionContext;
 		this.route = route;
 	}
 
@@ -80,7 +76,8 @@ public class TPartStoredProcedureTask
 			}
 
 			// Notify the sequencer that this transaction commits
-			Elasql.connectionMgr().sendCommitNotification(txNum);
+			long txLatency = profiler.getExecutionTime();
+			Elasql.connectionMgr().sendCommitNotification(txNum, txLatency);
 
 			// TODO: Uncomment this when the migration module is migrated
 //			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {
@@ -176,13 +173,5 @@ public class TPartStoredProcedureTask
 
 	public TransactionEstimation getEstimation() {
 		return estimation;
-	}
-
-	public BanditTransactionContext getBanditTransactionContext() {
-		return banditTransactionContext;
-	}
-
-	public void setBanditTransactionContext(BanditTransactionContext banditTransactionContext) {
-		this.banditTransactionContext = banditTransactionContext;
 	}
 }

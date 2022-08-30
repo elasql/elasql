@@ -3,7 +3,6 @@ package org.elasql.perf.tpart;
 import org.elasql.perf.MetricReport;
 import org.elasql.perf.MetricWarehouse;
 import org.elasql.perf.PerformanceManager;
-import org.elasql.perf.TransactionMetricReport;
 import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
@@ -140,20 +139,12 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	@Override
-	public void receiveTransactionMetricReport(TransactionMetricReport report) {
-//		if (banditTransactionDataCollector == null || banditActuator == null) {
-//			throw new RuntimeException("Cannot receive transaction metric report");
-//		}
-//		banditActuator.addTransactionData(banditTransactionDataCollector.addRewardAndTakeOut((BanditTransactionReward) report));
-	}
-
-	@Override
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
 	}
 
 	@Override
-	public void onTransactionCommit(long txNum, int masterId) {
-		spCallPreprocessor.onTransactionCommit(txNum, masterId);
+	public void onTransactionCommit(long txNum, int masterId, long txLatency) {
+		spCallPreprocessor.onTransactionCommit(txNum, masterId, txLatency);
 	}
 }

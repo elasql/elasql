@@ -43,13 +43,6 @@ public interface PerformanceManager {
 	void receiveMetricReport(MetricReport report);
 
 	/**
-	 * Receives transaction metric report from master node.
-	 *
-	 * @param report the transaction latency report
-	 */
-	void receiveTransactionMetricReport(TransactionMetricReport report);
-
-	/**
 	 * Get the instance of MetricWarehouse.
 	 */
 	MetricWarehouse getMetricWarehouse();
@@ -57,5 +50,5 @@ public interface PerformanceManager {
 	/**
 	 * Receives a commit message of a transaction.
 	 */
-	void onTransactionCommit(long txNum, int masterId);
+	void onTransactionCommit(long txNum, int masterId, long txLatency);
 }

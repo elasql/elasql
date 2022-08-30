@@ -1,7 +1,6 @@
 package org.elasql.schedule.tpart;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -11,9 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.math3.linear.ArrayRealVector;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
-import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionContext;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -116,8 +113,7 @@ public class TPartScheduler extends Task implements Scheduler {
 //				}
 
 				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL ||
-						task.getProcedureType() == ProcedureType.BANDIT) {
+						task.getProcedureType() == ProcedureType.CONTROL) {
 					batchedTasks.add(task);
 				}
 
@@ -182,7 +178,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, null, null, null,
+					call.getTxNum(), call.getArrivedTime(), profiler, null, null,
 					call.getRoute());
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
@@ -193,25 +189,15 @@ public class TPartScheduler extends Task implements Scheduler {
 			
 			// Take out the transaction estimation
 			TransactionEstimation estimation = null;
-			BanditTransactionContext banditTransactionContext = null;
-			int assignedPartition = -1;
-			Serializable metadata = call.getMetadata();
-			if (metadata != null) {
-				if (metadata.getClass().equals(byte[].class)) {
-					byte[] data = (byte[]) metadata;
+			if (call.getMetadata() != null) {
+				if (call.getMetadata().getClass().equals(byte[].class)) {
+					byte[] data = (byte[]) call.getMetadata();
 					estimation = TransactionEstimation.fromBytes(data);
-				} else if (metadata instanceof ArrayRealVector) {
-					ArrayRealVector context = (ArrayRealVector) metadata;
-					banditTransactionContext = new BanditTransactionContext(call.getTxNum(), context);
-				}// else if (metadata.getClass().equals(Integer.class)) {
-//					assignedPartition = (int) metadata;
-//					call.setRoute(assignedPartition);
-//				}
+				}
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, banditTransactionContext,
-					call.getRoute());
+					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, call.getRoute());
 		}
 	}
 

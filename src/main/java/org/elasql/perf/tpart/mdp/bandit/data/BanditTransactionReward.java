@@ -1,8 +1,6 @@
 package org.elasql.perf.tpart.mdp.bandit.data;
 
-import org.elasql.perf.TransactionMetricReport;
-
-public class BanditTransactionReward implements TransactionMetricReport {
+public class BanditTransactionReward {
 	private final long txNum;
 	private final double reward;
 

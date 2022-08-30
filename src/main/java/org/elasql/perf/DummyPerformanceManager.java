@@ -26,17 +26,12 @@ public class DummyPerformanceManager implements PerformanceManager {
 	}
 
 	@Override
-	public void receiveTransactionMetricReport(TransactionMetricReport report) {
-		// Do nothing
-	}
-
-	@Override
 	public MetricWarehouse getMetricWarehouse() {
 		throw new RuntimeException("Invalid function call on a dummy performance manager");
 	}
 	
 	@Override
-	public void onTransactionCommit(long txNum, int masterId) {
+	public void onTransactionCommit(long txNum, int masterId, long txLatency) {
 		// Do nothing
 	}
 }

@@ -27,7 +27,6 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.MetricReport;
-import org.elasql.perf.TransactionMetricReport;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.CommitNotification;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -77,9 +76,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				new ClientResponse(clientId, rteId, txNum, rs));
 	}
 	
-	public void sendCommitNotification(long txNum) {
+	public void sendCommitNotification(long txNum, long txLatency) {
 		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, 
-				new CommitNotification(txNum, Elasql.serverId()));
+				new CommitNotification(txNum, Elasql.serverId(), txLatency));
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
@@ -101,11 +100,6 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	}
 	
 	public void sendMetricReport(MetricReport report) {
-		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, report);
-	}
-
-	public void sendTransactionMetricReport(TransactionMetricReport report) {
-		// XXX: is vanilacomm thread safe?
 		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, report);
 	}
 
@@ -137,13 +131,11 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				flushTotalOrderMsgs();
 			} else if (message.getClass().equals(CommitNotification.class)) {
 				CommitNotification cn = (CommitNotification) message;
-				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum(), cn.getMasterId());
+				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum(),
+						cn.getMasterId(), cn.getTxLatency());
 			} else if (message instanceof MetricReport) {
 				MetricReport report = (MetricReport) message;
 				Elasql.performanceMgr().receiveMetricReport(report);
-			} else if (message instanceof TransactionMetricReport) {
-				TransactionMetricReport transactionMetricReport = (TransactionMetricReport) message;
-				Elasql.performanceMgr().receiveTransactionMetricReport(transactionMetricReport);
 			} else
 				throw new IllegalArgumentException("the sequencer doesn't know how to handle "
 						+ message);

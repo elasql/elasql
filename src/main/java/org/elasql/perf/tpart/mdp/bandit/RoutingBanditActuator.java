@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionData;
-import org.elasql.perf.tpart.workload.BanditTransactionDataRecorder;
+import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionDataRecorder;
 import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
