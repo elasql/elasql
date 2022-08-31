@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.elasql.perf.tpart.CentralRoutingAgent;
 import org.elasql.perf.tpart.mdp.State;
 import org.elasql.perf.tpart.mdp.TransactionRoutingEnvironment;
+import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionArm;
 import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionContext;
 import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionContextFactory;
 import org.elasql.perf.tpart.mdp.bandit.data.BanditTransactionDataCollector;
@@ -44,6 +45,10 @@ public class BanditAgent implements CentralRoutingAgent {
 		
 		BanditTransactionContext banditTransactionContext = contextFactory.buildContext(task.getTxNum(), state);
 		int arm = model.chooseArm(task.getTxNum(), banditTransactionContext.getContext());
+		
+		dataCollector.addContext(banditTransactionContext);
+		dataCollector.addArm(new BanditTransactionArm(task.getTxNum(), arm));
+		
 		return new Route(arm);
 	}
 

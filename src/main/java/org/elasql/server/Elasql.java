@@ -235,6 +235,7 @@ public class Elasql extends VanillaDb {
 		case LEAP: 
 		case HERMES_CONTROL:
 		case HERMES_RL:
+		case HERMES_BANDIT_SEQUENCER:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
@@ -360,6 +361,7 @@ public class Elasql extends VanillaDb {
 		case LEAP:
 		case HERMES_CONTROL:
 		case HERMES_RL:
+		case HERMES_BANDIT_SEQUENCER:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;

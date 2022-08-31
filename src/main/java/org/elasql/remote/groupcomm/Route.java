@@ -1,6 +1,8 @@
 package org.elasql.remote.groupcomm;
 
-public class Route {
+import java.io.Serializable;
+
+public class Route implements Serializable {
 	
 	private int destination;
 	
