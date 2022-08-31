@@ -7,7 +7,8 @@ import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.ai.SumMaxEstimator;
-import org.elasql.perf.tpart.control.RoutingControlActuator;
+import org.elasql.perf.tpart.control.ControlParamUpdater;
+import org.elasql.perf.tpart.control.PidControlAgent;
 import org.elasql.perf.tpart.mdp.bandit.BanditAgent;
 import org.elasql.perf.tpart.mdp.rl.agent.FullyOfflineAgent;
 import org.elasql.perf.tpart.mdp.rl.agent.OfflineAgent;
@@ -45,13 +46,13 @@ public class TPartPerformanceManager implements PerformanceManager {
 		Elasql.taskMgr().runTask(metricWarehouse);
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator(), newRoutingAgent());
+				metricWarehouse, newEstimator(), newRoutingAgent(metricWarehouse));
 
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
-			RoutingControlActuator actuator = new RoutingControlActuator(metricWarehouse);
+			ControlParamUpdater actuator = new ControlParamUpdater(metricWarehouse);
 			Elasql.taskMgr().runTask(actuator);
 		}
 
@@ -82,8 +83,11 @@ public class TPartPerformanceManager implements PerformanceManager {
 		}
 	}
 	
-	private static CentralRoutingAgent newRoutingAgent() {
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_RL) {
+	private static CentralRoutingAgent newRoutingAgent(TpartMetricWarehouse metricWarehouse) {
+		switch (Elasql.SERVICE_TYPE) {
+		case HERMES_CONTROL:
+			return new PidControlAgent(metricWarehouse);
+		case HERMES_RL:
 			switch (RL_TYPE) {
 			case 0:
 				return new FullyOfflineAgent();
@@ -94,9 +98,9 @@ public class TPartPerformanceManager implements PerformanceManager {
 			default:
 				throw new IllegalArgumentException("Not supported");
 			}
-		} else if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_BANDIT_SEQUENCER) {
+		case HERMES_BANDIT_SEQUENCER:
 			return new BanditAgent();
-		} else {
+		default:
 			return null;
 		}
 	}

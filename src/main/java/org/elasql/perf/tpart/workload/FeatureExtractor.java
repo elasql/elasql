@@ -1,7 +1,6 @@
 package org.elasql.perf.tpart.workload;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
@@ -47,8 +46,7 @@ public class FeatureExtractor {
 	 * @param graph the latest T-graph
 	 * @return the features of the stored procedure for cost estimation
 	 */
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph,
-			HashSet<PrimaryKey> keyHasBeenRead, int lastTxRoutingDest) {
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, FusionTGraph graph) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
@@ -60,7 +58,7 @@ public class FeatureExtractor {
 //		timeRelatedFeatureMgr.calculate(task.getArrivedTime());
 
 		// Extract the features
-		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum(), lastTxRoutingDest);
+		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
 		
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
 //		builder.addFeature("Start Time", task.getArrivedTime());
@@ -417,7 +415,7 @@ public class FeatureExtractor {
 		return newCounts;
 	}
 	
-	private int extractReadDataWithIO(Set<PrimaryKey> keys, HashSet<PrimaryKey> keyHasBeenRead) {
+	private int extractReadDataWithIO(Set<PrimaryKey> keys, FusionTGraph graph) {
 		int counts = 0;
 		
 		switch (Elasql.SERVICE_TYPE) {
@@ -426,7 +424,7 @@ public class FeatureExtractor {
 		case HERMES_CONTROL:
 		case HERMES_BANDIT_SEQUENCER:
 			for (PrimaryKey key : keys) {
-				if (!keyHasBeenRead.contains(key) ) {
+				if (graph.getCachedLocation(key) != -1) {
 					counts += 1;
 				}
 			}

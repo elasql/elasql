@@ -27,7 +27,6 @@ import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
-import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -41,7 +40,6 @@ import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.PresetRouter;
 import org.elasql.schedule.tpart.TPartScheduler;
-import org.elasql.schedule.tpart.control.ControlBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
@@ -240,7 +238,6 @@ public class Elasql extends VanillaDb {
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
-			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
 			scheduler = initTPartScheduler(tpartFactory);
 			break;
 		default:
@@ -298,7 +295,7 @@ public class Elasql extends VanillaDb {
 		case HERMES_CONTROL:
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new ControlBasedRouter(); 
+			inserter = new PresetRouter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
 			break; 
@@ -366,7 +363,6 @@ public class Elasql extends VanillaDb {
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
-			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
 			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
 		default:
@@ -404,7 +400,7 @@ public class Elasql extends VanillaDb {
 				break; 
 			case HERMES_CONTROL:
 				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new ControlBasedRouter();
+				inserter = new PresetRouter();
 				isBatching = false;
 				break; 
 			case HERMES_RL:

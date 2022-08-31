@@ -112,8 +112,7 @@ public class TPartScheduler extends Task implements Scheduler {
 //					continue;
 //				}
 
-				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
+				if (task.getProcedureType() == ProcedureType.NORMAL) {
 					batchedTasks.add(task);
 				}
 

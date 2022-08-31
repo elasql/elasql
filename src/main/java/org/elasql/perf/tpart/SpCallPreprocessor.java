@@ -26,6 +26,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
+import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
@@ -53,9 +54,6 @@ public class SpCallPreprocessor extends Task {
 	private Estimator performanceEstimator;
 	private CentralRoutingAgent routingAgent;
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
-
-	// XXX: Cache last tx's routing destination
-	private int lastTxRoutingDest = -1;
 
 	// For collecting features
 	private TpartMetricWarehouse metricWarehouse;
@@ -127,8 +125,7 @@ public class SpCallPreprocessor extends Task {
 				TPartStoredProcedureTask task = createSpTask(spc);
 				
 				// Add normal SPs to the task batch
-				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
+				if (task.getProcedureType() == ProcedureType.NORMAL) {
 					// Pre-process the transaction 
 					preprocess(spc, task);
 
@@ -170,17 +167,13 @@ public class SpCallPreprocessor extends Task {
 	}
 
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		if (task.getProcedureType() == ProcedureType.CONTROL)
-			return;
-		
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
+		TransactionFeatures features = featureExtractor.extractFeatures(task, (FusionTGraph) graph);
 
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
 
 		// Record the feature if necessary
-		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
-				task.getProcedureType() != ProcedureType.CONTROL) {
+		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
 		}
@@ -205,7 +198,7 @@ public class SpCallPreprocessor extends Task {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
 
-		lastTxRoutingDest = timeRelatedFeatureMgr.pushInfo(graph);
+		timeRelatedFeatureMgr.pushInfo(graph);
 
 		// Notify the estimator where the transactions are routed
 		if (performanceEstimator != null) {

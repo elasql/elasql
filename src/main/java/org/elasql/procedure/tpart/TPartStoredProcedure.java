@@ -30,7 +30,7 @@ import org.vanilladb.core.util.TransactionProfiler;
 public abstract class TPartStoredProcedure<H extends StoredProcedureParamHelper> extends StoredProcedure<H> {
 
 	public static enum ProcedureType {
-		NOP, NORMAL, UTILITY, MIGRATION, CONTROL
+		NOP, NORMAL, UTILITY, MIGRATION
 	}
 
 	// Protected resource
