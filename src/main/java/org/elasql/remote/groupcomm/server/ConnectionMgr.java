@@ -76,9 +76,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				new ClientResponse(clientId, rteId, txNum, rs));
 	}
 	
-	public void sendCommitNotification(long txNum) {
+	public void sendCommitNotification(long txNum, long txLatency) {
 		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, 
-				new CommitNotification(txNum, Elasql.serverId()));
+				new CommitNotification(txNum, Elasql.serverId(), txLatency));
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
@@ -131,7 +131,8 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				flushTotalOrderMsgs();
 			} else if (message.getClass().equals(CommitNotification.class)) {
 				CommitNotification cn = (CommitNotification) message;
-				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum(), cn.getMasterId());
+				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum(),
+						cn.getMasterId(), cn.getTxLatency());
 			} else if (message instanceof MetricReport) {
 				MetricReport report = (MetricReport) message;
 				Elasql.performanceMgr().receiveMetricReport(report);
@@ -237,7 +238,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 			e.printStackTrace();
 		}
 		profiler.addComponentProfile("OU0 - Broadcast", broadcastTime, 0, 0, networkSize, 0, 0);
-		profiler.startComponentProfiler("OU0 - ROUTE");
+		profiler.startComponentProfiler("OU0 - Dispatch to router");
 		
 		spc.setProfiler(TransactionProfiler.takeOut());
 	}

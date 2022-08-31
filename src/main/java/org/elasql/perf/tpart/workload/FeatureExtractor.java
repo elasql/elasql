@@ -1,7 +1,6 @@
 package org.elasql.perf.tpart.workload;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
@@ -28,10 +27,10 @@ public class FeatureExtractor {
 	
 	private DependencyTreeAnalyzer treeAnalyzer =
 			new DependencyTreeAnalyzer();
-	
+
 	private TpartMetricWarehouse metricWarehouse;
 	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
-	
+
 	public FeatureExtractor(TpartMetricWarehouse metricWarehouse, TimeRelatedFeatureMgr timeRelatedFeatureMgr) {
 		this.metricWarehouse = metricWarehouse;
 		this.timeRelatedFeatureMgr = timeRelatedFeatureMgr;
@@ -47,8 +46,7 @@ public class FeatureExtractor {
 	 * @param graph the latest T-graph
 	 * @return the features of the stored procedure for cost estimation
 	 */
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph,
-			HashSet<PrimaryKey> keyHasBeenRead, int lastTxRoutingDest) {
+	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, FusionTGraph graph) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
@@ -57,30 +55,32 @@ public class FeatureExtractor {
 					task.getTxNum(), lastProcessedTxNum));
 		
 		// Preprocess time related features
-		timeRelatedFeatureMgr.calculate(task.getArrivedTime());
-		
+//		timeRelatedFeatureMgr.calculate(task.getArrivedTime());
+
 		// Extract the features
-		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum(), lastTxRoutingDest);
+		TransactionFeatures.Builder builder = new TransactionFeatures.Builder(task.getTxNum());
 		
 		// Get features (all features in TransactionFeatures.FEATURE_KEYS must be set)
-		builder.addFeature("Start Time", task.getArrivedTime());
+//		builder.addFeature("Start Time", task.getArrivedTime());
 		
 		// Get features (tx type related)
-		builder.addFeature("Tx Type", task.getWeight());
+//		builder.addFeature("Tx Type", task.getWeight());
 		
 //		builder.addFeature("Number of Read Records", task.getReadSet().size());
 //		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
-		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
+//		builder.addFeature("Number of Insert Records", task.getInsertSet().size());
 //		builder.addFeature("Number of Fully Replicated Records", extractFullyReplicatedCount(task.getReadSet()));
-		
-		builder.addFeature("Remote Reads", extractRemoteDistribution(task.getReadSet(), graph));
+
+//		builder.addFeature("Remote Reads", extractRemoteDistribution(task.getReadSet(), graph));
 		builder.addFeature("Read Data Distribution", extractLocalDistribution(task.getReadSet(), graph));
 //		builder.addFeature("Read Data Distribution in Bytes", extractReadDistributionInBytes(task.getReadSet(), graph));
-		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
-		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
-		builder.addFeature("Update Data Distribution", extractLocalDistribution(task.getUpdateSet(), graph));
-//		
-		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
+//		builder.addFeature("Read Data in Cache Distribution", extractReadInCacheDistribution(task.getReadSet(), graph));
+//		builder.addFeature("Read Data with IO Distribution", extractReadDataWithIO(task.getReadSet(), keyHasBeenRead));
+//		builder.addFeature("Remote Writes", extractRemoteDistribution(task.getWriteSet(), graph));
+//		builder.addFeature("Update Data Distribution", extractLocalDistribution(task.getUpdateSet(), graph));
+		builder.addFeature("Write Data Distribution", extractLocalDistribution(task.getWriteSet(), graph));
+//
+//		builder.addFeature("Number of Overflows in Fusion Table", getFusionTableOverflowCount(graph));
 
 //		builder.addFeature("Buffer Hit Rate", extractBufferHitRate());
 //		builder.addFeature("Avg Pin Count", extractBufferAvgPinCount());
@@ -98,35 +98,35 @@ public class FeatureExtractor {
 //		builder.addFeature("Page SetVal Release Count", extractPageSetValReleaseCount());
 //
 		// Features below are from the servers
-		builder.addFeature("System CPU Load", extractSystemCpuLoad());
-		builder.addFeature("Process CPU Load", extractProcessCpuLoad());
-		builder.addFeature("System Load Average", extractSystemLoadAverage());
-		builder.addFeature("Thread Active Count", extractThreadActiveCount());
+//		builder.addFeature("System CPU Load", extractSystemCpuLoad());
+//		builder.addFeature("Process CPU Load", extractProcessCpuLoad());
+//		builder.addFeature("System Load Average", extractSystemLoadAverage());
+//		builder.addFeature("Thread Active Count", extractThreadActiveCount());
 		
 		// Features for i/o
-		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
-		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
-		builder.addFeature("I/O Queue Length", extractIOQueueLength());
-		
+//		builder.addFeature("I/O Read Bytes", extractIOReadBytes());
+//		builder.addFeature("I/O Write Bytes", extractIOWriteBytes());
+//		builder.addFeature("I/O Queue Length", extractIOQueueLength());
+
 		// Time-related features
-		builder.addFeature("Number of Read Record in Last 100 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(100));
-		builder.addFeature("Number of Read Record Excluding Cache in Last 100 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(100));
-		builder.addFeature("Number of Update Record in Last 100 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(100));
-		builder.addFeature("Number of Insert Record in Last 100 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(100));
-		builder.addFeature("Number of Commit Tx in Last 100 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(100));
-		
-		builder.addFeature("Number of Read Record in Last 500 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(500));
-		builder.addFeature("Number of Read Record Excluding Cache in Last 500 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(500));
-		builder.addFeature("Number of Update Record in Last 500 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(500));
-		builder.addFeature("Number of Insert Record in Last 500 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(500));
-		builder.addFeature("Number of Commit Tx in Last 500 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(500));
-		
-		builder.addFeature("Number of Read Record in Last 1000 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(1000));
-		builder.addFeature("Number of Read Record Excluding Cache in Last 1000 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(1000));
-		builder.addFeature("Number of Update Record in Last 1000 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(1000));
-		builder.addFeature("Number of Insert Record in Last 1000 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(1000));
-		builder.addFeature("Number of Commit Tx in Last 1000 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(1000));
-		
+//		builder.addFeature("Number of Read Record in Last 100 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(100));
+//		builder.addFeature("Number of Read Record Excluding Cache in Last 100 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(100));
+//		builder.addFeature("Number of Update Record in Last 100 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(100));
+//		builder.addFeature("Number of Insert Record in Last 100 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(100));
+//		builder.addFeature("Number of Commit Tx in Last 100 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(100));
+//
+//		builder.addFeature("Number of Read Record in Last 500 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(500));
+//		builder.addFeature("Number of Read Record Excluding Cache in Last 500 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(500));
+//		builder.addFeature("Number of Update Record in Last 500 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(500));
+//		builder.addFeature("Number of Insert Record in Last 500 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(500));
+//		builder.addFeature("Number of Commit Tx in Last 500 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(500));
+//
+//		builder.addFeature("Number of Read Record in Last 1000 us", timeRelatedFeatureMgr.getReadRecordNumInLastUs(1000));
+//		builder.addFeature("Number of Read Record Excluding Cache in Last 1000 us", timeRelatedFeatureMgr.getReadRecordExcludingCacheNumInLastUs(1000));
+//		builder.addFeature("Number of Update Record in Last 1000 us", timeRelatedFeatureMgr.getUpdateRecordNumInLastUs(1000));
+//		builder.addFeature("Number of Insert Record in Last 1000 us", timeRelatedFeatureMgr.getInsertRecordNumInLastUs(1000));
+//		builder.addFeature("Number of Commit Tx in Last 1000 us", timeRelatedFeatureMgr.getCommitTxNumInLastUs(1000));
+
 //		// Features for latches
 //		// Due to the complexity of getting individual latch features,
 //		// we just pass a huge string that consists of key latch features
@@ -139,22 +139,22 @@ public class FeatureExtractor {
 		// builder.addFeature("Latch Features", extractLatchFeatures());
 		
 		// Get dependencies
-		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
-				task.getTxNum(), task.getReadSet(), task.getWriteSet());
-		for (Long dependentTx : dependentTxs)
-			builder.addDependency(dependentTx);
-		
-		// Generate tree features
-		treeAnalyzer.addTransaction(task.getTxNum(), dependentTxs);
-		treeAnalyzer.addDependencyTreeFeatures(task.getTxNum(), builder);
-		
+//		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
+//				task.getTxNum(), task.getReadSet(), task.getWriteSet());
+//		for (Long dependentTx : dependentTxs)
+//			builder.addDependency(dependentTx);
+//
+//		// Generate tree features
+//		treeAnalyzer.addTransaction(task.getTxNum(), dependentTxs);
+//		treeAnalyzer.addDependencyTreeFeatures(task.getTxNum(), builder);
+
 		return builder.build();
 	}
 	
 	public void onTransactionCommit(long txNum) {
 		treeAnalyzer.onTransactionCommit(txNum);
 	}
-	
+
 	private Double[] extractBufferHitRate() {
 		int serverCount = PartitionMetaMgr.NUM_PARTITIONS;
 		Double[] bufferHitRates = new Double[serverCount];
@@ -329,7 +329,7 @@ public class FeatureExtractor {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		int fullyRepCount = 0;
-		
+
 		// Count records
 		for (PrimaryKey key : keys) {
 			if (partMgr.isFullyReplicated(key)) {
@@ -339,21 +339,21 @@ public class FeatureExtractor {
 				counts[partId]++;
 			}
 		}
-		
+
 		// Add fully replicated records
 		Integer[] newCounts = new Integer[PartitionMetaMgr.NUM_PARTITIONS];
 		for (int partId = 0; partId < newCounts.length; partId++) {
 			newCounts[partId] = counts[partId] + fullyRepCount;
 		}
-	    
+
 		return newCounts;
 	}
-	
+
 	private Integer[] extractRemoteDistribution(Set<PrimaryKey> keys, TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 		int totalCount = 0;
-		
+
 		// Count records
 		for (PrimaryKey key : keys) {
 			if (!partMgr.isFullyReplicated(key)) {
@@ -398,6 +398,7 @@ public class FeatureExtractor {
 		case HERMES:
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_BANDIT_SEQUENCER:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			for (PrimaryKey key : keys) {
 				int partId = fusionTGraph.getCachedLocation(key);
@@ -414,15 +415,16 @@ public class FeatureExtractor {
 		return newCounts;
 	}
 	
-	private int extractReadDataWithIO(Set<PrimaryKey> keys, HashSet<PrimaryKey> keyHasBeenRead) {
+	private int extractReadDataWithIO(Set<PrimaryKey> keys, FusionTGraph graph) {
 		int counts = 0;
 		
 		switch (Elasql.SERVICE_TYPE) {
 		case HERMES:
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_BANDIT_SEQUENCER:
 			for (PrimaryKey key : keys) {
-				if (!keyHasBeenRead.contains(key) ) {
+				if (graph.getCachedLocation(key) != -1) {
 					counts += 1;
 				}
 			}
@@ -438,6 +440,7 @@ public class FeatureExtractor {
 		case HERMES:
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_BANDIT_SEQUENCER:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			return fusionTGraph.getFusionTableOverflowCount();
 		default:

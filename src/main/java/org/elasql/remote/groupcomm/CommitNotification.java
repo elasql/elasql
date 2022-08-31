@@ -8,10 +8,12 @@ public class CommitNotification implements Serializable {
 	
 	private long txNum;
 	private int masterId;
+	private long txLatency;
 	
-	public CommitNotification(long txNum, int masterId) {
+	public CommitNotification(long txNum, int masterId, long txLatency) {
 		this.txNum = txNum;
 		this.masterId = masterId;
+		this.txLatency = txLatency;
 	}
 	
 	public long getTxNum() {
@@ -20,5 +22,9 @@ public class CommitNotification implements Serializable {
 	
 	public int getMasterId() {
 		return masterId;
+	}
+	
+	public long getTxLatency() {
+		return txLatency;
 	}
 }

@@ -23,31 +23,33 @@ public class TransactionFeatures {
 		// Transaction Features:
 		// (Modify this part to add/remove features)
 		// - Transaction start time (the time entering the system)
-		featureKeys.add("Start Time");
+//		featureKeys.add("Start Time");
 		
 		// - Transaction Type Related
-		featureKeys.add("Tx Type");
+//		featureKeys.add("Tx Type");
 		
 		// Transaction Dependency
-		featureKeys.add("Dependency - Max Depth");
-		featureKeys.add("Dependency - First Layer Tx Count");
-		featureKeys.add("Dependency - Total Tx Count");
+//		featureKeys.add("Dependency - Max Depth");
+//		featureKeys.add("Dependency - First Layer Tx Count");
+//		featureKeys.add("Dependency - Total Tx Count");
 		
 		// - Number of records
 //		featureKeys.add("Number of Read Records");
 //		featureKeys.add("Number of Update Records");
-		featureKeys.add("Number of Insert Records");
+//		featureKeys.add("Number of Insert Records");
 //		featureKeys.add("Number of Fully Replicated Records");
 //		// - Data distribution
-		featureKeys.add("Remote Reads");
+//		featureKeys.add("Remote Reads");
 		featureKeys.add("Read Data Distribution");
 //		featureKeys.add("Read Data Distribution in Bytes");
-		featureKeys.add("Read Data in Cache Distribution");
-		featureKeys.add("Read Data with IO Distribution");
-		featureKeys.add("Update Data Distribution");
+//		featureKeys.add("Read Data in Cache Distribution");
+//		featureKeys.add("Read Data with IO Distribution");
+//		featureKeys.add("Remote Writes");
+//		featureKeys.add("Update Data Distribution");
+		featureKeys.add("Write Data Distribution");
 //
 //		// Fusion Table
-		featureKeys.add("Number of Overflows in Fusion Table");
+//		featureKeys.add("Number of Overflows in Fusion Table");
 
 //		featureKeys.add("Buffer Hit Rate");
 //		featureKeys.add("Avg Pin Count");
@@ -64,32 +66,32 @@ public class TransactionFeatures {
 //		featureKeys.add("Page GetVal Release Count");
 //		featureKeys.add("Page SetVal Release Count");
 //
-		featureKeys.add("System CPU Load");
-		featureKeys.add("Process CPU Load");
-		featureKeys.add("System Load Average");
-		featureKeys.add("Thread Active Count");
+//		featureKeys.add("System CPU Load");
+//		featureKeys.add("Process CPU Load");
+//		featureKeys.add("System Load Average");
+//		featureKeys.add("Thread Active Count");
 //
-		featureKeys.add("I/O Read Bytes");
-		featureKeys.add("I/O Write Bytes");
-		featureKeys.add("I/O Queue Length");
-		
-		featureKeys.add("Number of Read Record in Last 100 us");
-		featureKeys.add("Number of Read Record Excluding Cache in Last 100 us");
-		featureKeys.add("Number of Update Record in Last 100 us");
-		featureKeys.add("Number of Insert Record in Last 100 us");
-		featureKeys.add("Number of Commit Tx in Last 100 us");
-		
-		featureKeys.add("Number of Read Record in Last 500 us");
-		featureKeys.add("Number of Read Record Excluding Cache in Last 500 us");
-		featureKeys.add("Number of Update Record in Last 500 us");
-		featureKeys.add("Number of Insert Record in Last 500 us");
-		featureKeys.add("Number of Commit Tx in Last 500 us");
-		
-		featureKeys.add("Number of Read Record in Last 1000 us");
-		featureKeys.add("Number of Read Record Excluding Cache in Last 1000 us");
-		featureKeys.add("Number of Update Record in Last 1000 us");
-		featureKeys.add("Number of Insert Record in Last 1000 us");
-		featureKeys.add("Number of Commit Tx in Last 1000 us");
+//		featureKeys.add("I/O Read Bytes");
+//		featureKeys.add("I/O Write Bytes");
+//		featureKeys.add("I/O Queue Length");
+//
+//		featureKeys.add("Number of Read Record in Last 100 us");
+//		featureKeys.add("Number of Read Record Excluding Cache in Last 100 us");
+//		featureKeys.add("Number of Update Record in Last 100 us");
+//		featureKeys.add("Number of Insert Record in Last 100 us");
+//		featureKeys.add("Number of Commit Tx in Last 100 us");
+//
+//		featureKeys.add("Number of Read Record in Last 500 us");
+//		featureKeys.add("Number of Read Record Excluding Cache in Last 500 us");
+//		featureKeys.add("Number of Update Record in Last 500 us");
+//		featureKeys.add("Number of Insert Record in Last 500 us");
+//		featureKeys.add("Number of Commit Tx in Last 500 us");
+//
+//		featureKeys.add("Number of Read Record in Last 1000 us");
+//		featureKeys.add("Number of Read Record Excluding Cache in Last 1000 us");
+//		featureKeys.add("Number of Update Record in Last 1000 us");
+//		featureKeys.add("Number of Insert Record in Last 1000 us");
+//		featureKeys.add("Number of Commit Tx in Last 1000 us");
 //
 //		featureKeys.add("Latch Features");
 
@@ -105,13 +107,11 @@ public class TransactionFeatures {
 	// - checks the correctness before building an object
 	public static class Builder {
 		private long txNum;
-		private int lastTxRoutingDest;
 		private Map<String, Object> features;
 		private List<Long> dependentTxns;
 
-		public Builder(long txNum, int lastTxRoutingDest) {
+		public Builder(long txNum) {
 			this.txNum = txNum;
-			this.lastTxRoutingDest = lastTxRoutingDest;
 			this.features = new HashMap<String, Object>();
 			this.dependentTxns = new ArrayList<Long>();
 		}
@@ -139,21 +139,19 @@ public class TransactionFeatures {
 			// Sort the dependencies
 			Collections.sort(dependentTxns);
 
-			return new TransactionFeatures(txNum, features, dependentTxns, lastTxRoutingDest);
+			return new TransactionFeatures(txNum, features, dependentTxns);
 		}
 	}
 
 	private long txNum;
-	private int lastTxRoutingDest;
 	private Map<String, Object> features;
 	// Transaction dependencies are handled separately
 	private List<Long> dependentTxns;
 
 	// Builder Pattern: set the constructor to private to avoid creating an object
 	// from outside
-	private TransactionFeatures(long txNum, Map<String, Object> features, List<Long> dependentTxns, int lastTxRoutingDest) {
+	private TransactionFeatures(long txNum, Map<String, Object> features, List<Long> dependentTxns) {
 		this.txNum = txNum;
-		this.lastTxRoutingDest = lastTxRoutingDest;
 		this.features = features;
 		this.dependentTxns = dependentTxns;
 	}
@@ -184,10 +182,6 @@ public class TransactionFeatures {
 		
 		// Transaction Dependencies
 		sb.append(dependentTxns);
-		sb.append(',');
-		
-		// Last tx's routing destination
-		sb.append(lastTxRoutingDest);
 		sb.append(',');
 		
 		// Non-array features

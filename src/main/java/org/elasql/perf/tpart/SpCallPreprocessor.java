@@ -19,23 +19,30 @@ import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.Route;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.remote.groupcomm.client.BatchSpcSender;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
+import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * A collector that collects the features of transactions.
- * 
+ *
  * @author Yu-Shan Lin
  */
 public class SpCallPreprocessor extends Task {
 	
+	static {
+//		TimerStatistics.startReporting(5);
+	}
+
 	private BlockingQueue<StoredProcedureCall> spcQueue;
 	private FeatureExtractor featureExtractor;
 
@@ -45,30 +52,31 @@ public class SpCallPreprocessor extends Task {
 	private TGraph graph;
 	private boolean isBatching;
 	private Estimator performanceEstimator;
+	private CentralRoutingAgent routingAgent;
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
-	
-	// XXX: Cache last tx's routing destination
-	private int lastTxRoutingDest = -1;
-	
+
 	// For collecting features
+	private TpartMetricWarehouse metricWarehouse;
 	private TransactionFeaturesRecorder featureRecorder;
 	private TransactionDependencyRecorder dependencyRecorder;
 	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
-	
-	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
+
+	public SpCallPreprocessor(TPartStoredProcedureFactory factory,
 			BatchNodeInserter inserter, TGraph graph,
 			boolean isBatching, TpartMetricWarehouse metricWarehouse,
-			Estimator performanceEstimator) {
-		
+			Estimator performanceEstimator, CentralRoutingAgent routingAgent) {
+
 		// For generating execution plan and sp task
 		this.factory = factory;
 		this.inserter = inserter;
 		this.graph = graph;
 		this.isBatching = isBatching;
 		this.performanceEstimator = performanceEstimator;
+		this.routingAgent = routingAgent;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
-		
+
 		// For collecting features
+		this.metricWarehouse = metricWarehouse;
 		timeRelatedFeatureMgr = new TimeRelatedFeatureMgr();
 		featureExtractor = new FeatureExtractor(metricWarehouse, timeRelatedFeatureMgr);
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
@@ -78,110 +86,120 @@ public class SpCallPreprocessor extends Task {
 			dependencyRecorder.startRecording();
 		}
 	}
-	
+
 	public void preprocessSpCall(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall())
 			spcQueue.add(spc);
 	}
-	
-	public void onTransactionCommit(long txNum, int masterId) {
+
+	public void onTransactionCommit(long txNum, int masterId, long txLatency) {
+		if (routingAgent != null) {
+			routingAgent.onTxCommitted(txNum, masterId, txLatency);
+		}
+		
 		featureExtractor.onTransactionCommit(txNum);
 		timeRelatedFeatureMgr.onTxCommit(masterId);
 	}
 
 	@Override
 	public void run() {
-		List<TPartStoredProcedureTask> batchedTasks = 
+		List<TPartStoredProcedureTask> batchedTasks =
 				new ArrayList<TPartStoredProcedureTask>();
 		List<Serializable> sendingList = new ArrayList<Serializable>();
-		
+
 		Thread.currentThread().setName("sp-call-preprocessor");
-		
+
 		while (true) {
 			try {
 				// Take a SP call
 				StoredProcedureCall spc = spcQueue.take();
 				
+				// XXX: Debug
+				TransactionProfiler.getLocalProfiler().reset();
+				TransactionProfiler.getLocalProfiler().startComponentProfiler("Schedule");
+				
 				// Add to the sending list
 				sendingList.add(spc);
-				
+
 				// Get the read-/write-set by creating a SP task
 				TPartStoredProcedureTask task = createSpTask(spc);
 				
 				// Add normal SPs to the task batch
-				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
+				if (task.getProcedureType() == ProcedureType.NORMAL) {
 					// Pre-process the transaction 
-					if (TPartPerformanceManager.ENABLE_COLLECTING_DATA ||
-							performanceEstimator != null) {
-						preprocess(spc, task);
-					}
-					
+					preprocess(spc, task);
+
 					// Add to the schedule batch
 					batchedTasks.add(task);
 				}
-				
+
 				if (sendingList.size() >= BatchSpcSender.COMM_BATCH_SIZE) {
 					// Send the SP call batch to total ordering
 					Elasql.connectionMgr().sendTotalOrderRequest(sendingList);
 					sendingList = new ArrayList<Serializable>();
 				}
-				
+
 				// Process the batch as TPartScheduler does
-				if ((isBatching && batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE)
-						|| !isBatching) {
+				if (!isBatching || batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE) {
 					// Route the task batch
 					routeBatch(batchedTasks);
 					batchedTasks.clear();
 				}
+				
+				// XXX: Debug
+				TransactionProfiler.getLocalProfiler().stopComponentProfiler("Schedule");
+				TransactionProfiler.getLocalProfiler().addToGlobalStatistics();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
 	}
-	
+
 	private TPartStoredProcedureTask createSpTask(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall()) {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
 			return new TPartStoredProcedureTask(spc.getClientId(), spc.getConnectionId(),
-					spc.getTxNum(), spc.getArrivedTime(), null, sp, null);
+					spc.getTxNum(), spc.getArrivedTime(), null, sp, null, null);
 		}
-		
+
 		return null;
 	}
-	
+
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		if (task.getProcedureType() == ProcedureType.CONTROL)
-			return;
-		
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
-		
+		TransactionFeatures features = featureExtractor.extractFeatures(task, (FusionTGraph) graph);
+
 		// records must be read from disk if they are never read.
 		bookKeepKeys(task);
-		
+
 		// Record the feature if necessary
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
 		}
-		
+
 		// Estimate the performance if necessary
 		if (performanceEstimator != null) {
 			TransactionEstimation estimation = performanceEstimator.estimate(features);
-			
+
 			// Save the estimation
 			spc.setMetadata(estimation.toBytes());
 			task.setEstimation(estimation);
 		}
+		
+		if (routingAgent != null) {
+			Route route = routingAgent.suggestRoute(graph, task, metricWarehouse);
+			spc.setRoute(route);
+			task.setRoute(route);
+		}
 	}
-	
+
 	private void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
-		
-		lastTxRoutingDest = timeRelatedFeatureMgr.pushInfo(graph);
-		
+
+		timeRelatedFeatureMgr.pushInfo(graph);
+
 		// Notify the estimator where the transactions are routed
 		if (performanceEstimator != null) {
 			for (TxNode node : graph.getTxNodes()) {
@@ -189,13 +207,19 @@ public class SpCallPreprocessor extends Task {
 			}
 		}
 		
+		if (routingAgent != null) {
+			for (TxNode node : graph.getTxNodes()) {
+				routingAgent.onTxRouted(node.getTxNum(), node.getPartId());
+			}
+		}
+
 		// add write back edges
 		graph.addWriteBackEdge();
-		
+
 		// Clean up the tx nodes
 		graph.clear();
 	}
-	
+
 	private void bookKeepKeys(TPartStoredProcedureTask task) {
 		for (PrimaryKey key : task.getReadSet()) {
 			keyHasBeenRead.add(key);

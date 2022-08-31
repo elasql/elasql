@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -19,22 +20,22 @@ import org.elasql.util.ElasqlProperties;
 
 public class HermesNodeInserter implements BatchNodeInserter {
 	
-	private static final double IMBALANCED_TOLERANCE;
+	protected static final double IMBALANCED_TOLERANCE;
 
 	static {
 		IMBALANCED_TOLERANCE = ElasqlProperties.getLoader()
 				.getPropertyAsDouble(HermesNodeInserter.class.getName() + ".IMBALANCED_TOLERANCE", 0.25);
 	}
 	
-	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
+	protected PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 	private double[] loadPerPart = new double[PartitionMetaMgr.NUM_PARTITIONS];
-	private Set<Integer> overloadedParts = new HashSet<Integer>();
+	protected Set<Integer> overloadedParts = new HashSet<Integer>();
 	private Set<Integer> saturatedParts = new HashSet<Integer>();
-	private int overloadedThreshold;
+	protected int overloadedThreshold;
 
 	// Debug: show the distribution of assigned masters
 	private long lastReportTime = -1;
-	private int[] assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	protected int[] assignedCounts = new int[PartitionMetaMgr.NUM_PARTITIONS];
 
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
@@ -76,13 +77,13 @@ public class HermesNodeInserter implements BatchNodeInserter {
 //		System.out.println(String.format("Final loads: %s", Arrays.toString(loadPerPart)));
 	}
 	
-	private void resetStatistics() {
+	protected void resetStatistics() {
 		Arrays.fill(loadPerPart, 0);
 		overloadedParts.clear();
 		saturatedParts.clear();
 	}
 	
-	private void insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
+	protected int insertAccordingRemoteEdges(TGraph graph, TPartStoredProcedureTask task) {
 		int bestPartId = 0;
 		int minRemoteEdgeCount = task.getReadSet().size();
 		
@@ -98,9 +99,14 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			}
 		}
 		
-		graph.insertTxNode(task, bestPartId);
+		if (task.getTxNum() % 10_000 == 0) {
+			System.out.println("Hermes : " + bestPartId);
+		}
+		if (task.getRoute() == null)
+			graph.insertTxNode(task, bestPartId);
 		
 		loadPerPart[bestPartId]++;
+		return bestPartId;
 	}
 	
 	private int countRemoteReadEdge(TGraph graph, TPartStoredProcedureTask task, int partId) {
@@ -119,7 +125,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		return remoteEdgeCount;
 	}
 	
-	private List<TxNode> findTxNodesOnOverloadedParts(TGraph graph, int batchSize) {
+	protected List<TxNode> findTxNodesOnOverloadedParts(TGraph graph, int batchSize) {
 		
 		// Find the overloaded parts
 		for (int partId = 0; partId < loadPerPart.length; partId++) {
@@ -144,7 +150,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		return nodesOnOverloadedParts;
 	}
 	
-	private List<TxNode> rerouteTxNodesToUnderloadedParts(List<TxNode> candidateTxNodes, int increaseTolerence) {
+	protected List<TxNode> rerouteTxNodesToUnderloadedParts(List<TxNode> candidateTxNodes, int increaseTolerence) {
 		List<TxNode> nextCandidates = new ArrayList<TxNode>();
 		
 		for (TxNode node : candidateTxNodes) {
@@ -238,7 +244,7 @@ public class HermesNodeInserter implements BatchNodeInserter {
 	}
 
 	// Debug: show the distribution of assigned masters
-	private void reportRoutingDistribution(long currentTime) {
+	protected void reportRoutingDistribution(long currentTime) {
 		if (lastReportTime == -1) {
 			lastReportTime = currentTime;
 		} else if (currentTime - lastReportTime > 5_000_000) {

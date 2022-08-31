@@ -1,10 +1,9 @@
-package org.elasql.schedule.tpart.control;
+package org.elasql.schedule.tpart;
 
 import java.util.Arrays;
 import java.util.List;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;

@@ -27,7 +27,6 @@ import org.elasql.migration.MigrationMgr;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.TPartPerformanceManager;
-import org.elasql.perf.tpart.control.ControlStoredProcedureFactory;
 import org.elasql.procedure.DdStoredProcedureFactory;
 import org.elasql.procedure.calvin.CalvinStoredProcedureFactory;
 import org.elasql.procedure.naive.NaiveStoredProcedureFactory;
@@ -39,13 +38,14 @@ import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalFirstNodeInserter;
+import org.elasql.schedule.tpart.PresetRouter;
 import org.elasql.schedule.tpart.TPartScheduler;
-import org.elasql.schedule.tpart.control.ControlBasedRouter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
+import org.elasql.schedule.tpart.rl.PresetOrHermesRouter;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashPartitionPlan;
@@ -66,7 +66,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB. 
 	 */ 
 	public enum ServiceType { 
-		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL; 
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL, HERMES_RL, HERMES_BANDIT_SEQUENCER;
  
 		static ServiceType fromInteger(int index) { 
 			switch (index) { 
@@ -84,7 +84,11 @@ public class Elasql extends VanillaDb {
 				return LEAP;
 			case 6:
 				return HERMES_CONTROL;
-			default: 
+			case 7:
+				return HERMES_RL;
+			case 9:
+				return HERMES_BANDIT_SEQUENCER;
+			default:
 				throw new RuntimeException("Unsupport service type"); 
 			} 
 		} 
@@ -200,6 +204,8 @@ public class Elasql extends VanillaDb {
 		case G_STORE: 
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_RL:
+		case HERMES_BANDIT_SEQUENCER:
 			remoteRecReceiver = new TPartCacheMgr(); 
 			break; 
  
@@ -228,13 +234,14 @@ public class Elasql extends VanillaDb {
 		case G_STORE: 
 		case LEAP: 
 		case HERMES_CONTROL:
+		case HERMES_RL:
+		case HERMES_BANDIT_SEQUENCER:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
-			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
-			scheduler = initTPartScheduler(tpartFactory); 
-			break; 
-		default: 
+			scheduler = initTPartScheduler(tpartFactory);
+			break;
+		default:
 			throw new UnsupportedOperationException(); 
 		} 
 	} 
@@ -289,12 +296,26 @@ public class Elasql extends VanillaDb {
 		case HERMES_CONTROL:
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new ControlBasedRouter(); 
+			inserter = new PresetRouter(); 
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
 			break; 
-		default: 
-			throw new IllegalArgumentException("Not supported"); 
+		case HERMES_RL:
+			table = new FusionTable(); 
+			graph = new FusionTGraph(table); 
+			inserter = new PresetOrHermesRouter();//PresetRouteInserter(); 
+			sinker = new FusionSinker(table); 
+			isBatching = false; 
+			break;
+		case HERMES_BANDIT_SEQUENCER:
+			table = new FusionTable();
+			graph = new FusionTGraph(table);
+			inserter = new PresetRouter();
+			sinker = new FusionSinker(table);
+			isBatching = false;
+			break;
+		default:
+			throw new IllegalArgumentException("Not supported");
 		} 
 		 
 		// TODO: Uncomment this when the migration module is migrated 
@@ -339,14 +360,15 @@ public class Elasql extends VanillaDb {
 		case G_STORE:
 		case LEAP:
 		case HERMES_CONTROL:
+		case HERMES_RL:
+		case HERMES_BANDIT_SEQUENCER:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
-			tpartFactory = new ControlStoredProcedureFactory(tpartFactory);
 			performanceMgr = newTPartPerfMgr(tpartFactory);
 			break;
-		default: 
-			performanceMgr = null; 
+		default:
+			performanceMgr = null;
 		} 
 	}
 	
@@ -380,9 +402,19 @@ public class Elasql extends VanillaDb {
 				break; 
 			case HERMES_CONTROL:
 				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new ControlBasedRouter();
+				inserter = new PresetRouter();
 				isBatching = false;
 				break; 
+			case HERMES_RL:
+				graph = new FusionTGraph(new FusionTable()); 
+				inserter = new PresetOrHermesRouter();
+				isBatching = false;
+				break;
+			case HERMES_BANDIT_SEQUENCER:
+				graph = new FusionTGraph(new FusionTable());
+				inserter = new PresetRouter();
+				isBatching = false;
+				break;
 			default: 
 				throw new IllegalArgumentException("Not supported"); 
 			} 

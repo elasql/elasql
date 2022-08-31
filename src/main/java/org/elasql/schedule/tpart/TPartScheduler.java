@@ -92,6 +92,9 @@ public class TPartScheduler extends Task implements Scheduler {
 
 				TransactionProfiler.setProfiler(call.getProfiler());
 				TransactionProfiler profiler = TransactionProfiler.getLocalProfiler();
+
+				profiler.stopComponentProfiler("OU0 - Dispatch to router");
+				profiler.startComponentProfiler("OU0 - ROUTE");
 				
 				TPartStoredProcedureTask task = createStoredProcedureTask(call, profiler);
 
@@ -109,16 +112,12 @@ public class TPartScheduler extends Task implements Scheduler {
 //					continue;
 //				}
 
-				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
+				if (task.getProcedureType() == ProcedureType.NORMAL) {
 					batchedTasks.add(task);
 				}
-				
-				profiler.stopComponentProfiler("OU0 - ROUTE");
-				
+
 				// sink current t-graph if # pending tx exceeds threshold
-				if ((batchingEnabled && batchedTasks.size() >= SCHEDULE_BATCH_SIZE)
-						|| !batchingEnabled) {
+				if (!batchingEnabled || batchedTasks.size() >= SCHEDULE_BATCH_SIZE) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
 				}
@@ -144,8 +143,11 @@ public class TPartScheduler extends Task implements Scheduler {
 		// Sink the graph
 		if (graph.getTxNodes().size() != 0) {
 			// Record plan gen start time, CPU start time, disk IO count
-			for(TPartStoredProcedureTask task : batchedTasks) 
-				task.getTxProfiler().startComponentProfiler("OU1 - Generate Plan");
+			for(TPartStoredProcedureTask task : batchedTasks) {
+				TransactionProfiler profiler = task.getTxProfiler();
+				profiler.stopComponentProfiler("OU0 - ROUTE");
+				profiler.startComponentProfiler("OU1 - Generate Plan");
+			}
 			
 			Iterator<TPartStoredProcedureTask> plansTter = sinker.sink(graph);
 
@@ -175,7 +177,8 @@ public class TPartScheduler extends Task implements Scheduler {
 			throws IOException {
 		if (call.isNoOpStoredProcCall()) {
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, null, null);
+					call.getTxNum(), call.getArrivedTime(), profiler, null, null,
+					call.getRoute());
 		} else {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(call.getPid(), call.getTxNum());
 			sp.prepare(call.getPars());
@@ -193,7 +196,7 @@ public class TPartScheduler extends Task implements Scheduler {
 			}
 
 			return new TPartStoredProcedureTask(call.getClientId(), call.getConnectionId(),
-					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation);
+					call.getTxNum(), call.getArrivedTime(), profiler, sp, estimation, call.getRoute());
 		}
 	}
 

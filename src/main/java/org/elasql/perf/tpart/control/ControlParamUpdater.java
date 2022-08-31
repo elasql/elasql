@@ -1,5 +1,7 @@
 package org.elasql.perf.tpart.control;
 
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -15,18 +17,15 @@ import org.vanilladb.core.server.task.Task;
  * 
  * @author Yu-Shan Lin
  */
-public class RoutingControlActuator extends Task {
-	private static Logger logger = Logger.getLogger(RoutingControlActuator.class.getName());
+public class ControlParamUpdater extends Task {
+	private static Logger logger = Logger.getLogger(ControlParamUpdater.class.getName());
 	
 	private static final long UPDATE_PERIOD;
-	private static final double INITIAL_ALPHA;
 	private static final double[] CPU_MAX_CAPACITIES;
 	
 	static {
 		UPDATE_PERIOD = ElasqlProperties.getLoader().getPropertyAsLong(
-				RoutingControlActuator.class.getName() + ".UPDATE_PERIOD", 5_000);
-		INITIAL_ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
-				RoutingControlActuator.class.getName() + ".INITIAL_ALPHA", 1.0);
+				ControlParamUpdater.class.getName() + ".UPDATE_PERIOD", 5_000);
 		
 		// Gather CPU MAXs
 		double[] cpuMaxCapacities = new double[PartitionMetaMgr.NUM_PARTITIONS];
@@ -34,7 +33,7 @@ public class RoutingControlActuator extends Task {
 			cpuMaxCapacities[i] = 1.0;
 		
 		String cpuMaxStr = ElasqlProperties.getLoader().getPropertyAsString(
-				RoutingControlActuator.class.getName() + ".CPU_MAX_CAPACITIES", "");
+				ControlParamUpdater.class.getName() + ".CPU_MAX_CAPACITIES", "");
 		if (!cpuMaxStr.isEmpty()) {
 			String[] cpuMaxValues = cpuMaxStr.split(",");
 			for (int i = 0; i < cpuMaxValues.length; i++) {
@@ -46,25 +45,19 @@ public class RoutingControlActuator extends Task {
 	}
 	
 	// Alpha parameters control the weights of CPU cost
-	// Beta parameters control the weights of disk cost
-	// Gamma parameters control the weights of network cost
 	private PidController[] alpha;
-	private PidController[] beta;
-	private PidController[] gamma;
 	
 	private TpartMetricWarehouse metricWarehouse;
+	private BlockingQueue<ControlParameters> updateQueue;
 
-	public RoutingControlActuator(TpartMetricWarehouse metricWarehouse) {
+	public ControlParamUpdater(TpartMetricWarehouse metricWarehouse) {
 		this.metricWarehouse = metricWarehouse;
+		this.updateQueue = new LinkedBlockingQueue<ControlParameters>();
 		
 		alpha = new PidController[PartitionMetaMgr.NUM_PARTITIONS];
-		beta = new PidController[PartitionMetaMgr.NUM_PARTITIONS];
-		gamma = new PidController[PartitionMetaMgr.NUM_PARTITIONS];
 		
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			alpha[nodeId] = new PidController(INITIAL_ALPHA);
-			beta[nodeId] = new PidController(1.0);
-			gamma[nodeId] = new PidController(1.0);
+			alpha[nodeId] = new PidController(ControlParameters.INITIAL_ALPHA);
 		}
 	}
 	
@@ -97,9 +90,13 @@ public class RoutingControlActuator extends Task {
 			// Update parameters
 			updateParameters(timeOffsetInSecs);
 			
-			// Issue an update transaction
-			issueUpdateTransaction();
+			// Put the new parameters to the update queue
+			sendNewParameters();
 		}
+	}
+	
+	public ControlParameters acquireUpdate() {
+		return updateQueue.poll();
 	}
 	
 	private void waitForServersReady() {
@@ -152,20 +149,11 @@ public class RoutingControlActuator extends Task {
 		}
 	}
 	
-	private void issueUpdateTransaction() {
-		// Prepare the parameters
-		Object[] params = new Object[PartitionMetaMgr.NUM_PARTITIONS * 3];
+	private void sendNewParameters() {
+		double[] paramAlpha = new double[PartitionMetaMgr.NUM_PARTITIONS];
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			params[nodeId] = 
-					alpha[nodeId].getControlParameter();
-			params[PartitionMetaMgr.NUM_PARTITIONS + nodeId] = 
-					beta[nodeId].getControlParameter();
-			params[PartitionMetaMgr.NUM_PARTITIONS * 2 + nodeId] = 
-					gamma[nodeId].getControlParameter();
+			paramAlpha[nodeId] = alpha[nodeId].getControlParameter();
 		}
-		
-		// Send a store procedure call
-		Elasql.connectionMgr().sendStoredProcedureCall(false, 
-				ControlStoredProcedureFactory.SP_CONTROL_PARAM_UPDATE, params);
+		updateQueue.add(new ControlParameters(paramAlpha));
 	}
 }

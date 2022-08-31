@@ -38,6 +38,7 @@ public class StoredProcedureCall implements Serializable {
 	// Some metadata for the stored procedure call
 	// This currently only used by TPartPerformanceMgr.
 	private Serializable metadata;
+	private Route route;
 	
 	// The timestamp to indicate the time that this request arrives
 	// at the database system. (-1 means 'not set')
@@ -135,6 +136,14 @@ public class StoredProcedureCall implements Serializable {
 	
 	public Serializable getMetadata() {
 		return metadata;
+	}
+	
+	public Route getRoute() {
+		return route;
+	}
+	
+	public void setRoute(Route route) {
+		this.route = route;
 	}
 	
 	@Override

@@ -7,7 +7,12 @@ import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.ai.SumMaxEstimator;
-import org.elasql.perf.tpart.control.RoutingControlActuator;
+import org.elasql.perf.tpart.control.ControlParamUpdater;
+import org.elasql.perf.tpart.control.PidControlAgent;
+import org.elasql.perf.tpart.mdp.bandit.BanditAgent;
+import org.elasql.perf.tpart.mdp.rl.agent.FullyOfflineAgent;
+import org.elasql.perf.tpart.mdp.rl.agent.OfflineAgent;
+import org.elasql.perf.tpart.mdp.rl.agent.OnlineAgent;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
@@ -23,12 +28,15 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 	public static final boolean ENABLE_COLLECTING_DATA;
 	public static final int ESTIMATOR_TYPE;
+	public static final int RL_TYPE;
 
 	static {
 		ENABLE_COLLECTING_DATA = ElasqlProperties.getLoader()
 				.getPropertyAsBoolean(TPartPerformanceManager.class.getName() + ".ENABLE_COLLECTING_DATA", false);
 		ESTIMATOR_TYPE = ElasqlProperties.getLoader()
 				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
+		RL_TYPE = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".RL_TYPE", 2);
 	}
 
 	public static TPartPerformanceManager newForSequencer(TPartStoredProcedureFactory factory,
@@ -38,17 +46,17 @@ public class TPartPerformanceManager implements PerformanceManager {
 		Elasql.taskMgr().runTask(metricWarehouse);
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator());
+				metricWarehouse, newEstimator(), newRoutingAgent(metricWarehouse));
+
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
-		RoutingControlActuator actuator = null;
 		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
-			actuator = new RoutingControlActuator(metricWarehouse);
+			ControlParamUpdater actuator = new ControlParamUpdater(metricWarehouse);
 			Elasql.taskMgr().runTask(actuator);
 		}
 
-		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, actuator);
+		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse);
 	}
 
 	public static TPartPerformanceManager newForDbServer() {
@@ -74,20 +82,39 @@ public class TPartPerformanceManager implements PerformanceManager {
 			throw new IllegalArgumentException("Not supported");
 		}
 	}
+	
+	private static CentralRoutingAgent newRoutingAgent(TpartMetricWarehouse metricWarehouse) {
+		switch (Elasql.SERVICE_TYPE) {
+		case HERMES_CONTROL:
+			return new PidControlAgent(metricWarehouse);
+		case HERMES_RL:
+			switch (RL_TYPE) {
+			case 0:
+				return new FullyOfflineAgent();
+			case 1:
+				return new OfflineAgent();
+			case 2:
+				return new OnlineAgent();
+			default:
+				throw new IllegalArgumentException("Not supported");
+			}
+		case HERMES_BANDIT_SEQUENCER:
+			return new BanditAgent();
+		default:
+			return null;
+		}
+	}
 
 	// On the sequencer
 	private SpCallPreprocessor spCallPreprocessor;
 	private TpartMetricWarehouse metricWarehouse;
-	private RoutingControlActuator actuator;
-
+	
 	// On each DB machine
 	private MetricCollector localMetricCollector;
 
-	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse,
-			RoutingControlActuator actuator) {
+	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse) {
 		this.spCallPreprocessor = spCallPreprocessor;
 		this.metricWarehouse = metricWarehouse;
-		this.actuator = actuator;
 	}
 
 	private TPartPerformanceManager(MetricCollector localMetricCollector) {
@@ -119,9 +146,9 @@ public class TPartPerformanceManager implements PerformanceManager {
 	public MetricWarehouse getMetricWarehouse() {
 		return metricWarehouse;
 	}
-	
+
 	@Override
-	public void onTransactionCommit(long txNum, int masterId) {
-		spCallPreprocessor.onTransactionCommit(txNum, masterId);
+	public void onTransactionCommit(long txNum, int masterId, long txLatency) {
+		spCallPreprocessor.onTransactionCommit(txNum, masterId, txLatency);
 	}
 }

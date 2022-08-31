@@ -41,7 +41,7 @@ public interface PerformanceManager {
 	 * @param report the metric report
 	 */
 	void receiveMetricReport(MetricReport report);
-	
+
 	/**
 	 * Get the instance of MetricWarehouse.
 	 */
@@ -50,5 +50,5 @@ public interface PerformanceManager {
 	/**
 	 * Receives a commit message of a transaction.
 	 */
-	void onTransactionCommit(long txNum, int masterId);
+	void onTransactionCommit(long txNum, int masterId, long txLatency);
 }
