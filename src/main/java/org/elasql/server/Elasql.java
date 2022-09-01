@@ -41,6 +41,7 @@ import org.elasql.schedule.tpart.LocalFirstNodeInserter;
 import org.elasql.schedule.tpart.PresetRouter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
+import org.elasql.schedule.tpart.hermes.ControlRouter;
 import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.schedule.tpart.hermes.FusionTable;
@@ -92,11 +93,12 @@ public class Elasql extends VanillaDb {
 				throw new RuntimeException("Unsupport service type"); 
 			} 
 		} 
-	} 
+	}
 	 
 	public static final ServiceType SERVICE_TYPE; 
 	public static final boolean ENABLE_STAND_ALONE_SEQUENCER; 
-	public static final long SYSTEM_INIT_TIME_MS = System.currentTimeMillis(); 
+	public static final long SYSTEM_INIT_TIME_MS = System.currentTimeMillis();
+	public static final int HERMES_ROUTER_TYPE;
 	 
 	static { 
 		int type = ElasqlProperties.getLoader().getPropertyAsInteger( 
@@ -104,6 +106,8 @@ public class Elasql extends VanillaDb {
 		SERVICE_TYPE = ServiceType.fromInteger(type); 
 		ENABLE_STAND_ALONE_SEQUENCER = ElasqlProperties.getLoader().getPropertyAsBoolean( 
 				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false);
+		HERMES_ROUTER_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger( 
+				Elasql.class.getName() + ".HERMES_ROUTER_TYPE", 0);
 	}
  
 	// DD modules 
@@ -274,9 +278,8 @@ public class Elasql extends VanillaDb {
 			break; 
 		case HERMES: 
 			table = new FusionTable(); 
-			graph = new FusionTGraph(table); 
-			inserter = new HermesNodeInserter();
-//			inserter = new HotAvoidanceRouter();
+			graph = new FusionTGraph(table);
+			inserter = newHermesRouter();
 			sinker = new FusionSinker(table); 
 			isBatching = true; 
 			break; 
@@ -339,7 +342,22 @@ public class Elasql extends VanillaDb {
 				logger.warning("error reading the class name for partition manager"); 
 			throw new RuntimeException(); 
 		} 
-	} 
+	}
+	
+	public static BatchNodeInserter newHermesRouter() {
+		switch (HERMES_ROUTER_TYPE) {
+		case 0:
+			return new HermesNodeInserter();
+		case 1:
+			return new RemoteReadFocusRouter();
+		case 2:
+			return new ControlRouter();
+		case 3:
+			return new MirrorDescentRouter();
+		default:
+			throw new IllegalArgumentException("No such router with id: " + HERMES_ROUTER_TYPE);
+		}
+	}
  
 	public static void initConnectionMgr(int id) { 
 		connMgr = new ConnectionMgr(id);
@@ -385,9 +403,8 @@ public class Elasql extends VanillaDb {
 				isBatching = true;
 				break; 
 			case HERMES:
-				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new HermesNodeInserter();
-//				inserter = new HotAvoidanceRouter();
+				graph = new FusionTGraph(new FusionTable());
+				inserter = newHermesRouter();
 				isBatching = true;
 				break; 
 			case G_STORE: 

@@ -310,7 +310,7 @@ public class TPartScheduler extends Task implements Scheduler {
 					Arrays.toString(numberOfRemoteReads)));
 			Arrays.fill(numberOfRemoteReads, 0);
 			
-			nextReportTime = time + 15;
+			nextReportTime = time + 5;
 		}
 	}
 	
