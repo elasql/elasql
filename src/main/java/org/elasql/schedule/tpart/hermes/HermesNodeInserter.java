@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Set;
 
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
-import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.Edge;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -99,9 +98,6 @@ public class HermesNodeInserter implements BatchNodeInserter {
 			}
 		}
 		
-		if (task.getTxNum() % 10_000 == 0) {
-			System.out.println("Hermes : " + bestPartId);
-		}
 		if (task.getRoute() == null)
 			graph.insertTxNode(task, bestPartId);
 		

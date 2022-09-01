@@ -188,7 +188,12 @@ public class Elasql extends VanillaDb {
 			logger.info("ElaSQL initializing..."); 
  
 		if (logger.isLoggable(Level.INFO)) 
-			logger.info("using " + SERVICE_TYPE + " type service"); 
+			logger.info("using " + SERVICE_TYPE + " type service");
+		
+		if (SERVICE_TYPE == ServiceType.HERMES) {
+			if (logger.isLoggable(Level.INFO)) 
+				logger.info("using " + HERMES_ROUTING_STRATEGY + " routing strategy"); 
+		}
  
 		if (isStandAloneSequencer()) { 
 			logger.info("initializing as the stand alone sequencer"); 
