@@ -69,7 +69,7 @@ public class Elasql extends VanillaDb {
 	 * deterministic VanillaDB. 
 	 */ 
 	public enum ServiceType { 
-		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP, HERMES_CONTROL, HERMES_RL, HERMES_BANDIT_SEQUENCER;
+		NAIVE, CALVIN, TPART, HERMES, G_STORE, LEAP;
  
 		static ServiceType fromInteger(int index) { 
 			switch (index) { 
@@ -85,12 +85,35 @@ public class Elasql extends VanillaDb {
 				return G_STORE; 
 			case 5: 
 				return LEAP;
+			default:
+				throw new RuntimeException("Unsupport service type"); 
+			} 
+		} 
+	}
+	
+	public enum HermesRoutingStrategy {
+		ORIGINAL, LOCAL_READ_FIRST, PID_CONTROL, PID_CONTROL_CENTRAL, DUAL_MIRROR_DESCENT, BANDITS, OFFLINE_RL, BOOTSTRAP_RL, ONLINE_RL;
+ 
+		static HermesRoutingStrategy fromInteger(int index) { 
+			switch (index) { 
+			case 0: 
+				return ORIGINAL; 
+			case 1: 
+				return LOCAL_READ_FIRST; 
+			case 2: 
+				return PID_CONTROL; 
+			case 3: 
+				return PID_CONTROL_CENTRAL; 
+			case 4: 
+				return DUAL_MIRROR_DESCENT; 
+			case 5: 
+				return BANDITS;
 			case 6:
-				return HERMES_CONTROL;
+				return OFFLINE_RL;
 			case 7:
-				return HERMES_RL;
-			case 9:
-				return HERMES_BANDIT_SEQUENCER;
+				return BOOTSTRAP_RL;
+			case 8:
+				return ONLINE_RL;
 			default:
 				throw new RuntimeException("Unsupport service type"); 
 			} 
@@ -100,7 +123,7 @@ public class Elasql extends VanillaDb {
 	public static final ServiceType SERVICE_TYPE; 
 	public static final boolean ENABLE_STAND_ALONE_SEQUENCER; 
 	public static final long SYSTEM_INIT_TIME_MS = System.currentTimeMillis();
-	public static final int HERMES_ROUTER_TYPE;
+	public static final HermesRoutingStrategy HERMES_ROUTING_STRATEGY;
 	 
 	static { 
 		int type = ElasqlProperties.getLoader().getPropertyAsInteger( 
@@ -108,8 +131,9 @@ public class Elasql extends VanillaDb {
 		SERVICE_TYPE = ServiceType.fromInteger(type); 
 		ENABLE_STAND_ALONE_SEQUENCER = ElasqlProperties.getLoader().getPropertyAsBoolean( 
 				Elasql.class.getName() + ".ENABLE_STAND_ALONE_SEQUENCER", false);
-		HERMES_ROUTER_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger( 
-				Elasql.class.getName() + ".HERMES_ROUTER_TYPE", 0);
+		int routing = ElasqlProperties.getLoader().getPropertyAsInteger( 
+				Elasql.class.getName() + ".HERMES_ROUTING_STRATEGY", 0);
+		HERMES_ROUTING_STRATEGY = HermesRoutingStrategy.fromInteger(routing);
 	}
  
 	// DD modules 
@@ -209,9 +233,6 @@ public class Elasql extends VanillaDb {
 		case HERMES: 
 		case G_STORE: 
 		case LEAP:
-		case HERMES_CONTROL:
-		case HERMES_RL:
-		case HERMES_BANDIT_SEQUENCER:
 			remoteRecReceiver = new TPartCacheMgr(); 
 			break; 
  
@@ -238,10 +259,7 @@ public class Elasql extends VanillaDb {
 		case TPART: 
 		case HERMES: 
 		case G_STORE: 
-		case LEAP: 
-		case HERMES_CONTROL:
-		case HERMES_RL:
-		case HERMES_BANDIT_SEQUENCER:
+		case LEAP:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
@@ -298,27 +316,6 @@ public class Elasql extends VanillaDb {
 			sinker = new FusionSinker(table); 
 			isBatching = false; 
 			break;
-		case HERMES_CONTROL:
-			table = new FusionTable(); 
-			graph = new FusionTGraph(table); 
-			inserter = new PresetRouter(); 
-			sinker = new FusionSinker(table); 
-			isBatching = false; 
-			break; 
-		case HERMES_RL:
-			table = new FusionTable(); 
-			graph = new FusionTGraph(table); 
-			inserter = new PresetOrHermesRouter();//PresetRouteInserter(); 
-			sinker = new FusionSinker(table); 
-			isBatching = false; 
-			break;
-		case HERMES_BANDIT_SEQUENCER:
-			table = new FusionTable();
-			graph = new FusionTGraph(table);
-			inserter = new PresetRouter();
-			sinker = new FusionSinker(table);
-			isBatching = false;
-			break;
 		default:
 			throw new IllegalArgumentException("Not supported");
 		} 
@@ -347,17 +344,25 @@ public class Elasql extends VanillaDb {
 	}
 	
 	public static BatchNodeInserter newHermesRouter() {
-		switch (HERMES_ROUTER_TYPE) {
-		case 0:
+		switch (HERMES_ROUTING_STRATEGY) {
+		case ORIGINAL:
 			return new HermesNodeInserter();
-		case 1:
+		case LOCAL_READ_FIRST:
 			return new LocalReadFirstRouter();
-		case 2:
+		case PID_CONTROL:
 			return new ControlRouter();
-		case 3:
+		case PID_CONTROL_CENTRAL:
+			return new PresetRouter();
+		case DUAL_MIRROR_DESCENT:
 			return new MirrorDescentRouter();
+		case BANDITS:
+			return new PresetRouter();
+		case OFFLINE_RL:
+		case BOOTSTRAP_RL:
+		case ONLINE_RL:
+			return new PresetOrHermesRouter();
 		default:
-			throw new IllegalArgumentException("No such router with id: " + HERMES_ROUTER_TYPE);
+			throw new RuntimeException("This should not happen. Please check the code.");
 		}
 	}
  
@@ -379,9 +384,6 @@ public class Elasql extends VanillaDb {
 		case HERMES:
 		case G_STORE:
 		case LEAP:
-		case HERMES_CONTROL:
-		case HERMES_RL:
-		case HERMES_BANDIT_SEQUENCER:
 			if (!TPartStoredProcedureFactory.class.isAssignableFrom(factory.getClass())) 
 				throw new IllegalArgumentException("The given factory is not a TPartStoredProcedureFactory");
 			TPartStoredProcedureFactory tpartFactory = (TPartStoredProcedureFactory) factory;
@@ -417,21 +419,6 @@ public class Elasql extends VanillaDb {
 			case LEAP: 
 				graph = new FusionTGraph(new FusionTable()); 
 				inserter = new LocalFirstNodeInserter();
-				isBatching = false;
-				break; 
-			case HERMES_CONTROL:
-				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new PresetRouter();
-				isBatching = false;
-				break; 
-			case HERMES_RL:
-				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new PresetOrHermesRouter();
-				isBatching = false;
-				break;
-			case HERMES_BANDIT_SEQUENCER:
-				graph = new FusionTGraph(new FusionTable());
-				inserter = new PresetRouter();
 				isBatching = false;
 				break;
 			default: 

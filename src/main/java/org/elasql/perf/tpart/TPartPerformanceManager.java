@@ -7,7 +7,6 @@ import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
 import org.elasql.perf.tpart.ai.SumMaxEstimator;
-import org.elasql.perf.tpart.control.ControlParamUpdater;
 import org.elasql.perf.tpart.control.PidControlAgent;
 import org.elasql.perf.tpart.mdp.bandit.BanditAgent;
 import org.elasql.perf.tpart.mdp.rl.agent.FullyOfflineAgent;
@@ -21,6 +20,8 @@ import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
+import org.elasql.server.Elasql.HermesRoutingStrategy;
+import org.elasql.server.Elasql.ServiceType;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.util.TransactionProfiler;
 
@@ -47,14 +48,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
 				metricWarehouse, newEstimator(), newRoutingAgent(metricWarehouse));
-
 		Elasql.taskMgr().runTask(spCallPreprocessor);
-
-		// Hermes-Control has a control actuator
-		if (Elasql.SERVICE_TYPE == Elasql.ServiceType.HERMES_CONTROL) {
-			ControlParamUpdater actuator = new ControlParamUpdater(metricWarehouse);
-			Elasql.taskMgr().runTask(actuator);
-		}
 
 		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse);
 	}
@@ -67,7 +61,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	private static Estimator newEstimator() {
-		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_CONTROL) {
+		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES ||
+				Elasql.HERMES_ROUTING_STRATEGY != HermesRoutingStrategy.PID_CONTROL_CENTRAL) {
 			return null;
 		}
 
@@ -84,22 +79,20 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 	
 	private static CentralRoutingAgent newRoutingAgent(TpartMetricWarehouse metricWarehouse) {
-		switch (Elasql.SERVICE_TYPE) {
-		case HERMES_CONTROL:
+		if (Elasql.SERVICE_TYPE != ServiceType.HERMES)
+			return null;
+		
+		switch (Elasql.HERMES_ROUTING_STRATEGY) {
+		case PID_CONTROL_CENTRAL:
 			return new PidControlAgent(metricWarehouse);
-		case HERMES_RL:
-			switch (RL_TYPE) {
-			case 0:
-				return new FullyOfflineAgent();
-			case 1:
-				return new OfflineAgent();
-			case 2:
-				return new OnlineAgent();
-			default:
-				throw new IllegalArgumentException("Not supported");
-			}
-		case HERMES_BANDIT_SEQUENCER:
+		case BANDITS:
 			return new BanditAgent();
+		case OFFLINE_RL:
+			return new FullyOfflineAgent();
+		case BOOTSTRAP_RL:
+			return new OfflineAgent();
+		case ONLINE_RL:
+			return new OnlineAgent();
 		default:
 			return null;
 		}
