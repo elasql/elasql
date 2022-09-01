@@ -397,8 +397,6 @@ public class FeatureExtractor {
 		switch (Elasql.SERVICE_TYPE) {
 		case HERMES:
 		case LEAP:
-		case HERMES_CONTROL:
-		case HERMES_BANDIT_SEQUENCER:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			for (PrimaryKey key : keys) {
 				int partId = fusionTGraph.getCachedLocation(key);
@@ -421,8 +419,6 @@ public class FeatureExtractor {
 		switch (Elasql.SERVICE_TYPE) {
 		case HERMES:
 		case LEAP:
-		case HERMES_CONTROL:
-		case HERMES_BANDIT_SEQUENCER:
 			for (PrimaryKey key : keys) {
 				if (graph.getCachedLocation(key) != -1) {
 					counts += 1;
@@ -439,8 +435,6 @@ public class FeatureExtractor {
 		switch (Elasql.SERVICE_TYPE) {
 		case HERMES:
 		case LEAP:
-		case HERMES_CONTROL:
-		case HERMES_BANDIT_SEQUENCER:
 			FusionTGraph fusionTGraph = (FusionTGraph) graph;
 			return fusionTGraph.getFusionTableOverflowCount();
 		default:
