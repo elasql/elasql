@@ -46,6 +46,8 @@ import org.elasql.schedule.tpart.hermes.FusionSinker;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
+import org.elasql.schedule.tpart.hermes.MirrorDescentRouter;
+import org.elasql.schedule.tpart.hermes.LocalReadFirstRouter;
 import org.elasql.schedule.tpart.rl.PresetOrHermesRouter;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.storage.log.DdLogMgr;
@@ -349,7 +351,7 @@ public class Elasql extends VanillaDb {
 		case 0:
 			return new HermesNodeInserter();
 		case 1:
-			return new RemoteReadFocusRouter();
+			return new LocalReadFirstRouter();
 		case 2:
 			return new ControlRouter();
 		case 3:

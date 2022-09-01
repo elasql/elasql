@@ -10,7 +10,7 @@ import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class RemoteReadFocusRouter implements BatchNodeInserter {
+public class LocalReadFirstRouter implements BatchNodeInserter {
 	
 	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 
