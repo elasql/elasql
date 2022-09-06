@@ -34,6 +34,7 @@ import org.elasql.remote.groupcomm.Tuple;
 import org.elasql.remote.groupcomm.TupleSet;
 import org.elasql.server.Elasql;
 import org.elasql.server.Elasql.ServiceType;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.comm.server.VanillaCommServer;
 import org.vanilladb.comm.server.VanillaCommServerListener;
 import org.vanilladb.comm.view.ProcessType;
@@ -45,6 +46,11 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	
 	public static final int SEQUENCER_ID = VanillaCommServer.getServerCount() - 1;
 
+	private final static long NETWORK_LATENCY; 
+	static { 
+		NETWORK_LATENCY = ElasqlProperties.getLoader().getPropertyAsLong(ConnectionMgr.class.getName() + ".NETWORK_LATENCY", 10); 
+	} 
+	
 	private VanillaCommServer commServer;
 	private boolean isSequencer;
 	private BlockingQueue<List<Serializable>> tomSendQueue = new LinkedBlockingQueue<List<Serializable>>();
@@ -96,6 +102,13 @@ public class ConnectionMgr implements VanillaCommServerListener {
 	public void pushTupleSet(int nodeId, TupleSet reading) {
 		// For controller
 		TransactionProfiler.getLocalProfiler().incrementNetworkOutSize(reading);
+		
+		try { 
+			Thread.sleep(NETWORK_LATENCY); 
+		} catch (InterruptedException e) { 
+			e.printStackTrace(); 
+		} 
+		
 		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
 	}
 	
