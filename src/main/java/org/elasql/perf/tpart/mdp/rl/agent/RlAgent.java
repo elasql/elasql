@@ -95,13 +95,6 @@ public abstract class RlAgent implements CentralRoutingAgent {
 		public void train() {
 			train = true;
 		}
-		
-		private void drainStepQueue() {
-			Step step = null;
-			while ((step = stepQueue.poll()) != null) {
-				memory.setStep(step.txNum, step.state, step.action, step.reward, step.mask);
-			}
-		}
 	}
 
 	public RlAgent() {
@@ -120,6 +113,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 				@Override
 				public void run() {
 					Thread.currentThread().setName("prepare-agent");
+					drainStepQueue();
 					prepareAgent();
 					System.out.println("prepare finished!");
 				}
@@ -127,6 +121,13 @@ public abstract class RlAgent implements CentralRoutingAgent {
 			firstTime = false;
 		}
 		trainer.train();
+	}
+	
+	private void drainStepQueue() {
+		Step step = null;
+		while ((step = stepQueue.poll()) != null) {
+			memory.setStep(step.txNum, step.state, step.action, step.reward, step.mask);
+		}
 	}
 
 	public void onTxRouted(long txNum, int routeDest) {
