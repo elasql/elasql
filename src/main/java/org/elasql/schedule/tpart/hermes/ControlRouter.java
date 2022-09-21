@@ -58,6 +58,11 @@ public class ControlRouter implements BatchNodeInserter {
 			reportRoutingDistribution(task.getArrivedTime());
 		}
 	}
+
+	@Override
+	public boolean needBatching() {
+		return false;
+	}
 	
 	private void updateControlParameters(TPartStoredProcedureTask task) {
 		if (lastUpdateTime == -1) {

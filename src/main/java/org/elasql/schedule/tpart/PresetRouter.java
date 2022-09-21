@@ -29,6 +29,11 @@ public class PresetRouter implements BatchNodeInserter {
 		}
 	}
 
+	@Override
+	public boolean needBatching() {
+		return false;
+	}
+
 	// Debug: show the distribution of assigned masters
 	private void reportRoutingDistribution(long currentTime) {
 		if (lastReportTime == -1) {

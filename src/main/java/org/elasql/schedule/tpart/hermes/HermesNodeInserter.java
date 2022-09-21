@@ -75,6 +75,11 @@ public class HermesNodeInserter implements BatchNodeInserter {
 		
 //		System.out.println(String.format("Final loads: %s", Arrays.toString(loadPerPart)));
 	}
+
+	@Override
+	public boolean needBatching() {
+		return true;
+	}
 	
 	protected void resetStatistics() {
 		Arrays.fill(loadPerPart, 0);

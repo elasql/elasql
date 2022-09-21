@@ -1,5 +1,7 @@
 package org.elasql.schedule.tpart;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -22,6 +24,7 @@ import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.graph.TxNode;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.server.Elasql;
+import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.storage.tx.recovery.DdRecoveryMgr;
 import org.elasql.util.ElasqlProperties;
@@ -47,21 +50,13 @@ public class TPartScheduler extends Task implements Scheduler {
 	private BatchNodeInserter inserter;
 	private Sinker sinker;
 	private TGraph graph;
-	private boolean batchingEnabled = true;
 
 	public TPartScheduler(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, Sinker sinker, TGraph graph) {
-		this(factory, inserter, sinker, graph, true);
-	}
-	
-	public TPartScheduler(TPartStoredProcedureFactory factory, 
-			BatchNodeInserter inserter, Sinker sinker, TGraph graph,
-			boolean isBatching) {
 		this.factory = factory;
 		this.inserter = inserter;
 		this.sinker = sinker;
 		this.graph = graph;
-		this.batchingEnabled = isBatching;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
 		
 		// Clear the dump dir
@@ -117,7 +112,7 @@ public class TPartScheduler extends Task implements Scheduler {
 				}
 
 				// sink current t-graph if # pending tx exceeds threshold
-				if (!batchingEnabled || batchedTasks.size() >= SCHEDULE_BATCH_SIZE) {
+				if (!inserter.needBatching() || batchedTasks.size() >= SCHEDULE_BATCH_SIZE) {
 					processBatch(batchedTasks);
 					batchedTasks.clear();
 				}
@@ -138,6 +133,7 @@ public class TPartScheduler extends Task implements Scheduler {
 //		System.out.println(graph);
 //		printStatistics();
 //		printImbalStatistics();
+//		printTargetPartitionDist();
 //		collectGraphStatistics();
 		
 		// Sink the graph
@@ -248,10 +244,39 @@ public class TPartScheduler extends Task implements Scheduler {
 		batchId++;
 	}
 	
-	private int[] numberOfRemoteReads = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	private BufferedWriter writer = null;
+	
+	private void printTargetPartitionDist() {
+		// Calculate the distributions
+		int[] dists = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		
+		for (TxNode node : graph.getTxNodes()) {
+			for (Edge e : node.getReadEdges()) {
+				PrimaryKey key = e.getResourceKey();
+				if (key.getTableName().equals("warehouse")) {
+					int wid = (Integer) key.getVal(0).asJavaVal();
+					int partId = (wid - 1) / 20;
+					dists[partId]++;
+				}	
+			}
+		}
+		
+		// Write to a file
+		try {
+			if (writer == null)
+				writer = new BufferedWriter(new FileWriter("part-dist.txt"));
+			
+			writer.write(Arrays.toString(dists));
+			writer.newLine();
+			writer.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	private int[] numberOfTxns = new int[PartitionMetaMgr.NUM_PARTITIONS];
 	private int[] numberOfDistTxns = new int[PartitionMetaMgr.NUM_PARTITIONS];
-	private double[] ratioOfDistTxns = new double[PartitionMetaMgr.NUM_PARTITIONS];
+	private double[] ratioOfRemoteReads = new double[PartitionMetaMgr.NUM_PARTITIONS];
 	
 	private void collectGraphStatistics() {
 		long time = (System.currentTimeMillis() - Elasql.START_TIME_MS) / 1000;
@@ -262,13 +287,16 @@ public class TPartScheduler extends Task implements Scheduler {
 			boolean distTx = false;
 			
 			// count remote reads
+			int remoteReads = 0;
 			for (Edge e : node.getReadEdges()) {
 				int resPartId = e.getTarget().getPartId();
 				if (masterId != resPartId) {
-					numberOfRemoteReads[masterId]++;
+					remoteReads++;
 					distTx = true;
 				}
 			}
+			double remoteReadRatio = ((double) remoteReads) / node.getReadEdges().size();
+			ratioOfRemoteReads[masterId] += remoteReadRatio;
 			
 			// count transactions
 			numberOfTxns[masterId]++;
@@ -281,7 +309,12 @@ public class TPartScheduler extends Task implements Scheduler {
 		if (time >= nextReportTime) {
 			System.out.println(String.format("Time: %d", time));
 			
-			// Count the % of dist. transactions
+			// # of transactions
+			System.out.println(String.format("Number of transactions: %s.",
+					Arrays.toString(numberOfTxns)));
+			
+			// % of dist transactions
+			double[] ratioOfDistTxns = new double[PartitionMetaMgr.NUM_PARTITIONS];
 			for (int i = 0; i < ratioOfDistTxns.length; i++) {
 				if (numberOfTxns[i] == 0) {
 					ratioOfDistTxns[i] = 0.0;
@@ -290,25 +323,24 @@ public class TPartScheduler extends Task implements Scheduler {
 					ratioOfDistTxns[i] /= numberOfTxns[i];
 				}
 			}
-			
-			// # of transactions
-			System.out.println(String.format("Number of transactions: %s.",
-					Arrays.toString(numberOfTxns)));
-			Arrays.fill(numberOfTxns, 0);
-			
-			// # of dist transactions
-			System.out.println(String.format("Number of dist. transactions: %s.",
-					Arrays.toString(numberOfDistTxns)));
-			Arrays.fill(numberOfDistTxns, 0);
-			
-			// % of dist transactions
 			System.out.println(String.format("Ratio of dist. transactions: %s.",
 					Arrays.toString(ratioOfDistTxns)));
 			
 			// # of remote reads
-			System.out.println(String.format("Number of remote reads: %s.",
-					Arrays.toString(numberOfRemoteReads)));
-			Arrays.fill(numberOfRemoteReads, 0);
+			for (int i = 0; i < ratioOfRemoteReads.length; i++) {
+				if (numberOfTxns[i] == 0) {
+					ratioOfRemoteReads[i] = 0.0;
+				} else {
+					ratioOfRemoteReads[i] /= numberOfTxns[i];
+				}
+			}
+			System.out.println(String.format("Average Remote Read Ratio: %s.",
+					Arrays.toString(ratioOfRemoteReads)));
+			
+			// Reset all numbers
+			Arrays.fill(numberOfTxns, 0);
+			Arrays.fill(numberOfDistTxns, 0);
+			Arrays.fill(ratioOfRemoteReads, 0.0);
 			
 			nextReportTime = time + 5;
 		}

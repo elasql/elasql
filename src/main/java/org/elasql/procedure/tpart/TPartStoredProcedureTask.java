@@ -11,6 +11,7 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
+import org.vanilladb.core.util.TimerStatistics;
 import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
@@ -18,7 +19,7 @@ public class TPartStoredProcedureTask
 
 	static {
 		// For Debugging
-//		TimerStatistics.startReporting();
+//		TimerStatistics.startReporting(5);
 	}
 
 	private TPartStoredProcedure<?> tsp;
@@ -87,8 +88,7 @@ public class TPartStoredProcedureTask
 //			}
 
 			// For Debugging
-//			timer.addToGlobalStatistics();
-
+//			profiler.addToGlobalStatistics();
 		}
 
 		if (Elasql.performanceMgr() != null) {

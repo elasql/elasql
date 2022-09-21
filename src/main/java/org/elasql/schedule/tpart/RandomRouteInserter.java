@@ -14,4 +14,9 @@ public class RandomRouteInserter implements BatchNodeInserter {
 			graph.insertTxNode(task, route);
 		}
 	}
+
+	@Override
+	public boolean needBatching() {
+		return false;
+	}
 }

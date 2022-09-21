@@ -43,6 +43,11 @@ public class MirrorDescentRouter implements BatchNodeInserter {
 			reportRoutingDistribution(task.getArrivedTime());
 		}
 	}
+
+	@Override
+	public boolean needBatching() {
+		return false;
+	}
 	
 	private void insert(TGraph graph, TPartStoredProcedureTask task) {
 		// Calculate score for each node

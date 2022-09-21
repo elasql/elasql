@@ -37,7 +37,7 @@ import org.elasql.schedule.calvin.CalvinScheduler;
 import org.elasql.schedule.naive.NaiveScheduler;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
-import org.elasql.schedule.tpart.LocalFirstNodeInserter;
+import org.elasql.schedule.tpart.LocalReadFirstRouter;
 import org.elasql.schedule.tpart.PresetRouter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
@@ -47,8 +47,7 @@ import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.schedule.tpart.hermes.FusionTable;
 import org.elasql.schedule.tpart.hermes.HermesNodeInserter;
 import org.elasql.schedule.tpart.hermes.MirrorDescentRouter;
-import org.elasql.schedule.tpart.hermes.LocalReadFirstRouter;
-import org.elasql.schedule.tpart.rl.PresetOrHermesRouter;
+import org.elasql.schedule.tpart.rl.PresetOrLocalReadFirstRouter;
 import org.elasql.schedule.tpart.sink.Sinker;
 import org.elasql.storage.log.DdLogMgr;
 import org.elasql.storage.metadata.HashPartitionPlan;
@@ -292,34 +291,29 @@ public class Elasql extends VanillaDb {
 		BatchNodeInserter inserter; 
 		Sinker sinker; 
 		FusionTable table; 
-		boolean isBatching = true; 
 		 
 		switch (SERVICE_TYPE) { 
 		case TPART: 
 			graph = new TGraph(); 
 			inserter = new CostAwareNodeInserter(); 
-			sinker = new Sinker(); 
-			isBatching = true; 
+			sinker = new Sinker();
 			break; 
 		case HERMES: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table);
 			inserter = newHermesRouter();
-			sinker = new FusionSinker(table); 
-			isBatching = true; 
+			sinker = new FusionSinker(table);
 			break; 
 		case G_STORE: 
 			graph = new TGraph(); 
-			inserter = new LocalFirstNodeInserter(); 
-			sinker = new Sinker(); 
-			isBatching = false; 
+			inserter = new LocalReadFirstRouter(); 
+			sinker = new Sinker();
 			break; 
 		case LEAP: 
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
-			inserter = new LocalFirstNodeInserter(); 
-			sinker = new FusionSinker(table); 
-			isBatching = false; 
+			inserter = new LocalReadFirstRouter(); 
+			sinker = new FusionSinker(table);
 			break;
 		default:
 			throw new IllegalArgumentException("Not supported");
@@ -329,7 +323,7 @@ public class Elasql extends VanillaDb {
 //		factory = new MigrationStoredProcFactory(factory); 
 		 
 		TPartScheduler scheduler = new TPartScheduler(factory,  inserter, 
-				sinker, graph, isBatching); 
+				sinker, graph); 
 		 
 		taskMgr().runTask(scheduler); 
 		return scheduler; 
@@ -365,7 +359,7 @@ public class Elasql extends VanillaDb {
 		case OFFLINE_RL:
 		case BOOTSTRAP_RL:
 		case ONLINE_RL:
-			return new PresetOrHermesRouter();
+			return new PresetOrLocalReadFirstRouter();
 		default:
 			throw new RuntimeException("This should not happen. Please check the code.");
 		}
@@ -403,34 +397,29 @@ public class Elasql extends VanillaDb {
 		if (isStandAloneSequencer()) {
 			TGraph graph = null; 
 			BatchNodeInserter inserter;
-			boolean isBatching = true;
 			 
 			switch (SERVICE_TYPE) { 
 			case TPART: 
 				graph = new TGraph(); 
 				inserter = new CostAwareNodeInserter();
-				isBatching = true;
 				break; 
 			case HERMES:
 				graph = new FusionTGraph(new FusionTable());
 				inserter = newHermesRouter();
-				isBatching = true;
 				break; 
 			case G_STORE: 
 				graph = new TGraph(); 
-				inserter = new LocalFirstNodeInserter();
-				isBatching = false;
+				inserter = new LocalReadFirstRouter();
 				break; 
 			case LEAP: 
 				graph = new FusionTGraph(new FusionTable()); 
-				inserter = new LocalFirstNodeInserter();
-				isBatching = false;
+				inserter = new LocalReadFirstRouter();
 				break;
 			default: 
 				throw new IllegalArgumentException("Not supported"); 
 			} 
 			 
-			return TPartPerformanceManager.newForSequencer(factory, inserter, graph, isBatching); 
+			return TPartPerformanceManager.newForSequencer(factory, inserter, graph); 
 		} else {
 			return TPartPerformanceManager.newForDbServer();
 		}
