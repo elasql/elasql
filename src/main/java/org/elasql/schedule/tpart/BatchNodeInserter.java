@@ -14,4 +14,12 @@ public interface BatchNodeInserter {
 	 * @param tasks the tasks to be inserted to the graph
 	 */
 	void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks);
+	
+	/**
+	 * Check whether batching is needed for this inserter. If not, the
+	 * scheduler may choose to give it transactions one by one.
+	 * 
+	 * @return
+	 */
+	boolean needBatching();
 }

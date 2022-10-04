@@ -30,4 +30,9 @@ public class IdealTPCCInserter implements BatchNodeInserter {
 			graph.insertTxNode(task, partId);
 		}
 	}
+
+	@Override
+	public boolean needBatching() {
+		return false;
+	}
 }

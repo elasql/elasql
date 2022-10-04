@@ -41,12 +41,12 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	public static TPartPerformanceManager newForSequencer(TPartStoredProcedureFactory factory,
-			BatchNodeInserter inserter, TGraph graph, boolean isBatching) {
+			BatchNodeInserter inserter, TGraph graph) {
 		// The sequencer maintains a SpCallPreprocessor and a warehouse.
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
 
-		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
+		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph,
 				metricWarehouse, newEstimator(), newRoutingAgent(metricWarehouse));
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 

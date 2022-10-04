@@ -48,7 +48,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 
 	private final static long NETWORK_LATENCY; 
 	static { 
-		NETWORK_LATENCY = ElasqlProperties.getLoader().getPropertyAsLong(ConnectionMgr.class.getName() + ".NETWORK_LATENCY", 10); 
+		NETWORK_LATENCY = ElasqlProperties.getLoader().getPropertyAsLong(ConnectionMgr.class.getName() + ".NETWORK_LATENCY", 0); 
 	} 
 	
 	private VanillaCommServer commServer;
@@ -103,11 +103,13 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		// For controller
 		TransactionProfiler.getLocalProfiler().incrementNetworkOutSize(reading);
 		
-		try { 
-			Thread.sleep(NETWORK_LATENCY); 
-		} catch (InterruptedException e) { 
-			e.printStackTrace(); 
-		} 
+		if (NETWORK_LATENCY > 0) {
+			try { 
+				Thread.sleep(NETWORK_LATENCY); 
+			} catch (InterruptedException e) { 
+				e.printStackTrace(); 
+			} 
+		}
 		
 		commServer.sendP2pMessage(ProcessType.SERVER, nodeId, reading);
 	}

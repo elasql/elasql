@@ -69,6 +69,11 @@ public class CostAwareNodeInserter implements BatchNodeInserter {
 		for (int partId = 0; partId < partMgr.getCurrentNumOfParts(); partId++)
 			loadPerPart[partId] = 0.0;
 	}
+
+	@Override
+	public boolean needBatching() {
+		return true;
+	}
 		
 	private void insertNode(TGraph graph, TPartStoredProcedureTask task) {
 		// for scaling-out experiments

@@ -50,7 +50,6 @@ public class SpCallPreprocessor extends Task {
 	private TPartStoredProcedureFactory factory;
 	private BatchNodeInserter inserter;
 	private TGraph graph;
-	private boolean isBatching;
 	private Estimator performanceEstimator;
 	private CentralRoutingAgent routingAgent;
 	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
@@ -63,14 +62,13 @@ public class SpCallPreprocessor extends Task {
 
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory,
 			BatchNodeInserter inserter, TGraph graph,
-			boolean isBatching, TpartMetricWarehouse metricWarehouse,
+			TpartMetricWarehouse metricWarehouse,
 			Estimator performanceEstimator, CentralRoutingAgent routingAgent) {
 
 		// For generating execution plan and sp task
 		this.factory = factory;
 		this.inserter = inserter;
 		this.graph = graph;
-		this.isBatching = isBatching;
 		this.performanceEstimator = performanceEstimator;
 		this.routingAgent = routingAgent;
 		this.spcQueue = new LinkedBlockingQueue<StoredProcedureCall>();
@@ -140,7 +138,7 @@ public class SpCallPreprocessor extends Task {
 				}
 
 				// Process the batch as TPartScheduler does
-				if (!isBatching || batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE) {
+				if (!inserter.needBatching() || batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE) {
 					// Route the task batch
 					routeBatch(batchedTasks);
 					batchedTasks.clear();
