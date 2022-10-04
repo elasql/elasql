@@ -12,10 +12,17 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
+import org.elasql.util.ElasqlProperties;
 
 public class OnlineAgent extends RlAgent {
 	private static Logger logger = Logger.getLogger(OnlineAgent.class.getName());
 	private final Random random = new Random(0);
+	
+	public final static float EPSILON;
+	static {
+		EPSILON = (float) ElasqlProperties.getLoader().getPropertyAsDouble(
+				OnlineAgent.class.getName() + ".EPSILON", 0.9);
+	}
 	
 	public OnlineAgent() {
 		prepareAgent();
