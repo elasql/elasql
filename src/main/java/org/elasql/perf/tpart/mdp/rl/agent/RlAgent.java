@@ -126,7 +126,9 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	private void drainStepQueue() {
 		Step step = null;
 		while ((step = stepQueue.poll()) != null) {
-			memory.setStep(step.txNum, step.state, step.action, step.reward, step.mask);
+			int bound = (int) (step.txNum / 5_000)+1;
+			if(random.nextInt(bound) == 0)
+				memory.setStep(step.txNum, step.state, step.action, step.reward, step.mask);
 		}
 	}
 
