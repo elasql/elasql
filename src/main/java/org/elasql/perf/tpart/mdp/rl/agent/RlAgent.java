@@ -1,6 +1,7 @@
 package org.elasql.perf.tpart.mdp.rl.agent;
 
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -51,17 +52,19 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	protected TrainedAgent trainedAgent;
 
 	protected int episode = 2_000;
-	protected Memory memory = new Memory(20_000);
+	protected Memory memory = new Memory(5_000);
 	protected Trainer trainer = new Trainer();
 	
 	protected Map<Long, State> cachedStates = new ConcurrentHashMap<Long, State>();
 
 	private boolean isEval = false;
+	private Random  random = new Random();
 	
 	protected boolean prepared = false;
 	protected boolean firstTime = true;
 	
-	protected long startTrainTxNum = TPartPerformanceManager.RL_TYPE == 2 ? 30_000 : 100_000;
+	protected long startTime, previousTrain;
+	protected long startTrainTxNum = 30_000;
 	protected int trainingPeriod = 5_000;
 
 	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
@@ -199,6 +202,22 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	}
 	
 	protected boolean isTrainTxNum(long txNum) {
-		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % trainingPeriod == 0;
+		boolean startTrain = System.currentTimeMillis() - startTime > 90_000;
+		if (startTrain) {
+			if(previousTrain == 0) {
+				previousTrain = System.currentTimeMillis();
+				return true;
+			} else {
+				if(System.currentTimeMillis() - previousTrain > 20_000) {
+					previousTrain = System.currentTimeMillis();
+					return true;
+				} else {
+					return false;
+				}	
+			}			
+		} else {
+			return false;
+		}
+//		return txNum >= startTrainTxNum && (txNum - startTrainTxNum) % trainingPeriod == 0;
 	}
 }
