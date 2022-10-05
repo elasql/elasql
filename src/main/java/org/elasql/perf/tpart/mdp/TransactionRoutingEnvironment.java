@@ -1,8 +1,12 @@
 package org.elasql.perf.tpart.mdp;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.DoubleSummaryStatistics;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
@@ -19,13 +23,10 @@ public class TransactionRoutingEnvironment {
 	
 	private static final int NUM_PARTITIONS = PartitionMetaMgr.NUM_PARTITIONS;
 	private static final int WINDOW_SIZE = 1000;
-	
-	private static final float LOAD_UNDERLOAD = 0;
-	private static final float LOAD_NORMAL = 0.3f;
-	private static final float LOAD_OVERLOAD = 1;
 
 	public static final int REWARD_TYPE;
 	public static final double LOAD_RATIO;
+	
 
 	static {
 		REWARD_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger(
@@ -39,6 +40,7 @@ public class TransactionRoutingEnvironment {
 	
 	private long lastTxNum = -1;
 
+	
 	public State getCurrentState(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		if (task.getTxNum() < lastTxNum)
 			throw new RuntimeException(String.format(
@@ -47,7 +49,7 @@ public class TransactionRoutingEnvironment {
 		lastTxNum = task.getTxNum();
 		
 		int[] localReadCounts = calcLocalKeyCounts(task.getReadSet(), graph);
-		int[] machineLoads = calcMachineLoads();
+		float[] machineLoads = calcMachineLoads();
 
 		// Tx distribution
 //		long txCount = task.getTxNum() + 1;
@@ -139,19 +141,25 @@ public class TransactionRoutingEnvironment {
 	private float[] calcMachineLoads() {
 		float[] machineLoads = new float[NUM_PARTITIONS];
 		int totalTxCount = routeHistory.size();
+//		int totalTxCount = 0;
+//		for (int partId = 0; partId < NUM_PARTITIONS; partId++) {
+//			totalTxCount+=machineTxCounts[partId];
+//		}
 		
 		float normalizedLoad = 0.0f;
+
 		for (int partId = 0; partId < NUM_PARTITIONS; partId++) {
 			if (totalTxCount > 0) {
 				normalizedLoad = ((float) machineTxCounts[partId]) / totalTxCount;
 			}
-			if(normalizedLoad > max)
-			machineLoads[partId] =(float)(Math.round(normalizedLoad*10))/10;// normalizedLoad > 0.7 ? LOAD_OVERLOAD : normalizedLoad < 0.4 ? LOAD_UNDERLOAD : LOAD_NORMAL;
+			machineLoads[partId] =(float)(Math.round(normalizedLoad*10))/10;
 		}
-		
+
 		return machineLoads;
 	}
-	
+	private int count = 0;
+	private float readReward = 0.0f;
+	private float loadReward = 0.0f;
 	private float calcRewardByState(State state, int routeDest) {
 //		double minLoad = Double.MAX_VALUE;
 //		double maxLoad = Double.MIN_VALUE;
@@ -177,6 +185,14 @@ public class TransactionRoutingEnvironment {
 		// Load balancing score
 		float loadBalScore = 1 - (float) state.getMachineLoad(routeDest);
 
+		count ++;
+		readReward += readRecordScore;
+		loadReward += loadBalScore;
+		if (count %10000==0) {
+			System.out.printf("%f, %f\n", readReward / 10000, loadReward / 10000);
+			readReward = 0;
+			loadReward = 0;
+		}
 		// Record balancing score
 //		float recordBalScore = 1 - state[partId + ACTION_DIM + ACTION_DIM];
 
