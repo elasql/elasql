@@ -15,19 +15,20 @@ public class FullyOfflineAgent extends RlAgent {
 	private static Logger logger = Logger.getLogger(FullyOfflineAgent.class.getName());
 	
 	private long startTrainTxNum = 150_000;
+	private boolean trained = false;
 
 	public Route suggestRoute(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		TransactionProfiler.getLocalProfiler().startComponentProfiler("Prepare state");
 		float[] state = getCurrentState(graph, task, metricWarehouse);
 		TransactionProfiler.getLocalProfiler().stopComponentProfiler("Prepare state");
 		Route action = null;
-		if (task.getTxNum() < startTrainTxNum) {
-			// XXX: What is this for?
-//			cacheRemote(task.getTxNum(), remote);
-		} else if(task.getTxNum() == startTrainTxNum) {
+//		if(task.getTxNum() == startTrainTxNum) {
+		if(!trained && System.currentTimeMillis() - startTime > 90_000) {
+			System.out.println("train");
 			train();
-			eval();
-		} else if (prepared) {
+			trained = true;
+		} 
+		if (prepared) {
 			TransactionProfiler.getLocalProfiler().startComponentProfiler("Base React");
 				action = new Route(trainedAgent.react(state));
 				TransactionProfiler.getLocalProfiler().stopComponentProfiler("Base React");

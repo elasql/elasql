@@ -5,6 +5,7 @@ import java.util.Random;
 import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.mdp.TransactionRoutingEnvironment;
 import org.elasql.perf.tpart.mdp.rl.util.Memory;
+import org.elasql.server.Elasql;
 
 import ai.djl.Model;
 import ai.djl.engine.Engine;
@@ -39,7 +40,7 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     private Optimizer optimizer;
     private Model policy_net;
     private Model target_net;
-    private Model imitation_net;
+    protected Model imitation_net;
     private Model final_net;
 
     protected NDManager manager;
@@ -107,7 +108,7 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
         policy_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
         target_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
         final_net = ScoreModel.newModel(manager, dim_of_state_space, hidden_size, num_of_actions);
-        if(TPartPerformanceManager.RL_TYPE != 2) {
+        if(!Elasql.HERMES_ROUTING_STRATEGY.equals(Elasql.HermesRoutingStrategy.ONLINE_RL)) {
         	imitation_net = prepareImitationNet();
         	imitation_predictor = imitation_net.newPredictor(new NoopTranslator());
         }
@@ -147,14 +148,16 @@ public abstract class OfflineBaseBCQ extends BaseAgent {
     
     protected abstract int getAction(NDManager manager, float[] state) throws TranslateException;
    
+	protected Imitation imitation_model;
+
     private Model prepareImitationNet() {
-    	Imitation imitation_model = new Imitation(dim_of_state_space, num_of_actions, hidden_size, batch_size, 0.001f, memory);
+    	imitation_model = new Imitation(dim_of_state_space, num_of_actions, hidden_size, batch_size, 0.001f, memory);
     	int episode = 0;
-		while (episode < 700) {
+		while (episode < 500) {
 			episode++;
 			try (NDManager submanager = NDManager.newBaseManager().newSubManager()) {
 				imitation_model.updateModel(submanager);
-				if (episode == 700) {
+				if (episode % 100 == 0) {
 					System.out.print("Imitation model loss: ");
 					System.out.println(imitation_model.updateModel(submanager).toString());
 				}

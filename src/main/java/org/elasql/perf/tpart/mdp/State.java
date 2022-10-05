@@ -3,9 +3,9 @@ package org.elasql.perf.tpart.mdp;
 public class State {
 	
 	private int[] localReadCounts;
-	private int[] machineLoads;
+	private float[] machineLoads;
 	
-	public State(int[] localReadCounts, int[] machineLoads) {
+	public State(int[] localReadCounts, float[] machineLoads) {
 		this.localReadCounts = localReadCounts;
 		this.machineLoads = machineLoads;
 	}
@@ -14,7 +14,7 @@ public class State {
 		return localReadCounts[partId];
 	}
 	
-	public int getMachineLoad(int partId) {
+	public float getMachineLoad(int partId) {
 		return machineLoads[partId];
 	}
 	
@@ -26,7 +26,7 @@ public class State {
 		
 		int offset = localReadCounts.length;
 		for (int i = 0; i < machineLoads.length; i++)
-			state[offset + i] = (float) machineLoads[i];
+			state[offset + i] = machineLoads[i];
 		
 		return state;
 	}

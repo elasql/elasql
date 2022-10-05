@@ -4,8 +4,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Random;
 
-import org.elasql.perf.tpart.TPartPerformanceManager;
+import org.elasql.perf.tpart.mdp.rl.agent.OnlineAgent;
 import org.elasql.perf.tpart.mdp.rl.util.ActionSampler;
+import org.elasql.server.Elasql;
 
 import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDArray;
@@ -20,10 +21,15 @@ public class TrainedBCQ extends TrainedAgent {
 	protected NDManager manager;
 	protected Predictor<NDList, NDList> target_predictor;
 	protected Predictor<NDList, NDList> imitation_predictor;
-	private float epsilon = 0.1f;
+	
+	private final static float EPSILON = OnlineAgent.EPSILON;
+	private final float DECAY_EXPLORE_RATE = 0.9f;
+	private float epsilon;
 
 	private HashMap<Integer, Integer> stateActionMap = new HashMap<Integer, Integer>();
 
+	
+	
 	public TrainedBCQ() {
 		manager = NDManager.newBaseManager();
 	}
@@ -33,6 +39,8 @@ public class TrainedBCQ extends TrainedAgent {
 		this.target_predictor = target_predictor;
 		this.imitation_predictor = imitation_predictor;
 		stateActionMap = new HashMap<Integer, Integer>();
+		
+		epsilon = EPSILON * DECAY_EXPLORE_RATE;
 	}
 
 	public final int react(float[] state) {
@@ -53,7 +61,7 @@ public class TrainedBCQ extends TrainedAgent {
 
 		NDArray score = target_predictor.predict(new NDList(manager.create(state))).singletonOrThrow();
 		int action;
-		if (TPartPerformanceManager.RL_TYPE != 2) {
+        if(!Elasql.HERMES_ROUTING_STRATEGY.equals(Elasql.HermesRoutingStrategy.ONLINE_RL)) {
 			NDArray imitation = imitation_predictor.predict(new NDList(manager.create(state))).singletonOrThrow();
 			imitation = imitation.softmax(-1);
 			action = ActionSampler.greedy(score, imitation);

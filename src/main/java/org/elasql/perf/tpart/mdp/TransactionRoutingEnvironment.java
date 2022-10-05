@@ -18,17 +18,20 @@ public class TransactionRoutingEnvironment {
 	public static final int ACTION_DIM = PartitionMetaMgr.NUM_PARTITIONS;
 	
 	private static final int NUM_PARTITIONS = PartitionMetaMgr.NUM_PARTITIONS;
-	private static final int WINDOW_SIZE = 100;
+	private static final int WINDOW_SIZE = 1000;
 	
-	private static final int LOAD_UNDERLOAD = -1;
-	private static final int LOAD_NORMAL = 0;
-	private static final int LOAD_OVERLOAD = 1;
+	private static final float LOAD_UNDERLOAD = 0;
+	private static final float LOAD_NORMAL = 0.3f;
+	private static final float LOAD_OVERLOAD = 1;
 
 	public static final int REWARD_TYPE;
+	public static final double LOAD_RATIO;
 
 	static {
 		REWARD_TYPE = ElasqlProperties.getLoader().getPropertyAsInteger(
 				TransactionRoutingEnvironment.class.getName() + ".REWARD_TYPE", 1);
+		LOAD_RATIO = ElasqlProperties.getLoader().getPropertyAsDouble(
+				TransactionRoutingEnvironment.class.getName() + ".LOAD_RATIO", 0.5);
 	}
 	
 	private int[] machineTxCounts = new int[NUM_PARTITIONS];
@@ -133,16 +136,17 @@ public class TransactionRoutingEnvironment {
 		}
 	}
 	
-	private int[] calcMachineLoads() {
-		int[] machineLoads = new int[NUM_PARTITIONS];
+	private float[] calcMachineLoads() {
+		float[] machineLoads = new float[NUM_PARTITIONS];
 		int totalTxCount = routeHistory.size();
 		
+		float normalizedLoad = 0.0f;
 		for (int partId = 0; partId < NUM_PARTITIONS; partId++) {
-			float normalizedLoad = 0.0f;
 			if (totalTxCount > 0) {
 				normalizedLoad = ((float) machineTxCounts[partId]) / totalTxCount;
 			}
-			machineLoads[partId] = normalizedLoad > 0.5 ? LOAD_OVERLOAD : normalizedLoad < 0.3 ? LOAD_UNDERLOAD : LOAD_NORMAL;
+			if(normalizedLoad > max)
+			machineLoads[partId] =(float)(Math.round(normalizedLoad*10))/10;// normalizedLoad > 0.7 ? LOAD_OVERLOAD : normalizedLoad < 0.4 ? LOAD_UNDERLOAD : LOAD_NORMAL;
 		}
 		
 		return machineLoads;
@@ -177,7 +181,7 @@ public class TransactionRoutingEnvironment {
 //		float recordBalScore = 1 - state[partId + ACTION_DIM + ACTION_DIM];
 
 //				float reward = readRecordScore * 0.5f + loadBalScore * 0.5f;
-		float reward = readRecordScore + loadBalScore;
+		float reward = (float) ((1 - LOAD_RATIO) * readRecordScore + LOAD_RATIO * loadBalScore);
 
 		return reward;
 	}
