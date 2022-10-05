@@ -47,7 +47,7 @@ public class TransactionRoutingEnvironment {
 		lastTxNum = task.getTxNum();
 		
 		int[] localReadCounts = calcLocalKeyCounts(task.getReadSet(), graph);
-		int[] machineLoads = calcMachineLoads();
+		float[] machineLoads = calcMachineLoads();
 
 		// Tx distribution
 //		long txCount = task.getTxNum() + 1;
@@ -145,10 +145,9 @@ public class TransactionRoutingEnvironment {
 			if (totalTxCount > 0) {
 				normalizedLoad = ((float) machineTxCounts[partId]) / totalTxCount;
 			}
-			if(normalizedLoad > max)
-			machineLoads[partId] =(float)(Math.round(normalizedLoad*10))/10;// normalizedLoad > 0.7 ? LOAD_OVERLOAD : normalizedLoad < 0.4 ? LOAD_UNDERLOAD : LOAD_NORMAL;
+			machineLoads[partId] =(float)(Math.round(normalizedLoad*10))/10;
 		}
-		
+
 		return machineLoads;
 	}
 	
