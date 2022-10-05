@@ -83,11 +83,13 @@ public abstract class RlAgent implements CentralRoutingAgent {
 				if (train) {
 					episode = 100;
 					drainStepQueue();
+					long startTime = System.currentTimeMillis();
 					updateAgent(episode);
+					System.out.printf("Training time: %d", (System.currentTimeMillis() - startTime)/1000);
 					train = false;
 				} else {
 					try {
-						Thread.sleep(5_000);
+						Thread.sleep(10_000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -102,6 +104,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 
 	public RlAgent() {
 		loadLib();
+		startTime = System.currentTimeMillis();
 	}
 	
 	public abstract Route suggestRoute(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse);
@@ -112,6 +115,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 
 	public void train() {
 		if (firstTime) {
+			
 			Elasql.taskMgr().runTask(new Task() {
 				@Override
 				public void run() {
@@ -148,6 +152,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 				throw new RuntimeException("Cannot find cached state for tx." + txNum);
 			
 			float reward = env.calcReward(state, masterId, latency);
+
 			stepQueue.add(new Step(txNum, state.toFloatArray(), masterId, reward, false));
 		}
 	}
