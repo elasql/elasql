@@ -6,7 +6,7 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 
-public class RandomRouteInserter implements BatchNodeInserter {
+public class UniformRandomRouter implements BatchNodeInserter {
 	@Override
 	public void insertBatch(TGraph graph, List<TPartStoredProcedureTask> tasks) {
 		for (TPartStoredProcedureTask task : tasks) {

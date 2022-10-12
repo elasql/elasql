@@ -39,6 +39,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.CostAwareNodeInserter;
 import org.elasql.schedule.tpart.LocalReadFirstRouter;
 import org.elasql.schedule.tpart.PresetRouter;
+import org.elasql.schedule.tpart.UniformRandomRouter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.ControlRouter;
@@ -91,7 +92,9 @@ public class Elasql extends VanillaDb {
 	}
 	
 	public enum HermesRoutingStrategy {
-		ORIGINAL, LOCAL_READ_FIRST, PID_CONTROL, PID_CONTROL_CENTRAL, DUAL_MIRROR_DESCENT, BANDITS, OFFLINE_RL, BOOTSTRAP_RL, ONLINE_RL;
+		ORIGINAL, LOCAL_READ_FIRST, PID_CONTROL, PID_CONTROL_CENTRAL, DUAL_MIRROR_DESCENT,
+		BANDITS, OFFLINE_RL, BOOTSTRAP_RL, ONLINE_RL,
+		UNIFORM_RANDOM;
  
 		static HermesRoutingStrategy fromInteger(int index) { 
 			switch (index) { 
@@ -113,6 +116,8 @@ public class Elasql extends VanillaDb {
 				return BOOTSTRAP_RL;
 			case 8:
 				return ONLINE_RL;
+			case 9:
+				return UNIFORM_RANDOM;
 			default:
 				throw new RuntimeException("Unsupport service type"); 
 			} 
@@ -360,6 +365,8 @@ public class Elasql extends VanillaDb {
 		case BOOTSTRAP_RL:
 		case ONLINE_RL:
 			return new PresetOrLocalReadFirstRouter();
+		case UNIFORM_RANDOM:
+			return new UniformRandomRouter();
 		default:
 			throw new RuntimeException("This should not happen. Please check the code.");
 		}
