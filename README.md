@@ -35,7 +35,7 @@ Check out our [configuration instructions](doc/configurations.md).
 <dependency>
   <groupId>org.elasql</groupId>
   <artifactId>elasql</artifactId>
-  <version>0.3.0</version>
+  <version>0.3.2</version>
 </dependency>
 ```
 
@@ -45,6 +45,6 @@ If you have any question, you can either open an issue here or contact [elasql@d
 
 ## License
 
-Copyright 2016-2021 elasql.org contributors
+Copyright 2016-2022 elasql.org contributors
 
 Licensed under the [Apache License 2.0](LICENSE)
