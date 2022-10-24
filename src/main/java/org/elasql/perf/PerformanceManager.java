@@ -50,5 +50,5 @@ public interface PerformanceManager {
 	/**
 	 * Receives a commit message of a transaction.
 	 */
-	void onTransactionCommit(long txNum, int masterId, long txLatency);
+	void onTransactionCommit(long txNum, TransactionReport report);
 }

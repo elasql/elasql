@@ -3,6 +3,7 @@ package org.elasql.procedure.tpart;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.elasql.perf.tpart.TpartTransactionReport;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
@@ -11,7 +12,6 @@ import org.elasql.schedule.tpart.sink.SunkPlan;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.remote.storedprocedure.SpResultSet;
-import org.vanilladb.core.util.TimerStatistics;
 import org.vanilladb.core.util.TransactionProfiler;
 
 public class TPartStoredProcedureTask
@@ -78,7 +78,8 @@ public class TPartStoredProcedureTask
 
 			// Notify the sequencer that this transaction commits
 			long txLatency = profiler.getExecutionTime();
-			Elasql.connectionMgr().sendCommitNotification(txNum, txLatency);
+			TpartTransactionReport report = new TpartTransactionReport(Elasql.serverId(), tsp.isTxDistributed(), txLatency);
+			Elasql.connectionMgr().sendCommitNotification(txNum, report);
 
 			// TODO: Uncomment this when the migration module is migrated
 //			if (tsp.getProcedureType() == ProcedureType.MIGRATION) {

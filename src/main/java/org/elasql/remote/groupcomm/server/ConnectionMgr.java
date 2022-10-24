@@ -27,6 +27,7 @@ import java.util.logging.Logger;
 import org.elasql.migration.MigrationRangeFinishMessage;
 import org.elasql.migration.MigrationSystemController;
 import org.elasql.perf.MetricReport;
+import org.elasql.perf.TransactionReport;
 import org.elasql.remote.groupcomm.ClientResponse;
 import org.elasql.remote.groupcomm.CommitNotification;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
@@ -82,9 +83,9 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				new ClientResponse(clientId, rteId, txNum, rs));
 	}
 	
-	public void sendCommitNotification(long txNum, long txLatency) {
+	public void sendCommitNotification(long txNum, TransactionReport report) {
 		commServer.sendP2pMessage(ProcessType.SERVER, SEQUENCER_ID, 
-				new CommitNotification(txNum, Elasql.serverId(), txLatency));
+				new CommitNotification(txNum, report));
 	}
 	
 	public void sendStoredProcedureCall(boolean fromAppiaThread, int pid, Object[] pars) {
@@ -146,8 +147,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				flushTotalOrderMsgs();
 			} else if (message.getClass().equals(CommitNotification.class)) {
 				CommitNotification cn = (CommitNotification) message;
-				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum(),
-						cn.getMasterId(), cn.getTxLatency());
+				Elasql.performanceMgr().onTransactionCommit(cn.getTxNum(), cn.getReport());
 			} else if (message instanceof MetricReport) {
 				MetricReport report = (MetricReport) message;
 				Elasql.performanceMgr().receiveMetricReport(report);

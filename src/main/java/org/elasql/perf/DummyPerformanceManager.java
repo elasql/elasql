@@ -31,7 +31,7 @@ public class DummyPerformanceManager implements PerformanceManager {
 	}
 	
 	@Override
-	public void onTransactionCommit(long txNum, int masterId, long txLatency) {
+	public void onTransactionCommit(long txNum, TransactionReport report) {
 		// Do nothing
 	}
 }

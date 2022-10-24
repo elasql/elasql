@@ -3,6 +3,7 @@ package org.elasql.perf.tpart;
 import org.elasql.perf.MetricReport;
 import org.elasql.perf.MetricWarehouse;
 import org.elasql.perf.PerformanceManager;
+import org.elasql.perf.TransactionReport;
 import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
@@ -49,8 +50,11 @@ public class TPartPerformanceManager implements PerformanceManager {
 		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph,
 				metricWarehouse, newEstimator(), newRoutingAgent(metricWarehouse));
 		Elasql.taskMgr().runTask(spCallPreprocessor);
+		
+		TransactionStatisticsRecorder txStatRecord = new TransactionStatisticsRecorder();
+		Elasql.taskMgr().runTask(txStatRecord);
 
-		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse);
+		return new TPartPerformanceManager(spCallPreprocessor, metricWarehouse, txStatRecord);
 	}
 
 	public static TPartPerformanceManager newForDbServer() {
@@ -101,13 +105,16 @@ public class TPartPerformanceManager implements PerformanceManager {
 	// On the sequencer
 	private SpCallPreprocessor spCallPreprocessor;
 	private TpartMetricWarehouse metricWarehouse;
+	private TransactionStatisticsRecorder txStatRecorder;
 	
 	// On each DB machine
 	private MetricCollector localMetricCollector;
 
-	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse) {
+	private TPartPerformanceManager(SpCallPreprocessor spCallPreprocessor, TpartMetricWarehouse metricWarehouse,
+			TransactionStatisticsRecorder txStatRecorder) {
 		this.spCallPreprocessor = spCallPreprocessor;
 		this.metricWarehouse = metricWarehouse;
+		this.txStatRecorder = txStatRecorder;
 	}
 
 	private TPartPerformanceManager(MetricCollector localMetricCollector) {
@@ -141,7 +148,9 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	@Override
-	public void onTransactionCommit(long txNum, int masterId, long txLatency) {
-		spCallPreprocessor.onTransactionCommit(txNum, masterId, txLatency);
+	public void onTransactionCommit(long txNum, TransactionReport report) {
+		TpartTransactionReport tpartReport = (TpartTransactionReport) report;
+		spCallPreprocessor.onTransactionCommit(txNum, tpartReport.getMasterId(), tpartReport.getLatency());
+		txStatRecorder.onTansactionCommit(txNum, tpartReport);
 	}
 }
