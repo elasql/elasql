@@ -249,15 +249,15 @@ public class TPartScheduler extends Task implements Scheduler {
 	private void printTargetPartitionDist() {
 		// Calculate the distributions
 		int[] dists = new int[PartitionMetaMgr.NUM_PARTITIONS];
+		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		
 		for (TxNode node : graph.getTxNodes()) {
 			for (Edge e : node.getReadEdges()) {
 				PrimaryKey key = e.getResourceKey();
-				if (key.getTableName().equals("warehouse")) {
-					int wid = (Integer) key.getVal(0).asJavaVal();
-					int partId = (wid - 1) / 20;
-					dists[partId]++;
-				}	
+				
+				// Get its original partition
+				int partId = partMgr.getPartition(key);
+				dists[partId]++;
 			}
 		}
 		
