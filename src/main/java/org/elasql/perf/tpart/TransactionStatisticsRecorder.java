@@ -95,6 +95,7 @@ public class TransactionStatisticsRecorder extends Task {
 						// Write to the CSV file
 						StatisticsRow row = calculateStatistics(nextWriteTime / 1000);
 						csvSaver.writeRecord(writer, row, columnCount);
+						writer.flush();
 						
 						nextWriteTime += WINDOW_SIZE * 1000;
 					}
