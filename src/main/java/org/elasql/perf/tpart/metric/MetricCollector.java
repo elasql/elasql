@@ -22,7 +22,7 @@ import oshi.software.os.OperatingSystem;
  * @author Yu-Shan Lin
  */
 public class MetricCollector extends Task {
-	private static final int SYSTEM_METRIC_INTERVAL = 100; // in milliseconds
+	private static final int SYSTEM_METRIC_INTERVAL = 1000; // in milliseconds
 
 	private TransactionMetricRecorder metricRecorder;
 
@@ -57,16 +57,19 @@ public class MetricCollector extends Task {
 		try {
 			while (true) {
 				startTime = System.nanoTime();
+				
+				// Send a metric report only if all the servers are ready
+				if (Elasql.connectionMgr().areAllServersReady()) {
+					// Read disk info
+					updateDiskStore();
 
-				// Read disk info
-				updateDiskStore();
+					// Collect the metrics
+					TPartSystemMetrics metrics = collectSystemMetrics();
 
-				// Collect the metrics
-				TPartSystemMetrics metrics = collectSystemMetrics();
-
-				// Send to the sequencer
-				if (Elasql.connectionMgr() != null)
-					Elasql.connectionMgr().sendMetricReport(metrics);
+					// Send to the sequencer
+					if (Elasql.connectionMgr() != null)
+						Elasql.connectionMgr().sendMetricReport(metrics);
+				}
 
 				// Wait for the next collection
 				while ((System.nanoTime() - startTime) / 1000_000 < SYSTEM_METRIC_INTERVAL) {
