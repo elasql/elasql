@@ -9,8 +9,19 @@ import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.util.ElasqlProperties;
 
 public class MirrorDescentRouter implements BatchNodeInserter {
+	
+	private static final double LEARNING_RATE_SCALE;
+	private static final double INITIAL_ALPHA;
+	
+	static {
+		LEARNING_RATE_SCALE = ElasqlProperties.getLoader().getPropertyAsDouble(
+				MirrorDescentRouter.class.getName() + ".LEARNING_RATE_SCALE", 1.0);
+		INITIAL_ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
+				MirrorDescentRouter.class.getName() + ".INITIAL_ALPHA", 1.0);
+	}
 	
 	private static final double TIE_CLOSENESS = 1.0; // 1%. Note that scores are in 0 ~ 1
 	
@@ -30,7 +41,7 @@ public class MirrorDescentRouter implements BatchNodeInserter {
 	public MirrorDescentRouter() {
 		paramAlpha = new double[PartitionMetaMgr.NUM_PARTITIONS];
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			paramAlpha[nodeId] = 0.0;
+			paramAlpha[nodeId] = INITIAL_ALPHA;
 		}
 	}
 
@@ -75,8 +86,7 @@ public class MirrorDescentRouter implements BatchNodeInserter {
 		double avgLoadBudget = loadSum / txCount / PartitionMetaMgr.NUM_PARTITIONS;
 		
 		// Update learning rate
-		eta = 1 / Math.sqrt(txCount);
-//		eta = 1 / Math.sqrt(100000);
+		eta = LEARNING_RATE_SCALE / Math.sqrt(txCount);
 		
 		// Calculate gradient
 		double[] gradient = new double[PartitionMetaMgr.NUM_PARTITIONS];
