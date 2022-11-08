@@ -1,6 +1,4 @@
-package org.elasql.perf.tpart.control;
-
-import org.elasql.util.ElasqlProperties;
+package org.elasql.util;
 
 public class PidController {
 	

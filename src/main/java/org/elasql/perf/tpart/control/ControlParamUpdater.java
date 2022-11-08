@@ -9,6 +9,7 @@ import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.server.Elasql;
 import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.ElasqlProperties;
+import org.elasql.util.PidController;
 import org.vanilladb.core.server.task.Task;
 
 /**

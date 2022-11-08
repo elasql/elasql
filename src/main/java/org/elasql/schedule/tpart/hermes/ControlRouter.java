@@ -5,19 +5,32 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 
-import org.elasql.perf.tpart.control.PidController;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.elasql.storage.metadata.PartitionMetaMgr;
+import org.elasql.util.ElasqlProperties;
+import org.elasql.util.PidController;
 
 public class ControlRouter implements BatchNodeInserter {
 	
+	private static final long CONTROL_UPDATE_PERIOD; // in milliseconds
+	private static final long OBSERVATION_LENGTH; // in milliseconds
+	private static final double INITIAL_ALPHA;
+	
+	static {
+		CONTROL_UPDATE_PERIOD = ElasqlProperties.getLoader().getPropertyAsLong(
+				ControlRouter.class.getName() + ".CONTROL_UPDATE_PERIOD", 100);
+		OBSERVATION_LENGTH = ElasqlProperties.getLoader().getPropertyAsLong(
+				ControlRouter.class.getName() + ".OBSERVATION_LENGTH", 1000);
+		INITIAL_ALPHA = ElasqlProperties.getLoader().getPropertyAsDouble(
+				ControlRouter.class.getName() + ".INITIAL_ALPHA", 1.0);
+	}
+
 	private static final double TIE_CLOSENESS = 1.0; // 1%. Note that scores are in 0 ~ 1
-	private static final long CONTROL_UPDATE_PERIOD = 100; // in milliseconds
-	private static final int WINDOW_SIZE = 10; // PERIOD * WINDOW_SIZE
+	private static final int WINDOW_SIZE = (int) (OBSERVATION_LENGTH / CONTROL_UPDATE_PERIOD);
 	
 	private PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 	private List<Integer> ties = new ArrayList<Integer>();
@@ -42,8 +55,8 @@ public class ControlRouter implements BatchNodeInserter {
 		alphaControllers = new PidController[PartitionMetaMgr.NUM_PARTITIONS];
 		paramAlpha = new double[PartitionMetaMgr.NUM_PARTITIONS];
 		for (int nodeId = 0; nodeId < PartitionMetaMgr.NUM_PARTITIONS; nodeId++) {
-			alphaControllers[nodeId] = new PidController(1.0);
-			paramAlpha[nodeId] = 1.0;
+			alphaControllers[nodeId] = new PidController(INITIAL_ALPHA);
+			paramAlpha[nodeId] = INITIAL_ALPHA;
 		}
 	}
 
