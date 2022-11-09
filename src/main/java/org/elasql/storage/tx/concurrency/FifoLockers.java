@@ -160,13 +160,12 @@ public class FifoLockers {
 			 * peek.
 			 */
 			nextFifoLock = requestQueue.peek();
-			if (nextFifoLock == null) {
-				return;
-			} else {
-				synchronized (nextFifoLock) {
-					nextFifoLock.notifyLock();
-				}
+			if (nextFifoLock != null) {
+			    synchronized (nextFifoLock) {
+			        nextFifoLock.notifyLock();
+			    }
 			}
+			return;
 		}
 
 		synchronized (nextFifoLock) {

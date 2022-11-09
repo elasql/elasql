@@ -30,16 +30,13 @@ public class FifoOrderedLockTable {
 	 * @param fifoLock
 	 */
 	void requestLock(Object obj, FifoLock fifoLock) {
-		if (!lockerMap.containsKey(obj)) {
-			/*
-			 * putIfAbsent is an atomic operation. It's OK to let two threads put a new
-			 * FifoLockers into the lockerMap because the second thread's fifoLockers will
-			 * be ignored. After that, the two threads will get the exactly same FifoLockers
-			 * from the map again.
-			 */
-			lockerMap.putIfAbsent(obj, new FifoLockers());
-		}
-
+		/*
+		 * putIfAbsent is an atomic operation. It's OK to let two threads put a new
+		 * FifoLockers into the lockerMap because the second thread's fifoLockers will
+		 * be ignored. After that, the two threads will get the exactly same FifoLockers
+		 * from the map again.
+		 */
+	    lockerMap.putIfAbsent(obj, new FifoLockers());
 		FifoLockers lks = lockerMap.get(obj);
 		lks.addToRequestQueue(fifoLock);
 	}
