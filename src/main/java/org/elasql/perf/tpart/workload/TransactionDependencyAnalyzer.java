@@ -49,7 +49,7 @@ public class TransactionDependencyAnalyzer {
 		return dependentTxs;
 	}
 	
-	private Set<Long> findDependentTransactions(Set<PrimaryKey> readSet, Set<PrimaryKey> writeSet) {
+	public Set<Long> findDependentTransactions(Set<PrimaryKey> readSet, Set<PrimaryKey> writeSet) {
 		Set<Long> dependentTxs = new HashSet<Long>();
 		
 		// Write-Read dependencies
@@ -92,7 +92,7 @@ public class TransactionDependencyAnalyzer {
 		return lastUse;
 	}
 	
-	private void addTransaction(long txNum, Set<PrimaryKey> readSet, Set<PrimaryKey> writeSet) {
+	public void addTransaction(long txNum, Set<PrimaryKey> readSet, Set<PrimaryKey> writeSet) {
 		for (PrimaryKey readKey : readSet) {
 			if (!writeSet.contains(readKey)) {
 				LastUse lastUse = getLastUseForUpdate(readKey);

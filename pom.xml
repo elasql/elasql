@@ -94,6 +94,11 @@
 			<artifactId>oshi-core</artifactId>
 			<version>5.8.2</version>
 		</dependency>
+		<dependency>
+			<groupId>org.elasql</groupId>
+			<artifactId>estimator</artifactId>
+			<version>0.0.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>

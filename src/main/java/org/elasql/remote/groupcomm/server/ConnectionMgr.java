@@ -221,7 +221,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 		if (!tomRequest.isEmpty()) {
 			sendTotalOrderRequest(tomRequest);
 			tomRequest = new ArrayList<Serializable>();
-		}	
+		}
 	}
 	
 	private void profileBroadcast(StoredProcedureCall spc, Serializable message) {
@@ -249,7 +249,7 @@ public class ConnectionMgr implements VanillaCommServerListener {
 				while (true) {
 					try {
 						List<Serializable> messages = tomSendQueue.take();
-						for (int i = messages.size() - 1; i >= 0; i--) {
+						for (int i = 0; i < messages.size(); i++) {
 							StoredProcedureCall spc = (StoredProcedureCall) messages.get(i);
 							spc.stampOu0StopTime(System.nanoTime());
 						}

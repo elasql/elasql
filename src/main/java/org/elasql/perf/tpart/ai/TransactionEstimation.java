@@ -89,6 +89,14 @@ public class TransactionEstimation {
 		return slaveCpus[slaveId];
 	}
 	
+	public double getAvgLatency() {
+	    double totalLatency = 0;
+	    for (double latency : latencies) {
+	        totalLatency += latency;
+	    }
+	    return totalLatency / latencies.length;
+	}
+	
 	public byte[] toBytes() {
 		try {
 			ByteArrayOutputStream bo = new ByteArrayOutputStream();

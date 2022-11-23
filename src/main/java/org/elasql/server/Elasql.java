@@ -296,7 +296,6 @@ public class Elasql extends VanillaDb {
 			table = new FusionTable(); 
 			graph = new FusionTGraph(table); 
 			inserter = new HermesNodeInserter();
-//			inserter = new HotAvoidanceRouter();
 			sinker = new FusionSinker(table); 
 			isBatching = true; 
 			break; 

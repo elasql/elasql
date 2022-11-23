@@ -6,6 +6,7 @@ import org.elasql.perf.PerformanceManager;
 import org.elasql.perf.tpart.ai.ConstantEstimator;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.ReadCountEstimator;
+import org.elasql.perf.tpart.ai.SumMaxEstimator;
 import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
@@ -36,7 +37,7 @@ public class TPartPerformanceManager implements PerformanceManager {
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
 
-		SpCallPreprocessor spCallPreprocessor = new SpCallPreprocessor(factory, inserter, graph, isBatching,
+		SpCallPreprocessor spCallPreprocessor = new SlaPreprocessor(factory, inserter, graph, isBatching,
 				metricWarehouse, newEstimator());
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
@@ -58,15 +59,13 @@ public class TPartPerformanceManager implements PerformanceManager {
 	}
 
 	private static Estimator newEstimator() {
-		if (Elasql.SERVICE_TYPE != Elasql.ServiceType.HERMES_CONTROL) {
-			return null;
-		}
-
 		switch (ESTIMATOR_TYPE) {
 		case 0:
 			return new ConstantEstimator();
 		case 1:
 			return new ReadCountEstimator();
+		case 2:
+		    return new SumMaxEstimator();
 		default:
 			throw new IllegalArgumentException("Not supported");
 		}

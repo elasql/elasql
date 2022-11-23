@@ -36,27 +36,27 @@ import org.vanilladb.core.server.task.Task;
  */
 public class SpCallPreprocessor extends Task {
 	
-	private BlockingQueue<StoredProcedureCall> spcQueue;
-	private FeatureExtractor featureExtractor;
+	protected BlockingQueue<StoredProcedureCall> spcQueue;
+	protected FeatureExtractor featureExtractor;
 
 	// Components to simulate the scheduler
-	private TPartStoredProcedureFactory factory;
-	private BatchNodeInserter inserter;
-	private TGraph graph;
-	private boolean isBatching;
-	private Estimator performanceEstimator;
-	private HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
+	protected TPartStoredProcedureFactory factory;
+	protected BatchNodeInserter inserter;
+	protected TGraph graph;
+	protected boolean isBatching;
+	protected Estimator performanceEstimator;
+	protected HashSet<PrimaryKey> keyHasBeenRead = new HashSet<PrimaryKey>();
 	
 	// XXX: Quick test
 //	private Estimator testEstimator = new PythonSubProcessEstimator();
 	
 	// XXX: Cache last tx's routing destination
-	private int lastTxRoutingDest = -1;
+	protected int lastTxRoutingDest = -1;
 	
 	// For collecting features
-	private TransactionFeaturesRecorder featureRecorder;
-	private TransactionDependencyRecorder dependencyRecorder;
-	private TimeRelatedFeatureMgr timeRelatedFeatureMgr;
+	protected TransactionFeaturesRecorder featureRecorder;
+	protected TransactionDependencyRecorder dependencyRecorder;
+	protected TimeRelatedFeatureMgr timeRelatedFeatureMgr;
 	
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
@@ -143,7 +143,7 @@ public class SpCallPreprocessor extends Task {
 		}
 	}
 	
-	private TPartStoredProcedureTask createSpTask(StoredProcedureCall spc) {
+	protected TPartStoredProcedureTask createSpTask(StoredProcedureCall spc) {
 		if (!spc.isNoOpStoredProcCall()) {
 			TPartStoredProcedure<?> sp = factory.getStoredProcedure(spc.getPid(), spc.getTxNum());
 			sp.prepare(spc.getPars());
@@ -182,7 +182,7 @@ public class SpCallPreprocessor extends Task {
 		}
 	}
 	
-	private void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
+	protected void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {
 		// Insert the batch of tasks
 		inserter.insertBatch(graph, batchedTasks);
 		
@@ -195,7 +195,7 @@ public class SpCallPreprocessor extends Task {
 		graph.clear();
 	}
 	
-	private void bookKeepKeys(TPartStoredProcedureTask task) {
+	protected void bookKeepKeys(TPartStoredProcedureTask task) {
 		for (PrimaryKey key : task.getReadSet()) {
 			keyHasBeenRead.add(key);
 		}
