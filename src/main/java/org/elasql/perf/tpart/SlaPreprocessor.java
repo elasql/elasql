@@ -7,8 +7,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
@@ -30,17 +28,18 @@ import org.elasql.server.Elasql;
  *
  */
 public class SlaPreprocessor extends SpCallPreprocessor {
-    private static Logger logger = Logger.getLogger(SlaPreprocessor.class.getName()); 
     // For transaction delay service-level agreement
-    private PriorityQueue<StoredProcedureCallOrder> delayQueue = 
-            new PriorityQueue<StoredProcedureCallOrder>(Collections.reverseOrder());
+    private final PriorityQueue<StoredProcedureCallOrder> delayQueue =
+            new PriorityQueue<>(Collections.reverseOrder());
 
     private class StoredProcedureCallOrder implements Comparable<StoredProcedureCallOrder> {
         
-        private StoredProcedureCall spc;
-        private TPartStoredProcedureTask task;
+        private final StoredProcedureCall spc;
+        private final TPartStoredProcedureTask task;
         private TransactionEstimation est;
-        private Comparator<TransactionEstimation> latencyOrder = Comparator.comparingDouble((TransactionEstimation est) -> est.getAvgLatency());
+        private final Comparator<TransactionEstimation> latencyOrder = Comparator.comparingDouble(
+                TransactionEstimation::getAvgLatency
+        );
         
         private StoredProcedureCallOrder(StoredProcedureCall spc) {
             this.spc = spc;
@@ -78,8 +77,8 @@ public class SlaPreprocessor extends SpCallPreprocessor {
     
     @Override
     public void run() {
-        List <TPartStoredProcedureTask> batchedTasks = new ArrayList<TPartStoredProcedureTask>();
-        List<Serializable> sendingList = new ArrayList<Serializable>();
+        List <TPartStoredProcedureTask> batchedTasks = new ArrayList<>();
+        List<Serializable> sendingList = new ArrayList<>();
         
         Thread.currentThread().setName("sla-preprocessor");
         
@@ -112,7 +111,7 @@ public class SlaPreprocessor extends SpCallPreprocessor {
                     
                     Elasql.connectionMgr().sendTotalOrderRequest(sendingList);
 //                    System.out.println("====DONE====");
-                    sendingList = new ArrayList<Serializable>(); // clear sending list
+                    sendingList = new ArrayList<>(); // clear sending list
                 }
                 
                 // Process the batch as TPartScheduler does
