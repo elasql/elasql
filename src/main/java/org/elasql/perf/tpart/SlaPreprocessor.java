@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
@@ -28,10 +29,16 @@ import org.elasql.server.Elasql;
  *
  */
 public class SlaPreprocessor extends SpCallPreprocessor {
-    // For transaction delay service-level agreement
-    private final PriorityQueue<StoredProcedureCallOrder> delayQueue =
-            new PriorityQueue<>(Collections.reverseOrder());
+    // Each transaction has 5 ms to finish its task
+    private final float DEADLINE = 10000; // TODO: different deadline for each transaction type
+    private final float THRESHOLD = 1000; // us
 
+    private List<StoredProcedureCallOrder> txQueue = new ArrayList<>();
+//    private final List<StoredProcedureCallOrder> criticalTxQueue = new ArrayList<>();
+//    private final PriorityQueue<StoredProcedureCallOrder> criticalTxs =
+//            new PriorityQueue<>(Collections.reverseOrder());
+
+//    private AtomicInteger transactionReceived = new AtomicInteger(0);
     private class StoredProcedureCallOrder implements Comparable<StoredProcedureCallOrder> {
         
         private final StoredProcedureCall spc;
@@ -81,37 +88,53 @@ public class SlaPreprocessor extends SpCallPreprocessor {
         List<Serializable> sendingList = new ArrayList<>();
         
         Thread.currentThread().setName("sla-preprocessor");
-        
+
         while (true) {
             try {
                 StoredProcedureCallOrder spc = new StoredProcedureCallOrder(spcQueue.take());
-                
+
                 // Get the read-/write-set by creating StoredProcedureTask
                 TPartStoredProcedureTask task = spc.getStoredProcedureTask();
                 
-                if (task.getProcedureType() == ProcedureType.NORMAL) {
+                if (task.getProcedureType() == ProcedureType.NORMAL ||
+                        task.getProcedureType() == ProcedureType.CONTROL) {
                     // Pre-process the transaction
                     preprocess(spc, task);
-                    // Add transaction to priority queue
-                    delayQueue.add(spc);
+                    // Get critical transactions
+//                    System.out.println("Latency: " + spc.est.getAvgLatency());
+                    if (spc.est.getAvgLatency() >= DEADLINE && spc.est.getAvgLatency() < DEADLINE + THRESHOLD) {
+//                        criticalTxQueue.add(spc);
+                        sendingList.add(spc.getStoredProcedureCall());
+                        featureExtractor.addDependency(spc.getStoredProcedureTask());
+                    } else {
+                        txQueue.add(spc);
+                    }
                     // Add to the schedule batch
                     batchedTasks.add(task);
+
+                } else {
+                    txQueue.add(spc);
                 }
 
-                if (delayQueue.size() >= BatchSpcSender.COMM_BATCH_SIZE) {
-//                    System.out.println("====BATCH====");
+//                transactionReceived.incrementAndGet();
+
+                if (sendingList.size() + txQueue.size() >= BatchSpcSender.COMM_BATCH_SIZE) {
+//                    System.out.println(sendingList.size() + txQueue.size());
                     // Send the SP call batch to total ordering
-                    while (delayQueue.peek() != null) {
-                        StoredProcedureCallOrder spcOrder = delayQueue.poll();
-//                        System.out.print("Tx: " + spcOrder.spc.getTxNum());
-//                        System.out.println(", " + spcOrder.est.getAvgLatency());
-                        featureExtractor.addDependency(task);
+//                    for (StoredProcedureCallOrder spcOrder : criticalTxQueue) {
+//                        // Put critical transactions in front of transaction traffic
+////                        StoredProcedureCallOrder spcOrder = criticalTxQueue.poll();
+////                        featureExtractor.addDependency(spcOrder.getStoredProcedureTask());
+//                        sendingList.add(spcOrder.getStoredProcedureCall());
+//                    }
+                    for (StoredProcedureCallOrder spcOrder : txQueue) {
+                        featureExtractor.addDependency(spcOrder.getStoredProcedureTask());
                         sendingList.add(spcOrder.getStoredProcedureCall());
                     }
-                    
                     Elasql.connectionMgr().sendTotalOrderRequest(sendingList);
-//                    System.out.println("====DONE====");
                     sendingList = new ArrayList<>(); // clear sending list
+                    txQueue = new ArrayList<>();
+//                    transactionReceived.set(0);
                 }
                 
                 // Process the batch as TPartScheduler does
@@ -141,13 +164,12 @@ public class SlaPreprocessor extends SpCallPreprocessor {
         
         if (performanceEstimator == null) {
             throw new RuntimeException("Performance estimator is not loaded.");
-        } else {
-            TransactionEstimation estimation = performanceEstimator.estimate(features);
-            
-            // Save the estimation
-            spc.setMetadata(estimation.toBytes());
-            spc.setEstimation(estimation);
-            task.setEstimation(estimation);
         }
+        TransactionEstimation estimation = performanceEstimator.estimate(features);
+
+        // Save the estimation
+        spc.setMetadata(estimation.toBytes());
+        spc.setEstimation(estimation);
+        task.setEstimation(estimation);
     }
 }
