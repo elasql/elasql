@@ -18,10 +18,17 @@ public class OnlineAgent extends RlAgent {
 	private static Logger logger = Logger.getLogger(OnlineAgent.class.getName());
 	private final Random random = new Random(0);
 	
-	public final static float EPSILON;
+	public static final float EPSILON;
+	public static final float LEARNING_RATE;
+	public static final float DISCOUNT_RATE;
+	
 	static {
 		EPSILON = (float) ElasqlProperties.getLoader().getPropertyAsDouble(
 				OnlineAgent.class.getName() + ".EPSILON", 0.9);
+		LEARNING_RATE = (float) ElasqlProperties.getLoader().getPropertyAsDouble(
+				OnlineAgent.class.getName() + ".LEARNING_RATE", 0.001f);
+		DISCOUNT_RATE = (float) ElasqlProperties.getLoader().getPropertyAsDouble(
+				OnlineAgent.class.getName() + ".DISCOUNT_RATE", 0.99f);
 	}
 	
 	public OnlineAgent() {
@@ -45,7 +52,7 @@ public class OnlineAgent extends RlAgent {
 	}
 
 	protected void prepareAgent() {
-		agent = new OfflineBCQ(64, 32, 32, 0.99f, 0.001f, memory);
+		agent = new OfflineBCQ(256, 32, 32, DISCOUNT_RATE, LEARNING_RATE, memory);
 		Elasql.taskMgr().runTask(trainer);
 		trainedAgent = new TrainedBCQ();
 	}

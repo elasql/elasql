@@ -101,6 +101,10 @@ public final class Memory {
 			throw new ArrayIndexOutOfBoundsException("Index out of bound " + index);
 		}
 		
+		// Check if the state is available
+		if (states[index] == null)
+			return null;
+		
 		// Check if the next state is available by checking the tx number
 		int nextIndex = (index + 1) % capacity;
 		if (txNums[index] + 1 != txNums[nextIndex])

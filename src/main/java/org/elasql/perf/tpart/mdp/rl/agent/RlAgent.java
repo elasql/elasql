@@ -10,7 +10,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.elasql.perf.tpart.CentralRoutingAgent;
-import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.mdp.State;
 import org.elasql.perf.tpart.mdp.TransactionRoutingEnvironment;
 import org.elasql.perf.tpart.mdp.rl.model.BaseAgent;
@@ -22,14 +21,23 @@ import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.remote.groupcomm.Route;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
+import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
 
 import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
 
 public abstract class RlAgent implements CentralRoutingAgent {
-
 	private static Logger logger = Logger.getLogger(RlAgent.class.getName());
+	
+	private static final int MODEL_UPDATE_PERIDO = 20_000; // in milliseconds
+	private static final int MEMORY_SIZE = 10000;
+	private static final int TRAINING_EPISODE;
+	
+	static {
+		TRAINING_EPISODE = ElasqlProperties.getLoader().getPropertyAsInteger(
+				RlAgent.class.getName() + ".TRAINING_EPISODE", 100);
+	}
 	
 	private static class Step {
 		long txNum;
@@ -52,7 +60,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	protected TrainedAgent trainedAgent;
 
 	protected int episode = 2_000;
-	protected Memory memory = new Memory(5_000);
+	protected Memory memory = new Memory(MEMORY_SIZE);
 	protected Trainer trainer = new Trainer();
 	
 	protected Map<Long, State> cachedStates = new ConcurrentHashMap<Long, State>();
@@ -81,7 +89,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 
 			while (true) {
 				if (train) {
-					episode = 100;
+					episode = TRAINING_EPISODE;
 					drainStepQueue();
 					long startTime = System.currentTimeMillis();
 					updateAgent(episode);
@@ -213,7 +221,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 				previousTrain = System.currentTimeMillis();
 				return true;
 			} else {
-				if(System.currentTimeMillis() - previousTrain > 20_000) {
+				if(System.currentTimeMillis() - previousTrain > MODEL_UPDATE_PERIDO) {
 					previousTrain = System.currentTimeMillis();
 					return true;
 				} else {
