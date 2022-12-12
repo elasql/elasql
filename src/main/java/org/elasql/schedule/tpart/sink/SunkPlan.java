@@ -34,6 +34,8 @@ public class SunkPlan {
 	private Map<Integer, Set<PushInfo>> sinkPushingInfoMap = new HashMap<Integer, Set<PushInfo>>();
 
 	private Set<PrimaryKey> sinkReadingSet = new HashSet<PrimaryKey>();
+	
+	private int remoteReadCount;
 
 	public SunkPlan(int sinkProcessId, boolean isHereMaster) {
 		this.sinkProcessId = sinkProcessId;
@@ -75,6 +77,14 @@ public class SunkPlan {
 
 	public void addSinkReadingInfo(PrimaryKey key) {
 		sinkReadingSet.add(key);
+	}
+	
+	public void setRemoteReadCount(int remoteReadCount) {
+		this.remoteReadCount = remoteReadCount;
+	}
+	
+	public int getRemoteReadCount() {
+		return remoteReadCount;
 	}
 
 	public Map<Integer, Set<PushInfo>> getSinkPushingInfo() {

@@ -135,11 +135,18 @@ public class Sinker {
 	
 	private void checkIfIsDistributed(SunkPlan plan, TxNode node) {
 		// Check read edges
+		int remoteReadCount = 0;
 		for (Edge e : node.getReadEdges()) {
 			if (e.getTarget().getPartId() != node.getPartId()) {
-				plan.setDistributed(true);
-				return;
+				remoteReadCount++;
 			}
+		}
+		
+		// Record remote read count
+		plan.setRemoteReadCount(remoteReadCount);
+		if (remoteReadCount > 0) {
+			plan.setDistributed(true);
+			return;
 		}
 		
 		// Check write back edges

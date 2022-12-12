@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.elasql.storage.metadata.PartitionMetaMgr;
 import org.elasql.util.CsvRow;
 import org.elasql.util.CsvSaver;
 import org.vanilladb.core.server.task.Task;
@@ -27,13 +28,18 @@ public class TransactionStatisticsRecorder extends Task {
 		private double latencyAvg;
 		private double latencyStd;
 		private double distTxRate;
+		private double avgRemoteReads;
+		private double imbalanceScore;
 
-		public StatisticsRow(int time, int txCount, double latencyAvg, double latencyStd, double distTxRate) {
+		public StatisticsRow(int time, int txCount, double latencyAvg, double latencyStd, double distTxRate,
+				double avgRemoteReads, double imbalanceScore) {
 			this.time = time;
 			this.txCount = txCount;
 			this.latencyAvg = latencyAvg;
 			this.latencyStd = latencyStd;
 			this.distTxRate = distTxRate;
+			this.avgRemoteReads = avgRemoteReads;
+			this.imbalanceScore = imbalanceScore;
 		}
 		
 		@Override
@@ -49,6 +55,10 @@ public class TransactionStatisticsRecorder extends Task {
 				return Double.toString(latencyStd);
 			case 4:
 				return Double.toString(distTxRate);
+			case 5:
+				return Double.toString(avgRemoteReads);
+			case 6:
+				return Double.toString(imbalanceScore);
 			default:
 				throw new IllegalArgumentException("No column with index " + index);
 			}
@@ -58,8 +68,9 @@ public class TransactionStatisticsRecorder extends Task {
 	private BlockingQueue<TpartTransactionReport> queue = new LinkedBlockingQueue<TpartTransactionReport>();
 	
 	// Statistics
-	private int distTxCount;
+	private int distTxCount, remoteReadCount;
 	private List<Long> latencies = new ArrayList<Long>();
+	private int[] loads = new int[PartitionMetaMgr.NUM_PARTITIONS];
 	
 	public void onTansactionCommit(long txNum, TpartTransactionReport report) {
 		queue.add(report);
@@ -135,6 +146,8 @@ public class TransactionStatisticsRecorder extends Task {
 		header.add("Average Latency (microseconds)");
 		header.add("Latency STD (microseconds)");
 		header.add("Distributed Txn. Rate");
+		header.add("Average Number of Remote Reads");
+		header.add("Imbalanced Score");
 		return header;
 	}
 	
@@ -142,6 +155,8 @@ public class TransactionStatisticsRecorder extends Task {
 		latencies.add(report.getLatency());
 		if (report.isDistributed())
 			distTxCount++;
+		remoteReadCount += report.getRemoteReadCount();
+		loads[report.getMasterId()]++;
 	}
 	
 	private StatisticsRow calculateStatistics(long timeInSec) {
@@ -150,12 +165,16 @@ public class TransactionStatisticsRecorder extends Task {
 		double distTxRate = ((double) distTxCount) / txCount;
 		double latencyAvg = calculateLatencyAvg();
 		double latencyStd = calculateLatencyStd(latencyAvg);
+		double avgRemoteReads = ((double) remoteReadCount) / txCount;
+		double imbalanceScore = calculateImbalanceScore();
 		
 		// Reset the values
 		latencies.clear();
 		distTxCount = 0;
+		remoteReadCount = 0;
 		
-		return new StatisticsRow((int) timeInSec, txCount, latencyAvg, latencyStd, distTxRate);
+		return new StatisticsRow((int) timeInSec, txCount, latencyAvg, latencyStd,
+				distTxRate, avgRemoteReads, imbalanceScore);
 	}
 	
 	private double calculateLatencyAvg() {
@@ -174,5 +193,22 @@ public class TransactionStatisticsRecorder extends Task {
 			var += Math.pow(latency.doubleValue() - latencyAvg, 2) / txCount;
 		}
 		return Math.sqrt(var);
+	}
+	
+	private double calculateImbalanceScore() {
+		// Average load
+		double avg = 0.0;
+		for (int i = 0; i < loads.length; i++) {
+			avg += loads[i];
+		}
+		avg /= loads.length;
+		
+		// Score
+		double score = 0.0;
+		for (int i = 0; i < loads.length; i++) {
+			score += Math.abs(1 - loads[i] / avg);
+		}
+		
+		return score;
 	}
 }
