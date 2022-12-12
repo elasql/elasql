@@ -30,11 +30,15 @@ import ai.djl.translate.TranslateException;
 public abstract class RlAgent implements CentralRoutingAgent {
 	private static Logger logger = Logger.getLogger(RlAgent.class.getName());
 	
-	private static final int MODEL_UPDATE_PERIDO = 20_000; // in milliseconds
-	private static final int MEMORY_SIZE = 10000;
+	private static final int MODEL_UPDATE_PERIDO; // in milliseconds
+	private static final int MEMORY_SIZE;
 	private static final int TRAINING_EPISODE;
 	
 	static {
+		MODEL_UPDATE_PERIDO = ElasqlProperties.getLoader().getPropertyAsInteger(
+				RlAgent.class.getName() + ".MODEL_UPDATE_PERIDO", 20_000);
+		MEMORY_SIZE = ElasqlProperties.getLoader().getPropertyAsInteger(
+				RlAgent.class.getName() + ".MEMORY_SIZE", 10000);
 		TRAINING_EPISODE = ElasqlProperties.getLoader().getPropertyAsInteger(
 				RlAgent.class.getName() + ".TRAINING_EPISODE", 100);
 	}
