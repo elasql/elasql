@@ -93,7 +93,7 @@ public class TransactionStatisticsRecorder extends Task {
 				logger.info("Transaction statistics recorder starts");
 
 			// Create a CSV file
-			CsvSaver<StatisticsRow> csvSaver = new CsvSaver<StatisticsRow>("transaction-statistics");
+			CsvSaver<StatisticsRow> csvSaver = new CsvSaver<StatisticsRow>("transaction-statistics", false);
 
 			try (BufferedWriter writer = csvSaver.createOutputFile()) {
 				csvSaver.writeHeader(writer, header);

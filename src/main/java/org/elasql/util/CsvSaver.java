@@ -8,17 +8,26 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class CsvSaver<R extends CsvRow> {
+	
+	private String filenamePrefix;
 
 	// Set 'true' to use the same filename for the report.
 	// This is used to avoid create too many files in a series of experiments.
-	private static final boolean USE_SAME_FILENAME = true;
+	private boolean useSameFileName;
+	
+	public CsvSaver(String filenamePrefix) {
+		this(filenamePrefix, true);
+	}
 
-	private String filenamePrefix;
+	public CsvSaver(String filenamePrefix, boolean useSameFileName) {
+		this.filenamePrefix = filenamePrefix;
+		this.useSameFileName = useSameFileName;
+	}
 
 	private String generateOutputFileName() {
 		String filename;
 
-		if (USE_SAME_FILENAME) {
+		if (useSameFileName) {
 			filename = String.format("%s.csv", filenamePrefix);
 		} else {
 			LocalDateTime datetime = LocalDateTime.now();
@@ -32,10 +41,6 @@ public class CsvSaver<R extends CsvRow> {
 
 	private BufferedWriter createOutputFile(String fileName) throws IOException {
 		return new BufferedWriter(new FileWriter(fileName));
-	}
-
-	public CsvSaver(String filenamePrefix) {
-		this.filenamePrefix = filenamePrefix;
 	}
 
 	public String fileName() {
