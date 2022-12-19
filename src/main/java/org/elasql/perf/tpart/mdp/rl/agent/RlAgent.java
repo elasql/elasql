@@ -95,9 +95,9 @@ public abstract class RlAgent implements CentralRoutingAgent {
 				if (train) {
 					episode = TRAINING_EPISODE;
 					drainStepQueue();
-					long startTime = System.currentTimeMillis();
+					long startTime = System.nanoTime();
 					updateAgent(episode);
-					System.out.printf("Training time: %d", (System.currentTimeMillis() - startTime)/1000);
+					System.out.printf("Training time: %d microseconds", (System.nanoTime() - startTime) / 1000);
 					train = false;
 				} else {
 					try {

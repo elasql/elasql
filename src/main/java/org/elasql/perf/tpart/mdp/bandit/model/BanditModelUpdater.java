@@ -49,12 +49,19 @@ public class BanditModelUpdater extends Task {
 			try {
 				ModelUpdate modelUpdate = pendingModelUpdates.take();
 				RealVector[] context = modelUpdate.context;
+				
+				// Debug: recording training time
+				long startTime = System.nanoTime();
 
 				if (modelUpdate.model.getClass().equals(HybridLinUCB.class)) {
 					context = Arrays.stream(context).map(c -> c.append(c)).toArray(RealVector[]::new);
 				}
 
 				modelUpdate.model.receiveRewards(context, modelUpdate.arm, modelUpdate.reward);
+				
+				// Debug: recording training time
+				long latency = (System.nanoTime() - startTime) / 1000;
+				System.out.println(String.format("Updating the model takes %d microseconds", latency));
 
 				updatedModels.put(new Pair<>(modelUpdate.updateTransactionNumber, modelUpdate.model));
 			} catch (InterruptedException e) {
