@@ -11,6 +11,9 @@ import org.elasql.perf.tpart.control.RoutingControlActuator;
 import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.perf.tpart.preprocessor.DropPreprocessor;
+import org.elasql.perf.tpart.preprocessor.SlaPreprocessor;
+import org.elasql.perf.tpart.preprocessor.SpCallPreprocessor;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
 import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.BatchNodeInserter;
@@ -19,16 +22,32 @@ import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.util.TransactionProfiler;
 
+import java.lang.reflect.Constructor;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class TPartPerformanceManager implements PerformanceManager {
+	// Logger
+	private static Logger logger = Logger.getLogger(TPartPerformanceManager.class.getName());
 
 	public static final boolean ENABLE_COLLECTING_DATA;
 	public static final int ESTIMATOR_TYPE;
+	public static final int PREPROCESSOR_TYPE;
+	public static double TRANSACTION_DEADLINE;
+	public static double ESTIMATION_ERROR;
+	public static Class<?> PreprocessorCls;
 
 	static {
+		PREPROCESSOR_TYPE = ElasqlProperties.getLoader()
+				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".PREPROCESSOR_TYPE", 0);
 		ENABLE_COLLECTING_DATA = ElasqlProperties.getLoader()
 				.getPropertyAsBoolean(TPartPerformanceManager.class.getName() + ".ENABLE_COLLECTING_DATA", false);
 		ESTIMATOR_TYPE = ElasqlProperties.getLoader()
-				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 0);
+				.getPropertyAsInteger(TPartPerformanceManager.class.getName() + ".ESTIMATOR_TYPE", 2);
+		TRANSACTION_DEADLINE = ElasqlProperties.getLoader()
+				.getPropertyAsDouble(TPartPerformanceManager.class.getName() + ".TRANSACTION_DEADLINE",  12500);
+		ESTIMATION_ERROR = ElasqlProperties.getLoader()
+				.getPropertyAsDouble(TPartPerformanceManager.class.getName() + ".ESTIMATION_ERROR", 2500);
 	}
 
 	public static TPartPerformanceManager newForSequencer(TPartStoredProcedureFactory factory,
@@ -37,8 +56,13 @@ public class TPartPerformanceManager implements PerformanceManager {
 		TpartMetricWarehouse metricWarehouse = new TpartMetricWarehouse();
 		Elasql.taskMgr().runTask(metricWarehouse);
 
-		SpCallPreprocessor spCallPreprocessor = new SlaPreprocessor(factory, inserter, graph, isBatching,
-				metricWarehouse, newEstimator());
+		SpCallPreprocessor spCallPreprocessor = newPreprocessor(factory, inserter,
+				graph, isBatching, metricWarehouse, newEstimator());
+
+		if (logger.isLoggable(Level.INFO)) {
+			logger.info(String.format("Using %s", spCallPreprocessor.getClass().getName()));
+		}
+
 		Elasql.taskMgr().runTask(spCallPreprocessor);
 
 		// Hermes-Control has a control actuator
@@ -66,8 +90,28 @@ public class TPartPerformanceManager implements PerformanceManager {
 			return new ReadCountEstimator();
 		case 2:
 		    return new SumMaxEstimator();
+		case 3:
+			// Training mode
+			return null;
 		default:
 			throw new IllegalArgumentException("Not supported");
+		}
+	}
+
+	private static SpCallPreprocessor newPreprocessor(TPartStoredProcedureFactory factory,
+													  BatchNodeInserter inserter,
+													  TGraph graph,
+													  boolean isBatching,
+													  TpartMetricWarehouse metricWarehouse, Estimator estimator) {
+		switch (PREPROCESSOR_TYPE) {
+		case 0:
+			return new SpCallPreprocessor(factory, inserter, graph, isBatching, metricWarehouse, estimator);
+		case 1:
+			return new SlaPreprocessor(factory, inserter, graph, isBatching, metricWarehouse, estimator);
+		case 2:
+			return new DropPreprocessor(factory, inserter, graph, isBatching, metricWarehouse, estimator);
+		default:
+			throw new IllegalArgumentException("Preprocessor not supported");
 		}
 	}
 

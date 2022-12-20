@@ -7,19 +7,16 @@ package org.elasql.storage.tx.concurrency;
  * @author Pin-Yu Wang, Yu-Shan Lin
  *
  */
-public class FifoLock {
+public final class FifoLock {
 	private final long txNum;
-	
 	public FifoLock(long txNum) {
 		this.txNum = txNum;
 	}
-
 	long getTxNum() {
 		return txNum;
 	}
-
 	boolean isMyFifoLock(FifoLock fifoLock) {
-		return this == fifoLock;
+		return this.getTxNum() == fifoLock.getTxNum();
 	}
 
 	void waitOnLock() {

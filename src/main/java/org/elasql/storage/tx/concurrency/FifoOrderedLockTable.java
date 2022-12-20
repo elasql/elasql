@@ -1,6 +1,11 @@
 package org.elasql.storage.tx.concurrency;
 
+import java.util.HashSet;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.elasql.sql.PrimaryKey;
 
@@ -38,6 +43,7 @@ public class FifoOrderedLockTable {
 		 */
 	    lockerMap.putIfAbsent(obj, new FifoLockers());
 		FifoLockers lks = lockerMap.get(obj);
+
 		lks.addToRequestQueue(fifoLock);
 	}
 

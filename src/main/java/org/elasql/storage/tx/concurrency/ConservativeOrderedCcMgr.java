@@ -290,10 +290,9 @@ public class ConservativeOrderedCcMgr extends ConcurrencyMgr {
 		}
 
 		for (Object obj : readObjs) {
-			if (!writeObjs.contains(obj)) {
-				fifoLockTbl.releaseSLock(obj, myFifoLock);
-			}
-
+//			if (!writeObjs.contains(obj)) {
+			fifoLockTbl.releaseSLock(obj, myFifoLock);
+//			}
 		}
 		readObjs.clear();
 		writeObjs.clear();

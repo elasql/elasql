@@ -131,7 +131,7 @@ public class SumMaxEstimator implements Estimator {
         }
         // Check if the directory exists
         if (MODEL_DIR == null)
-            throw new RuntimeException("please sepecify the path to "
+            throw new RuntimeException("please specify the path to "
                     + "the estimator models in properties");
         
         File modelDir = new File(MODEL_DIR);

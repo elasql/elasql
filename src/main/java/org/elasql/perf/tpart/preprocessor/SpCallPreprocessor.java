@@ -1,4 +1,4 @@
-package org.elasql.perf.tpart;
+package org.elasql.perf.tpart.preprocessor;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -7,14 +7,12 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.PythonSubProcessEstimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
-import org.elasql.perf.tpart.workload.FeatureExtractor;
-import org.elasql.perf.tpart.workload.TransactionDependencyRecorder;
-import org.elasql.perf.tpart.workload.TransactionFeatures;
-import org.elasql.perf.tpart.workload.TransactionFeaturesRecorder;
+import org.elasql.perf.tpart.workload.*;
 import org.elasql.perf.tpart.workload.time.TimeRelatedFeatureMgr;
 import org.elasql.procedure.tpart.TPartStoredProcedure;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
@@ -35,7 +33,6 @@ import org.vanilladb.core.server.task.Task;
  * @author Yu-Shan Lin
  */
 public class SpCallPreprocessor extends Task {
-	
 	protected BlockingQueue<StoredProcedureCall> spcQueue;
 	protected FeatureExtractor featureExtractor;
 
@@ -57,6 +54,7 @@ public class SpCallPreprocessor extends Task {
 	protected TransactionFeaturesRecorder featureRecorder;
 	protected TransactionDependencyRecorder dependencyRecorder;
 	protected TimeRelatedFeatureMgr timeRelatedFeatureMgr;
+	CriticalTransactionRecorder criticalTransactionRecorder;
 	
 	public SpCallPreprocessor(TPartStoredProcedureFactory factory, 
 			BatchNodeInserter inserter, TGraph graph,
@@ -79,6 +77,10 @@ public class SpCallPreprocessor extends Task {
 			featureRecorder.startRecording();
 			dependencyRecorder = new TransactionDependencyRecorder();
 			dependencyRecorder.startRecording();
+			if (performanceEstimator != null) {
+				criticalTransactionRecorder = new CriticalTransactionRecorder();
+				criticalTransactionRecorder.startRecording();
+			}
 		}
 	}
 	
@@ -156,30 +158,32 @@ public class SpCallPreprocessor extends Task {
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
 		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
-		
-		// XXX: Quick test
-//		TransactionEstimation est = testEstimator.estimate(features);
-//		System.out.println(String.format("Tx.%d's latencies: %s",
-//				features.getTxNum(), est));
-		
-		// records must be read from disk if they are never read.
+		featureExtractor.addDependency(task);
+
 		bookKeepKeys(task);
-		
+
+		if (performanceEstimator == null) {
+			if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
+					task.getProcedureType() != ProcedureType.CONTROL) {
+				featureRecorder.record(features);
+				dependencyRecorder.record(features);
+			}
+			return;
+		}
+
+		TransactionEstimation estimation = performanceEstimator.estimate(features);
+
 		// Record the feature if necessary
 		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
 				task.getProcedureType() != ProcedureType.CONTROL) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
+			criticalTransactionRecorder.record(task, estimation);
 		}
-		
-		// Estimate the performance if necessary
-		if (performanceEstimator != null) {
-			TransactionEstimation estimation = performanceEstimator.estimate(features);
-			
-			// Save the estimation
-			spc.setMetadata(estimation.toBytes());
-			task.setEstimation(estimation);
-		}
+
+		// Save the estimation
+		spc.setMetadata(estimation.toBytes());
+		task.setEstimation(estimation);
 	}
 	
 	protected void routeBatch(List<TPartStoredProcedureTask> batchedTasks) {

@@ -138,8 +138,8 @@ public class FeatureExtractor {
 		// builder.addFeature("Latch Features", extractLatchFeatures());
 		
 		// Get dependencies
-		Set<Long> dependentTxs = dependencyAnalyzer.addAndGetDependency(
-				task.getTxNum(), task.getReadSet(), task.getWriteSet());
+		Set<Long> dependentTxs = dependencyAnalyzer.findDependentTransactions(
+				task.getReadSet(), task.getWriteSet());
 		for (Long dependentTx : dependentTxs)
 			builder.addDependency(dependentTx);
 		

@@ -90,7 +90,7 @@ public class Elasql extends VanillaDb {
 			case 6:
 				return HERMES_CONTROL;
 			default: 
-				throw new RuntimeException("Unsupport service type"); 
+				throw new RuntimeException("Unsupported service type");
 			} 
 		} 
 	} 

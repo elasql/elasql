@@ -1,36 +1,39 @@
 package org.elasql.storage.tx.concurrency;
 
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * FifoLockers is used to keep which transaction possesses right to access a
  * record, and to keep those transactions which are waiting for the record.
- * 
- * @author Pin-Yu Wang, Yu-Shan Lin
+ *
+ * @author Pin-Yu Wang, Yu-Shan Lin, Wilbert Harriman
  *
  */
 public class FifoLockers {
-	private ConcurrentLinkedDeque<FifoLock> requestQueue = new ConcurrentLinkedDeque<FifoLock>();
-	private ConcurrentLinkedDeque<Long> sLockers = new ConcurrentLinkedDeque<Long>();
+	private Queue<FifoLock> requestQueue = new ConcurrentLinkedQueue<>(); // FIFO
+	private Set<Long> sLockers = Collections.synchronizedSet(new HashSet<>());
 	private AtomicLong xLocker = new AtomicLong(-1);
 
 	private boolean sLocked() {
-		// avoid using sLockers.size() due to the cost of traversing the queue
-		return !sLockers.isEmpty();
+        return !sLockers.isEmpty();
 	}
 
 	private boolean xLocked() {
-		return xLocker.get() != -1;
+        return xLocker.get() != -1;
 	}
 
 	private boolean hasXLock(long txNum) {
-		return xLocker.get() == txNum;
+        return xLocker.get() == txNum;
 	}
 
 	private boolean isTheOnlySLocker(long txNum) {
 		return sLockers.size() == 1 && sLockers.contains(txNum);
-	}
+    }
 
 	private boolean sLockable(long txNum) {
 		return (!xLocked() || hasXLock(txNum));
@@ -45,8 +48,8 @@ public class FifoLockers {
 	}
 
 	private void waitIfHeadIsNotSelf(FifoLock myFifoLock) {
-		while (true) {
-			synchronized (myFifoLock) {
+		synchronized (myFifoLock) {
+			while (true) {
 				FifoLock headFifoLock = requestQueue.peek();
 
 				if (!headFifoLock.isMyFifoLock(myFifoLock)) {
@@ -80,10 +83,10 @@ public class FifoLockers {
 	void waitOrPossessXLock(FifoLock myFifoLock) {
 		/*-
 		 * The following example shows that a thread might not be notified.
-		 * 
+		 *
 		 * Assume Thread A and Thread B come concurrently,
 		 * and both of them want to acquire xLock.
-		 * 
+		 *
 		 * =========================================================
 		 * 			Thread A peeks the request queue (see A's proxy object)
 		 * 			Thread A finds xLockable
@@ -106,7 +109,7 @@ public class FifoLockers {
 		 * 							v
 		 * 			Thread B waits on the record
 		 * =========================================================
-		 * 
+		 *
 		 */
 		waitIfHeadIsNotSelf(myFifoLock);
 
@@ -128,60 +131,73 @@ public class FifoLockers {
 	void releaseSLock(FifoLock myFifoLock) {
 		long myTxNum = myFifoLock.getTxNum();
 
-		FifoLock nextFifoLock = requestQueue.peek();
-		if (nextFifoLock == null) {
+		synchronized (myFifoLock) {
 			sLockers.remove(myTxNum);
-			/*
-			 * Check again because there might be a transaction added after the previous
-			 * peek.
-			 */
-			nextFifoLock = requestQueue.peek();
-			if (nextFifoLock != null) {
-				synchronized (nextFifoLock) {
-					nextFifoLock.notifyLock();
-				}
-			}
-			return;
 		}
-
-		synchronized (nextFifoLock) {
-			sLockers.remove(myTxNum);
-			nextFifoLock.notifyLock();
-		}
+		notifyNext();
 	}
+
+//	void releaseSLock(FifoLock myFifoLock) {
+//		long myTxNum = myFifoLock.getTxNum();
+//
+//		FifoLock nextFifoLock = requestQueue.peek();
+//		if (nextFifoLock == null) {
+//			sLockers.remove(myTxNum);
+//			/*
+//			 * Check again because there might be a transaction added after the previous
+//			 * peek.
+//			 */
+//			nextFifoLock = requestQueue.peek();
+//			if (nextFifoLock != null) {
+//				synchronized (nextFifoLock) {
+//					nextFifoLock.notifyLock();
+//				}
+//			}
+//			return;
+//		}
+//
+//		synchronized (nextFifoLock) {
+//			sLockers.remove(myTxNum);
+//			nextFifoLock.notifyLock();
+//		}
+//	}
 
 	void releaseXLock(FifoLock myFifoLock) {
-		FifoLock nextFifoLock = requestQueue.peek();
-		if (nextFifoLock == null) {
+		synchronized (myFifoLock) {
 			xLocker.set(-1);
-
-			/*
-			 * Check again because there might be a transaction added after the previous
-			 * peek.
-			 */
-			nextFifoLock = requestQueue.peek();
-			if (nextFifoLock != null) {
-			    synchronized (nextFifoLock) {
-			        nextFifoLock.notifyLock();
-			    }
-			}
-			return;
 		}
-
-		synchronized (nextFifoLock) {
-			xLocker.set(-1);
-			nextFifoLock.notifyLock();
-		}
+		notifyNext();
 	}
+//	void releaseXLock(FifoLock myFifoLock) {
+//		FifoLock nextFifoLock = requestQueue.peek();
+//		if (nextFifoLock == null) {
+//			xLocker.set(-1);
+//
+//			/*
+//			 * Check again because there might be a transaction added after the previous
+//			 * peek.
+//			 */
+//			nextFifoLock = requestQueue.peek();
+//			if (nextFifoLock != null) {
+//				synchronized (nextFifoLock) {
+//					nextFifoLock.notifyLock();
+//				}
+//			}
+//			return;
+//		}
+//
+//		synchronized (nextFifoLock) {
+//			xLocker.set(-1);
+//			nextFifoLock.notifyLock();
+//		}
+//	}
 
 	private void notifyNext() {
 		FifoLock nextFifoLock = requestQueue.peek();
-		if (nextFifoLock == null) {
-			return;
-		}
-
-		synchronized (nextFifoLock) {
-			nextFifoLock.notifyLock();
+		if (nextFifoLock != null) {
+			synchronized (nextFifoLock) {
+				nextFifoLock.notifyLock();
+			}
 		}
 	}
 }

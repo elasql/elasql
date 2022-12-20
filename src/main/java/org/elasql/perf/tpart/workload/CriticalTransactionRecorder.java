@@ -1,5 +1,6 @@
 package org.elasql.perf.tpart.workload;
 
+import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
 import org.elasql.server.Elasql;
@@ -18,9 +19,6 @@ public class CriticalTransactionRecorder extends Task {
     private static Logger logger = Logger.getLogger(CriticalTransactionRecorder.class.getName());
     private static final String FILENAME = "critical-transactions.csv";
     private static final long TIME_TO_FLUSH = 10; // in seconds
-    public final double DEADLINE = 12500;
-    public final double ERROR = 2500;
-
     private static class CriticalTransactionRow {
         long txNum;
         double txType;
@@ -45,10 +43,10 @@ public class CriticalTransactionRecorder extends Task {
 
     public void record(TPartStoredProcedureTask task, TransactionEstimation estimation) {
         double estimatedLatency = estimation.getAvgLatency();
-        boolean isCritical = estimatedLatency > DEADLINE - ERROR && estimatedLatency < DEADLINE + ERROR;
+        boolean isCritical = estimatedLatency > TPartPerformanceManager.TRANSACTION_DEADLINE - TPartPerformanceManager.ESTIMATION_ERROR &&
+                estimatedLatency < TPartPerformanceManager.TRANSACTION_DEADLINE + TPartPerformanceManager.ESTIMATION_ERROR;
         queue.add(new CriticalTransactionRow(task.getTxNum(), task.getWeight(), estimatedLatency, isCritical));
     }
-
 
     @Override
     public void run() {
@@ -62,6 +60,8 @@ public class CriticalTransactionRecorder extends Task {
             }
 
             saveToFile(row);
+
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -79,6 +79,17 @@ public class CriticalTransactionRecorder extends Task {
 
         } catch (IOException e) {
             e.printStackTrace();
+        }
+
+        if (logger.isLoggable(Level.INFO)) {
+            String log = String.format("No more features coming in last %d seconds. Start generating a report.",
+                    TIME_TO_FLUSH);
+            logger.info(log);
+        }
+
+        if (logger.isLoggable(Level.INFO)) {
+            String log = String.format("A feature log is generated at \"%s\"", FILENAME);
+            logger.info(log);
         }
     }
 
