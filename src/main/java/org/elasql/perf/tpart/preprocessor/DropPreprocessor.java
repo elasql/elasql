@@ -38,8 +38,7 @@ public class DropPreprocessor extends SpCallPreprocessor {
             try {
                 StoredProcedureCall spc = spcQueue.take();
                 TPartStoredProcedureTask task = createSpTask(spc);
-                if (task.getProcedureType() == ProcedureType.NORMAL ||
-                        task.getProcedureType() == TPartStoredProcedure.ProcedureType.CONTROL) {
+                if (task.getProcedureType() == ProcedureType.NORMAL) {
                     preprocess(spc, task);
                     double latencyEstimate = task.getEstimation().getAvgLatency();
                     // Only execute transactions that do not violate the SLA
@@ -81,8 +80,7 @@ public class DropPreprocessor extends SpCallPreprocessor {
         TransactionEstimation estimation = performanceEstimator.estimate(features);
 
         // Record the feature if necessary
-        if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
-                task.getProcedureType() != ProcedureType.CONTROL) {
+        if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
             featureRecorder.record(features);
             dependencyRecorder.record(features);
             criticalTransactionRecorder.record(task, estimation);

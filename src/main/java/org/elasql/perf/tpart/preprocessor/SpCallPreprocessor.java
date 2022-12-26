@@ -114,14 +114,10 @@ public class SpCallPreprocessor extends Task {
 				TPartStoredProcedureTask task = createSpTask(spc);
 				
 				// Add normal SPs to the task batch
-				if (task.getProcedureType() == ProcedureType.NORMAL ||
-						task.getProcedureType() == ProcedureType.CONTROL) {
-					// Pre-process the transaction 
-					if (TPartPerformanceManager.ENABLE_COLLECTING_DATA ||
-							performanceEstimator != null) {
-						preprocess(spc, task);
-					}
-					
+				if (task.getProcedureType() == ProcedureType.NORMAL) {
+					// Pre-process the transaction
+					preprocess(spc, task);
+
 					// Add to the schedule batch
 					batchedTasks.add(task);
 				}
@@ -129,7 +125,7 @@ public class SpCallPreprocessor extends Task {
 				if (sendingList.size() >= BatchSpcSender.COMM_BATCH_SIZE) {
 					// Send the SP call batch to total ordering
 					Elasql.connectionMgr().sendTotalOrderRequest(sendingList);
-					sendingList = new ArrayList<Serializable>();
+					sendingList = new ArrayList<>();
 				}
 				
 				// Process the batch as TPartScheduler does
@@ -163,8 +159,7 @@ public class SpCallPreprocessor extends Task {
 		bookKeepKeys(task);
 
 		if (performanceEstimator == null) {
-			if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
-					task.getProcedureType() != ProcedureType.CONTROL) {
+			if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 				featureRecorder.record(features);
 				dependencyRecorder.record(features);
 			}
@@ -174,8 +169,7 @@ public class SpCallPreprocessor extends Task {
 		TransactionEstimation estimation = performanceEstimator.estimate(features);
 
 		// Record the feature if necessary
-		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
-				task.getProcedureType() != ProcedureType.CONTROL) {
+		if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
 			featureRecorder.record(features);
 			dependencyRecorder.record(features);
 			criticalTransactionRecorder.record(task, estimation);

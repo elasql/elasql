@@ -28,11 +28,15 @@ import org.elasql.server.Elasql;
  */
 public class SlaPreprocessor extends SpCallPreprocessor {
     private List<StoredProcedureCall> txQueue = new ArrayList<>();
+    double lowerBound;
+    double upperBound;
     public SlaPreprocessor(TPartStoredProcedureFactory factory,
             BatchNodeInserter inserter, TGraph graph,
             boolean isBatching, TpartMetricWarehouse metricWarehouse,
             Estimator performanceEstimator) {
         super(factory, inserter, graph, isBatching, metricWarehouse, performanceEstimator);
+        lowerBound = TPartPerformanceManager.TRANSACTION_DEADLINE - TPartPerformanceManager.ESTIMATION_ERROR;
+        upperBound = TPartPerformanceManager.TRANSACTION_DEADLINE + TPartPerformanceManager.ESTIMATION_ERROR;
     }
     
     @Override
@@ -49,14 +53,13 @@ public class SlaPreprocessor extends SpCallPreprocessor {
                 // Get the read-/write-set by creating StoredProcedureTask
                 TPartStoredProcedureTask task = createSpTask(spc);
                 
-                if (task.getProcedureType() == ProcedureType.NORMAL ||
-                        task.getProcedureType() == ProcedureType.CONTROL) {
+                if (task.getProcedureType() == ProcedureType.NORMAL) {
                     // Pre-process the transaction
                     preprocess(spc, task);
                     // Get critical transactions
                     double latencyEstimate = task.getEstimation().getAvgLatency();
-                    if (latencyEstimate > TPartPerformanceManager.TRANSACTION_DEADLINE - TPartPerformanceManager.ESTIMATION_ERROR &&
-                            latencyEstimate < TPartPerformanceManager.TRANSACTION_DEADLINE + TPartPerformanceManager.ESTIMATION_ERROR) {
+
+                    if (latencyEstimate > lowerBound && latencyEstimate < upperBound) {
                         sendingList.add(spc);
                     } else {
                         txQueue.add(spc);
@@ -101,8 +104,7 @@ public class SlaPreprocessor extends SpCallPreprocessor {
         TransactionEstimation estimation = performanceEstimator.estimate(features);
 
         // Record the feature if necessary
-        if (TPartPerformanceManager.ENABLE_COLLECTING_DATA &&
-                task.getProcedureType() != ProcedureType.CONTROL) {
+        if (TPartPerformanceManager.ENABLE_COLLECTING_DATA) {
             featureRecorder.record(features);
             dependencyRecorder.record(features);
             criticalTransactionRecorder.record(task, estimation);
