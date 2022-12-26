@@ -22,13 +22,11 @@ public class TrainedBCQ extends TrainedAgent {
 	protected Predictor<NDList, NDList> target_predictor;
 	protected Predictor<NDList, NDList> imitation_predictor;
 	
-	private final static float EPSILON = OnlineAgent.EPSILON;
-	private final float DECAY_EXPLORE_RATE = 0.9f;
-	private float epsilon;
+	private final static float DECAY_EXPLORE_RATE = 0.9f;
+	
+	private float epsilon = OnlineAgent.EPSILON;
 
 	private HashMap<Integer, Integer> stateActionMap = new HashMap<Integer, Integer>();
-
-	
 	
 	public TrainedBCQ() {
 		manager = NDManager.newBaseManager();
@@ -40,7 +38,7 @@ public class TrainedBCQ extends TrainedAgent {
 		this.imitation_predictor = imitation_predictor;
 		stateActionMap = new HashMap<Integer, Integer>();
 		
-		epsilon = EPSILON * DECAY_EXPLORE_RATE;
+		epsilon *= DECAY_EXPLORE_RATE;
 	}
 
 	public final int react(float[] state) {
