@@ -24,16 +24,17 @@ import org.elasql.server.Elasql;
 import org.elasql.util.ElasqlProperties;
 import org.vanilladb.core.server.task.Task;
 
+import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
 
 public abstract class RlAgent implements CentralRoutingAgent {
 	private static Logger logger = Logger.getLogger(RlAgent.class.getName());
-	
+
 	private static final int MODEL_UPDATE_PERIDO; // in milliseconds
 	private static final int MEMORY_SIZE;
 	private static final int TRAINING_EPISODE;
-	
+
 	static {
 		MODEL_UPDATE_PERIDO = ElasqlProperties.getLoader().getPropertyAsInteger(
 				RlAgent.class.getName() + ".MODEL_UPDATE_PERIDO", 20_000);
@@ -42,16 +43,15 @@ public abstract class RlAgent implements CentralRoutingAgent {
 		TRAINING_EPISODE = ElasqlProperties.getLoader().getPropertyAsInteger(
 				RlAgent.class.getName() + ".TRAINING_EPISODE", 100);
 	}
-	
+
 	private static class Step {
 		long txNum;
 		float[] state;
 		int action;
 		float reward;
 		boolean mask;
-		
-		public Step(long txNum, float[] state, int action, float reward,
-			boolean mask) {
+
+		public Step(long txNum, float[] state, int action, float reward, boolean mask) {
 			this.txNum = txNum;
 			this.state = state;
 			this.action = action;
@@ -66,21 +66,21 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	protected int episode = 2_000;
 	protected Memory memory = new Memory(MEMORY_SIZE);
 	protected Trainer trainer = new Trainer();
-	
+
 	protected Map<Long, State> cachedStates = new ConcurrentHashMap<Long, State>();
 
 	private boolean isEval = false;
-	private Random  random = new Random();
-	
+	private Random random = new Random();
+
 	protected boolean prepared = false;
 	protected boolean firstTime = true;
-	
+
 	protected long startTime, previousTrain;
 	protected long startTrainTxNum = 30_000;
 	protected int trainingPeriod = 5_000;
 
 	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-	
+
 	private TransactionRoutingEnvironment env = new TransactionRoutingEnvironment();
 	private final BlockingQueue<Step> stepQueue = new LinkedBlockingQueue<Step>();
 
@@ -97,11 +97,12 @@ public abstract class RlAgent implements CentralRoutingAgent {
 					drainStepQueue();
 					long startTime = System.nanoTime();
 					updateAgent(episode);
-					System.out.println(String.format("Training time: %d microseconds", (System.nanoTime() - startTime) / 1000));
+					System.out.println(
+							String.format("Training time: %d microseconds", (System.nanoTime() - startTime) / 1000));
 					train = false;
 				} else {
 					try {
-						Thread.sleep(10_000);
+						Thread.sleep(MODEL_UPDATE_PERIDO / 10);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -118,8 +119,9 @@ public abstract class RlAgent implements CentralRoutingAgent {
 		loadLib();
 		startTime = System.currentTimeMillis();
 	}
-	
-	public abstract Route suggestRoute(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse);
+
+	public abstract Route suggestRoute(TGraph graph, TPartStoredProcedureTask task,
+			TpartMetricWarehouse metricWarehouse);
 
 	private void loadLib() {
 		NDManager.newBaseManager();
@@ -127,7 +129,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 
 	public void train() {
 		if (firstTime) {
-			
+
 			Elasql.taskMgr().runTask(new Task() {
 				@Override
 				public void run() {
@@ -141,12 +143,12 @@ public abstract class RlAgent implements CentralRoutingAgent {
 		}
 		trainer.train();
 	}
-	
+
 	private void drainStepQueue() {
 		Step step = null;
 		while ((step = stepQueue.poll()) != null) {
-			int bound = (int) (step.txNum / 5_000)+1;
-			if(random.nextInt(bound) == 0)
+			int bound = (int) (step.txNum / 5_000) + 1;
+			if (random.nextInt(bound) == 0)
 				memory.setStep(step.txNum, step.state, step.action, step.reward, step.mask);
 		}
 	}
@@ -159,10 +161,10 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	public void onTxCommitted(long txNum, int masterId, long latency) {
 		if (!isEval) {
 			State state = cachedStates.remove(txNum);
-			
+
 			if (state == null)
 				throw new RuntimeException("Cannot find cached state for tx." + txNum);
-			
+
 			float reward = env.calcReward(state, masterId, latency);
 
 			stepQueue.add(new Step(txNum, state.toFloatArray(), masterId, reward, false));
@@ -171,12 +173,12 @@ public abstract class RlAgent implements CentralRoutingAgent {
 
 	public float[] getCurrentState(TGraph graph, TPartStoredProcedureTask task, TpartMetricWarehouse metricWarehouse) {
 		State state = env.getCurrentState(graph, task, metricWarehouse);
-		
+
 		if (!isEval) {
 			// Cache the state for later training
 			cachedStates.put(task.getTxNum(), state);
 		}
-		
+
 		return state.toFloatArray();
 	}
 
@@ -194,16 +196,28 @@ public abstract class RlAgent implements CentralRoutingAgent {
 
 	protected abstract void prepareAgent();
 
-	protected void updateAgent(int episode) {
-		while (episode > 0) {
+	protected void updateAgent(int maxEpisode) {
+//		LocalDateTime datetime = LocalDateTime.now();
+//		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+//		String datetimeStr = datetime.format(formatter);
+
+//		try (BufferedWriter log = new BufferedWriter(new FileWriter("training-" + datetimeStr + ".txt"))) {
+		int ep = 0;
+		while (ep < maxEpisode) {
 			try (NDManager submanager = NDManager.newBaseManager().newSubManager()) {
-				agent.updateModel(submanager);
+				NDArray loss = agent.updateModel(submanager);
+//					log.append(String.format("Episode: %d, Loss: %s", ep, Arrays.toString(loss.toFloatArray())));
+//					log.newLine();
 			} catch (TranslateException e) {
 				e.printStackTrace();
 			}
-			episode--;
+			ep++;
 			// TODO : need a evaluate method?
 		}
+//		} catch (IOException e) {
+//			throw new RuntimeException(e);
+//		}
+
 		if (logger.isLoggable(Level.INFO))
 			logger.info(String.format("Training finished!!"));
 		lock.writeLock().lock();
@@ -217,21 +231,21 @@ public abstract class RlAgent implements CentralRoutingAgent {
 			prepared = true;
 		}
 	}
-	
+
 	protected boolean isTrainTxNum(long txNum) {
 		boolean startTrain = System.currentTimeMillis() - startTime > 90_000;
 		if (startTrain) {
-			if(previousTrain == 0) {
+			if (previousTrain == 0) {
 				previousTrain = System.currentTimeMillis();
 				return true;
 			} else {
-				if(System.currentTimeMillis() - previousTrain > MODEL_UPDATE_PERIDO) {
+				if (System.currentTimeMillis() - previousTrain > MODEL_UPDATE_PERIDO) {
 					previousTrain = System.currentTimeMillis();
 					return true;
 				} else {
 					return false;
-				}	
-			}			
+				}
+			}
 		} else {
 			return false;
 		}
