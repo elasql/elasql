@@ -2,6 +2,7 @@ package org.elasql.perf.tpart.mdp;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.DoubleSummaryStatistics;
 import java.util.List;
 import java.util.Queue;
@@ -50,6 +51,11 @@ public class TransactionRoutingEnvironment {
 		
 		int[] localReadCounts = calcLocalKeyCounts(task.getReadSet(), graph);
 		float[] machineLoads = calcMachineLoads();
+		
+		if (task.getTxNum() % 10000 == 0) {
+			System.out.println(String.format("Tx.%d checks states. Local reads: %s, machine loads: %s",
+					task.getTxNum(), Arrays.toString(localReadCounts), Arrays.toString(machineLoads)));
+		}
 
 		// Tx distribution
 //		long txCount = task.getTxNum() + 1;
@@ -108,25 +114,16 @@ public class TransactionRoutingEnvironment {
 	private int[] calcLocalKeyCounts(Set<PrimaryKey> keys, TGraph graph) {
 		PartitionMetaMgr partMgr = Elasql.partitionMetaMgr();
 		int[] counts = new int[NUM_PARTITIONS];
-		int fullyRepCount = 0;
 
 		// Count records
 		for (PrimaryKey key : keys) {
-			if (partMgr.isFullyReplicated(key)) {
-				fullyRepCount++;
-			} else {
+			if (!partMgr.isFullyReplicated(key)) {
 				int partId = graph.getResourcePosition(key).getPartId();
 				counts[partId]++;
 			}
 		}
 
-		// Add fully replicated records
-		int[] newCounts = new int[NUM_PARTITIONS];
-		for (int partId = 0; partId < newCounts.length; partId++) {
-			newCounts[partId] = counts[partId] + fullyRepCount;
-		}
-
-		return newCounts;
+		return counts;
 	}
 	
 	private void updateMachineLoads(long txNum, int routeDest) {
@@ -157,9 +154,13 @@ public class TransactionRoutingEnvironment {
 
 		return machineLoads;
 	}
+	
+	// Debug
 	private int count = 0;
 	private float readReward = 0.0f;
 	private float loadReward = 0.0f;
+	private float totalReward = 0.0f;
+	
 	private float calcRewardByState(State state, int routeDest) {
 //		double minLoad = Double.MAX_VALUE;
 //		double maxLoad = Double.MIN_VALUE;
@@ -185,25 +186,32 @@ public class TransactionRoutingEnvironment {
 		// Load balancing score
 		float loadBalScore = 1 - (float) state.getMachineLoad(routeDest);
 
-		count ++;
-		readReward += readRecordScore;
-		loadReward += loadBalScore;
-		if (count %10000==0) {
-			System.out.printf("%f, %f\n", readReward / 10000, loadReward / 10000);
-			readReward = 0;
-			loadReward = 0;
-		}
+		
 		// Record balancing score
 //		float recordBalScore = 1 - state[partId + ACTION_DIM + ACTION_DIM];
 
 //				float reward = readRecordScore * 0.5f + loadBalScore * 0.5f;
 		float reward = (float) ((1 - LOAD_RATIO) * readRecordScore + LOAD_RATIO * loadBalScore);
+		
+		// Debug
+		count++;
+		readReward += readRecordScore;
+		loadReward += loadBalScore;
+		totalReward += reward;
+		if (count % 10000 == 0) {
+			System.out.println(String.format("Read part: %f, load part: %f, merged: %f", 
+					readReward / 10000, loadReward / 10000, totalReward / 10000));
+			readReward = 0;
+			loadReward = 0;
+			totalReward = 0;
+		}
 
 		return reward;
 	}
 	
 	private float calcRewardByLatency(long latency) {
-		// avg is 100ms
-		return (float) 100.0f / (float) latency;
+		float latencyInMs = latency / 1000.0f;
+		// avg is 10ms
+		return (float) 10.0f / (float) latencyInMs;
 	}
 }
