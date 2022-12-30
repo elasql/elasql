@@ -22,7 +22,7 @@ public class TPartStoredProcedureTask
 	}
 
 	private TPartStoredProcedure<?> tsp;
-	private int clientId, connectionId, parId;
+	public int clientId, connectionId, parId;
 	private long txNum;
 	
 	// Timestamps

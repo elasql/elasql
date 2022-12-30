@@ -15,6 +15,7 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
+import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -46,6 +47,11 @@ public class DropPreprocessor extends SpCallPreprocessor {
                         featureExtractor.addDependency(task);
                         sendingList.add(spc);
                         batchedTasks.add(task);
+                    } else {
+                        if (task.clientId != -1) {
+                            // abort transaction
+                            Elasql.connectionMgr().sendClientResponse(task.clientId, task.connectionId, task.getTxNum(), new SpResultSet(false, null));
+                        }
                     }
                 } else {
                     sendingList.add(spc);
