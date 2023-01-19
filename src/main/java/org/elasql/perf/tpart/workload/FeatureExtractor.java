@@ -5,8 +5,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
+import org.elasql.perf.tpart.preprocessor.SpCallPreprocessor;
 import org.elasql.perf.tpart.workload.time.TimeRelatedFeatureMgr;
+import org.elasql.procedure.StoredProcedureTask;
 import org.elasql.procedure.tpart.TPartStoredProcedureTask;
+import org.elasql.remote.groupcomm.StoredProcedureCall;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.schedule.tpart.hermes.FusionTGraph;
 import org.elasql.server.Elasql;
@@ -47,8 +50,8 @@ public class FeatureExtractor {
 	 * @param graph the latest T-graph
 	 * @return the features of the stored procedure for cost estimation
 	 */
-	public TransactionFeatures extractFeatures(TPartStoredProcedureTask task, TGraph graph,
-			HashSet<PrimaryKey> keyHasBeenRead, int lastTxRoutingDest) {
+	public TransactionFeatures extractFeatures(StoredProcedureCall spc, TPartStoredProcedureTask task, TGraph graph,
+											   HashSet<PrimaryKey> keyHasBeenRead, int lastTxRoutingDest) {
 		// Check if transaction requests are given in the total order
 		if (task.getTxNum() <= lastProcessedTxNum)
 			throw new RuntimeException(String.format(
@@ -67,7 +70,17 @@ public class FeatureExtractor {
 		
 		// Get features (tx type related)
 //		builder.addFeature("Tx Type", task.getWeight());
-		
+
+		if (spc.getPid() == 3) {
+			builder.addFeature("New Order", 1);
+			builder.addFeature("Payment", 0);
+		} else if (spc.getPid() == 4) {
+			builder.addFeature("New Order", 0);
+			builder.addFeature("Payment", 1);
+		} else {
+			throw new RuntimeException("Unrecognized transaction");
+		}
+
 		builder.addFeature("Number of Read Records", task.getReadSet().size());
 		builder.addFeature("Number of Update Records", task.getUpdateSet().size());
 		builder.addFeature("Number of Insert Records", task.getInsertSet().size());

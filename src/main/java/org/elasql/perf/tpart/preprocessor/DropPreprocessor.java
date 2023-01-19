@@ -75,7 +75,7 @@ public class DropPreprocessor extends SpCallPreprocessor {
     }
 
     private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-        TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
+        TransactionFeatures features = featureExtractor.extractFeatures(spc, task, graph, keyHasBeenRead, lastTxRoutingDest);
 
         bookKeepKeys(task);
 

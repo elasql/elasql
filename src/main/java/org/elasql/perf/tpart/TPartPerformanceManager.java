@@ -12,6 +12,7 @@ import org.elasql.perf.tpart.metric.MetricCollector;
 import org.elasql.perf.tpart.metric.TPartSystemMetrics;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
 import org.elasql.perf.tpart.preprocessor.DropPreprocessor;
+import org.elasql.perf.tpart.preprocessor.HybridPreprocessor;
 import org.elasql.perf.tpart.preprocessor.SlaPreprocessor;
 import org.elasql.perf.tpart.preprocessor.SpCallPreprocessor;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -110,6 +111,8 @@ public class TPartPerformanceManager implements PerformanceManager {
 			return new SlaPreprocessor(factory, inserter, graph, isBatching, metricWarehouse, estimator);
 		case 2:
 			return new DropPreprocessor(factory, inserter, graph, isBatching, metricWarehouse, estimator);
+		case 3:
+			return new HybridPreprocessor(factory, inserter, graph, isBatching, metricWarehouse, estimator);
 		default:
 			throw new IllegalArgumentException("Preprocessor not supported");
 		}

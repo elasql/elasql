@@ -8,7 +8,6 @@ import org.elasql.perf.tpart.TPartPerformanceManager;
 import org.elasql.perf.tpart.ai.Estimator;
 import org.elasql.perf.tpart.ai.TransactionEstimation;
 import org.elasql.perf.tpart.metric.TpartMetricWarehouse;
-import org.elasql.perf.tpart.workload.CriticalTransactionRecorder;
 import org.elasql.perf.tpart.workload.TransactionFeatures;
 import org.elasql.procedure.tpart.TPartStoredProcedure.ProcedureType;
 import org.elasql.procedure.tpart.TPartStoredProcedureFactory;
@@ -19,31 +18,32 @@ import org.elasql.schedule.tpart.BatchNodeInserter;
 import org.elasql.schedule.tpart.TPartScheduler;
 import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
+import org.vanilladb.core.remote.storedprocedure.SpResultSet;
 
 /**
  * A preprocessor optimized for latency SLA
- * 
+ *
  * @author wilbertharriman
  *
  */
-public class SlaPreprocessor extends SpCallPreprocessor {
+public class HybridPreprocessor extends SpCallPreprocessor {
     private List<StoredProcedureCall> txQueue = new ArrayList<>();
     double lowerBound;
     double upperBound;
-    public SlaPreprocessor(TPartStoredProcedureFactory factory,
-            BatchNodeInserter inserter, TGraph graph,
-            boolean isBatching, TpartMetricWarehouse metricWarehouse,
-            Estimator performanceEstimator) {
+    public HybridPreprocessor(TPartStoredProcedureFactory factory,
+                           BatchNodeInserter inserter, TGraph graph,
+                           boolean isBatching, TpartMetricWarehouse metricWarehouse,
+                           Estimator performanceEstimator) {
         super(factory, inserter, graph, isBatching, metricWarehouse, performanceEstimator);
         lowerBound = TPartPerformanceManager.TRANSACTION_DEADLINE - TPartPerformanceManager.ESTIMATION_ERROR;
         upperBound = TPartPerformanceManager.TRANSACTION_DEADLINE + TPartPerformanceManager.ESTIMATION_ERROR;
     }
-    
+
     @Override
     public void run() {
         List <TPartStoredProcedureTask> batchedTasks = new ArrayList<>();
         List<Serializable> sendingList = new ArrayList<>();
-        
+
         Thread.currentThread().setName("sla-preprocessor");
 
         while (true) {
@@ -52,7 +52,7 @@ public class SlaPreprocessor extends SpCallPreprocessor {
 
                 // Get the read-/write-set by creating StoredProcedureTask
                 TPartStoredProcedureTask task = createSpTask(spc);
-                
+
                 if (task.getProcedureType() == ProcedureType.NORMAL) {
                     // Pre-process the transaction
                     preprocess(spc, task);
@@ -60,24 +60,40 @@ public class SlaPreprocessor extends SpCallPreprocessor {
                     double latencyEstimate = task.getEstimation().getAvgLatency();
 
                     if (latencyEstimate > lowerBound && latencyEstimate < upperBound) {
+                        // prioritize transaction near the deadline
                         sendingList.add(spc);
+                        batchedTasks.add(task);
+                    } else if (latencyEstimate >= upperBound) {
+                        // abort transaction
+                        if (task.clientId != -1)
+                            Elasql.connectionMgr().sendClientResponse(
+                                    task.clientId,
+                                    task.connectionId,
+                                    task.getTxNum(),
+                                    new SpResultSet(false, null));
                     } else {
                         txQueue.add(spc);
+                        batchedTasks.add(task);
                     }
-                    // Add to the schedule batch
-                    batchedTasks.add(task);
                 } else {
                     txQueue.add(spc);
                 }
 
                 if (sendingList.size() + txQueue.size() >= BatchSpcSender.COMM_BATCH_SIZE) {
                     // Send the SP call batch to total ordering
+//                    for (StoredProcedureCall spCall : txQueue) {
+//                        sendingList.add(spCall);
+//                        TPartStoredProcedureTask spTask = createSpTask(spCall);
+//                        if (task.getProcedureType() == ProcedureType.NORMAL) {
+//                            batchedTasks.add(spTask);
+//                        }
+//                    }
                     sendingList.addAll(txQueue);
                     Elasql.connectionMgr().sendTotalOrderRequest(sendingList);
                     sendingList = new ArrayList<>(); // clear sending list
                     txQueue = new ArrayList<>();
                 }
-                
+
                 // Process the batch as TPartScheduler does
                 if (isBatching && batchedTasks.size() >= TPartScheduler.SCHEDULE_BATCH_SIZE
                         || !isBatching) {

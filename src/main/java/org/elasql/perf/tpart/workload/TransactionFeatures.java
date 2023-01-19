@@ -26,7 +26,8 @@ public class TransactionFeatures {
 		featureKeys.add("Start Time");
 		
 		// - Transaction Type Related
-//		featureKeys.add("Tx Type");
+		featureKeys.add("New Order");
+		featureKeys.add("Payment");
 		
 		// Transaction Dependency
 		featureKeys.add("Dependency - Max Depth");

@@ -31,6 +31,7 @@ public class TPartStoredProcedureTask
 	private TransactionEstimation estimation;
 	private TransactionProfiler profiler;
 
+
 	public TPartStoredProcedureTask(int cid, int connId, long txNum, long sequencerStartTime,
 			TransactionProfiler profiler, TPartStoredProcedure<?> sp, TransactionEstimation estimation) {
 		super(cid, connId, txNum, sp);

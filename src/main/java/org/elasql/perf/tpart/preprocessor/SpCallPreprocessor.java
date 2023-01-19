@@ -26,6 +26,7 @@ import org.elasql.schedule.tpart.graph.TGraph;
 import org.elasql.server.Elasql;
 import org.elasql.sql.PrimaryKey;
 import org.vanilladb.core.server.task.Task;
+import org.vanilladb.core.util.TransactionProfiler;
 
 /**
  * A collector that collects the features of transactions.
@@ -153,7 +154,7 @@ public class SpCallPreprocessor extends Task {
 	}
 	
 	private void preprocess(StoredProcedureCall spc, TPartStoredProcedureTask task) {
-		TransactionFeatures features = featureExtractor.extractFeatures(task, graph, keyHasBeenRead, lastTxRoutingDest);
+		TransactionFeatures features = featureExtractor.extractFeatures(spc, task, graph, keyHasBeenRead, lastTxRoutingDest);
 		featureExtractor.addDependency(task);
 
 		bookKeepKeys(task);
