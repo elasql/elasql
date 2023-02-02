@@ -40,7 +40,7 @@ public class OnlineAgent extends RlAgent {
 
 		Route action = null;
 		
-		if (isTrainTxNum(task.getTxNum())) {
+		if (needToTrainNow(task.getTxNum())) {
 			train();
 		} 
 		if (prepared) {

@@ -75,7 +75,7 @@ public abstract class RlAgent implements CentralRoutingAgent {
 	protected boolean prepared = false;
 	protected boolean firstTime = true;
 
-	protected long startTime, previousTrain;
+	protected long startTime, lastTrainTime;
 	protected long startTrainTxNum = 30_000;
 	protected int trainingPeriod = 5_000;
 
@@ -232,15 +232,15 @@ public abstract class RlAgent implements CentralRoutingAgent {
 		}
 	}
 
-	protected boolean isTrainTxNum(long txNum) {
-		boolean startTrain = System.currentTimeMillis() - startTime > 90_000;
-		if (startTrain) {
-			if (previousTrain == 0) {
-				previousTrain = System.currentTimeMillis();
+	protected boolean needToTrainNow(long currentTxNum) {
+		boolean isWarmUpCompleted = System.currentTimeMillis() - startTime > 90_000;
+		if (isWarmUpCompleted) {
+			if (lastTrainTime == 0) {
+				lastTrainTime = System.currentTimeMillis();
 				return true;
 			} else {
-				if (System.currentTimeMillis() - previousTrain > MODEL_UPDATE_PERIDO) {
-					previousTrain = System.currentTimeMillis();
+				if (System.currentTimeMillis() - lastTrainTime > MODEL_UPDATE_PERIDO) {
+					lastTrainTime = System.currentTimeMillis();
 					return true;
 				} else {
 					return false;
