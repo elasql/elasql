@@ -10,12 +10,15 @@ public class TpartTransactionReport implements TransactionReport {
 	private boolean isDistributed;
 	private int remoteReadCount;
 	private long latency;
+	private double load;
 	
-	public TpartTransactionReport(int masterId, boolean isDistributed, int remoteReadCount, long latency) {
+	public TpartTransactionReport(int masterId, boolean isDistributed, int remoteReadCount, long latency,
+			double load) {
 		this.masterId = masterId;
 		this.isDistributed = isDistributed;
 		this.remoteReadCount = remoteReadCount;
 		this.latency = latency;
+		this.load = load;
 	}
 	
 	public int getMasterId() {
@@ -33,5 +36,8 @@ public class TpartTransactionReport implements TransactionReport {
 	public long getLatency() {
 		return latency;
 	}
-
+	
+	public double getLoad() {
+		return load;
+	}
 }

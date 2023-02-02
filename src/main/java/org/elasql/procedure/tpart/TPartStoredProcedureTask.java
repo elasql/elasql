@@ -79,7 +79,8 @@ public class TPartStoredProcedureTask
 			// Notify the sequencer that this transaction commits
 			int remoteReadCount = tsp.getSunkPlan().getRemoteReadCount();
 			long txLatency = profiler.getExecutionTime();
-			TpartTransactionReport report = new TpartTransactionReport(Elasql.serverId(), tsp.isTxDistributed(), remoteReadCount, txLatency);
+			TpartTransactionReport report = new TpartTransactionReport(Elasql.serverId(),
+					tsp.isTxDistributed(), remoteReadCount, txLatency, getWeight());
 			Elasql.connectionMgr().sendCommitNotification(txNum, report);
 
 			// TODO: Uncomment this when the migration module is migrated

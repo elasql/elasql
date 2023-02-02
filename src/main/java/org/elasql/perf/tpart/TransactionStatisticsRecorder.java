@@ -3,6 +3,7 @@ package org.elasql.perf.tpart;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -28,17 +29,19 @@ public class TransactionStatisticsRecorder extends Task {
 		private double latencyAvg;
 		private double latencyStd;
 		private double distTxRate;
-		private double avgRemoteReads;
+		private double remoteReadAvg;
+		private double remoteReadStd;
 		private double imbalanceScore;
 
 		public StatisticsRow(int time, int txCount, double latencyAvg, double latencyStd, double distTxRate,
-				double avgRemoteReads, double imbalanceScore) {
+				double remoteReadAvg, double remoteReadStd, double imbalanceScore) {
 			this.time = time;
 			this.txCount = txCount;
 			this.latencyAvg = latencyAvg;
 			this.latencyStd = latencyStd;
 			this.distTxRate = distTxRate;
-			this.avgRemoteReads = avgRemoteReads;
+			this.remoteReadAvg = remoteReadAvg;
+			this.remoteReadStd = remoteReadStd;
 			this.imbalanceScore = imbalanceScore;
 		}
 		
@@ -56,8 +59,10 @@ public class TransactionStatisticsRecorder extends Task {
 			case 4:
 				return Double.toString(distTxRate);
 			case 5:
-				return Double.toString(avgRemoteReads);
+				return Double.toString(remoteReadAvg);
 			case 6:
+				return Double.toString(remoteReadStd);
+			case 7:
 				return Double.toString(imbalanceScore);
 			default:
 				throw new IllegalArgumentException("No column with index " + index);
@@ -68,9 +73,20 @@ public class TransactionStatisticsRecorder extends Task {
 	private BlockingQueue<TpartTransactionReport> queue = new LinkedBlockingQueue<TpartTransactionReport>();
 	
 	// Statistics
-	private int distTxCount, remoteReadCount;
+	private int distTxCount;
 	private List<Long> latencies = new ArrayList<Long>();
-	private int[] loads = new int[PartitionMetaMgr.NUM_PARTITIONS];
+	private List<Long> remoteReads = new ArrayList<Long>();
+	private double[] loads = new double[PartitionMetaMgr.NUM_PARTITIONS];
+	
+	private String fileName;
+	
+	public TransactionStatisticsRecorder() {
+		this.fileName = "transaction-statistics";
+	}
+	
+	public TransactionStatisticsRecorder(String fileNamePostfix) {
+		this.fileName = "transaction-statistics-" + fileNamePostfix;
+	}
 	
 	public void onTansactionCommit(long txNum, TpartTransactionReport report) {
 		queue.add(report);
@@ -78,7 +94,7 @@ public class TransactionStatisticsRecorder extends Task {
 	
 	@Override
 	public void run() {
-		Thread.currentThread().setName("Transaction Features Recorder");
+		Thread.currentThread().setName("Transaction Statistics Recorder");
 		List<String> header = initHeader();
 		int columnCount = header.size();
 
@@ -93,7 +109,7 @@ public class TransactionStatisticsRecorder extends Task {
 				logger.info("Transaction statistics recorder starts");
 
 			// Create a CSV file
-			CsvSaver<StatisticsRow> csvSaver = new CsvSaver<StatisticsRow>("transaction-statistics", false);
+			CsvSaver<StatisticsRow> csvSaver = new CsvSaver<StatisticsRow>(fileName, false);
 
 			try (BufferedWriter writer = csvSaver.createOutputFile()) {
 				csvSaver.writeHeader(writer, header);
@@ -147,50 +163,53 @@ public class TransactionStatisticsRecorder extends Task {
 		header.add("Latency STD (microseconds)");
 		header.add("Distributed Txn. Rate");
 		header.add("Average Number of Remote Reads");
+		header.add("STD of Number of Remote Reads");
 		header.add("Imbalanced Score");
 		return header;
 	}
 	
 	private void processReport(TpartTransactionReport report) {
 		latencies.add(report.getLatency());
+		remoteReads.add((long) report.getRemoteReadCount());
 		if (report.isDistributed())
 			distTxCount++;
-		remoteReadCount += report.getRemoteReadCount();
-		loads[report.getMasterId()]++;
+		loads[report.getMasterId()] += report.getLoad();
 	}
 	
 	private StatisticsRow calculateStatistics(long timeInSec) {
 		// Calculate the statistics
 		int txCount = latencies.size();
 		double distTxRate = ((double) distTxCount) / txCount;
-		double latencyAvg = calculateLatencyAvg();
-		double latencyStd = calculateLatencyStd(latencyAvg);
-		double avgRemoteReads = ((double) remoteReadCount) / txCount;
+		double latencyAvg = calculateAvg(latencies);
+		double latencyStd = calculateStd(latencies, latencyAvg);
+		double remoteReadAvg = calculateAvg(remoteReads);
+		double remoteReadStd = calculateStd(remoteReads, remoteReadAvg);
 		double imbalanceScore = calculateImbalanceScore();
 		
 		// Reset the values
 		latencies.clear();
+		remoteReads.clear();
 		distTxCount = 0;
-		remoteReadCount = 0;
+		Arrays.fill(loads, 0.0);
 		
 		return new StatisticsRow((int) timeInSec, txCount, latencyAvg, latencyStd,
-				distTxRate, avgRemoteReads, imbalanceScore);
+				distTxRate, remoteReadAvg, remoteReadStd, imbalanceScore);
 	}
 	
-	private double calculateLatencyAvg() {
+	private double calculateAvg(List<Long> data) {
 		double avg = 0.0;
-		double txCount = latencies.size();
-		for (Long latency : latencies) {
-			avg += latency.doubleValue() / txCount;
+		double txCount = data.size();
+		for (Long num : data) {
+			avg += num.doubleValue() / txCount;
 		}
 		return avg;
 	}
 	
-	private double calculateLatencyStd(double latencyAvg) {
+	private double calculateStd(List<Long> data, double avg) {
 		double var = 0.0;
-		double txCount = latencies.size();
-		for (Long latency : latencies) {
-			var += Math.pow(latency.doubleValue() - latencyAvg, 2) / txCount;
+		double txCount = data.size();
+		for (Long num : data) {
+			var += Math.pow(num.doubleValue() - avg, 2) / txCount;
 		}
 		return Math.sqrt(var);
 	}
